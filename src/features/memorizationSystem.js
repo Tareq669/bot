@@ -266,23 +266,23 @@ class MemorizationSystem {
       return '📖 لم تضف أي آيات للحفظ بعد\n\nابدأ رحلة الحفظ الآن! 🌟';
     }
 
-    let message = `📖 <b>قائمة الحفظ</b>\n\n`;
+    let message = '📖 <b>قائمة الحفظ</b>\n\n';
 
     verses.forEach((verse, index) => {
-      const statusEmoji = verse.status === 'mastered' ? '✅' : 
-                         verse.status === 'review' ? '🔄' : '📝';
+      const statusEmoji = verse.status === 'mastered' ? '✅' :
+        verse.status === 'review' ? '🔄' : '📝';
       const masteryBar = this.getMasteryBar(verse.masteryLevel);
 
       message += `${index + 1}. ${statusEmoji} <b>${verse.surahName}</b>\n`;
       message += `   └ الآيات: ${verse.fromAyah}-${verse.toAyah}\n`;
       message += `   └ ${masteryBar} ${verse.masteryLevel}%\n`;
-      
+
       if (verse.lastReview) {
         const daysSince = Math.floor((new Date() - verse.lastReview) / (1000 * 60 * 60 * 24));
         message += `   └ آخر مراجعة: منذ ${daysSince} يوم\n`;
       }
-      
-      message += `\n`;
+
+      message += '\n';
     });
 
     return message;
@@ -294,14 +294,14 @@ class MemorizationSystem {
   static formatStats(stats) {
     if (!stats) return '❌ لا توجد إحصائيات';
 
-    let message = `📊 <b>إحصائيات الحفظ</b>\n\n`;
-    
+    let message = '📊 <b>إحصائيات الحفظ</b>\n\n';
+
     message += `📖 إجمالي الآيات: ${stats.totalVerses}\n\n`;
-    
+
     message += `📝 قيد الحفظ: ${stats.memorizing}\n`;
     message += `🔄 قيد المراجعة: ${stats.reviewing}\n`;
     message += `✅ متقن: ${stats.mastered}\n\n`;
-    
+
     message += `⏰ مراجعات مستحقة: ${stats.dueReviews}\n`;
     message += `📈 متوسط الإتقان: ${stats.averageMastery}%\n`;
     message += `🔥 سلسلة المراجعة: ${stats.streak} يوم\n\n`;
@@ -312,7 +312,7 @@ class MemorizationSystem {
     if (stats.dueReviews > 0) {
       message += `⚠️ لديك ${stats.dueReviews} مراجعة مستحقة اليوم!`;
     } else {
-      message += `✨ أحسنت! لا توجد مراجعات مستحقة اليوم.`;
+      message += '✨ أحسنت! لا توجد مراجعات مستحقة اليوم.';
     }
 
     return message;

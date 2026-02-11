@@ -21,9 +21,9 @@ class RewardsSystem {
 
       // Check if user has enough coins
       if (user.coins < box.cost) {
-        return { 
-          success: false, 
-          message: `❌ تحتاج إلى ${box.cost} عملة لفتح ${box.name}` 
+        return {
+          success: false,
+          message: `❌ تحتاج إلى ${box.cost} عملة لفتح ${box.name}`
         };
       }
 
@@ -36,7 +36,7 @@ class RewardsSystem {
       // Apply rewards
       if (rewards.coins) user.coins += rewards.coins;
       if (rewards.xp) user.xp += rewards.xp;
-      
+
       await user.save();
 
       return {
@@ -55,7 +55,7 @@ class RewardsSystem {
    */
   static generateLootBoxRewards(boxType) {
     const rarityRoll = Math.random();
-    let rewards = { coins: 0, xp: 0, items: [] };
+    const rewards = { coins: 0, xp: 0, items: [] };
 
     switch (boxType) {
       case 'basic':
@@ -101,23 +101,23 @@ class RewardsSystem {
       if (!user) return { success: false, message: 'مستخدم غير موجود' };
 
       const spinCost = 50;
-      
+
       // Check if user has enough coins
       if (user.coins < spinCost) {
-        return { 
-          success: false, 
-          message: `❌ تحتاج إلى ${spinCost} عملة لتدوير العجلة` 
+        return {
+          success: false,
+          message: `❌ تحتاج إلى ${spinCost} عملة لتدوير العجلة`
         };
       }
 
       // Check if user already spun today
       const lastSpin = user.rewards?.lastSpin;
       const today = new Date().setHours(0, 0, 0, 0);
-      
+
       if (lastSpin && new Date(lastSpin).setHours(0, 0, 0, 0) === today) {
-        return { 
-          success: false, 
-          message: '❌ لقد قمت بتدوير العجلة اليوم. عد غداً!' 
+        return {
+          success: false,
+          message: '❌ لقد قمت بتدوير العجلة اليوم. عد غداً!'
         };
       }
 
@@ -153,7 +153,7 @@ class RewardsSystem {
    */
   static generateWheelReward() {
     const roll = Math.random();
-    let reward = { type: '', coins: 0, xp: 0, message: '' };
+    const reward = { type: '', coins: 0, xp: 0, message: '' };
 
     if (roll < 0.05) { // 5% - Jackpot
       reward.type = 'jackpot';
@@ -209,18 +209,18 @@ class RewardsSystem {
 
       // Check if already claimed today
       if (lastClaim && new Date(lastClaim).setHours(0, 0, 0, 0) === today) {
-        return { 
-          success: false, 
-          message: '❌ لقد استلمت المكافأة اليومية. عد غداً!' 
+        return {
+          success: false,
+          message: '❌ لقد استلمت المكافأة اليومية. عد غداً!'
         };
       }
 
       // Check streak
       const yesterday = new Date(today - 24 * 60 * 60 * 1000);
       const lastClaimDay = lastClaim ? new Date(lastClaim).setHours(0, 0, 0, 0) : 0;
-      
+
       let streak = user.rewards?.dailyStreak || 0;
-      
+
       if (lastClaimDay === yesterday.getTime()) {
         streak++; // Continue streak
       } else {
@@ -231,7 +231,7 @@ class RewardsSystem {
       const baseCoins = 100;
       const baseXP = 50;
       const streakBonus = Math.min(streak * 10, 200); // Max 200% bonus at day 20
-      
+
       const coins = baseCoins + (baseCoins * streakBonus / 100);
       const xp = baseXP + (baseXP * streakBonus / 100);
 
@@ -264,12 +264,12 @@ class RewardsSystem {
    */
   static formatLootBoxReward(box, rewards) {
     let message = `${box.emoji} <b>فتح ${box.name}</b>\n\n`;
-    message += `🎉 <b>المكافآت:</b>\n`;
+    message += '🎉 <b>المكافآت:</b>\n';
     message += `💰 ${rewards.coins} عملة\n`;
     message += `⭐ ${rewards.xp} XP\n`;
-    
+
     if (rewards.items && rewards.items.length > 0) {
-      message += `\n🎁 <b>مكافآت خاصة:</b>\n`;
+      message += '\n🎁 <b>مكافآت خاصة:</b>\n';
       rewards.items.forEach(item => message += `• ${item}\n`);
     }
 
@@ -280,13 +280,13 @@ class RewardsSystem {
    * Format wheel reward message
    */
   static formatWheelReward(reward) {
-    let message = `🎰 <b>عجلة الحظ</b>\n\n`;
+    let message = '🎰 <b>عجلة الحظ</b>\n\n';
     message += `${reward.emoji} <b>${reward.message}</b>\n\n`;
-    
+
     if (reward.coins > 0) {
       message += `💰 +${reward.coins} عملة\n`;
     }
-    
+
     if (reward.xp > 0) {
       message += `⭐ +${reward.xp} XP\n`;
     }
@@ -298,16 +298,16 @@ class RewardsSystem {
    * Format daily reward message
    */
   static formatDailyReward(coins, xp, streak) {
-    let message = `🎁 <b>المكافأة اليومية</b>\n\n`;
-    message += `✅ تم استلام المكافأة بنجاح!\n\n`;
+    let message = '🎁 <b>المكافأة اليومية</b>\n\n';
+    message += '✅ تم استلام المكافأة بنجاح!\n\n';
     message += `💰 +${coins} عملة\n`;
     message += `⭐ +${xp} XP\n\n`;
     message += `🔥 <b>سلسلة الحضور:</b> ${streak} يوم\n`;
-    
+
     if (streak >= 7) {
       message += `\n🏆 رائع! ${streak} يوم متتالي!`;
     }
-    
+
     return message;
   }
 
@@ -315,20 +315,20 @@ class RewardsSystem {
    * Get available rewards info
    */
   static getRewardsInfo() {
-    return `🎁 <b>نظام المكافآت</b>\n\n` +
-           `📦 <b>الصناديق:</b>\n` +
-           `• صندوق بسيط: 100 عملة\n` +
-           `• صندوق فضي: 250 عملة\n` +
-           `• صندوق ذهبي: 500 عملة\n` +
-           `• صندوق أسطوري: 1000 عملة\n\n` +
-           `🎰 <b>عجلة الحظ:</b>\n` +
-           `• التكلفة: 50 عملة\n` +
-           `• مرة واحدة يومياً\n` +
-           `• جوائز حتى 1000 عملة!\n\n` +
-           `🎫 <b>المكافأة اليومية:</b>\n` +
-           `• مجانية!\n` +
-           `• مكافآت متزايدة مع السلسلة\n` +
-           `• حتى 300% مكافأة إضافية!`;
+    return '🎁 <b>نظام المكافآت</b>\n\n' +
+           '📦 <b>الصناديق:</b>\n' +
+           '• صندوق بسيط: 100 عملة\n' +
+           '• صندوق فضي: 250 عملة\n' +
+           '• صندوق ذهبي: 500 عملة\n' +
+           '• صندوق أسطوري: 1000 عملة\n\n' +
+           '🎰 <b>عجلة الحظ:</b>\n' +
+           '• التكلفة: 50 عملة\n' +
+           '• مرة واحدة يومياً\n' +
+           '• جوائز حتى 1000 عملة!\n\n' +
+           '🎫 <b>المكافأة اليومية:</b>\n' +
+           '• مجانية!\n' +
+           '• مكافآت متزايدة مع السلسلة\n' +
+           '• حتى 300% مكافأة إضافية!';
   }
 }
 

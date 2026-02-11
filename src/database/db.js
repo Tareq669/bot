@@ -12,7 +12,7 @@ class Database {
         serverSelectionTimeoutMS: 5000,
         socketTimeoutMS: 45000,
         retryWrites: true,
-        connectTimeoutMS: 10000,
+        connectTimeoutMS: 10000
       });
 
       logger.info('✅ تم الاتصال بقاعدة البيانات بنجاح');

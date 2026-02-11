@@ -135,19 +135,19 @@ ${Formatter.formatGameResult('أنت', result, prize)}
     try {
       const { User } = require('../database/models');
       const user = await User.findOne({ userId: ctx.from.id });
-      
+
       const isSuccess = Math.random() > 0.5;
       const reward = isSuccess ? Math.floor(Math.random() * 91) + 10 : 0; // 10-100
-      
+
       if (isSuccess && user) {
         user.coins += reward;
         user.xp += 5;
         await user.save();
       }
 
-      const message = isSuccess 
+      const message = isSuccess
         ? `🍀 <b>حظ سعيد!</b> 🎉\n\n✨ لقد فزت بـ <b>${reward}</b> عملة!\n💰 رصيدك الآن: ${user.coins}`
-        : `🍀 <b>لعبة الحظ</b>\n\n😔 لم يحالفك الحظ هذه المرة\nحاول مرة أخرى!`;
+        : '🍀 <b>لعبة الحظ</b>\n\n😔 لم يحالفك الحظ هذه المرة\nحاول مرة أخرى!';
 
       const buttons = Markup.inlineKeyboard([
         [Markup.button.callback('🔄 حاول مرة أخرى', 'game:luck')],

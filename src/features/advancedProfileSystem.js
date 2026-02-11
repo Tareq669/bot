@@ -178,17 +178,17 @@ class AdvancedProfileSystem {
         firstName: user.firstName,
         profilePic: user.profilePic,
         bio: user.bio,
-        
+
         level,
         xp: user.xp,
         nextLevelXP,
         levelProgress: (currentLevelXP / 1000) * 100,
-        
+
         coins: user.coins,
         totalEarned: user.totalEarnings || 0,
-        
+
         badges: user.badgeDetails || [],
-        
+
         stats: {
           totalKhatma: user.khatmaProgress?.completionCount || 0,
           totalGamesPlayed: user.gamesPlayed?.total || 0,
@@ -199,10 +199,10 @@ class AdvancedProfileSystem {
           goals: user.goals?.filter(g => g.status === 'active').length || 0,
           memorization: user.memorization?.stats?.totalVerses || 0
         },
-        
+
         joinDate: user.joinDate,
         lastActive: user.lastActive,
-        
+
         referrals: user.referral?.referrals?.length || 0,
         goals: user.goals?.filter(g => g.status === 'active').length || 0,
         memorization: user.memorization?.stats?.totalVerses || 0
@@ -298,11 +298,11 @@ class AdvancedProfileSystem {
     if (!profileData) return '❌ لم يتم العثور على الملف الشخصي';
 
     let message = `👤 <b>${profileData.firstName}</b>\n`;
-    
+
     if (profileData.bio) {
       message += `<i>"${profileData.bio}"</i>\n\n`;
     } else {
-      message += `\n`;
+      message += '\n';
     }
 
     // Level and XP
@@ -312,12 +312,12 @@ class AdvancedProfileSystem {
     message += `XP: ${profileData.xp} / ${profileData.nextLevelXP}\n\n`;
 
     // Economy
-    message += `💰 <b>الاقتصاد:</b>\n`;
+    message += '💰 <b>الاقتصاد:</b>\n';
     message += `• الرصيد: ${profileData.coins.toLocaleString()} عملة\n`;
     message += `• المجموع المكسوب: ${profileData.totalEarned.toLocaleString()}\n\n`;
 
     // Statistics
-    message += `📈 <b>الإحصائيات:</b>\n`;
+    message += '📈 <b>الإحصائيات:</b>\n';
     message += `• الختمات: ${profileData.stats.totalKhatma}\n`;
     message += `• الألعاب: ${profileData.stats.totalGamesPlayed} (فوز: ${profileData.stats.totalGamesWon})\n`;
     message += `• معدل الفوز: ${profileData.stats.winRate}%\n`;
@@ -337,7 +337,7 @@ class AdvancedProfileSystem {
         message += `• ${badge.icon} ${badge.name}\n`;
       });
     } else {
-      message += `🎖️ <b>لم تحصل على شارات بعد</b>\n`;
+      message += '🎖️ <b>لم تحصل على شارات بعد</b>\n';
     }
 
     return message;

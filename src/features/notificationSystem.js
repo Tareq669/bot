@@ -22,7 +22,7 @@ class NotificationSystem {
         parse_mode: 'HTML',
         ...options
       });
-      
+
       // تسجيل الإشعار في قاعدة البيانات
       await User.findByIdAndUpdate(userId, {
         $push: {
@@ -47,27 +47,27 @@ class NotificationSystem {
     // الساعة 7 صباحاً كل يوم
     node_cron.schedule('0 7 * * *', async () => {
       const users = await User.find({ 'notifications.adhkarReminder': true });
-      
-      const message = `📿 <b>حان وقت الأذكار الصباحية</b>\n\nكل صباح جميل معك! 🌅\n\n/adhkar`;
-      
+
+      const message = '📿 <b>حان وقت الأذكار الصباحية</b>\n\nكل صباح جميل معك! 🌅\n\n/adhkar';
+
       for (const user of users) {
         await this.sendNotification(user._id, message);
       }
-      
-      logger.info(`📬 تم إرسال تذكيرات الأذكار الصباحية`);
+
+      logger.info('📬 تم إرسال تذكيرات الأذكار الصباحية');
     });
 
     // الساعة 7 مساءً كل يوم
     node_cron.schedule('0 19 * * *', async () => {
       const users = await User.find({ 'notifications.adhkarReminder': true });
-      
-      const message = `📿 <b>حان وقت أذكار المساء</b>\n\nمساء الخير! 🌙\n\n/adhkar`;
-      
+
+      const message = '📿 <b>حان وقت أذكار المساء</b>\n\nمساء الخير! 🌙\n\n/adhkar';
+
       for (const user of users) {
         await this.sendNotification(user._id, message);
       }
-      
-      logger.info(`📬 تم إرسال تذكيرات الأذكار المسائية`);
+
+      logger.info('📬 تم إرسال تذكيرات الأذكار المسائية');
     });
   }
 
@@ -78,9 +78,9 @@ class NotificationSystem {
     // سيتم حسابها حسب موقع المستخدم (اختياري متقدم)
     node_cron.schedule('0 */4 * * *', async () => {
       const users = await User.find({ 'notifications.prayerReminder': true });
-      
-      const message = `🕌 <b>تذكير الصلاة</b>\n\nحافظ على الصلاة في أوقاتها\n\n/adhkar`;
-      
+
+      const message = '🕌 <b>تذكير الصلاة</b>\n\nحافظ على الصلاة في أوقاتها\n\n/adhkar';
+
       for (const user of users) {
         await this.sendNotification(user._id, message);
       }
@@ -92,13 +92,13 @@ class NotificationSystem {
    */
   async scheduleEventNotifications(eventId, eventDate, eventName) {
     const timeUntilEvent = new Date(eventDate) - new Date();
-    
+
     if (timeUntilEvent > 0) {
       setTimeout(async () => {
         const users = await User.find({ 'notifications.eventReminder': true });
-        
+
         const message = `🎉 <b>${eventName}</b>\n\nبدأت الآن! انضم إلينا\n\n/events`;
-        
+
         for (const user of users) {
           await this.sendNotification(user._id, message);
         }
@@ -118,10 +118,10 @@ class NotificationSystem {
         '🎯 ركز على أهدافك، ستحققها قريباً',
         '📈 تقدمك اليوم سيكون نجاحك غداً'
       ];
-      
+
       const users = await User.find({ 'notifications.motivational': true });
       const randomMsg = messages[Math.floor(Math.random() * messages.length)];
-      
+
       for (const user of users) {
         await this.sendNotification(user._id, randomMsg);
       }
@@ -159,7 +159,7 @@ class NotificationSystem {
     }
 
     let text = '📬 <b>الإشعارات</b>\n\n';
-    
+
     notifications.forEach((notif, index) => {
       const time = new Date(notif.timestamp).toLocaleDateString('ar');
       const status = notif.read ? '✅' : '🆕';

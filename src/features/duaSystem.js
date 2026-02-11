@@ -168,7 +168,7 @@ class DuaSystem {
 
     Object.entries(collections).forEach(([category, collection]) => {
       collection.duas.forEach(dua => {
-        if (dua.arabic.includes(keyword) || 
+        if (dua.arabic.includes(keyword) ||
             collection.name.includes(keyword) ||
             dua.meaning?.includes(keyword)) {
           results.push({
@@ -308,7 +308,7 @@ class DuaSystem {
       }
 
       message += `📚 <b>المصدر:</b> ${dua.source}\n`;
-      
+
       if (dua.repeat && dua.repeat > 1) {
         message += `🔄 <b>التكرار:</b> ${dua.repeat} مرات`;
       }

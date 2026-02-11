@@ -16,16 +16,16 @@ class CommandHandler {
 
       // Check if owner
       const isOwner = UIManager.isOwner(ctx.from.id);
-      
+
       // Simple welcome message with keyboard
       let message = `👋 مرحباً ${dbUser.firstName || 'صديقي'}!\n\n🎯 اختر من لوحة المفاتيح:`;
-      
+
       if (isOwner) {
         message = `👑 أهلاً بك يا مالك البوت ${dbUser.firstName}!\n\n⚡ لديك صلاحيات كاملة على النظام\n🎯 اختر من لوحة المفاتيح الخاصة:`;
       }
-      
+
       const keyboard = UIManager.mainReplyKeyboard(ctx.from.id);
-      
+
       await ctx.reply(message, keyboard);
     } catch (error) {
       console.error('Error in handleStart:', error);
@@ -90,25 +90,25 @@ class CommandHandler {
   }
 
   // ===== OWNER ONLY COMMANDS =====
-  
+
   static async handleOwnerPanel(ctx) {
     try {
       if (!UIManager.isOwner(ctx.from.id)) {
         return ctx.reply('❌ هذا الأمر متاح للمالك فقط');
       }
 
-      const message = `👑 <b>لوحة تحكم المالك</b>\n\n` +
-        `⚡ مرحباً في لوحة التحكم الكاملة\n` +
-        `🎯 اختر العملية التي تريد القيام بها:\n\n` +
-        `📊 إحصائيات البوت\n` +
-        `👥 إدارة المستخدمين\n` +
-        `💰 إدارة الاقتصاد\n` +
-        `🗄️ إدارة قاعدة البيانات\n` +
-        `📢 بث الرسائل\n` +
-        `⚙️ صيانة النظام`;
+      const message = '👑 <b>لوحة تحكم المالك</b>\n\n' +
+        '⚡ مرحباً في لوحة التحكم الكاملة\n' +
+        '🎯 اختر العملية التي تريد القيام بها:\n\n' +
+        '📊 إحصائيات البوت\n' +
+        '👥 إدارة المستخدمين\n' +
+        '💰 إدارة الاقتصاد\n' +
+        '🗄️ إدارة قاعدة البيانات\n' +
+        '📢 بث الرسائل\n' +
+        '⚙️ صيانة النظام';
 
       const keyboard = UIManager.ownerControlPanel();
-      
+
       try {
         await ctx.editMessageText(message, {
           parse_mode: 'HTML',
@@ -133,15 +133,15 @@ class CommandHandler {
       }
 
       const totalUsers = await User.countDocuments();
-      const activeUsers = await User.countDocuments({ 
+      const activeUsers = await User.countDocuments({
         lastActiveDay: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
       });
       const bannedUsers = await User.countDocuments({ banned: true });
-      
+
       const totalCoins = await User.aggregate([
         { $group: { _id: null, total: { $sum: '$coins' } } }
       ]);
-      
+
       const totalXP = await User.aggregate([
         { $group: { _id: null, total: { $sum: '$xp' } } }
       ]);
@@ -154,18 +154,18 @@ class CommandHandler {
       const dbName = mongoose.connection.db.databaseName;
       const dbSize = await mongoose.connection.db.stats();
 
-      const message = `📊 <b>إحصائيات البوت الشاملة</b>\n\n` +
-        `👥 <b>المستخدمون:</b>\n` +
+      const message = '📊 <b>إحصائيات البوت الشاملة</b>\n\n' +
+        '👥 <b>المستخدمون:</b>\n' +
         `   • الكل: ${totalUsers}\n` +
         `   • نشطون (7 أيام): ${activeUsers}\n` +
         `   • محظورون: ${bannedUsers}\n\n` +
-        `💰 <b>الاقتصاد:</b>\n` +
+        '💰 <b>الاقتصاد:</b>\n' +
         `   • مجموع العملات: ${totalCoins[0]?.total || 0}\n` +
         `   • مجموع النقاط: ${totalXP[0]?.total || 0}\n` +
         `   • المعاملات: ${totalTransactions}\n\n` +
-        `🎮 <b>الألعاب:</b>\n` +
+        '🎮 <b>الألعاب:</b>\n' +
         `   • إحصائيات محفوظة: ${totalGames}\n\n` +
-        `🗄️ <b>قاعدة البيانات:</b>\n` +
+        '🗄️ <b>قاعدة البيانات:</b>\n' +
         `   • الاسم: ${dbName}\n` +
         `   • الحجم: ${(dbSize.dataSize / 1024 / 1024).toFixed(2)} MB\n` +
         `   • المستندات: ${dbSize.objects}\n\n` +
@@ -199,17 +199,17 @@ class CommandHandler {
         return ctx.answerCbQuery('❌ غير مصرح');
       }
 
-      const message = `👥 <b>إدارة المستخدمين</b>\n\n` +
-        `اختر العملية:\n\n` +
-        `👁️ عرض جميع المستخدمين\n` +
-        `🔍 البحث عن مستخدم\n` +
-        `🚫 حظر/إلغاء حظر\n` +
-        `💎 إعطاء عملات أو XP\n` +
-        `🔄 إعادة تعيين بيانات\n` +
-        `🗑️ حذف مستخدمين`;
+      const message = '👥 <b>إدارة المستخدمين</b>\n\n' +
+        'اختر العملية:\n\n' +
+        '👁️ عرض جميع المستخدمين\n' +
+        '🔍 البحث عن مستخدم\n' +
+        '🚫 حظر/إلغاء حظر\n' +
+        '💎 إعطاء عملات أو XP\n' +
+        '🔄 إعادة تعيين بيانات\n' +
+        '🗑️ حذف مستخدمين';
 
       const keyboard = UIManager.ownerUsersManagement();
-      
+
       try {
         await ctx.editMessageText(message, {
           parse_mode: 'HTML',
@@ -235,13 +235,13 @@ class CommandHandler {
 
       ctx.session = ctx.session || {};
       ctx.session.ownerAwait = { type: 'broadcast' };
-      
+
       await ctx.answerCbQuery('✅ جاهز');
       await ctx.reply(
-        `📢 <b>بث رسالة لجميع المستخدمين</b>\n\n` +
-        `اكتب الرسالة التي تريد إرسالها:\n\n` +
-        `💡 يمكنك استخدام HTML للتنسيق\n` +
-        `❌ اكتب /cancel للإلغاء`,
+        '📢 <b>بث رسالة لجميع المستخدمين</b>\n\n' +
+        'اكتب الرسالة التي تريد إرسالها:\n\n' +
+        '💡 يمكنك استخدام HTML للتنسيق\n' +
+        '❌ اكتب /cancel للإلغاء',
         { parse_mode: 'HTML' }
       );
     } catch (error) {
@@ -258,20 +258,20 @@ class CommandHandler {
 
       const richest = await User.find().sort({ coins: -1 }).limit(5);
       const poorest = await User.find().sort({ coins: 1 }).limit(5);
-      
-      let message = `💰 <b>إدارة الاقتصاد</b>\n\n`;
-      message += `<b>أغنى 5 مستخدمين:</b>\n`;
+
+      let message = '💰 <b>إدارة الاقتصاد</b>\n\n';
+      message += '<b>أغنى 5 مستخدمين:</b>\n';
       richest.forEach((u, i) => {
         message += `${i + 1}. ${u.firstName} - 💰${u.coins}\n`;
       });
-      
-      message += `\n<b>أفقر 5 مستخدمين:</b>\n`;
+
+      message += '\n<b>أفقر 5 مستخدمين:</b>\n';
       poorest.forEach((u, i) => {
         message += `${i + 1}. ${u.firstName} - 💰${u.coins}\n`;
       });
 
       const keyboard = UIManager.ownerEconomyManagement();
-      
+
       try {
         await ctx.editMessageText(message, {
           parse_mode: 'HTML',
@@ -297,17 +297,17 @@ class CommandHandler {
 
       const mongoose = require('mongoose');
       const collections = await mongoose.connection.db.listCollections().toArray();
-      
-      let message = `🗄️ <b>إدارة قاعدة البيانات</b>\n\n`;
-      message += `<b>المجموعات (Collections):</b>\n`;
-      
+
+      let message = '🗄️ <b>إدارة قاعدة البيانات</b>\n\n';
+      message += '<b>المجموعات (Collections):</b>\n';
+
       for (const col of collections) {
         const count = await mongoose.connection.db.collection(col.name).countDocuments();
         message += `• ${col.name}: ${count} مستند\n`;
       }
 
       const keyboard = UIManager.ownerDatabaseManagement();
-      
+
       try {
         await ctx.editMessageText(message, {
           parse_mode: 'HTML',
@@ -334,7 +334,7 @@ class CommandHandler {
       const healthMonitor = require('../utils/healthMonitor');
       const stats = healthMonitor.stats;
 
-      const message = `📝 <b>سجلات النظام</b>\n\n` +
+      const message = '📝 <b>سجلات النظام</b>\n\n' +
         `⏰ وقت التشغيل: ${Math.floor(stats.uptime / 60)} دقيقة\n` +
         `✅ الطلبات الناجحة: ${stats.successfulRequests}\n` +
         `❌ الأخطاء: ${stats.errors}\n` +
@@ -371,8 +371,8 @@ class CommandHandler {
       }
 
       const users = await User.find().sort({ createdAt: -1 }).limit(20);
-      
-      let message = `👥 <b>آخر 20 مستخدماً</b>\n\n`;
+
+      let message = '👥 <b>آخر 20 مستخدماً</b>\n\n';
       users.forEach((u, i) => {
         const status = u.banned ? '🚫' : '✅';
         message += `${i + 1}. ${status} ${u.firstName} (@${u.username || 'لا يوجد'})\n`;
@@ -409,13 +409,13 @@ class CommandHandler {
 
       ctx.session = ctx.session || {};
       ctx.session.ownerAwait = { type: 'givecoins' };
-      
+
       await ctx.answerCbQuery('✅ جاهز');
       await ctx.reply(
-        `💎 <b>إعطاء عملات لمستخدم</b>\n\n` +
-        `أرسل ID المستخدم، ثم المبلغ\n` +
-        `مثال: 123456789 1000\n\n` +
-        `❌ اكتب /cancel للإلغاء`,
+        '💎 <b>إعطاء عملات لمستخدم</b>\n\n' +
+        'أرسل ID المستخدم، ثم المبلغ\n' +
+        'مثال: 123456789 1000\n\n' +
+        '❌ اكتب /cancel للإلغاء',
         { parse_mode: 'HTML' }
       );
     } catch (error) {
@@ -430,7 +430,7 @@ class CommandHandler {
     try {
       const AdvancedProfileSystem = require('../features/advancedProfileSystem');
       const profileData = await AdvancedProfileSystem.getProfileData(ctx.from.id);
-      
+
       if (!profileData) {
         await ctx.reply('❌ لم يتم العثور على الملف الشخصي');
         return;
@@ -455,8 +455,8 @@ class CommandHandler {
       const goals = user.goals || [];
       const activeGoals = goals.filter(g => g.status === 'active');
 
-      let message = `🎯 <b>أهدافك</b>\n\n`;
-      
+      let message = '🎯 <b>أهدافك</b>\n\n';
+
       if (activeGoals.length === 0) {
         message += '📋 لا توجد أهداف نشطة حالياً\n\n';
       } else {
@@ -483,7 +483,7 @@ class CommandHandler {
     try {
       const CharityTracker = require('../features/charityTracker');
       const data = await CharityTracker.getCharityHistory(ctx.from.id);
-      
+
       const message = CharityTracker.formatCharityHistory(data);
       const keyboard = UIManager.charityTypesKeyboard();
 
@@ -498,7 +498,7 @@ class CommandHandler {
     try {
       const MemorizationSystem = require('../features/memorizationSystem');
       const user = await User.findOne({ userId: ctx.from.id });
-      
+
       if (!user || !user.memorization) {
         await ctx.reply('📖 لم تضف أي آيات للحفظ بعد');
         return;
@@ -520,7 +520,7 @@ class CommandHandler {
     try {
       const DuaSystem = require('../features/duaSystem');
       const randomDua = DuaSystem.getRandomDua();
-      
+
       const message = DuaSystem.formatDua(randomDua);
 
       const keyboard = UIManager.duaCollectionsKeyboard();
@@ -535,17 +535,17 @@ class CommandHandler {
   static async handleReferral(ctx) {
     try {
       const ReferralSystem = require('../features/referralSystem');
-      
+
       // Check if user has a code
       let stats = await ReferralSystem.getReferralStats(ctx.from.id);
-      
+
       if (!stats.code) {
         const codeResult = await ReferralSystem.generateReferralCode(ctx.from.id);
         stats = await ReferralSystem.getReferralStats(ctx.from.id);
       }
 
       const message = ReferralSystem.formatReferralStats(stats);
-      
+
       const keyboard = Markup.inlineKeyboard([
         [Markup.button.callback('📊 اللوحة', 'referral_leaderboard')],
         [Markup.button.callback('ℹ️ معلومات', 'referral_info')],
@@ -583,8 +583,8 @@ class CommandHandler {
         return;
       }
 
-      let message = `🏆 <b>الأحداث النشطة</b>\n\n`;
-      
+      let message = '🏆 <b>الأحداث النشطة</b>\n\n';
+
       events.forEach((event, index) => {
         message += `${index + 1}. ${event.title}\n`;
         message += `   └ ${event.stats.totalParticipants} مشترك\n\n`;
@@ -606,14 +606,14 @@ class CommandHandler {
     try {
       const AdvancedStatsSystem = require('../features/advancedStatsSystem');
       const report = await AdvancedStatsSystem.generateStatsReport(ctx.from.id);
-      
+
       if (!report) {
         await ctx.reply('❌ لم يتم العثور على الإحصائيات');
         return;
       }
 
       const message = AdvancedStatsSystem.formatStatsReport(report);
-      
+
       const keyboard = Markup.inlineKeyboard([
         [Markup.button.callback('⬅️ رجوع', 'menu')]
       ]);
@@ -628,9 +628,9 @@ class CommandHandler {
   static async handleLibrary(ctx) {
     try {
       const IslamicLibrary = require('../features/islamicLibrary');
-      
-      let message = `📚 <b>المكتبة الإسلامية</b>\n\n`;
-      message += `اختر من الفئات:`;
+
+      let message = '📚 <b>المكتبة الإسلامية</b>\n\n';
+      message += 'اختر من الفئات:';
 
       const keyboard = UIManager.islamicContentKeyboard();
 

@@ -52,7 +52,7 @@ class SmartGreetings {
       if (!user) return;
 
       const motivation = await AIManager.getPersonalizedRecommendation(userId);
-      
+
       // This would be called by a scheduler or trigger
       return motivation;
     } catch (error) {

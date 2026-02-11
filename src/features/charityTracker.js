@@ -28,7 +28,7 @@ class CharityTracker {
       // Award points for charity tracking
       const xpReward = 20;
       const coinsReward = 10;
-      
+
       user.xp += xpReward;
       user.coins += coinsReward;
 
@@ -153,7 +153,7 @@ class CharityTracker {
 
       const leaderboard = users.map(user => {
         let charities = user.charity.filter(c => !c.isPrivate);
-        
+
         if (period !== 'all') {
           charities = charities.filter(c => c.date >= dateFilter);
         }
@@ -166,9 +166,9 @@ class CharityTracker {
           totalAmount: charities.reduce((sum, c) => sum + (c.amount || 0), 0)
         };
       })
-      .filter(u => u.charityCount > 0)
-      .sort((a, b) => b.charityCount - a.charityCount)
-      .slice(0, limit);
+        .filter(u => u.charityCount > 0)
+        .sort((a, b) => b.charityCount - a.charityCount)
+        .slice(0, limit);
 
       return leaderboard;
     } catch (error) {
@@ -185,45 +185,45 @@ class CharityTracker {
       return '📊 لم تسجل أي صدقات بعد\n\nابدأ بتسجيل صدقاتك لتتبع أعمالك الخيرية! ❤️';
     }
 
-    let message = `💝 <b>سجل الصدقات</b>\n\n`;
+    let message = '💝 <b>سجل الصدقات</b>\n\n';
 
     // Statistics
-    message += `📊 <b>الإحصائيات:</b>\n`;
+    message += '📊 <b>الإحصائيات:</b>\n';
     message += `• المجموع: ${data.stats.total} صدقة\n`;
-    
+
     if (data.stats.totalAmount > 0) {
       message += `• القيمة المالية: ${data.stats.totalAmount.toLocaleString()} 💰\n`;
     }
-    
+
     message += `• هذا الشهر: ${data.stats.thisMonth}\n`;
     message += `• هذا الأسبوع: ${data.stats.thisWeek}\n\n`;
 
     // By type
     if (Object.keys(data.stats.byType).length > 0) {
-      message += `📋 <b>حسب النوع:</b>\n`;
+      message += '📋 <b>حسب النوع:</b>\n';
       Object.entries(data.stats.byType).forEach(([type, data]) => {
         const emoji = this.getCharityEmoji(type);
         message += `${emoji} ${type}: ${data.count}`;
         if (data.amount > 0) message += ` (${data.amount.toLocaleString()} ريال)`;
-        message += `\n`;
+        message += '\n';
       });
-      message += `\n`;
+      message += '\n';
     }
 
     // Recent charities (last 5)
-    message += `📝 <b>آخر الصدقات:</b>\n`;
+    message += '📝 <b>آخر الصدقات:</b>\n';
     const recentCharities = data.charities.slice(0, 5);
-    
+
     recentCharities.forEach((charity, index) => {
       const emoji = this.getCharityEmoji(charity.type);
       const date = new Date(charity.date).toLocaleDateString('ar-SA');
-      
+
       message += `\n${index + 1}. ${emoji} <b>${charity.type}</b> - ${date}\n`;
-      
+
       if (charity.description) {
         message += `   └ ${charity.description}\n`;
       }
-      
+
       if (charity.amount) {
         message += `   └ القيمة: ${charity.amount.toLocaleString()} ريال\n`;
       }
@@ -241,24 +241,24 @@ class CharityTracker {
     }
 
     const periodText = period === 'month' ? 'هذا الشهر' : period === 'week' ? 'هذا الأسبوع' : 'على الإطلاق';
-    
-    let message = `💝 <b>لوحة المتصدرين - الصدقات</b>\n`;
+
+    let message = '💝 <b>لوحة المتصدرين - الصدقات</b>\n';
     message += `📅 ${periodText}\n\n`;
 
     leaderboard.forEach((user, index) => {
       const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
-      
+
       message += `${medal} ${user.firstName}\n`;
       message += `   └ ${user.charityCount} صدقة`;
-      
+
       if (user.totalAmount > 0) {
         message += ` | ${user.totalAmount.toLocaleString()} ريال`;
       }
-      
-      message += `\n\n`;
+
+      message += '\n\n';
     });
 
-    message += `\n💡 <i>"من تصدق بعدل تمرة من كسب طيب، ولا يقبل الله إلا الطيب"</i>`;
+    message += '\n💡 <i>"من تصدق بعدل تمرة من كسب طيب، ولا يقبل الله إلا الطيب"</i>';
 
     return message;
   }

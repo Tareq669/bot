@@ -25,54 +25,54 @@ class AdvancedStatsSystem {
         level: user.level || Math.floor(user.xp / 1000),
         xp: user.xp,
         coins: user.coins,
-        
+
         // Progress Stats
         totalKhatma: user.khatmaProgress?.completionCount || 0,
         totalGames: user.gamesPlayed?.total || 0,
         totalWins: user.gamesPlayed?.wins || 0,
         winRate: user.gamesPlayed?.total ? (user.gamesPlayed.wins / user.gamesPlayed.total * 100).toFixed(1) : 0,
-        
+
         // Time-based Stats
         loginStreak: user.streak?.current || user.dailyReward?.streak || 0,
         daysActive: user.khatmaProgress?.daysActive || 0,
         lastActive: user.lastActive,
-        
+
         // Content Stats
         charities: (user.charity || []).length,
         goals: (user.goals || []).length,
         activeGoals: (user.goals || []).filter(g => g.status === 'active').length,
         memorizedVerses: user.memorization?.stats?.totalVerses || 0,
         masteredVerses: (user.memorization?.verses || []).filter(v => v.status === 'mastered').length,
-        
+
         // Social Stats
         referrals: (user.referral?.referrals || []).length,
         referralTier: user.referral?.tier || 1,
         referralRewards: user.referral?.totalRewards || 0,
-        
+
         // Badges
         badges: (user.badgeDetails || user.badges || []).length,
-        
+
         // Achievements
         firstAchievement: user.achievements?.first,
         achievements: (user.achievements || []).length,
-        
+
         // Period-specific
         thisMonth: {
           gamesPlayed: this.countByPeriod(user, 'games', monthStart),
           charities: this.countByPeriod(user, 'charity', monthStart),
           xpEarned: this.restoreMonthlyXP(user, currentMonth, currentYear) || 0
         },
-        
+
         thisWeek: {
           gamesPlayed: this.countByPeriod(user, 'games', weekAgo),
           charities: this.countByPeriod(user, 'charity', weekAgo)
         },
-        
+
         today: {
           logins: this.countLogins(user, todayStart),
           gamesPlayed: this.countByPeriod(user, 'games', todayStart)
         },
-        
+
         joinDate: user.joinDate,
         accountAge: this.calculateAccountAge(user.joinDate)
       };
@@ -87,7 +87,7 @@ class AdvancedStatsSystem {
    */
   static countByPeriod(user, type, startDate) {
     let items = [];
-    
+
     switch (type) {
       case 'games':
         // Historical tracking needed in DB
@@ -106,11 +106,11 @@ class AdvancedStatsSystem {
   static calculateAccountAge(joinDate) {
     const now = new Date();
     const diff = now - joinDate;
-    
+
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
     const months = Math.floor(days / 30);
     const years = Math.floor(months / 12);
-    
+
     if (years > 0) return `${years} سنة و${months % 12} شهر`;
     if (months > 0) return `${months} شهر و${days % 30} يوم`;
     return `${days} يوم`;
@@ -121,8 +121,8 @@ class AdvancedStatsSystem {
    */
   static countLogins(user, startDate) {
     if (!user.loginHistory) return 0;
-    
-    return user.loginHistory.filter(login => 
+
+    return user.loginHistory.filter(login =>
       login >= startDate
     ).length;
   }
@@ -132,7 +132,7 @@ class AdvancedStatsSystem {
    */
   static restoreMonthlyXP(user, month, year) {
     if (!user.monthlyStats) return 0;
-    
+
     const key = `${year}-${String(month + 1).padStart(2, '0')}`;
     return user.monthlyStats[key]?.xpEarned || 0;
   }
@@ -152,21 +152,21 @@ class AdvancedStatsSystem {
           coins: stats.coins,
           badges: stats.badges
         },
-        
+
         performance: {
           totalGames: stats.totalGames,
           totalWins: stats.totalWins,
           winRate: `${stats.winRate}%`,
           averagePerGame: stats.totalGames > 0 ? (stats.totalWins / stats.totalGames).toFixed(2) : 0
         },
-        
+
         engagement: {
           daysActive: stats.daysActive,
           loginStreak: stats.loginStreak,
           accountAge: stats.accountAge,
           lastActive: new Date(stats.lastActive).toLocaleDateString('ar-SA')
         },
-        
+
         islamic: {
           khatmaCompleted: stats.totalKhatma,
           charities: stats.charities,
@@ -174,13 +174,13 @@ class AdvancedStatsSystem {
           masteredVerses: stats.masteredVerses,
           activeGoals: stats.activeGoals
         },
-        
+
         social: {
           referrals: stats.referrals,
           referralTier: stats.referralTier,
           referralRewards: stats.referralRewards
         },
-        
+
         comparison: {
           topCategory: this.getTopCategory(stats),
           strengths: this.getStrengths(stats),
@@ -290,29 +290,29 @@ class AdvancedStatsSystem {
   static formatStatsReport(report) {
     if (!report) return '❌ لم يتم العثور على الإحصائيات';
 
-    let message = `📊 <b>تقرير الإحصائيات</b>\n\n`;
+    let message = '📊 <b>تقرير الإحصائيات</b>\n\n';
 
     // Summary
-    message += `📈 <b>الملخص:</b>\n`;
+    message += '📈 <b>الملخص:</b>\n';
     message += `• المستوى: ${report.summary.level}\n`;
     message += `• XP: ${report.summary.xp.toLocaleString()}\n`;
     message += `• العملات: ${report.summary.coins.toLocaleString()}\n`;
     message += `• الشارات: ${report.summary.badges}\n\n`;
 
     // Performance
-    message += `🎮 <b>الأداء:</b>\n`;
+    message += '🎮 <b>الأداء:</b>\n';
     message += `• إجمالي الألعاب: ${report.performance.totalGames}\n`;
     message += `• الفوز: ${report.performance.totalWins}\n`;
     message += `• معدل الفوز: ${report.performance.winRate}\n\n`;
 
     // Engagement
-    message += `🔥 <b>الحضور:</b>\n`;
+    message += '🔥 <b>الحضور:</b>\n';
     message += `• أيام نشطة: ${report.engagement.daysActive}\n`;
     message += `• سلسلة الحضور: ${report.engagement.loginStreak} يوم\n`;
     message += `• عمر الحساب: ${report.engagement.accountAge}\n\n`;
 
     // Islamic
-    message += `🕌 <b>العبادات:</b>\n`;
+    message += '🕌 <b>العبادات:</b>\n';
     message += `• الختمات: ${report.islamic.khatmaCompleted}\n`;
     message += `• الصدقات: ${report.islamic.charities}\n`;
     message += `• الحفظ: ${report.islamic.memorizedVerses} آية\n`;
@@ -320,14 +320,14 @@ class AdvancedStatsSystem {
 
     // Strengths
     if (report.comparison.strengths.length > 0) {
-      message += `⭐ <b>نقاط قوتك:</b>\n`;
+      message += '⭐ <b>نقاط قوتك:</b>\n';
       report.comparison.strengths.forEach(s => message += `• ${s}\n`);
-      message += `\n`;
+      message += '\n';
     }
 
     // Recommendations
     if (report.comparison.recommendations.length > 0) {
-      message += `💡 <b>التوصيات:</b>\n`;
+      message += '💡 <b>التوصيات:</b>\n';
       report.comparison.recommendations.forEach(r => message += `• ${r}\n`);
     }
 
@@ -340,19 +340,19 @@ class AdvancedStatsSystem {
   static formatComparisonReport(comparison) {
     if (!comparison) return '❌ لم يتم العثور على البيانات';
 
-    let message = `⚔️ <b>مقارنة الإحصائيات</b>\n\n`;
+    let message = '⚔️ <b>مقارنة الإحصائيات</b>\n\n';
 
     const diff = comparison.differences;
 
-    message += `📊 <b>المستوى:</b>\n`;
+    message += '📊 <b>المستوى:</b>\n';
     const levelWinner = diff.levelDiff > 0 ? '1️⃣' : diff.levelDiff < 0 ? '2️⃣' : '🤝';
     message += `${levelWinner} الفرق: ${Math.abs(diff.levelDiff)} مستوى\n\n`;
 
-    message += `💰 <b>العملات:</b>\n`;
+    message += '💰 <b>العملات:</b>\n';
     const coinsWinner = diff.coinsDiff > 0 ? '1️⃣' : diff.coinsDiff < 0 ? '2️⃣' : '🤝';
     message += `${coinsWinner} الفرق: ${Math.abs(diff.coinsDiff).toLocaleString()}\n\n`;
 
-    message += `🎮 <b>معدل الفوز:</b>\n`;
+    message += '🎮 <b>معدل الفوز:</b>\n';
     const winRateWinner = diff.winRateDiff > 0 ? '1️⃣' : diff.winRateDiff < 0 ? '2️⃣' : '🤝';
     message += `${winRateWinner} الفرق: ${Math.abs(diff.winRateDiff).toFixed(1)}%\n\n`;
 

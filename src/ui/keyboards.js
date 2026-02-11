@@ -27,7 +27,7 @@ class UIManager {
     if (userId && this.isOwner(userId)) {
       return this.ownerReplyKeyboard();
     }
-    
+
     return Markup.keyboard([
       ['🕌 الختمة', '📿 الأذكار'],
       ['📖 القرآن', '💭 الاقتباسات'],
@@ -169,7 +169,7 @@ class UIManager {
   static userSettingsKeyboard() {
     return Markup.inlineKeyboard([
       [
-        Markup.button.callback('🕌 إعدادات الختمة', 'khatma:settings'),
+        Markup.button.callback('🕌 إعدادات الختمة', 'khatma:settings')
       ],
       [
         Markup.button.callback('🔔 الإشعارات', 'settings:notifications'),
@@ -185,17 +185,17 @@ class UIManager {
   // Pagination Keyboard
   static paginationKeyboard(page, totalPages, baseCallback) {
     const buttons = [];
-    
+
     if (page > 1) {
       buttons.push(Markup.button.callback('⬅️ السابق', `${baseCallback}:${page - 1}`));
     }
-    
+
     buttons.push(Markup.button.callback(`${page}/${totalPages}`, 'noop'));
-    
+
     if (page < totalPages) {
       buttons.push(Markup.button.callback('التالي ➡️', `${baseCallback}:${page + 1}`));
     }
-    
+
     return Markup.inlineKeyboard([buttons]);
   }
 
@@ -380,8 +380,8 @@ class UIManager {
   static charityTypesKeyboard() {
     const CharityTracker = require('../features/charityTracker');
     const types = CharityTracker.getCharityTypes();
-    
-    const buttons = types.map(t => 
+
+    const buttons = types.map(t =>
       Markup.button.callback(`${t.emoji} ${t.type}`, `charity:add:${t.type}`)
     );
 

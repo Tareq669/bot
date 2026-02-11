@@ -25,7 +25,7 @@ class IslamicLibrary {
     };
 
     const tafsir = tafsirs[tafsirSource]?.[surahNumber]?.[ayahNumber];
-    
+
     if (tafsir) {
       return {
         surah: surahNumber,
@@ -90,8 +90,8 @@ class IslamicLibrary {
       }
     ];
 
-    const filtered = category === 'all' 
-      ? ahadith 
+    const filtered = category === 'all'
+      ? ahadith
       : ahadith.filter(h => h.category === category);
 
     return filtered[Math.floor(Math.random() * filtered.length)];
@@ -297,7 +297,7 @@ class IslamicLibrary {
         break;
 
       case 'hadith':
-        message = `📿 <b>حديث شريف</b>\n\n`;
+        message = '📿 <b>حديث شريف</b>\n\n';
         message += `<b>المتن:</b>\n${data.text}\n\n`;
         message += `<b>الراوي:</b> ${data.narrator}\n`;
         message += `<b>المصدر:</b> ${data.source}\n`;
@@ -308,9 +308,9 @@ class IslamicLibrary {
       case 'story':
         message = `📚 <b>${data.title}</b>\n\n`;
         message += `<b>الملخص:</b>\n${data.summary}\n\n`;
-        message += `<b>الأحداث الرئيسية:</b>\n`;
+        message += '<b>الأحداث الرئيسية:</b>\n';
         data.mainEvents.forEach(event => message += `${event}\n`);
-        message += `\n<b>الدروس المستفادة:</b>\n`;
+        message += '\n<b>الدروس المستفادة:</b>\n';
         data.lessons.forEach(lesson => message += `• ${lesson}\n`);
         message += `\n<b>الآيات:</b> ${data.verses}`;
         break;
@@ -320,9 +320,9 @@ class IslamicLibrary {
         message += `<i>${data.title}</i>\n\n`;
         message += `<b>الاسم الكامل:</b> ${data.fullName}\n\n`;
         message += `<b>نبذة:</b> ${data.description}\n\n`;
-        message += `<b>الفضائل:</b>\n`;
+        message += '<b>الفضائل:</b>\n';
         data.virtues.forEach(v => message += `${v}\n`);
-        message += `\n<b>قصص مشهورة:</b>\n`;
+        message += '\n<b>قصص مشهورة:</b>\n';
         data.famousStories.forEach(s => message += `• ${s}\n`);
         message += `\n<b>الوفاة:</b> ${data.death}`;
         break;
@@ -330,21 +330,21 @@ class IslamicLibrary {
       case 'fiqh':
         message = `⚖️ <b>${data.title}</b>\n\n`;
         message += `<b>التعريف:</b> ${data.definition}\n\n`;
-        
+
         if (data.pillars) {
-          message += `<b>الأركان:</b>\n`;
+          message += '<b>الأركان:</b>\n';
           data.pillars.forEach(p => message += `${p}\n`);
-          message += `\n`;
+          message += '\n';
         }
-        
+
         if (data.conditions) {
-          message += `<b>الشروط:</b>\n`;
+          message += '<b>الشروط:</b>\n';
           data.conditions.forEach(c => message += `• ${c}\n`);
-          message += `\n`;
+          message += '\n';
         }
-        
+
         if (data.types) {
-          message += `<b>الأنواع:</b>\n`;
+          message += '<b>الأنواع:</b>\n';
           data.types.forEach(t => message += `${t}\n`);
         }
         break;

@@ -13,7 +13,7 @@ class BotHealthMonitor {
       databaseStatus: false,
       botStatus: false,
       reconnectAttempts: 0,
-      errorCount: 0,
+      errorCount: 0
     };
     this.checkInterval = null;
   }
@@ -60,7 +60,7 @@ class BotHealthMonitor {
         database: dbHealth ? '✅ متصل' : '❌ معطل',
         memory: `${heapUsedMB}/${heapTotalMB} MB`,
         errors: this.stats.errorCount,
-        reconnectAttempts: this.stats.reconnectAttempts,
+        reconnectAttempts: this.stats.reconnectAttempts
       };
 
       if (!dbHealth) {
@@ -72,7 +72,7 @@ class BotHealthMonitor {
       logger.error('خطأ في فحص الصحة:', error.message);
       return {
         status: '❌ خطأ',
-        error: error.message,
+        error: error.message
       };
     }
   }

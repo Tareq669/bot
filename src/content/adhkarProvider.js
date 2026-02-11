@@ -357,7 +357,7 @@ class AdhkarProvider {
   // الحصول على ذكر حسب الموقت الزمني
   static async getTimedAdhkar() {
     const hour = new Date().getHours();
-    
+
     if (hour >= 5 && hour < 12) {
       return await this.getMorningAdhkar();
     } else if (hour >= 19 && hour < 23) {
@@ -418,7 +418,7 @@ class AdhkarProvider {
   // اقتراح الأذكار حسب الحالة النفسية
   static async getAdhkarByMood(mood) {
     const adhkar = await this.getAdhkarVerses();
-    
+
     const moodMap = {
       حزن: adhkar.filter(a => a.id === 6 || a.id === 14 || a.id === 18),
       خوف: adhkar.filter(a => a.id === 3 || a.id === 14 || a.id === 10),
@@ -426,7 +426,7 @@ class AdhkarProvider {
       ذنب: adhkar.filter(a => a.id === 2 || a.id === 15 || a.id === 22),
       شكر: adhkar.filter(a => a.id === 1 || a.id === 4 || a.id === 23)
     };
-    
+
     return moodMap[mood] || await this.getMorningAdhkar();
   }
 }

@@ -155,12 +155,12 @@ class ContentHandler {
       const QuranProvider = require('../content/quranProvider');
       const stats = await QuranProvider.getQuranStats();
 
-      const message = `📊 **احصائيات القرآن الكريم**\n\n` +
+      const message = '📊 **احصائيات القرآن الكريم**\n\n' +
         `📕 **السور:** ${stats.totalSurahs}\n` +
         `📄 **الآيات:** ${stats.totalAyahs}\n` +
         `📝 **الكلمات:** ${stats.totalWords}\n` +
         `🔤 **الحروف:** ${stats.totalLetters}\n\n` +
-        `⏱️ **أوقات القراءة:**\n` +
+        '⏱️ **أوقات القراءة:**\n' +
         `• اليومي: ${stats.dailyReading}\n` +
         `• الأسبوعي: ${stats.weeklyGoal}\n` +
         `• السنوي: ${stats.yearlyGoal}\n` +
@@ -283,7 +283,7 @@ class ContentHandler {
       const AdhkarProvider = require('../content/adhkarProvider');
       const stats = await AdhkarProvider.getAdhkarStats();
 
-      const message = `📊 **إحصائيات الأذكار**\n\n` +
+      const message = '📊 **إحصائيات الأذكار**\n\n' +
         `📿 **إجمالي الأذكار:** ${stats.totalAdhkar}\n` +
         `🌅 **أذكار الصباح:** ${stats.morningAdhkar}\n` +
         `🌙 **أذكار المساء:** ${stats.eveningAdhkar}\n` +

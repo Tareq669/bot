@@ -157,7 +157,7 @@ class ShopSystem {
   static async getUserPurchases(userId) {
     try {
       const user = await User.findById(userId);
-      
+
       if (!user.badgeDetails || user.badgeDetails.length === 0) {
         return '📦 لم تشترِ أي عناصر حتى الآن';
       }
@@ -189,7 +189,7 @@ class ShopSystem {
   static async calculatePointsWithBoost(userId, basePoints) {
     try {
       const user = await User.findById(userId);
-      
+
       // تنظيف الـ Boosts المنتهية
       if (user.activeBoosts) {
         user.activeBoosts = user.activeBoosts.filter(b => new Date(b.endDate) > new Date());
@@ -213,12 +213,12 @@ class ShopSystem {
    */
   static getTopSellingItems() {
     let text = '📈 <b>أفضل العناصر مبيعاً</b>\n\n';
-    
+
     const items = Object.entries(this.SHOP_ITEMS)
       .slice(0, 5)
       .map(([key, item]) => `⭐ ${item.name} - ${item.price} نقطة`);
 
-    text += items.join('\n') + '\n\n';
+    text += `${items.join('\n')  }\n\n`;
     text += 'استخدم: <code>/shop</code> لعرض جميع العناصر';
 
     return text;

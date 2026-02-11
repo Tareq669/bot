@@ -105,7 +105,7 @@ class IntegratedAI {
     message += `📈 <b>المشاركة:</b> ${dashboard.behavior?.engagement}%\n\n`;
 
     // Quick stats
-    message += `<b>📋 ملخص سريع:</b>\n`;
+    message += '<b>📋 ملخص سريع:</b>\n';
     message += `💰 الرصيد: ${dashboard.report?.overview?.totalCoins || 0}\n`;
     message += `⭐ المستوى: ${dashboard.report?.overview?.totalLevel || 0}\n`;
     message += `🎮 ألعاب: ${dashboard.report?.gameStats?.totalGames || 0}\n`;
@@ -113,7 +113,7 @@ class IntegratedAI {
 
     // Achievements
     if (dashboard.achievements?.length > 0) {
-      message += `<b>🏆 إنجازات جديدة!</b>\n`;
+      message += '<b>🏆 إنجازات جديدة!</b>\n';
       dashboard.achievements.slice(0, 2).forEach(achievement => {
         message += `✅ ${achievement.title}\n`;
       });
@@ -122,13 +122,13 @@ class IntegratedAI {
 
     // Notification
     if (dashboard.notification) {
-      message += `<b>📢 إشعار مهم:</b>\n`;
+      message += '<b>📢 إشعار مهم:</b>\n';
       message += `${SmartNotifications.formatNotification(dashboard.notification)}\n\n`;
     }
 
     // Recommendations
     if (dashboard.recommendations?.length > 0) {
-      message += `<b>💡 اقتراحاتنا الذكية:</b>\n`;
+      message += '<b>💡 اقتراحاتنا الذكية:</b>\n';
       dashboard.recommendations.slice(0, 3).forEach(rec => {
         message += `${rec.icon} <b>${rec.title}</b>\n${rec.action}\n`;
       });
@@ -205,7 +205,7 @@ class IntegratedAI {
 
       // Personalized coaching
       if (insights.strengths?.length > 0) {
-        message += `<b>نقاط قوتك:</b>\n`;
+        message += '<b>نقاط قوتك:</b>\n';
         insights.strengths.forEach(strength => {
           message += `✅ ${strength}\n`;
         });
@@ -213,19 +213,19 @@ class IntegratedAI {
       }
 
       if (insights.weaknesses?.length > 0) {
-        message += `<b>يمكنك التحسن في:</b>\n`;
+        message += '<b>يمكنك التحسن في:</b>\n';
         insights.weaknesses.forEach(weakness => {
           message += `📍 ${weakness}\n`;
         });
         message += '\n';
       }
 
-      message += `<b>ما تتوقعنا:</b>\n`;
+      message += '<b>ما تتوقعنا:</b>\n';
       predictions.nextAction.split('🎯')[1] && (message += `🎯 ${predictions.nextAction}\n`);
       message += `📊 المشاركة المتوقعة: ${predictions.estimatedEngagement}\n\n`;
 
-      message += `💪 تذكر: النجاح يأتي من الاستمرار والمثابرة!\n`;
-      message += `🚀 ركز على أهدافك وحققها واحدة تلو الأخرى!`;
+      message += '💪 تذكر: النجاح يأتي من الاستمرار والمثابرة!\n';
+      message += '🚀 ركز على أهدافك وحققها واحدة تلو الأخرى!';
 
       return message;
     } catch (error) {
@@ -248,22 +248,22 @@ class IntegratedAI {
     } else if (level > 10) {
       motivation += `مستوى ${level}! أنت في الطريق الصحيح! 🎯\n`;
     } else {
-      motivation += `كل خطوة تقربك من الهدف! استمر! 🌱\n`;
+      motivation += 'كل خطوة تقربك من الهدف! استمر! 🌱\n';
     }
 
     if (winRate > 0.7) {
       motivation += `معدل فوزك ${Math.round(winRate * 100)}%! أنت محترف! 🏆\n`;
     } else if (winRate > 0.5) {
-      motivation += `تحسن ملحوظ في أدائك! استمر! 📈\n`;
+      motivation += 'تحسن ملحوظ في أدائك! استمر! 📈\n';
     }
 
     if (readProgress > 0.8) {
-      motivation += `أنت قريب من إكمال الختمة! استمر! 🎉\n`;
+      motivation += 'أنت قريب من إكمال الختمة! استمر! 🎉\n';
     } else if (readProgress > 0.5) {
-      motivation += `نصفك الثاني من القرآن! قوي! 📖\n`;
+      motivation += 'نصفك الثاني من القرآن! قوي! 📖\n';
     }
 
-    motivation += `\nتذكر: <i>كل محاولة تقربك من النجاح! 🌟</i>`;
+    motivation += '\nتذكر: <i>كل محاولة تقربك من النجاح! 🌟</i>';
 
     return motivation;
   }

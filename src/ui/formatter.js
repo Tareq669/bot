@@ -3,38 +3,38 @@ class Formatter {
   static getSmartGreeting(user) {
     const hour = new Date().getHours();
     let greeting = '';
-    
+
     if (hour < 6) greeting = '🌙 ليل الخير';
     else if (hour < 12) greeting = '☀️ صباح الخير';
     else if (hour < 17) greeting = '🌤️ ظهر الخير';
     else greeting = '🌅 مساء الخير';
-    
+
     return `${greeting} ${user.firstName || 'صديقي'}! 👋`;
   }
 
   // AI Recommendations
   static getSmartRecommendations(user) {
     const recommendations = [];
-    
+
     // توصيات بناءً على النشاط
     if (user.khatmaProgress?.currentPage < 50) {
       recommendations.push('📖 يبدو أنك جديد في الختمة، ابدأ رحلتك اليوم!');
     }
-    
+
     if (user.level < 5 && user.gamesPlayed?.total < 10) {
       recommendations.push('🎮 لعب بعض الألعاب لرفع مستواك!');
     }
-    
+
     if (user.coins < 100) {
       recommendations.push('💰 جمِّع عملات من المهام اليومية!');
     }
-    
+
     const lastDaily = new Date(user.lastDailyReward);
     const now = new Date();
     if ((now - lastDaily) / (1000 * 60 * 60) >= 24) {
       recommendations.push('🎁 لم تأخذ مكافأتك اليومية بعد!');
     }
-    
+
     return recommendations.slice(0, 3);
   }
 
@@ -44,7 +44,7 @@ class Formatter {
     const xpProgress = Math.round((user.xp / nextLevel) * 100);
     const progressBar = this.getProgressBar(xpProgress);
     const recommendations = this.getSmartRecommendations(user);
-    
+
     const message = `${this.getSmartGreeting(user)}
 
 ╔════════════════════════════════════╗
@@ -59,7 +59,7 @@ ${progressBar}
 ║ 💡 التوصيات الذكية:
 ${recommendations.map(rec => `║ ${rec}`).join('\n')}
 ╚════════════════════════════════════╝`;
-    
+
     return message.trim();
   }
 
@@ -103,14 +103,14 @@ ${recommendations.map(rec => `║ ${rec}`).join('\n')}
       message += `║ ${medal} ${user.firstName} - ${getter(user).toLocaleString()}\n`;
     });
 
-    message += `╚════════════════════════════════════╝`;
+    message += '╚════════════════════════════════════╝';
     return message;
   }
 
   // Format game result
   static formatGameResult(playerName, result, prize = 0) {
-    let resultEmoji = result === 'win' ? '🎉' : result === 'draw' ? '🤝' : '😔';
-    let resultText = result === 'win' ? 'انتصار!' : result === 'draw' ? 'تعادل!' : 'هزيمة!';
+    const resultEmoji = result === 'win' ? '🎉' : result === 'draw' ? '🤝' : '😔';
+    const resultText = result === 'win' ? 'انتصار!' : result === 'draw' ? 'تعادل!' : 'هزيمة!';
 
     const message = `
 ${resultEmoji} ${resultText}
@@ -179,7 +179,7 @@ ${content.content}
     const wins = user.gamesPlayed?.wins || 0;
     const winRate = totalGames > 0 ? Math.round((wins / totalGames) * 100) : 0;
     const daysActive = Math.floor((new Date() - new Date(user.createdAt)) / (1000 * 60 * 60 * 24)) || 1;
-    
+
     let level_status = '';
     if (user.level >= 20) level_status = '👑 محترف';
     else if (user.level >= 10) level_status = '🌟 متقدم';
@@ -202,19 +202,19 @@ ${content.content}
   // Daily Quest Recommendations
   static formatDailyQuests(user) {
     const quests = [];
-    
+
     if (!user.lastDailyReward || (new Date() - new Date(user.lastDailyReward)) / (1000 * 60 * 60) >= 24) {
       quests.push('✅ خذ مكافأتك اليومية (50 عملة)');
     }
-    
+
     if ((user.gamesPlayed?.total || 0) < (user.gamesPlayed?.total || 0) + 3) {
       quests.push('🎮 العب 3 ألعاب (+30 نقطة)');
     }
-    
+
     if ((user.khatmaProgress?.currentPage || 0) < ((this.lastKhatmaPage || 0) + 5)) {
       quests.push('📖 اقرأ 5 صفحات من القرآن (+20 نقطة)');
     }
-    
+
     return `
 🎯 **مهام يومك الموصى بها:**
 
@@ -226,17 +226,17 @@ ${quests.map((q, i) => `${i + 1}. ${q}`).join('\n')}
   // Achievement Display
   static formatAchievements(user) {
     const achievements = [];
-    
+
     if (user.level >= 5) achievements.push('🌟 المستكشف: وصلت للمستوى 5');
     if (user.level >= 10) achievements.push('💎 المحترف: وصلت للمستوى 10');
     if (user.gamesPlayed?.wins >= 10) achievements.push('🏆 الفائز: فزت في 10 ألعاب');
     if (user.khatmaProgress?.completionCount >= 1) achievements.push('📖 الختّام: أكملت ختمة واحدة');
     if (user.coins >= 500) achievements.push('💰 المليونير: جمعت 500 عملة');
-    
+
     if (achievements.length === 0) {
       return '🚀 لم تحقق أي إنجازات بعد، ابدأ الآن!';
     }
-    
+
     return `
 🏅 **إنجازاتك:**
 

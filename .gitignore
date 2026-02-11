@@ -9,3 +9,8 @@ dist/
 build/
 .vscode/
 .idea/
+logs/
+coverage/
+.nyc_output/
+*.tmp
+*.temp

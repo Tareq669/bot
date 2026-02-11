@@ -14,7 +14,7 @@ class PrayerTimesManager {
   static async getPrayerTimes(city = 'Riyadh', country = 'SA') {
     const cacheKey = `prayer_${city}_${country}`;
     const cached = cache.get(cacheKey);
-    
+
     if (cached) return cached;
 
     try {
@@ -23,14 +23,14 @@ class PrayerTimesManager {
         params: {
           city,
           country,
-          method: 4, // Umm Al-Qura University, Makkah
+          method: 4 // Umm Al-Qura University, Makkah
         }
       });
 
       if (response.data.code === 200) {
         const timings = response.data.data.timings;
         const date = response.data.data.date;
-        
+
         const prayerData = {
           date: {
             hijri: date.hijri.date,
@@ -54,7 +54,7 @@ class PrayerTimesManager {
         cache.set(cacheKey, prayerData);
         return prayerData;
       }
-      
+
       return null;
     } catch (error) {
       console.error('Prayer times error:', error.message);
@@ -69,12 +69,12 @@ class PrayerTimesManager {
     if (!data) return '❌ لم نتمكن من الحصول على أوقات الصلاة';
 
     const { timings, date, city } = data;
-    
-    let message = `🕌 <b>أوقات الصلاة</b>\n\n`;
+
+    let message = '🕌 <b>أوقات الصلاة</b>\n\n';
     message += `📍 المدينة: ${city}\n`;
     message += `📅 ${date.hijri} هـ\n`;
     message += `📆 ${date.gregorian} م\n\n`;
-    
+
     message += `🌅 <b>الفجر:</b> ${timings.Fajr}\n`;
     message += `☀️ <b>الشروق:</b> ${timings.Sunrise}\n`;
     message += `🌤️ <b>الظهر:</b> ${timings.Dhuhr}\n`;
@@ -92,7 +92,7 @@ class PrayerTimesManager {
   static getNextPrayer(timings) {
     const now = new Date();
     const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-    
+
     const prayers = [
       { name: 'الفجر', time: timings.Fajr, icon: '🌅' },
       { name: 'الظهر', time: timings.Dhuhr, icon: '🌤️' },
@@ -136,10 +136,10 @@ class PrayerTimesManager {
     try {
       const user = await User.findOne({ userId });
       const location = user?.preferences?.location;
-      
+
       const city = location?.city || 'Riyadh';
       const country = location?.country || 'SA';
-      
+
       return await this.getPrayerTimes(city, country);
     } catch (error) {
       console.error('Get user prayer times error:', error);

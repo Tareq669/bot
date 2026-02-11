@@ -9,7 +9,7 @@ class RateLimiter {
   constructor() {
     this.userRequests = new Map();
     this.blockedUsers = new Map();
-    
+
     // الحدود الافتراضية
     this.limits = {
       messages: { max: 10, window: 60 }, // 10 رسائل في 60 ثانية
@@ -65,7 +65,7 @@ class RateLimiter {
     }
 
     const requests = this.userRequests.get(key);
-    
+
     // إزالة الطلبات القديمة (خارج الإطار الزمني)
     const validRequests = requests.filter(
       time => now - time < limit.window * 1000
@@ -75,13 +75,13 @@ class RateLimiter {
     // التحقق من تجاوز الحد
     if (validRequests.length >= limit.max) {
       logger.warn(`⚠️ المستخدم ${userId} تجاوز حد ${limitType}`);
-      
+
       // حظر المستخدم مؤقتاً (5 دقائق)
       this.blockUser(userId, 300);
-      
+
       return {
         allowed: false,
-        message: `⏳ لقد تجاوزت الحد المسموح\nحاول بعد 5 دقائق`,
+        message: '⏳ لقد تجاوزت الحد المسموح\nحاول بعد 5 دقائق',
         blocked: true
       };
     }
@@ -149,7 +149,7 @@ class RateLimiter {
    * مسح بيانات المستخدم
    */
   clearUserData(userId) {
-    for (let key of this.userRequests.keys()) {
+    for (const key of this.userRequests.keys()) {
       if (key.startsWith(userId)) {
         this.userRequests.delete(key);
       }
@@ -176,17 +176,17 @@ class RateLimiter {
    */
   getUserInfo(userId) {
     const userLimits = {};
-    
-    for (let [key, requests] of this.userRequests.entries()) {
+
+    for (const [key, requests] of this.userRequests.entries()) {
       if (key.startsWith(userId)) {
         const limitType = key.split(':')[1];
         const now = Date.now();
         const limit = this.limits[limitType];
-        
+
         const validRequests = requests.filter(
           time => now - time < limit.window * 1000
         );
-        
+
         userLimits[limitType] = {
           used: validRequests.length,
           max: limit.max,

@@ -19,17 +19,17 @@ class ConnectionMonitor {
       const start = Date.now();
       const response = await this.fetch('https://api.telegram.org/botTest/getMe', {
         timeout: 5000,
-        method: 'GET',
+        method: 'GET'
       });
-      
+
       const duration = Date.now() - start;
-      
+
       if (!response || response.status !== 404) {
         // نتوقع 404 لأن البوت تجريبي
         // لكن المهم أننا تمكنا من الاتصال بـ Telegram API
         return true;
       }
-      
+
       return true;
     } catch (error) {
       logger.warn(`⚠️ فحص الاتصال فشل: ${error.message}`);
@@ -48,9 +48,9 @@ class ConnectionMonitor {
     try {
       const response = await require('https').get(url, {
         headers: { 'User-Agent': 'TelegramBot/1.0' },
-        timeout: timeout,
+        timeout: timeout
       });
-      
+
       clearTimeout(timeoutId);
       return response;
     } catch (error) {
@@ -74,7 +74,7 @@ class ConnectionMonitor {
         } else {
           logger.warn('🔴 فقدان اتصال الإنترنت!');
         }
-        
+
         if (onStatusChange) {
           onStatusChange(this.isOnline);
         }
@@ -99,7 +99,7 @@ class ConnectionMonitor {
     return {
       isOnline: this.isOnline,
       lastCheckTime: this.lastCheckTime,
-      timeSinceLastCheck: Date.now() - this.lastCheckTime,
+      timeSinceLastCheck: Date.now() - this.lastCheckTime
     };
   }
 }

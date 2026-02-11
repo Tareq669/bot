@@ -57,7 +57,7 @@ class SmartNotifications {
           type: 'progress',
           icon: '📖',
           title: `تقدم: ${pages}/114 صفحة`,
-          message: `أنت في الطريق الصحيح! استمر بقراءتك 📚`,
+          message: 'أنت في الطريق الصحيح! استمر بقراءتك 📚',
           action: '👍 شكراً'
         });
       }
@@ -66,12 +66,12 @@ class SmartNotifications {
       if (user.gamesPlayed?.total % 5 === 0 && user.gamesPlayed?.total > 0) {
         const wins = user.gamesPlayed?.wins || 0;
         const winRate = Math.round((wins / user.gamesPlayed.total) * 100);
-        
+
         if (winRate > 70) {
           notifications.push({
             type: 'achievement',
             icon: '🏆',
-            title: `أنت لاعب ماهر!`,
+            title: 'أنت لاعب ماهر!',
             message: `معدل انتصاراتك ${winRate}%! 🎮`,
             action: '💪 تحدِِ اصعب'
           });
@@ -164,7 +164,7 @@ class SmartNotifications {
   static formatDailyDigest(digest) {
     if (!digest) return null;
 
-    const highlightText = digest.highlights.length > 0 
+    const highlightText = digest.highlights.length > 0
       ? digest.highlights.map(h => `✅ ${h}`).join('\n')
       : '📊 يوم عادي';
 

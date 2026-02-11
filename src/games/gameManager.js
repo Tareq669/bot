@@ -7,18 +7,18 @@ class GameManager {
     const choices = ['🪨', '📄', '✂️'];
     const choiceTexts = ['حجر', 'ورق', 'مقص'];
     const idx = Math.floor(Math.random() * 3);
-    
+
     const botChoice = choices[idx];
     const botText = choiceTexts[idx];
-    
+
     let userIdx = -1;
     if (userChoice.includes('rock')) userIdx = 0;
     else if (userChoice.includes('paper')) userIdx = 1;
     else if (userChoice.includes('scissors')) userIdx = 2;
-    
+
     const userChoiceStr = userIdx >= 0 ? choices[userIdx] : userChoice;
 
-    let result = this.determineRPS(userIdx, idx);
+    const result = this.determineRPS(userIdx, idx);
     let prize = 0;
 
     if (result === 'win') prize = Math.floor(Math.random() * 100) + 50;
@@ -156,7 +156,7 @@ ${Formatter.formatGameResult('أنت', result, prize)}
   // Helper: Determine RPS winner
   static determineRPS(userIdx, botIdx) {
     if (userIdx === botIdx) return 'draw';
-    
+
     // 0 = rock, 1 = paper, 2 = scissors
     if (userIdx === 0) {
       return botIdx === 2 ? 'win' : 'lost';
@@ -167,7 +167,7 @@ ${Formatter.formatGameResult('أنت', result, prize)}
     if (userIdx === 2) {
       return botIdx === 1 ? 'win' : 'lost';
     }
-    
+
     return 'lost';
   }
 
@@ -192,7 +192,7 @@ ${Formatter.formatGameResult('أنت', result, prize)}
       } else if (result === 'draw') {
         stats.draw += 1;
       }
-      
+
       stats.xpEarned += 10;
       stats.lastPlayed = new Date();
 

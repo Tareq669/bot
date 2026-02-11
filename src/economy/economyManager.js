@@ -47,7 +47,7 @@ class EconomyManager {
   // Remove coins
   static async removeCoins(userId, amount, reason = 'general') {
     try {
-      let user = await User.findOne({ userId });
+      const user = await User.findOne({ userId });
       if (!user) return null;
 
       if (user.coins < amount) {
@@ -77,7 +77,7 @@ class EconomyManager {
   static async transferCoins(fromUserId, toUserId, amount) {
     try {
       const fromUser = await User.findOne({ userId: fromUserId });
-      let toUser = await User.findOne({ userId: toUserId });
+      const toUser = await User.findOne({ userId: toUserId });
 
       if (!fromUser || !toUser) return false;
       if (fromUser.coins < amount) return false;
@@ -131,9 +131,9 @@ class EconomyManager {
         const nextClaimTime = new Date(lastClaimed);
         nextClaimTime.setDate(nextClaimTime.getDate() + 1);
         nextClaimTime.setHours(0, 0, 0);
-        
+
         const hoursLeft = Math.ceil((nextClaimTime - now) / (1000 * 60 * 60));
-        
+
         return {
           success: false,
           message: `⏰ يمكنك الادعاء مرة واحدة يومياً فقط\n⏳ حاول بعد ${hoursLeft} ساعة`,
@@ -149,7 +149,7 @@ class EconomyManager {
       // Calculate reward based on streak (bonus for consecutive claims)
       let reward = 100; // Base reward
       let bonus = 0;
-      
+
       if (user.dailyReward.streak > 0) {
         bonus = Math.min(user.dailyReward.streak * 20, 200); // Max bonus 200
         reward += bonus;
@@ -170,15 +170,15 @@ class EconomyManager {
         status: 'completed'
       });
 
-      let message = `🎁 <b>مكافأة يومية</b>\n\n`;
+      let message = '🎁 <b>مكافأة يومية</b>\n\n';
       message += `💰 حصلت على <b>${reward}</b> عملة!\n`;
       if (bonus > 0) {
         message += `🎁 مكافأة إضافية: <b>${bonus}</b> عملة\n`;
       }
-      message += `⭐ حصلت على <b>50</b> نقطة XP\n\n`;
+      message += '⭐ حصلت على <b>50</b> نقطة XP\n\n';
       message += `⛓️ <b>سلسلتك المتتالية:</b> <b>${user.dailyReward.streak}</b> يوم\n`;
       message += `💵 <b>رصيدك الجديد:</b> <b>${user.coins}</b> عملة\n\n`;
-      message += `✨ تذكر: ادعِ المكافأة كل يوم للحفاظ على سلسلتك!`;
+      message += '✨ تذكر: ادعِ المكافأة كل يوم للحفاظ على سلسلتك!';
 
       return {
         success: true,
@@ -216,7 +216,7 @@ class EconomyManager {
 
       if (!item) return { success: false, message: '❌ العنصر غير موجود' };
 
-      let user = await User.findOne({ userId });
+      const user = await User.findOne({ userId });
       if (!user) return { success: false, message: '❌ المستخدم غير موجود' };
 
       if (user.coins < item.price) {

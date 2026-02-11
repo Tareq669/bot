@@ -21,7 +21,7 @@ class BackupSystem {
   ensureBackupDir() {
     if (!fs.existsSync(this.backupDir)) {
       fs.mkdirSync(this.backupDir, { recursive: true });
-      logger.info(`📁 تم إنشاء مجلد النسخ الاحتياطية`);
+      logger.info('📁 تم إنشاء مجلد النسخ الاحتياطية');
     }
   }
 
@@ -62,7 +62,7 @@ class BackupSystem {
   async fullBackup() {
     try {
       const users = await User.find();
-      
+
       const backupData = {
         timestamp: new Date().toISOString(),
         dataVersion: '1.0',
@@ -89,13 +89,13 @@ class BackupSystem {
   async restoreFromBackup(filename) {
     try {
       const filepath = path.join(this.backupDir, filename);
-      
+
       if (!fs.existsSync(filepath)) {
         return { success: false, error: 'الملف غير موجود' };
       }
 
       const backupData = JSON.parse(fs.readFileSync(filepath, 'utf-8'));
-      
+
       // تحذير: هذه عملية حساسة جداً!
       logger.warn(`⚠️ جاري استرجاع من نسخة احتياطية: ${filename}`);
 
@@ -123,7 +123,7 @@ class BackupSystem {
           const stats = fs.statSync(filepath);
           return {
             filename: f,
-            size: (stats.size / 1024).toFixed(2) + ' KB',
+            size: `${(stats.size / 1024).toFixed(2)  } KB`,
             date: stats.mtime.toLocaleString('ar')
           };
         })
@@ -191,13 +191,13 @@ class BackupSystem {
    */
   formatBackupsList() {
     const backups = this.listBackups();
-    
+
     if (backups.length === 0) {
       return '📭 لا توجد نسخ احتياطية حتى الآن';
     }
 
     let text = '📋 <b>النسخ الاحتياطية المتاحة</b>\n\n';
-    
+
     backups.forEach((backup, index) => {
       text += `${index + 1}. <code>${backup.filename}</code>\n`;
       text += `   📦 ${backup.size}\n`;
@@ -220,7 +220,7 @@ class BackupSystem {
 
     return {
       backupCount: backups.length,
-      totalSize: totalSize.toFixed(2) + ' KB',
+      totalSize: `${totalSize.toFixed(2)  } KB`,
       oldestBackup: backups[backups.length - 1]?.date,
       newestBackup: backups[0]?.date
     };

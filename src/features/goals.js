@@ -10,7 +10,7 @@ class GoalsManager {
       if (!user) return { success: false, message: 'المستخدم غير موجود' };
 
       user.goals = user.goals || [];
-      
+
       const newGoal = {
         id: Date.now().toString(),
         type: goalData.type, // 'khatma', 'adhkar', 'quran_pages', 'games'
@@ -29,10 +29,10 @@ class GoalsManager {
       user.goals.push(newGoal);
       await user.save();
 
-      return { 
-        success: true, 
+      return {
+        success: true,
         message: '✅ تم إنشاء الهدف بنجاح',
-        goal: newGoal 
+        goal: newGoal
       };
     } catch (error) {
       console.error('Create goal error:', error);
@@ -57,13 +57,13 @@ class GoalsManager {
       if (goal.current >= goal.target) {
         goal.status = 'completed';
         goal.completedAt = new Date();
-        
+
         // Give reward
         user.coins += goal.reward;
         user.xp += goal.reward;
-        
+
         await user.save();
-        
+
         return {
           success: true,
           completed: true,
@@ -73,11 +73,11 @@ class GoalsManager {
       }
 
       await user.save();
-      return { 
-        success: true, 
+      return {
+        success: true,
         completed: false,
         message: `✅ تم تحديث التقدم: ${goal.current}/${goal.target}`,
-        goal 
+        goal
       };
     } catch (error) {
       console.error('Update goal progress error:', error);
@@ -94,7 +94,7 @@ class GoalsManager {
       if (!user) return [];
 
       let goals = user.goals || [];
-      
+
       if (status) {
         goals = goals.filter(g => g.status === status);
       }
@@ -129,33 +129,33 @@ class GoalsManager {
    */
   static formatGoals(goals, type = 'active') {
     if (goals.length === 0) {
-      return type === 'active' 
+      return type === 'active'
         ? '📋 لا توجد أهداف نشطة\n\nأنشئ هدفاً جديداً وابدأ التحدي!'
         : '✅ لا توجد أهداف مكتملة بعد';
     }
 
-    let message = type === 'active' 
+    let message = type === 'active'
       ? `🎯 <b>أهدافك النشطة (${goals.length})</b>\n\n`
       : `✅ <b>أهداف مكتملة (${goals.length})</b>\n\n`;
 
     goals.forEach((goal, i) => {
       const progress = Math.min(100, Math.round((goal.current / goal.target) * 100));
       const progressBar = '█'.repeat(Math.floor(progress / 5)) + '░'.repeat(20 - Math.floor(progress / 5));
-      
+
       message += `${i + 1}. <b>${goal.title}</b>\n`;
       message += `   ${this.getGoalIcon(goal.type)} ${goal.description}\n`;
       message += `   ${progressBar} ${progress}%\n`;
       message += `   📊 ${goal.current}/${goal.target}\n`;
       message += `   💰 المكافأة: ${goal.reward}\n`;
-      
+
       if (goal.status === 'active') {
         const daysLeft = Math.ceil((new Date(goal.endDate) - new Date()) / (1000 * 60 * 60 * 24));
         message += `   ⏰ الوقت المتبقي: ${daysLeft} يوم\n`;
       } else {
         message += `   ✅ مكتمل في: ${new Date(goal.completedAt).toLocaleDateString('ar-EG')}\n`;
       }
-      
-      message += `\n`;
+
+      message += '\n';
     });
 
     return message;
@@ -166,7 +166,7 @@ class GoalsManager {
    */
   static calculateEndDate(period) {
     const date = new Date();
-    
+
     switch (period) {
       case 'daily':
         date.setDate(date.getDate() + 1);
@@ -181,7 +181,7 @@ class GoalsManager {
         date.setFullYear(date.getFullYear() + 1);
         break;
     }
-    
+
     return date;
   }
 

@@ -119,7 +119,7 @@ class PaymentSystem {
       });
 
       logger.info(`✅ تم خصم ${amount} نقطة من المستخدم ${userId}`);
-      return { success: true, message: `✅ تم الخصم بنجاح` };
+      return { success: true, message: '✅ تم الخصم بنجاح' };
     } catch (error) {
       logger.error(`خطأ في الخصم: ${error.message}`);
       return { success: false, message: '❌ حدث خطأ' };

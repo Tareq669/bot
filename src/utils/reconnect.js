@@ -57,7 +57,7 @@ class ReconnectManager {
 
     this.retryCount++;
     this.currentDelay = this.calculateDelay();
-    
+
     const retryAfterSeconds = Math.round(this.currentDelay / 1000);
     logger.warn(
       `⏳ محاولة رقم ${this.retryCount}/${this.maxRetries} بعد ${retryAfterSeconds} ثانية...`
@@ -138,7 +138,7 @@ class ReconnectManager {
       isConnected: this.isConnected,
       retryCount: this.retryCount,
       currentDelay: this.currentDelay,
-      maxRetries: this.maxRetries,
+      maxRetries: this.maxRetries
     };
   }
 

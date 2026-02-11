@@ -8,23 +8,23 @@ class TeamManager {
   static async createTeam(userId, teamName, description = '') {
     try {
       // Check if user already has a team
-      const existingTeam = await Team.findOne({ 
-        'members.userId': userId 
+      const existingTeam = await Team.findOne({
+        'members.userId': userId
       });
-      
+
       if (existingTeam) {
-        return { 
-          success: false, 
-          message: '❌ أنت عضو في فريق بالفعل. اترك فريقك الحالي أولاً.' 
+        return {
+          success: false,
+          message: '❌ أنت عضو في فريق بالفعل. اترك فريقك الحالي أولاً.'
         };
       }
 
       // Check if team name exists
       const nameExists = await Team.findOne({ name: teamName });
       if (nameExists) {
-        return { 
-          success: false, 
-          message: '❌ اسم الفريق موجود بالفعل. اختر اسماً آخر.' 
+        return {
+          success: false,
+          message: '❌ اسم الفريق موجود بالفعل. اختر اسماً آخر.'
         };
       }
 
@@ -42,16 +42,16 @@ class TeamManager {
 
       await team.save();
 
-      return { 
-        success: true, 
+      return {
+        success: true,
         message: `✅ تم إنشاء فريق "${teamName}" بنجاح!`,
-        team 
+        team
       };
     } catch (error) {
       console.error('Error creating team:', error);
-      return { 
-        success: false, 
-        message: '❌ حدث خطأ أثناء إنشاء الفريق.' 
+      return {
+        success: false,
+        message: '❌ حدث خطأ أثناء إنشاء الفريق.'
       };
     }
   }
@@ -62,31 +62,31 @@ class TeamManager {
   static async joinTeam(userId, teamName) {
     try {
       // Check if already in a team
-      const existingMembership = await Team.findOne({ 
-        'members.userId': userId 
+      const existingMembership = await Team.findOne({
+        'members.userId': userId
       });
-      
+
       if (existingMembership) {
-        return { 
-          success: false, 
-          message: '❌ أنت عضو في فريق بالفعل.' 
+        return {
+          success: false,
+          message: '❌ أنت عضو في فريق بالفعل.'
         };
       }
 
       // Find team
       const team = await Team.findOne({ name: teamName });
       if (!team) {
-        return { 
-          success: false, 
-          message: '❌ الفريق غير موجود.' 
+        return {
+          success: false,
+          message: '❌ الفريق غير موجود.'
         };
       }
 
       // Check if team is full
       if (team.members.length >= team.settings.maxMembers) {
-        return { 
-          success: false, 
-          message: '❌ الفريق ممتلئ.' 
+        return {
+          success: false,
+          message: '❌ الفريق ممتلئ.'
         };
       }
 
@@ -99,16 +99,16 @@ class TeamManager {
 
       await team.save();
 
-      return { 
-        success: true, 
+      return {
+        success: true,
         message: `✅ تم الانضمام إلى فريق "${teamName}" بنجاح!`,
-        team 
+        team
       };
     } catch (error) {
       console.error('Error joining team:', error);
-      return { 
-        success: false, 
-        message: '❌ حدث خطأ أثناء الانضمام للفريق.' 
+      return {
+        success: false,
+        message: '❌ حدث خطأ أثناء الانضمام للفريق.'
       };
     }
   }
@@ -119,11 +119,11 @@ class TeamManager {
   static async leaveTeam(userId) {
     try {
       const team = await Team.findOne({ 'members.userId': userId });
-      
+
       if (!team) {
-        return { 
-          success: false, 
-          message: '❌ أنت لست عضواً في أي فريق.' 
+        return {
+          success: false,
+          message: '❌ أنت لست عضواً في أي فريق.'
         };
       }
 
@@ -138,9 +138,9 @@ class TeamManager {
         } else {
           // Delete team if leader is only member
           await Team.deleteOne({ _id: team._id });
-          return { 
-            success: true, 
-            message: '✅ تم حذف الفريق.' 
+          return {
+            success: true,
+            message: '✅ تم حذف الفريق.'
           };
         }
       }
@@ -149,15 +149,15 @@ class TeamManager {
       team.members = team.members.filter(m => m.userId !== userId);
       await team.save();
 
-      return { 
-        success: true, 
-        message: '✅ تم مغادرة الفريق بنجاح.' 
+      return {
+        success: true,
+        message: '✅ تم مغادرة الفريق بنجاح.'
       };
     } catch (error) {
       console.error('Error leaving team:', error);
-      return { 
-        success: false, 
-        message: '❌ حدث خطأ أثناء مغادرة الفريق.' 
+      return {
+        success: false,
+        message: '❌ حدث خطأ أثناء مغادرة الفريق.'
       };
     }
   }
@@ -168,7 +168,7 @@ class TeamManager {
   static async getTeamInfo(teamNameOrUserId) {
     try {
       let team;
-      
+
       // Check if searching by name or user ID
       if (typeof teamNameOrUserId === 'string') {
         team = await Team.findOne({ name: teamNameOrUserId });
@@ -247,7 +247,7 @@ class TeamManager {
     if (!teamData) return '❌ لم يتم العثور على الفريق';
 
     let message = `🏆 <b>${teamData.name}</b>\n\n`;
-    
+
     if (teamData.description) {
       message += `📝 ${teamData.description}\n\n`;
     }
@@ -255,13 +255,13 @@ class TeamManager {
     message += `👑 <b>القائد:</b> ${teamData.memberDetails.find(m => m.role === 'leader')?.firstName || 'Unknown'}\n`;
     message += `👥 <b>الأعضاء:</b> ${teamData.members.length}/${teamData.settings.maxMembers}\n\n`;
 
-    message += `📊 <b>إحصائيات الفريق:</b>\n`;
+    message += '📊 <b>إحصائيات الفريق:</b>\n';
     message += `⭐ نقاط الخبرة: ${teamData.stats.totalXP.toLocaleString()}\n`;
     message += `💰 العملات: ${teamData.stats.totalCoins.toLocaleString()}\n`;
     message += `📖 صفحات الختمة: ${teamData.stats.totalKhatmaPages.toLocaleString()}\n`;
     message += `🎮 ألعاب: ${teamData.stats.gamesPlayed} (${teamData.stats.gamesWon} فوز)\n\n`;
 
-    message += `👥 <b>أعضاء الفريق:</b>\n`;
+    message += '👥 <b>أعضاء الفريق:</b>\n';
     teamData.memberDetails
       .sort((a, b) => b.xp - a.xp)
       .forEach((member, index) => {
@@ -271,7 +271,7 @@ class TeamManager {
       });
 
     if (teamData.achievements && teamData.achievements.length > 0) {
-      message += `\n🏅 <b>الإنجازات:</b>\n`;
+      message += '\n🏅 <b>الإنجازات:</b>\n';
       teamData.achievements.forEach(a => {
         message += `• ${a.name}\n`;
       });
@@ -288,11 +288,11 @@ class TeamManager {
       return '❌ لا توجد فرق بعد';
     }
 
-    let message = `🏆 <b>لوحة المتصدرين - الفرق</b>\n\n`;
+    let message = '🏆 <b>لوحة المتصدرين - الفرق</b>\n\n';
 
     teams.forEach((team, index) => {
       const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
-      
+
       message += `${medal} <b>${team.name}</b>\n`;
       message += `   👥 ${team.members.length} عضو | ⭐ ${team.stats.totalXP.toLocaleString()} XP\n\n`;
     });

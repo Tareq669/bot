@@ -29,7 +29,7 @@ class EventsSystem {
   static async joinEvent(userId, eventId) {
     try {
       const { User } = require('../database/models');
-      
+
       const event = await Event.findById(eventId);
       if (!event) {
         return { success: false, message: '❌ الحدث غير موجود' };
@@ -46,7 +46,7 @@ class EventsSystem {
       }
 
       // Check max participants
-      if (event.requirements.maxParticipants && 
+      if (event.requirements.maxParticipants &&
           event.participants.length >= event.requirements.maxParticipants) {
         return { success: false, message: '❌ الحدث ممتلئ' };
       }
@@ -59,18 +59,18 @@ class EventsSystem {
 
       const userLevel = user.level || Math.floor(user.xp / 1000);
       if (userLevel < event.requirements.minLevel) {
-        return { 
-          success: false, 
-          message: `❌ تحتاج إلى المستوى ${event.requirements.minLevel} للمشاركة` 
+        return {
+          success: false,
+          message: `❌ تحتاج إلى المستوى ${event.requirements.minLevel} للمشاركة`
         };
       }
 
       // Check entry fee
       if (event.requirements.entryFee > 0) {
         if (user.coins < event.requirements.entryFee) {
-          return { 
-            success: false, 
-            message: `❌ تحتاج إلى ${event.requirements.entryFee} عملة للمشاركة` 
+          return {
+            success: false,
+            message: `❌ تحتاج إلى ${event.requirements.entryFee} عملة للمشاركة`
           };
         }
         user.coins -= event.requirements.entryFee;
@@ -112,7 +112,7 @@ class EventsSystem {
 
       // Update progress
       Object.assign(participant.progress, progressData);
-      
+
       // Calculate score based on progress
       participant.score = this.calculateEventScore(event.type, participant.progress);
 
@@ -169,7 +169,7 @@ class EventsSystem {
   static async getEventLeaderboard(eventId, limit = 10) {
     try {
       const { User } = require('../database/models');
-      
+
       const event = await Event.findById(eventId);
       if (!event) return [];
 
@@ -204,7 +204,7 @@ class EventsSystem {
   static async endEvent(eventId) {
     try {
       const { User } = require('../database/models');
-      
+
       const event = await Event.findById(eventId);
       if (!event) return { success: false };
 
@@ -223,7 +223,7 @@ class EventsSystem {
         if (user) {
           user.coins += prize.coins || 0;
           user.xp += prize.xp || 0;
-          
+
           if (prize.badge) {
             if (!user.badgeDetails) user.badgeDetails = [];
             user.badgeDetails.push({
@@ -278,7 +278,7 @@ class EventsSystem {
     };
 
     let message = `${typeEmoji[event.type]} <b>${event.title}</b> ${statusEmoji[event.status]}\n\n`;
-    
+
     if (event.description) {
       message += `📝 ${event.description}\n\n`;
     }
@@ -290,7 +290,7 @@ class EventsSystem {
     if (event.requirements.maxParticipants) {
       message += `/${event.requirements.maxParticipants}`;
     }
-    message += `\n\n`;
+    message += '\n\n';
 
     if (event.requirements.minLevel > 0) {
       message += `📊 <b>المستوى المطلوب:</b> ${event.requirements.minLevel}\n`;
@@ -301,7 +301,7 @@ class EventsSystem {
     }
 
     if (event.prizes && event.prizes.length > 0) {
-      message += `\n🏆 <b>الجوائز:</b>\n`;
+      message += '\n🏆 <b>الجوائز:</b>\n';
       event.prizes.forEach(prize => {
         const rankEmoji = prize.rank === 1 ? '🥇' : prize.rank === 2 ? '🥈' : prize.rank === 3 ? '🥉' : `${prize.rank}.`;
         message += `${rankEmoji} `;
@@ -309,7 +309,7 @@ class EventsSystem {
         if (prize.coins) rewards.push(`${prize.coins} عملة`);
         if (prize.xp) rewards.push(`${prize.xp} XP`);
         if (prize.badge) rewards.push(prize.badge);
-        message += rewards.join(' + ') + `\n`;
+        message += `${rewards.join(' + ')  }\n`;
       });
     }
 
@@ -328,7 +328,7 @@ class EventsSystem {
 
     leaderboard.forEach((participant, index) => {
       const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
-      
+
       message += `${medal} <b>${participant.firstName}</b>\n`;
       message += `   └ ${participant.score} نقطة\n\n`;
     });

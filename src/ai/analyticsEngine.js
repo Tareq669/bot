@@ -29,7 +29,7 @@ class AnalyticsEngine {
   // Generate overview
   static generateOverview(user) {
     const accountAge = Math.floor((new Date() - new Date(user.createdAt)) / (1000 * 60 * 60 * 24));
-    
+
     return {
       accountAge: `${accountAge} يوم`,
       totalLevel: user.level,
