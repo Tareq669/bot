@@ -602,6 +602,13 @@ bot.action('menu:features', (ctx) => CommandHandler.handleFeaturesMenu(ctx));
 bot.action('menu:library', (ctx) => CommandHandler.handleLibrary(ctx));
 bot.action('menu:leaderboard', (ctx) => MenuHandler.handleLeaderboardMenu(ctx));
 bot.action('menu:settings', (ctx) => MenuHandler.handleSettingsMenu(ctx));
+bot.action('menu:shop', (ctx) => MenuHandler.handleShopMenu(ctx));
+bot.action('menu:transfers', (ctx) => MenuHandler.handleTransfersMenu(ctx));
+bot.action('menu:smartnotifications', (ctx) => MenuHandler.handleSmartNotificationsMenu(ctx));
+bot.action('menu:languages', (ctx) => MenuHandler.handleLanguagesMenu(ctx));
+bot.action('menu:backups', (ctx) => MenuHandler.handleBackupsMenu(ctx));
+bot.action('menu:cache', (ctx) => MenuHandler.handleCacheMenu(ctx));
+bot.action('menu:protection', (ctx) => MenuHandler.handleProtectionMenu(ctx));
 bot.action('settings:notifications', (ctx) => MenuHandler.handleNotificationsSettings(ctx));
 bot.action('settings:toggleNotify', (ctx) => MenuHandler.handleToggleNotifications(ctx));
 bot.action('settings:language', (ctx) => MenuHandler.handleLanguageSettings(ctx));
@@ -1657,6 +1664,13 @@ bot.hears('✨ الميزات', (ctx) => CommandHandler.handleFeaturesMenu(ctx))
 bot.hears('📚 المكتبة', (ctx) => CommandHandler.handleLibrary(ctx));
 bot.hears('📊 إحصائيات', (ctx) => CommandHandler.handleStats(ctx));
 bot.hears('🎁 المكافآت', (ctx) => CommandHandler.handleRewards(ctx));
+bot.hears('🛍️ المتجر', (ctx) => MenuHandler.handleShopMenu(ctx));
+bot.hears('💸 التحويلات والتبرعات', (ctx) => MenuHandler.handleTransfersMenu(ctx));
+bot.hears('🔔 الإشعارات الذكية', (ctx) => MenuHandler.handleSmartNotificationsMenu(ctx));
+bot.hears('🌍 إدارة اللغات', (ctx) => MenuHandler.handleLanguagesMenu(ctx));
+bot.hears('📁 النسخ الاحتياطية', (ctx) => MenuHandler.handleBackupsMenu(ctx));
+bot.hears('⚡ التخزين المؤقت', (ctx) => MenuHandler.handleCacheMenu(ctx));
+bot.hears('🛡️ حماية من الإساءة', (ctx) => MenuHandler.handleProtectionMenu(ctx));
 bot.hears('❌ إغلق', (ctx) => ctx.deleteMessage().catch(() => ctx.reply('✅ تم')));
 
 // --- OWNER KEYBOARD BUTTON HANDLERS ---

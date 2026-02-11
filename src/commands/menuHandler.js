@@ -1370,6 +1370,238 @@ ${rankMessage}
     }
   }
 
+  // New feature handlers - stubs for future development
+
+  static async handleShopMenu(ctx) {
+    try {
+      const UIManager = require('../ui/keyboards');
+      const message = `🛍️ <b>المتجر</b>
+
+مرحباً بك في متجر البوت! هنا يمكنك شراء:
+• 👑 الأوسمة والشارات
+• ⚡ المعززات والأدوات
+• 🎁 الجوائز والهدايا
+• 🎮 أدوات الألعاب
+
+💰 رصيدك الحالي سيظهر هنا قريباً...
+
+⚠️ هذه الميزة قيد التطوير`;
+
+      const keyboard = UIManager.shopMenuKeyboard();
+
+      if (ctx.callbackQuery) {
+        await ctx.editMessageText(message, {
+          parse_mode: 'HTML',
+          reply_markup: keyboard.reply_markup
+        });
+      } else {
+        await ctx.reply(message, {
+          parse_mode: 'HTML',
+          reply_markup: keyboard.reply_markup
+        });
+      }
+    } catch (error) {
+      console.error('Error in handleShopMenu:', error);
+      await ctx.reply('❌ حدث خطأ في عرض المتجر');
+    }
+  }
+
+  static async handleTransfersMenu(ctx) {
+    try {
+      const UIManager = require('../ui/keyboards');
+      const message = `💸 <b>التحويلات والتبرعات</b>
+
+هنا يمكنك:
+• 💰 تحويل العملات للأصدقاء
+• ⭐ تحويل النقاط
+• 💝 التبرع للصدقات
+• 📊 عرض سجل التحويلات
+
+⚠️ هذه الميزة قيد التطوير`;
+
+      const keyboard = UIManager.transferMenuKeyboard();
+
+      if (ctx.callbackQuery) {
+        await ctx.editMessageText(message, {
+          parse_mode: 'HTML',
+          reply_markup: keyboard.reply_markup
+        });
+      } else {
+        await ctx.reply(message, {
+          parse_mode: 'HTML',
+          reply_markup: keyboard.reply_markup
+        });
+      }
+    } catch (error) {
+      console.error('Error in handleTransfersMenu:', error);
+      await ctx.reply('❌ حدث خطأ في عرض قائمة التحويلات');
+    }
+  }
+
+  static async handleSmartNotificationsMenu(ctx) {
+    try {
+      const UIManager = require('../ui/keyboards');
+      const message = `🔔 <b>الإشعارات الذكية</b>
+
+يمكنك تفعيل:
+• 🕌 إشعارات الأذكار اليومية
+• ⏰ إشعارات أوقات الصلاة
+• 🎮 إشعارات الألعاب
+• 💰 إشعارات المكافآت
+• 🏆 إشعارات الأحداث الخاصة
+• 📊 إشعارات الإحصائيات
+
+⚠️ هذه الميزة قيد التطوير`;
+
+      const keyboard = UIManager.notificationsMenuKeyboard();
+
+      if (ctx.callbackQuery) {
+        await ctx.editMessageText(message, {
+          parse_mode: 'HTML',
+          reply_markup: keyboard.reply_markup
+        });
+      } else {
+        await ctx.reply(message, {
+          parse_mode: 'HTML',
+          reply_markup: keyboard.reply_markup
+        });
+      }
+    } catch (error) {
+      console.error('Error in handleSmartNotificationsMenu:', error);
+      await ctx.reply('❌ حدث خطأ في عرض قائمة الإشعارات');
+    }
+  }
+
+  static async handleLanguagesMenu(ctx) {
+    try {
+      const UIManager = require('../ui/keyboards');
+      const message = `🌍 <b>إدارة اللغات</b>
+
+اللغات المتاحة:
+• 🇸🇦 العربية (الافتراضية)
+• 🇬🇧 English
+• 🇫🇷 Français
+
+اختر اللغة المفضلة للبوت من القائمة أدناه.
+
+⚠️ هذه الميزة قيد التطوير`;
+
+      const keyboard = UIManager.languageMenuKeyboard();
+
+      if (ctx.callbackQuery) {
+        await ctx.editMessageText(message, {
+          parse_mode: 'HTML',
+          reply_markup: keyboard.reply_markup
+        });
+      } else {
+        await ctx.reply(message, {
+          parse_mode: 'HTML',
+          reply_markup: keyboard.reply_markup
+        });
+      }
+    } catch (error) {
+      console.error('Error in handleLanguagesMenu:', error);
+      await ctx.reply('❌ حدث خطأ في عرض قائمة اللغات');
+    }
+  }
+
+  static async handleBackupsMenu(ctx) {
+    try {
+      const UIManager = require('../ui/keyboards');
+      const message = `📁 <b>النسخ الاحتياطية</b>
+
+يمكنك:
+• 💾 إنشاء نسخة احتياطية لبياناتك
+• 📋 عرض قائمة النسخ الاحتياطية
+• 🔄 استعادة نسخة احتياطية
+• 🗑️ حذف النسخ القديمة
+• 📊 عرض إحصائيات النسخ
+
+⚠️ هذه الميزة قيد التطوير`;
+
+      const keyboard = UIManager.backupMenuKeyboard();
+
+      if (ctx.callbackQuery) {
+        await ctx.editMessageText(message, {
+          parse_mode: 'HTML',
+          reply_markup: keyboard.reply_markup
+        });
+      } else {
+        await ctx.reply(message, {
+          parse_mode: 'HTML',
+          reply_markup: keyboard.reply_markup
+        });
+      }
+    } catch (error) {
+      console.error('Error in handleBackupsMenu:', error);
+      await ctx.reply('❌ حدث خطأ في عرض قائمة النسخ الاحتياطية');
+    }
+  }
+
+  static async handleCacheMenu(ctx) {
+    try {
+      const UIManager = require('../ui/keyboards');
+      const message = `⚡ <b>التخزين المؤقت</b>
+
+معلومات عن نظام التخزين المؤقت:
+• 📊 إحصائيات استخدام الذاكرة
+• 🧹 مسح الذاكرة المؤقتة
+• ⚡ تحسين الأداء
+• ❓ معلومات النظام
+
+⚠️ هذه الميزة قيد التطوير`;
+
+      const keyboard = UIManager.cacheSystemKeyboard();
+
+      if (ctx.callbackQuery) {
+        await ctx.editMessageText(message, {
+          parse_mode: 'HTML',
+          reply_markup: keyboard.reply_markup
+        });
+      } else {
+        await ctx.reply(message, {
+          parse_mode: 'HTML',
+          reply_markup: keyboard.reply_markup
+        });
+      }
+    } catch (error) {
+      console.error('Error in handleCacheMenu:', error);
+      await ctx.reply('❌ حدث خطأ في عرض قائمة التخزين المؤقت');
+    }
+  }
+
+  static async handleProtectionMenu(ctx) {
+    try {
+      const UIManager = require('../ui/keyboards');
+      const message = `🛡️ <b>حماية من الإساءة</b>
+
+نظام الحماية يوفر:
+• 📊 عرض حالة الحماية الحالية
+• 🛡️ مستويات الحماية المختلفة
+• ❓ معلومات عن آلية العمل
+• ⚡ منع الاستخدام المفرط
+
+⚠️ هذه الميزة قيد التطوير`;
+
+      const keyboard = UIManager.rateLimiterKeyboard();
+
+      if (ctx.callbackQuery) {
+        await ctx.editMessageText(message, {
+          parse_mode: 'HTML',
+          reply_markup: keyboard.reply_markup
+        });
+      } else {
+        await ctx.reply(message, {
+          parse_mode: 'HTML',
+          reply_markup: keyboard.reply_markup
+        });
+      }
+    } catch (error) {
+      console.error('Error in handleProtectionMenu:', error);
+      await ctx.reply('❌ حدث خطأ في عرض قائمة الحماية');
+    }
+  }
+
   static async handleClose(ctx) {
     try {
       await ctx.deleteMessage();
