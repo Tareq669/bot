@@ -4,3 +4,5 @@ build/
 *.iml
 *.idea/
 *.vscode/
+logs/
+*.log
