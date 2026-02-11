@@ -1,36 +1,56 @@
-// Import necessary modules
-const express = require('express');
+// src/index.js
+
+const { Telegraf } = require('telegraf');
 const mongoose = require('mongoose');
-const process = require('process');
+const { MongoClient } = require('mongodb');
+const dotenv = require('dotenv');
 
-// Initialize the application
-const app = express();
+dotenv.config();
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-    console.error(err.stack);
-    res.status(500).send('Something broke!');
+// Connect to MongoDB
+const mongoUri = process.env.MONGO_URI;
+const client = new MongoClient(mongoUri, { useNewUrlParser: true, useUnifiedTopology: true });
+
+(async () => {
+    try {
+        await client.connect();
+        console.log('Connected to database');
+    } catch (error) {
+        console.error('Error connecting to database:', error);
+        process.exit(1);
+    }
+})();
+
+// Initialize Telegraf bot
+const bot = new Telegraf(process.env.BOT_TOKEN);
+
+// Start command
+bot.start((ctx) => {
+    ctx.reply('Welcome!');
 });
 
-// Database connection
-const dbURI = 'your_database_uri';  // replace with your actual database URI
-mongoose.connect(dbURI, { useNewUrlParser: true, useUnifiedTopology: true })
-    .then(() => console.log('Database connected successfully'))
-    .catch(err => console.error('Database connection error:', err));
+// Handle errors
+bot.catch((err) => {
+    console.error('Error occurred:', err);
+});
 
 // Graceful shutdown
-const shutdown = () => {
+process.on('SIGINT', async () => {
     console.log('Shutting down gracefully...');
-    mongoose.connection.close(() => {
-        console.log('Database connection closed');
-        process.exit(0);
-    });
-};
-process.on('SIGINT', shutdown);
-process.on('SIGTERM', shutdown);
+    await client.close();
+    process.exit(0);
+});
 
-// Start the server
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+process.on('SIGTERM', async () => {
+    console.log('Shutting down gracefully...');
+    await client.close();
+    process.exit(0);
+});
+
+// Start the bot
+bot.launch().then(() => {
+    console.log('Bot is running...');
+}).catch((err) => {
+    console.error('Error launching bot:', err);
+    process.exit(1);
 });
