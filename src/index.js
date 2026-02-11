@@ -7,20 +7,6 @@ const dotenv = require('dotenv');
 
 dotenv.config();
 
-// Connect to MongoDB
-const mongoUri = process.env.MONGO_URI;
-const client = new MongoClient(mongoUri, { useNewUrlParser: true, useUnifiedTopology: true });
-
-(async () => {
-    try {
-        await client.connect();
-        console.log('Connected to database');
-    } catch (error) {
-        console.error('Error connecting to database:', error);
-        process.exit(1);
-    }
-})();
-
 // Initialize Telegraf bot
 const bot = new Telegraf(process.env.BOT_TOKEN);
 
@@ -34,23 +20,40 @@ bot.catch((err) => {
     console.error('Error occurred:', err);
 });
 
-// Graceful shutdown
-process.on('SIGINT', async () => {
-    console.log('Shutting down gracefully...');
-    await client.close();
-    process.exit(0);
-});
+// Main startup function
+(async () => {
+    try {
+        // Connect to MongoDB
+        const mongoUri = process.env.MONGODB_URI;
+        const client = new MongoClient(mongoUri);
+        
+        console.log('📡 جاري الاتصال بقاعدة البيانات...');
+        await client.connect();
+        console.log('✅ تم الاتصال بقاعدة البيانات');
 
-process.on('SIGTERM', async () => {
-    console.log('Shutting down gracefully...');
-    await client.close();
-    process.exit(0);
-});
+        // Graceful shutdown
+        process.on('SIGINT', async () => {
+            console.log('\n🛑 إيقاف البوت بشكل آمن...');
+            await client.close();
+            process.exit(0);
+        });
 
-// Start the bot
-bot.launch().then(() => {
-    console.log('Bot is running...');
-}).catch((err) => {
-    console.error('Error launching bot:', err);
-    process.exit(1);
-});
+        process.on('SIGTERM', async () => {
+            console.log('\n🛑 إيقاف البوت بشكل آمن...');
+            await client.close();
+            process.exit(0);
+        });
+
+        // Start the bot
+        console.log('🚀 بدء تشغيل البوت...');
+        await bot.launch();
+        console.log('✅ البوت يعمل الآن!');
+        console.log('🤖 Bot Token: ' + (process.env.BOT_TOKEN ? 'موجود ✓' : 'مفقود ✗'));
+        console.log('📊 Database: متصل ✓');
+        console.log('⏸️  اضغط Ctrl+C لإيقاف البوت');
+
+    } catch (error) {
+        console.error('❌ خطأ:', error.message);
+        process.exit(1);
+    }
+})();
