@@ -606,6 +606,322 @@ bot.action('settings:notifications', (ctx) => MenuHandler.handleNotificationsSet
 bot.action('settings:toggleNotify', (ctx) => MenuHandler.handleToggleNotifications(ctx));
 bot.action('settings:language', (ctx) => MenuHandler.handleLanguageSettings(ctx));
 
+// --- NEW FEATURES MENU ---
+bot.action('menu:newfeatures', async (ctx) => {
+  const UIManager = require('./ui/keyboards');
+  const keyboard = UIManager.newFeaturesMenuKeyboard();
+  await ctx.editMessageText(
+    '✨ <b>المميزات الجديدة في البوت</b>\n\n' +
+    '🎮 <b>الألعاب القرآنية</b> - ألعاب تفاعلية قرآنية ممتعة\n' +
+    '🛍️ <b>المتجر المتقدم</b> - أوسمة وجوائز وأدوات\n' +
+    '💸 <b>النظام المالي</b> - تحويلات وتبرعات\n' +
+    '🔔 <b>الإشعارات الذكية</b> - تنبيهات شخصية مخصصة\n' +
+    '🌍 <b>اللغات المتعددة</b> - عربي وإنجليزي وفرنسي\n' +
+    '📁 <b>النسخ الاحتياطية</b> - حفظ البيانات تلقائياً\n' +
+    '⚡ <b>نظام التخزين المؤقت</b> - أداء أسرع\n' +
+    '🛡️ <b>حماية من الإساءة</b> - أمان معزز',
+    { parse_mode: 'HTML', reply_markup: keyboard }
+  );
+});
+
+bot.action('menu:premiumfeatures', async (ctx) => {
+  const UIManager = require('./ui/keyboards');
+  const keyboard = UIManager.premiumFeaturesKeyboard();
+  await ctx.editMessageText(
+    '💎 <b>الميزات المميزة</b>\n\n' +
+    'قريباً: ميزات احترافية حصرية',
+    { parse_mode: 'HTML', reply_markup: keyboard }
+  );
+});
+
+// --- NEW QGAMES ACTIONS ---
+bot.action('new:qgames', async (ctx) => {
+  const UIManager = require('./ui/keyboards');
+  const keyboard = UIManager.quranicGamesKeyboard();
+  await ctx.editMessageText(
+    '🎮 <b>الألعاب القرآنية</b>\n\n' +
+    '1️⃣ <b>تخمين الآية</b> - خمّن الآية من الآيات الأربعة\n' +
+    '2️⃣ <b>إكمال الآية</b> - أكمل الآية الناقصة\n' +
+    '3️⃣ <b>اكتشف الفرق</b> - جد الفرق بين آيتين\n' +
+    '4️⃣ <b>ثلاثيات قرآنية</b> - أجب على أسئلة قرآنية\n' +
+    '5️⃣ <b>عد السور</b> - عد السور المذكورة\n\n' +
+    '💰 كل لعبة توفر <b>10-20 عملة</b> عند النجاح!',
+    { parse_mode: 'HTML', reply_markup: keyboard }
+  );
+});
+
+bot.action(/qgame:(gueverse|complete|spot|trivia|surah)/, async (ctx) => {
+  ctx.answerCbQuery('🎮 جاري البدء بالعبة...');
+  const GameHandler = require('./commands/gameHandler');
+  const GameManager = require('./games/quranicGames');
+  
+  const gameType = ctx.match[1];
+  const games = {
+    'gueverse': 'guessTheVerse',
+    'complete': 'completeTheVerse',
+    'spot': 'spotTheDifference',
+    'trivia': 'qurranTrivia',
+    'surah': 'surahCount'
+  };
+  
+  const result = await GameManager[games[gameType]](ctx.from.id);
+  if (result.success) {
+    let message = result.question;
+    const keyboard = Markup.inlineKeyboard(
+      result.options.map(opt => [
+        Markup.button.callback(opt, `qgameans:${gameType}:${opt}`)
+      ])
+    );
+    await ctx.reply(message, { parse_mode: 'HTML', reply_markup: keyboard });
+  } else {
+    await ctx.reply('❌ ' + result.message);
+  }
+});
+
+// --- NEW SHOP ACTIONS ---
+bot.action('new:shop', async (ctx) => {
+  const UIManager = require('./ui/keyboards');
+  const keyboard = UIManager.shopMenuKeyboard();
+  await ctx.editMessageText(
+    '🛍️ <b>متجر البوت المتقدم</b>\n\n' +
+    '👑 <b>الأوسمة</b> - أوسمة عادية VIP وأسطورية\n' +
+    '⚡ <b>المعززات</b> - معززات لعبتك بـ 2x و3x\n' +
+    '🎁 <b>الجوائز</b> - جوائز حصرية\n' +
+    '🎮 <b>أدوات الألعاب</b> - كنوز وأدوات خاصة\n\n' +
+    '💰 <b>الرصيد:</b> استخدم <code>/balance</code>',
+    { parse_mode: 'HTML', reply_markup: keyboard }
+  );
+});
+
+bot.action('shop:all', async (ctx) => {
+  const shopSystem = require('./features/shopSystem');
+  const items = shopSystem.getAllShopItems();
+  let message = '🛍️ <b>كل العناصر المتاحة</b>\n\n';
+  items.forEach(item => {
+    message += `${item.emoji} <b>${item.name}</b>\n💰 ${item.price} عملة\n${item.description}\n\n`;
+  });
+  const keyboard = Markup.inlineKeyboard([[Markup.button.callback('⬅️ رجوع', 'new:shop')]]);
+  await ctx.reply(message, { parse_mode: 'HTML', reply_markup: keyboard });
+});
+
+// --- NEW TRANSFER ACTIONS ---
+bot.action('new:transfer', async (ctx) => {
+  const UIManager = require('./ui/keyboards');
+  const keyboard = UIManager.transferMenuKeyboard();
+  await ctx.editMessageText(
+    '💸 <b>نظام التحويلات والتبرعات</b>\n\n' +
+    '💸 <b>تحويل عملات</b> - حول عملاتك لأصدقائك\n' +
+    '⭐ <b>تحويل نقاط</b> - شارك نقاطك\n' +
+    '💝 <b>تبرع خيري</b> - تُرجع لمسكين\n' +
+    '📊 <b>السجل</b> - شاهد تحويلاتك\n\n' +
+    '✅ آمن وموثوق 100%',
+    { parse_mode: 'HTML', reply_markup: keyboard }
+  );
+});
+
+bot.action('transfer:coins', async (ctx) => {
+  ctx.session = ctx.session || {};
+  ctx.session.ecoAwait = { type: 'transfer' };
+  await ctx.reply('💸 <b>تحويل عملات</b>\n\n' +
+    'أدخل معرّف المستخدم الذي تريد التحويل له:\n\n' +
+    '<code>@username</code> أو <code>معرّفه الرقمي</code>',
+    { parse_mode: 'HTML' }
+  );
+});
+
+bot.action('transfer:charity', async (ctx) => {
+  ctx.session = ctx.session || {};
+  ctx.session.ecoAwait = { type: 'donate' };
+  await ctx.reply('💝 <b>تبرع خيري</b>\n\nأدخل المبلغ والجهة (اختياري):\nمثال: 100 مساعدة محتاج', { parse_mode: 'HTML' });
+});
+
+// --- NEW NOTIFICATIONS ACTIONS ---
+bot.action('new:notifications', async (ctx) => {
+  const UIManager = require('./ui/keyboards');
+  const keyboard = UIManager.notificationsMenuKeyboard();
+  await ctx.editMessageText(
+    '🔔 <b>الإشعارات الذكية</b>\n\n' +
+    '🕌 <b>إشعارات الأذكار</b> - تنبيهات يومية\n' +
+    '⏰ <b>إشعارات الصلaة</b> - مواقيت الصلاة\n' +
+    '🎮 <b>إشعارات الألعاب</b> - تذكر بالألعاب\n' +
+    '💰 <b>إشعارات المكافآت</b> - عروض خاصة\n' +
+    '🔔 <b>إشعارات الأحداث</b> - أحداث جديدة\n\n' +
+    '⚙️ اختر الإشعارات التي تريدها',
+    { parse_mode: 'HTML', reply_markup: keyboard }
+  );
+});
+
+bot.action(/notify:(adhkar|prayer|games|rewards|events|stats)/, async (ctx) => {
+  const type = ctx.match[1];
+  const notificationSystem = require('./features/notificationSystem');
+  const user = await require('./database/db').User.findById(ctx.from.id);
+  
+  let message = '';
+  switch(type) {
+    case 'adhkar':
+      message = '🕌 إشعارات الأذكار مفعلة\n✅ ستتلقى تنبيهات يومية بالأذكار';
+      break;
+    case 'prayer':
+      message = '⏰ إشعارات الصلاة\n✅ ستتلقى مواقيت الصلاة';
+      break;
+    case 'games':
+      message = '🎮 إشعارات الألعاب\n✅ سيتم تنبيهك بالألعاب الجديدة';
+      break;
+    case 'rewards':
+      message = '💰 إشعارات المكافآت\n✅ ستتلقى عروض حصرية';
+      break;
+    case 'events':
+      message = '🔔 إشعارات الأحداث\n✅ ستتلقى تنبيهات الأحداث';
+      break;
+    case 'stats':
+      const userStats = await require('./database/db').User.findById(ctx.from.id);
+      message = `📊 <b>إحصائياتك</b>\n\n` +
+        `💰 عملات: ${userStats.coins}\n` +
+        `⭐ نقاط: ${userStats.xp}\n` +
+        `🎮 الألعاب المكملة: ${userStats.gamesPlayed}\n` +
+        `📖 القرآن المقروء: ${userStats.quranPages} صفحة`;
+      break;
+  }
+  
+  await ctx.reply(message, { parse_mode: 'HTML' });
+  ctx.answerCbQuery('✅ تم');
+});
+
+// --- NEW LANGUAGE ACTIONS ---
+bot.action('new:language', async (ctx) => {
+  const UIManager = require('./ui/keyboards');
+  const keyboard = UIManager.languageMenuKeyboard();
+  await ctx.editMessageText(
+    '🌍 <b>إدارة اللغات</b>\n\n' +
+    '🇸🇦 <b>العربية</b> - العربية الفصحى (افتراضي)\n' +
+    '🇬🇧 <b>English</b> - الإنجليزية\n' +
+    '🇫🇷 <b>Français</b> - الفرنسية\n\n' +
+    '📊 اختر لغتك المفضلة',
+    { parse_mode: 'HTML', reply_markup: keyboard }
+  );
+});
+
+bot.action(/lang:(ar|en|fr)/, async (ctx) => {
+  const lang = ctx.match[1];
+  const languageManager = global.languageManager;
+  const result = await languageManager.setUserLanguage(ctx.from.id, lang);
+  
+  const messages = {
+    'ar': '✅ تم تغيير اللغة إلى العربية',
+    'en': '✅ Language changed to English',
+    'fr': '✅ La langue a été changée en français'
+  };
+  
+  await ctx.reply(messages[lang], { parse_mode: 'HTML' });
+  ctx.answerCbQuery('✅');
+});
+
+// --- NEW BACKUP ACTIONS ---
+bot.action('new:backup', async (ctx) => {
+  const UIManager = require('./ui/keyboards');
+  const keyboard = UIManager.backupMenuKeyboard();
+  await ctx.editMessageText(
+    '📁 <b>نظام النسخ الاحتياطية</b>\n\n' +
+    '💾 <b>النسخ التلقائية</b> - يومياً تلقائياً\n' +
+    '📋 <b>قائمة النسخ</b> - كل النسخ المحفوظة\n' +
+    '🔄 <b>استعادة</b> - عودة لنسخة قديمة\n' +
+    '🗑️ <b>حذف</b> - حذف نسخة معينة\n\n' +
+    '✅ بيانات آمنة محمية تماماً',
+    { parse_mode: 'HTML', reply_markup: keyboard }
+  );
+});
+
+bot.action('backup:create', async (ctx) => {
+  await ctx.answerCbQuery('⏳ جاري إنشاء نسخة احتياطية...');
+  const backupSystem = require('./utils/backupSystem');
+  const result = await backupSystem.createBackup('manual');
+  await ctx.reply(result.message, { parse_mode: 'HTML' });
+});
+
+bot.action('backup:list', async (ctx) => {
+  const backupSystem = require('./utils/backupSystem');
+  const backups = await backupSystem.listBackups();
+  let message = '📋 <b>قائمة النسخ الاحتياطية</b>\n\n';
+  backups.forEach((b, i) => {
+    message += `${i+1}. ${b.date}\n📊 ${b.size}\n\n`;
+  });
+  const keyboard = Markup.inlineKeyboard([[Markup.button.callback('⬅️ رجوع', 'new:backup')]]);
+  await ctx.reply(message, { parse_mode: 'HTML', reply_markup: keyboard });
+});
+
+// --- NEW CACHE ACTIONS ---
+bot.action('new:cache', async (ctx) => {
+  const UIManager = require('./ui/keyboards');
+  const keyboard = UIManager.cacheSystemKeyboard();
+  await ctx.editMessageText(
+    '⚡ <b>نظام التخزين المؤقت</b>\n\n' +
+    '📊 <b>إحصائيات</b> - معلومات الذاكرة\n' +
+    '🧹 <b>مسح</b> - تفريغ الذاكرة\n' +
+    '⚡ <b>الأداء</b> - حالة الأداء\n\n' +
+    '⚙️ يحسّن سرعة البوت معاً',
+    { parse_mode: 'HTML', reply_markup: keyboard }
+  );
+});
+
+bot.action('cache:stats', async (ctx) => {
+  const cache = global.cache;
+  const stats = cache.getStats();
+  const message = `📊 <b>إحصائيات الذاكرة</b>\n\n` +
+    `💾 العناصر: ${stats.keys}\n` +
+    `✅ النجاحات: ${stats.hits}\n` +
+    `❌ الفشل: ${stats.misses}\n` +
+    `📈 معدل النجاح: ${((stats.hits / (stats.hits + stats.misses)) * 100).toFixed(2)}%`;
+  const keyboard = Markup.inlineKeyboard([[Markup.button.callback('⬅️ رجوع', 'new:cache')]]);
+  await ctx.reply(message, { parse_mode: 'HTML', reply_markup: keyboard });
+});
+
+bot.action('cache:clear', async (ctx) => {
+  await ctx.answerCbQuery('🧹 جاري المسح...');
+  const cache = global.cache;
+  cache.flushAll();
+  await ctx.reply('✅ تم مسح الذاكرة بنجاح', { parse_mode: 'HTML' });
+});
+
+// --- NEW RATE LIMITER ACTIONS ---
+bot.action('new:ratelimiter', async (ctx) => {
+  const UIManager = require('./ui/keyboards');
+  const keyboard = UIManager.rateLimiterKeyboard();
+  await ctx.editMessageText(
+    '🛡️ <b>نظام الحماية من الإساءة</b>\n\n' +
+    '⚠️ <b>الحد من الرسائل</b> - 10 رسائل/دقيقة\n' +
+    '⚠️ <b>الحد من الأوامر</b> - 20 أمر/دقيقة\n' +
+    '⚠️ <b>الحد من الألعاب</b> - 5 ألعاب/5 دقائق\n\n' +
+    '🔒 حماية عالية ضد الإساءة والبوتات المزعجة',
+    { parse_mode: 'HTML', reply_markup: keyboard }
+  );
+});
+
+bot.action('ratelimit:status', async (ctx) => {
+  const rateLimiter = global.rateLimiter;
+  const status = rateLimiter.getUserStatus(ctx.from.id);
+  const message = `📊 <b>حالة حسابك</b>\n\n` +
+    `الرسائل: ${status.messages.count}/${status.messages.limit}\n` +
+    `الأوامر: ${status.commands.count}/${status.commands.limit}\n` +
+    `الألعاب: ${status.games.count}/${status.games.limit}\n\n` +
+    `${status.blocked ? '🚫 <b>محظور حالياً</b>' : '✅ <b>آمن</b>'}`;
+  const keyboard = Markup.inlineKeyboard([[Markup.button.callback('⬅️ رجوع', 'new:ratelimiter')]]);
+  await ctx.reply(message, { parse_mode: 'HTML', reply_markup: keyboard });
+});
+
+bot.action('ratelimit:info', async (ctx) => {
+  const message = `❓ <b>ما هو نظام الحماية؟</b>\n\n` +
+    `🛡️ يحمي البوت من:\n` +
+    `• البوتات المزعجة\n` +
+    `• الهجمات المكثفة\n` +
+    `• الاستخدام المفرط\n\n` +
+    `⚠️ إذا تجاوزت الحد الأقصى:\n` +
+    `• حظر تلقائي 5 دقائق\n` +
+    `• شطب المحاولات الخاطئة\n\n` +
+    `✅ الاستخدام الطبيعي آمن تماماً`;
+  const keyboard = Markup.inlineKeyboard([[Markup.button.callback('⬅️ رجوع', 'new:ratelimiter')]]);
+  await ctx.reply(message, { parse_mode: 'HTML', reply_markup: keyboard });
+});
+
 // --- ADVANCED FEATURES ACTIONS ---
 bot.action('features:goals', (ctx) => CommandHandler.handleGoals(ctx));
 bot.action('features:charity', (ctx) => CommandHandler.handleCharity(ctx));

@@ -73,7 +73,12 @@ class UIManager {
         Markup.button.callback('🏆 المتصدرين', 'menu:leaderboard'),
         Markup.button.callback('⚙️ الإعدادات', 'menu:settings')
       ],
-      // الصف السادس: الخيارات الإضافية
+      // الصف السادس: الميزات الجديدة
+      [
+        Markup.button.callback('✨ الميزات الجديدة', 'menu:newfeatures'),
+        Markup.button.callback('💎 المميزات', 'menu:premiumfeatures')
+      ],
+      // الصف السابع: الخيارات الإضافية
       [
         Markup.button.callback('📊 إحصائيات', 'stats:view'),
         Markup.button.callback('🎁 المكافآت', 'rewards:daily')
@@ -486,6 +491,195 @@ class UIManager {
         Markup.button.callback('ℹ️ معلومات فريقي', 'team:info')
       ],
       [
+        Markup.button.callback('⬅️ رجوع', 'menu:main')
+      ]
+    ]);
+  }
+
+  // ==================== جديد: المميزات الجديدة ====================
+
+  // New Features Menu - قائمة المميزات الجديدة
+  static newFeaturesMenuKeyboard() {
+    return Markup.inlineKeyboard([
+      [
+        Markup.button.callback('🎮 الألعاب القرآنية', 'new:qgames'),
+        Markup.button.callback('🛍️ المتجر', 'new:shop')
+      ],
+      [
+        Markup.button.callback('💸 التحويلات المالية', 'new:transfer'),
+        Markup.button.callback('💝 التبرعات', 'new:donate')
+      ],
+      [
+        Markup.button.callback('🔔 الإشعارات الذكية', 'new:notifications'),
+        Markup.button.callback('🌍 إدارة اللغات', 'new:language')
+      ],
+      [
+        Markup.button.callback('📁 النسخ الاحتياطية', 'new:backup'),
+        Markup.button.callback('⚡ نظام التخزين المؤقت', 'new:cache')
+      ],
+      [
+        Markup.button.callback('🛡️ حماية من الإساءة', 'new:ratelimiter'),
+        Markup.button.callback('⬅️ رجوع', 'menu:main')
+      ]
+    ]);
+  }
+
+  // Quranic Games Keyboard
+  static quranicGamesKeyboard() {
+    return Markup.inlineKeyboard([
+      [
+        Markup.button.callback('1️⃣ تخمين الآية', 'qgame:gueverse'),
+        Markup.button.callback('2️⃣ إكمال الآية', 'qgame:complete')
+      ],
+      [
+        Markup.button.callback('3️⃣ اكتشف الفرق', 'qgame:spot'),
+        Markup.button.callback('4️⃣ ثلاثيات قرآنية', 'qgame:trivia')
+      ],
+      [
+        Markup.button.callback('5️⃣ عد السور', 'qgame:surah'),
+        Markup.button.callback('⬅️ رجوع', 'new:qgames')
+      ]
+    ]);
+  }
+
+  // Shop Menu - قائمة المتجر
+  static shopMenuKeyboard() {
+    return Markup.inlineKeyboard([
+      [
+        Markup.button.callback('👑 الأوسمة', 'shop:badges'),
+        Markup.button.callback('⚡ المعززات', 'shop:boosts')
+      ],
+      [
+        Markup.button.callback('🎁 الجوائز', 'shop:rewards'),
+        Markup.button.callback('🎮 أدوات الألعاب', 'shop:weapons')
+      ],
+      [
+        Markup.button.callback('📋 الكل', 'shop:all'),
+        Markup.button.callback('🛒 حقيبتي', 'shop:inventory')
+      ],
+      [
+        Markup.button.callback('⬅️ رجوع', 'new:shop')
+      ]
+    ]);
+  }
+
+  // Transfer & Donate Menu
+  static transferMenuKeyboard() {
+    return Markup.inlineKeyboard([
+      [
+        Markup.button.callback('💸 تحويل عملات', 'transfer:coins'),
+        Markup.button.callback('⭐ تحويل نقاط', 'transfer:points')
+      ],
+      [
+        Markup.button.callback('💝 تبرع خيري', 'transfer:charity'),
+        Markup.button.callback('📊 السجل', 'transfer:history')
+      ],
+      [
+        Markup.button.callback('⬅️ رجوع', 'new:transfer')
+      ]
+    ]);
+  }
+
+  // Notifications Settings
+  static notificationsMenuKeyboard() {
+    return Markup.inlineKeyboard([
+      [
+        Markup.button.callback('🕌 إشعارات الأذكار', 'notify:adhkar'),
+        Markup.button.callback('⏰ إشعارات الصلاة', 'notify:prayer')
+      ],
+      [
+        Markup.button.callback('🎮 إشعارات الألعاب', 'notify:games'),
+        Markup.button.callback('💰 إشعارات المكافآت', 'notify:rewards')
+      ],
+      [
+        Markup.button.callback('🔔 انتبه للحدث', 'notify:events'),
+        Markup.button.callback('📊 إحصائياتي', 'notify:stats')
+      ],
+      [
+        Markup.button.callback('⬅️ رجوع', 'new:notifications')
+      ]
+    ]);
+  }
+
+  // Language Settings
+  static languageMenuKeyboard() {
+    return Markup.inlineKeyboard([
+      [
+        Markup.button.callback('🇸🇦 العربية', 'lang:ar'),
+        Markup.button.callback('🇬🇧 English', 'lang:en')
+      ],
+      [
+        Markup.button.callback('🇫🇷 Français', 'lang:fr'),
+        Markup.button.callback('📊 إحصائيات اللغات', 'lang:stats')
+      ],
+      [
+        Markup.button.callback('⬅️ رجوع', 'new:language')
+      ]
+    ]);
+  }
+
+  // Backup System Menu
+  static backupMenuKeyboard() {
+    return Markup.inlineKeyboard([
+      [
+        Markup.button.callback('💾 إنشاء نسخة احتياطية', 'backup:create'),
+        Markup.button.callback('📋 قائمة النسخ', 'backup:list')
+      ],
+      [
+        Markup.button.callback('🔄 استعادة', 'backup:restore'),
+        Markup.button.callback('🗑️ حذف نسخة', 'backup:delete')
+      ],
+      [
+        Markup.button.callback('📊 إحصائيات', 'backup:stats'),
+        Markup.button.callback('⬅️ رجوع', 'new:backup')
+      ]
+    ]);
+  }
+
+  // Cache System Info
+  static cacheSystemKeyboard() {
+    return Markup.inlineKeyboard([
+      [
+        Markup.button.callback('📊 إحصائيات الذاكرة', 'cache:stats'),
+        Markup.button.callback('🧹 مسح الذاكرة', 'cache:clear')
+      ],
+      [
+        Markup.button.callback('⚡ الأداء', 'cache:performance'),
+        Markup.button.callback('❓ معلومات', 'cache:info')
+      ],
+      [
+        Markup.button.callback('⬅️ رجوع', 'new:cache')
+      ]
+    ]);
+  }
+
+  // Rate Limiter Protection Info
+  static rateLimiterKeyboard() {
+    return Markup.inlineKeyboard([
+      [
+        Markup.button.callback('📊 حالتي', 'ratelimit:status'),
+        Markup.button.callback('❓ ما هذا؟', 'ratelimit:info')
+      ],
+      [
+        Markup.button.callback('🛡️ مستويات الحماية', 'ratelimit:levels'),
+        Markup.button.callback('⬅️ رجوع', 'new:ratelimiter')
+      ]
+    ]);
+  }
+
+  // Premium Features Menu
+  static premiumFeaturesKeyboard() {
+    return Markup.inlineKeyboard([
+      [
+        Markup.button.callback('💎 الميزات المميزة', 'premium:features'),
+        Markup.button.callback('💰 الأسعار', 'premium:pricing')
+      ],
+      [
+        Markup.button.callback('🎁 العروض الخاصة', 'premium:offers'),
+        Markup.button.callback('📊 الإحصائيات', 'premium:stats')
+      ],
+      [
+        Markup.button.callback('💳 الاشتراك', 'premium:subscribe'),
         Markup.button.callback('⬅️ رجوع', 'menu:main')
       ]
     ]);
