@@ -1,48 +1,55 @@
 {
-  "name": "arab-telegram-bot",
-  "version": "1.0.0",
-  "description": "Advanced Arabic Telegram Bot with games, economy, content system, and group protection",
-  "main": "src/index.js",
-  "scripts": {
-    "start": "node src/index.js",
-    "dev": "nodemon src/index.js",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage",
-    "lint": "eslint src/**/*.js",
-    "lint:fix": "eslint src/**/*.js --fix",
-    "format": "prettier --write \"src/**/*.js\" \"test/**/*.js\"",
-    "format:check": "prettier --check \"src/**/*.js\" \"test/**/*.js\""
-  },
-  "keywords": [
-    "telegram",
-    "bot",
-    "arabic",
-    "games",
-    "economy"
-  ],
-  "author": "TareqFX",
-  "license": "ISC",
-  "dependencies": {
-    "axios": "^1.5.0",
-    "dotenv": "^16.3.1",
-    "express": "^4.18.2",
-    "https-proxy-agent": "^7.0.6",
-    "moment": "^2.29.4",
-    "mongodb": "^7.1.0",
-    "mongoose": "^7.5.0",
-    "node-cache": "^5.1.2",
-    "node-cron": "^4.2.1",
-    "node-fetch": "^2.7.0",
-    "p-retry": "^7.1.1",
-    "socks-proxy-agent": "^8.0.5",
-    "telegraf": "^4.14.0"
-  },
-  "devDependencies": {
-    "nodemon": "^3.0.1",
-    "jest": "^29.7.0",
-    "@types/jest": "^29.5.11",
-    "eslint": "^8.56.0",
-    "prettier": "^3.1.1"
-  }
+    "name": "arab-telegram-bot",
+    "version": "1.0.0",
+    "description": "Advanced Arabic Telegram Bot with games, economy, content system, and group protection",
+    "main": "src/index.js",
+    "scripts": {
+        "start": "node src/index.js",
+        "dev": "nodemon src/index.js",
+        "test": "jest",
+        "test:watch": "jest --watch",
+        "test:coverage": "jest --coverage",
+        "lint": "eslint src/**/*.js",
+        "lint:fix": "eslint src/**/*.js --fix",
+        "format": "prettier --write \"src/**/*.js\" \"test/**/*.js\"",
+        "format:check": "prettier --check \"src/**/*.js\" \"test/**/*.js\""
+    },
+    "keywords": [
+        "telegram",
+        "bot",
+        "arabic",
+        "games",
+        "economy"
+    ],
+    "author": "TareqFX",
+    "license": "ISC",
+    "dependencies": {
+        "axios": "^1.5.0",
+        "bcryptjs": "^2.4.3",
+        "dotenv": "^16.3.1",
+        "express": "^4.18.2",
+        "https-proxy-agent": "^7.0.6",
+        "joi": "^17.11.0",
+        "moment": "^2.29.4",
+        "mongodb": "^7.1.0",
+        "mongoose": "^7.5.0",
+        "node-cache": "^5.1.2",
+        "node-cron": "^4.2.1",
+        "node-fetch": "^2.7.0",
+        "p-retry": "^7.1.1",
+        "redis": "^4.6.0",
+        "socks-proxy-agent": "^8.0.5",
+        "telegraf": "^4.14.0"
+    },
+    "devDependencies": {
+        "nodemon": "^3.0.1",
+        "jest": "^29.7.0",
+        "@types/jest": "^29.5.11",
+        "eslint": "^8.56.0",
+        "prettier": "^3.1.1"
+    },
+    "engines": {
+        "node": ">=14.0.0",
+        "npm": ">=6.0.0"
+    }
 }

@@ -57,7 +57,7 @@ class AIManager {
 
     // Islamic content request
     if (this.isIslamicRequest(msg)) {
-      return this.generateIslamicResponse();
+      return this.generateIslamicResponse(user);
     }
 
     // Default friendly response
@@ -206,7 +206,7 @@ class AIManager {
 🔥 أنت بتقدم رائع! استمر هكذا! 🚀`;
   }
 
-  static generateIslamicResponse() {
+  static generateIslamicResponse(user) {
     const responses = [
       '📖 <b>محتوى ديني قيّم</b>\n\nاستمع للقرآن وتأمل في آياته، فهناك سلام عظيم ينتظرك! 🕌\n\nجزاك الله خيراً على اهتمامك بالعلم الديني! 📚',
       `🤲 <b>نصيحتك الدينية اليومية</b>\n\nلا تنسَ ذكر الله في كل وقت، فذكر الله يريح النفس ويطمئن القلب! 💚\n\nأستودعك الله يا ${user?.firstName}! 🌙`,
