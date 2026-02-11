@@ -27,6 +27,7 @@ const UIManager = require('./ui/keyboards');
 
 // Import Models
 const { User } = require('./database/models');
+const EconomyManager = require('./economy/economyManager');
 
 // Validate environment variables
 if (!process.env.BOT_TOKEN) {
@@ -46,6 +47,25 @@ const bot = new Telegraf(process.env.BOT_TOKEN);
 bot.use(session());
 
 // ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+/**
+ * Call a menu handler or show fallback message if handler doesn't exist
+ * @param {Object} handler - Handler object (e.g., MenuHandler)
+ * @param {string} methodName - Method name to call
+ * @param {Object} ctx - Telegraf context
+ * @param {string} fallbackMessage - Message to show if handler doesn't exist
+ */
+async function callMenuOrFallback(handler, methodName, ctx, fallbackMessage) {
+  if (typeof handler[methodName] === 'function') {
+    return await handler[methodName](ctx);
+  } else {
+    return ctx.reply(fallbackMessage);
+  }
+}
+
+// ============================================================================
 // MIDDLEWARE
 // ============================================================================
 
@@ -55,7 +75,6 @@ bot.use(async (ctx, next) => {
     try {
       let user = await User.findOne({ userId: ctx.from.id });
       if (!user) {
-        const EconomyManager = require('./economy/economyManager');
         user = await EconomyManager.createUser(ctx.from.id, ctx.from);
       }
       ctx.dbUser = user;
@@ -319,18 +338,10 @@ bot.on('text', async (ctx) => {
       return await MenuHandler.handleSettingsMenu(ctx);
     }
     if (text === '✨ الميزات') {
-      if (typeof MenuHandler.handleFeaturesMenu === 'function') {
-        return await MenuHandler.handleFeaturesMenu(ctx);
-      } else {
-        return ctx.reply('✨ الميزات\n\nهذه الميزة قيد التطوير');
-      }
+      return await callMenuOrFallback(MenuHandler, 'handleFeaturesMenu', ctx, '✨ الميزات\n\nهذه الميزة قيد التطوير');
     }
     if (text === '📚 المكتبة') {
-      if (typeof MenuHandler.handleLibraryMenu === 'function') {
-        return await MenuHandler.handleLibraryMenu(ctx);
-      } else {
-        return ctx.reply('📚 المكتبة\n\nهذه الميزة قيد التطوير');
-      }
+      return await callMenuOrFallback(MenuHandler, 'handleLibraryMenu', ctx, '📚 المكتبة\n\nهذه الميزة قيد التطوير');
     }
     if (text === '🛍️ المتجر') {
       return await MenuHandler.handleShopMenu(ctx);
@@ -354,28 +365,16 @@ bot.on('text', async (ctx) => {
       return await MenuHandler.handleProtectionMenu(ctx);
     }
     if (text === '✨ الميزات الجديدة') {
-      if (typeof MenuHandler.handleNewFeaturesMenu === 'function') {
-        return await MenuHandler.handleNewFeaturesMenu(ctx);
-      } else {
-        return ctx.reply('✨ الميزات الجديدة\n\nهذه الميزة قيد التطوير');
-      }
+      return await callMenuOrFallback(MenuHandler, 'handleNewFeaturesMenu', ctx, '✨ الميزات الجديدة\n\nهذه الميزة قيد التطوير');
     }
     if (text === '📊 إحصائيات') {
-      if (typeof MenuHandler.handleAdminStats === 'function') {
-        return await MenuHandler.handleAdminStats(ctx);
-      } else {
-        return ctx.reply('📊 إحصائيات\n\nهذه الميزة قيد التطوير');
-      }
+      return await callMenuOrFallback(MenuHandler, 'handleAdminStats', ctx, '📊 إحصائيات\n\nهذه الميزة قيد التطوير');
     }
     if (text === '🎁 المكافآت') {
-      if (typeof MenuHandler.handleRewardsMenu === 'function') {
-        return await MenuHandler.handleRewardsMenu(ctx);
-      } else {
-        return ctx.reply('🎁 المكافآت\n\nاستخدم /daily للحصول على مكافأتك اليومية');
-      }
+      return await callMenuOrFallback(MenuHandler, 'handleRewardsMenu', ctx, '🎁 المكافآت\n\nاستخدم /daily للحصول على مكافأتك اليومية');
     }
     if (text === '👑 لوحة المالك') {
-      if (UIManager.isOwner(ctx.from.id)) {
+      if (ctx.from && UIManager.isOwner(ctx.from.id)) {
         return await CommandHandler.handleOwnerPanel(ctx);
       } else {
         return ctx.reply('❌ هذا الأمر متاح للمالك فقط');
@@ -434,7 +433,14 @@ process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 // Handle uncaught exceptions
 process.on('uncaughtException', (error) => {
   logger.error('Uncaught Exception:', error);
-  gracefulShutdown('uncaughtException');
+  // For uncaught exceptions, we need to exit immediately after logging
+  // as the application state may be inconsistent
+  try {
+    bot.stop('uncaughtException');
+  } catch (e) {
+    // Ignore errors during emergency stop
+  }
+  process.exit(1);
 });
 
 // Handle unhandled promise rejections
