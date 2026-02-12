@@ -156,8 +156,8 @@ class LanguageManager {
       guess_choice_label: '🔢 اختيارك:',
       luck_title: '🎮 لعبة الحظ',
       dice_title: '🎲 رول النرد',
-      dice_result_label: '🎲 النتيجة:'
-      ,daily_reward_once: '⏰ يمكنك الادعاء مرة واحدة يومياً فقط',
+      dice_result_label: '🎲 النتيجة:',
+      daily_reward_once: '⏰ يمكنك الادعاء مرة واحدة يومياً فقط',
       daily_reward_try_after: '⏳ حاول بعد {hours} ساعة',
       daily_reward_title: '🎁 <b>مكافأة يومية</b>',
       daily_reward_received: '💰 حصلت على <b>{reward}</b> عملة!',
@@ -170,7 +170,7 @@ class LanguageManager {
       shop_user_not_found: '❌ المستخدم غير موجود',
       shop_insufficient_balance: '❌ رصيدك غير كافي. تحتاج {diff} عملة أخرى',
       shop_purchase_success: '✅ تم الشراء بنجاح!',
-      shop_purchase_summary: '✅ تم الشراء بنجاح!\n\n🎉 {item}\n💰 تم خصم {price} عملة\n\nرصيدك الآن: {coins} عملة'
+      shop_purchase_summary: '✅ تم الشراء بنجاح!\n\n🎉 {item}\n💰 تم خصم {price} عملة\n\nرصيدك الآن: {coins} عملة',
       welcome: 'مرحباً بك في البوت الإسلامي! 🕌',
       start: 'اختر خياراً من القائمة أدناه:',
       help: 'هل تحتاج إلى مساعدة؟',
@@ -324,8 +324,8 @@ class LanguageManager {
       guess_choice_label: '🔢 Your guess:',
       luck_title: '🎮 Luck Game',
       dice_title: '🎲 Dice Roll',
-      dice_result_label: '🎲 Result:'
-      ,daily_reward_once: '⏰ You can claim once per day only',
+      dice_result_label: '🎲 Result:',
+      daily_reward_once: '⏰ You can claim once per day only',
       daily_reward_try_after: '⏳ Try again after {hours} hours',
       daily_reward_title: '🎁 <b>Daily Reward</b>',
       daily_reward_received: '💰 You received <b>{reward}</b> coins!',
@@ -338,7 +338,7 @@ class LanguageManager {
       shop_user_not_found: '❌ User not found',
       shop_insufficient_balance: '❌ Insufficient balance. You need {diff} more coins',
       shop_purchase_success: '✅ Purchase successful!',
-      shop_purchase_summary: '✅ Purchase successful!\n\n🎉 {item}\n💰 {price} coins deducted\n\nYour balance now: {coins} coins'
+      shop_purchase_summary: '✅ Purchase successful!\n\n🎉 {item}\n💰 {price} coins deducted\n\nYour balance now: {coins} coins',
       welcome: 'Welcome to the Islamic Bot! 🕌',
       start: 'Choose an option from the menu below:',
       help: 'Need help?',
@@ -492,8 +492,8 @@ class LanguageManager {
       guess_choice_label: '🔢 Votre essai:',
       luck_title: '🎮 Jeu de Chance',
       dice_title: '🎲 Lancer de des',
-      dice_result_label: '🎲 Resultat:'
-      ,daily_reward_once: '⏰ Vous ne pouvez reclamer qu\'une fois par jour',
+      dice_result_label: '🎲 Resultat:',
+      daily_reward_once: '⏰ Vous ne pouvez reclamer qu\'une fois par jour',
       daily_reward_try_after: '⏳ Reessayez apres {hours} heures',
       daily_reward_title: '🎁 <b>Recompense Quotidienne</b>',
       daily_reward_received: '💰 Vous avez recu <b>{reward}</b> pieces!',
@@ -506,7 +506,7 @@ class LanguageManager {
       shop_user_not_found: '❌ Utilisateur introuvable',
       shop_insufficient_balance: '❌ Solde insuffisant. Il vous faut {diff} pieces',
       shop_purchase_success: '✅ Achat reussi!',
-      shop_purchase_summary: '✅ Achat reussi!\n\n🎉 {item}\n💰 {price} pieces deduites\n\nVotre solde: {coins} pieces'
+      shop_purchase_summary: '✅ Achat reussi!\n\n🎉 {item}\n💰 {price} pieces deduites\n\nVotre solde: {coins} pieces',
       welcome: 'Bienvenue dans le bot islamique! 🕌',
       start: 'Choisissez une option dans le menu ci-dessous:',
       help: 'Besoin d\'aide?',
