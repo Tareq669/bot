@@ -124,13 +124,18 @@ ${prize > 0 ? `💰 الجائزة: +${prize} عملات` : ''}
 
   // Format balance info
   static formatBalanceInfo(user) {
+    const safeUser = user || {};
+    const coins = Number.isFinite(safeUser.coins) ? safeUser.coins : 0;
+    const gamesPlayedTotal = Number.isFinite(safeUser.gamesPlayed?.total)
+      ? safeUser.gamesPlayed.total
+      : 0;
     const message = `
 ╔════════════════════════════════════╗
 ║     💰 رصيدك المالي     
 ╠════════════════════════════════════╣
-║ 💵 الرصيد الحالي: ${user.coins.toLocaleString()}
+║ 💵 الرصيد الحالي: ${coins.toLocaleString()}
 ║ 📈 الدخل اليومي: 50
-║ 💸 الإنفاق: ${user.gamesPlayed.total * 10}
+║ 💸 الإنفاق: ${gamesPlayedTotal * 10}
 ║ 📊 إجمالي المعاملات: (من DB)
 ╚════════════════════════════════════╝
     `;
