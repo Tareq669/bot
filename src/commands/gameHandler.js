@@ -43,7 +43,6 @@ class GameHandler {
     try {
       // Initialize session if needed
       ctx.session = ctx.session || {};
-      
       const gameNumber = Math.floor(Math.random() * 100) + 1;
       ctx.session.gameState = { game: 'guess', number: gameNumber, attempts: 0 };
 
@@ -65,7 +64,6 @@ class GameHandler {
     try {
       // Initialize session if needed
       ctx.session = ctx.session || {};
-      
       const questions = GameManager.getQuizQuestions();
       const question = questions[Math.floor(Math.random() * questions.length)];
 
@@ -93,7 +91,6 @@ class GameHandler {
     try {
       // Initialize session if needed
       ctx.session = ctx.session || {};
-      
       const correct = ctx.session.gameState?.correct;
       const result = answer === correct ? 'win' : 'lost';
       const prize = result === 'win' ? 100 : 0;
