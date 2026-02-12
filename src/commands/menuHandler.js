@@ -690,7 +690,7 @@ ${rankMessage}
 
       users.forEach((u, i) => {
         const medal = i === 0 ? '1.' : i === 1 ? '2.' : i === 2 ? '3.' : `${i+1}.`;
-        const userMark = u.userId === user.userId ? '⬅ أنت' : '';
+        const userMark = u.userId === user.userId ? '<< أنت' : '';
         board += `║ ${medal} ${u.firstName || 'مستخدم'} - ${u.xp.toLocaleString()} نقطة ${userMark}\n`;
       });
 
