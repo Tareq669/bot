@@ -33,8 +33,18 @@ class MenuHandler {
       const user = await User.findOne({ userId: ctx.from.id });
       if (!user) return ctx.reply('❌ لم يتم العثور على ملفك');
 
+      if (!user.khatmaProgress) {
+        user.khatmaProgress = {
+          currentPage: 1,
+          percentComplete: 0,
+          completionCount: 0,
+          daysActive: 0
+        };
+      }
+
       user.khatmaProgress.currentPage = user.khatmaProgress.currentPage || 1;
       user.khatmaProgress.percentComplete = Math.round((user.khatmaProgress.currentPage / 604) * 100);
+      user.khatmaProgress.completionCount = user.khatmaProgress.completionCount || 0;
 
       // Smart Khatma insights
       const pagesLeft = 604 - user.khatmaProgress.currentPage;
