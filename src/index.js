@@ -799,7 +799,13 @@ bot.action('new:language', async (ctx) => {
 
 bot.action(/lang:(ar|en|fr)/, async (ctx) => {
   const lang = ctx.match[1];
-  const languageManager = global.languageManager;
+  let languageManager = global.languageManager;
+  if (!languageManager) {
+    const LanguageManager = require('./utils/languageManager');
+    languageManager = new LanguageManager();
+    global.languageManager = languageManager;
+  }
+
   await languageManager.setUserLanguage(ctx.from.id, lang);
 
   const messages = {
