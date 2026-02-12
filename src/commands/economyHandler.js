@@ -17,7 +17,14 @@ class EconomyHandler {
         [Markup.button.callback('⬅️ رجوع', 'menu:economy')]
       ]);
 
-      await ctx.editMessageText(message, buttons);
+      try {
+        await ctx.editMessageText(message, buttons);
+      } catch (error) {
+        // Ignore "message not modified" error - it's expected when content hasn't changed
+        if (!error.message.includes('message is not modified')) {
+          throw error;
+        }
+      }
     } catch (error) {
       console.error('Error:', error);
       ctx.reply('❌ حدث خطأ');
@@ -46,7 +53,14 @@ class EconomyHandler {
         [Markup.button.callback('⬅️ رجوع', 'menu:economy')]
       ]);
 
-      await ctx.editMessageText(message, buttons);
+      try {
+        await ctx.editMessageText(message, buttons);
+      } catch (error) {
+        // Ignore "message not modified" error - it's expected when shop content hasn't changed
+        if (!error.message.includes('message is not modified')) {
+          console.error('Error editing shop message:', error);
+        }
+      }
     } catch (error) {
       console.error('Error:', error);
       ctx.reply('❌ حدث خطأ');
@@ -63,6 +77,7 @@ class EconomyHandler {
         await ctx.answerCbQuery(result.message);
       }
 
+      // Refresh the shop display (handles "message not modified" gracefully)
       await this.handleShop(ctx);
     } catch (error) {
       console.error('Error:', error);
