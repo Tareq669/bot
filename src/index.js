@@ -2194,16 +2194,15 @@ let botStart = async () => {
         })
         .catch((error) => {
           logger.error('❌ فشل في بدء البوت:', error.message);
-          logger.error('📋 تفاصيل الخطأ:', error);
           reconnectManager.isConnected = false;
           
-          // Handle 409 Conflict error
+          // Handle 409 Conflict error (another bot instance running)
           if (error.response && error.response.error_code === 409) {
-            logger.error('💥 خطأ 409: يوجد نسخة أخرى من البوت تعمل!');
-            logger.error('📍 تأكد من إيقاف جميع النسخ الأخرى على Railway أو أي خدمة أخرى');
-            process.exit(1);
+            logger.warn('⚠️ خطأ 409: يوجد نسخة أخرى من البوت جاري التوقف...');
+            logger.warn('⏳ سيحاول إعادة الاتصال خلال 5 ثواني...');
+            reject(error); // Will trigger retry in startBot
           } else {
-            logger.error('🔄 سيحاول النظام إعادة التشغيل تلقائياً...');
+            logger.error('❌ خطأ غير متوقع:', error.message);
             reject(error);
           }
         });
@@ -2217,6 +2216,9 @@ let botStart = async () => {
 
 async function startBot() {
   try {
+    // Give any previous instance time to fully shutdown (Railway cold start delay)
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
     // Connect to database
     logger.info('📦 جاري الاتصال بـ MongoDB...');
     const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/arab-bot';
@@ -2227,15 +2229,45 @@ async function startBot() {
       logger.info('✅ تم الاتصال بـ MongoDB بنجاح!');
     });
 
-    // Start bot with reconnection management
+    // Start bot with intelligent retry logic
     logger.info('🚀 جاري بدء البوت...');
     
-    try {
-      await botStart();
-      logger.info('✅ البوت جاهز!');
-    } catch (error) {
-      logger.error('❌ فشل في بدء البوت في المحاولة الأولى:', error.message);
-      // Continue - the system will handle reconnection
+    let botStarted = false;
+    let retryCount = 0;
+    const maxRetries = 5;
+    const retryDelays = [3000, 5000, 7000, 10000, 15000]; // Increasing delays
+    
+    while (retryCount < maxRetries && !botStarted) {
+      try {
+        // Wait before trying to start (gives previous instance time to shutdown)
+        if (retryCount > 0) {
+          const delayMs = retryDelays[retryCount - 1];
+          logger.info(`⏳ محاولة #${retryCount + 1}/${maxRetries} بعد ${delayMs / 1000} ثانية...`);
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+        
+        await botStart();
+        botStarted = true;
+        logger.info('✅ البوت جاهز!');
+      } catch (error) {
+        retryCount++;
+        
+        // Check if it's a 409 error (another instance running)
+        if (error.response && error.response.error_code === 409) {
+          logger.warn(`⚠️ محاولة #${retryCount}/${maxRetries} - خطأ 409 (نسخة أخرى تعمل)`);
+          
+          if (retryCount >= maxRetries) {
+            logger.error('❌ تم تجاوز عدد المحاولات. سيتم الإيقاف للسماح للسحابة بإعادة التشغيل.');
+            process.exit(1);
+          }
+        } else {
+          logger.error(`❌ فشل في محاولة #${retryCount}: ${error.message}`);
+          if (retryCount >= maxRetries) {
+            logger.error('❌ تم تجاوز عدد المحاولات.');
+            throw error;
+          }
+        }
+      }
     }
 
     // بدء مراقبة صحة الاتصال
