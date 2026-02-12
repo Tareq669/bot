@@ -15,16 +15,6 @@ const ReconnectManager = require('./utils/reconnect');
 const connectionMonitor = require('./utils/connectionMonitor');
 const healthMonitor = require('./utils/healthMonitor');
 const Formatter = require('./utils/formatter');
-const LanguageManager = require('./utils/languageManager');
-
-const languageManager = new LanguageManager();
-global.languageManager = languageManager;
-
-const getLabels = (key) => Object.values(languageManager.languages)
-  .map((lang) => lang.translations[key])
-  .filter(Boolean);
-
-const matchLabel = (key) => (text) => getLabels(key).includes(text);
 
 // Import AI Systems
 const AIManager = require('./ai/aiManager');
@@ -56,23 +46,6 @@ const bot = new Telegraf(process.env.BOT_TOKEN, {
 // Initialize session middleware
 bot.use(session());
 
-// Language middleware
-bot.use(async (ctx, next) => {
-  if (!ctx.from) {
-    return next();
-  }
-
-  const { language, translations } = await languageManager.getTranslationsForUser(ctx.from.id);
-  ctx.lang = language;
-  ctx.tr = translations;
-  ctx.t = (key, vars = {}) => {
-    const fallback = languageManager.getTranslationsForLanguage('ar');
-    const template = translations[key] || fallback[key] || key;
-    return languageManager.formatTemplate(template, vars);
-  };
-
-  return next();
-});
 
 // --- SET BOT COMMANDS MENU ---
 bot.telegram
@@ -88,7 +61,6 @@ bot.telegram
     { command: 'transfer', description: '📤 تحويل أموال' },
     { command: 'profile', description: '👤 حسابي' },
     { command: 'leaderboard', description: '🏆 المتصدرين' },
-    { command: 'language', description: '🌐 اللغة' },
     { command: 'notifications', description: '🔔 الإشعارات' },
     { command: 'help', description: '❓ المساعدة' }
   ])
@@ -224,16 +196,6 @@ bot.command('transfer', async (ctx) => {
   }
 });
 
-// Multi-language
-bot.command('language', async (ctx) => {
-  try {
-    const { language } = await languageManager.getTranslationsForUser(ctx.from.id);
-    const menu = languageManager.getLanguagesMenu(language);
-    ctx.reply(menu, { parse_mode: 'HTML' });
-  } catch (error) {
-    ctx.reply('❌ خدمة اللغات غير متاحة');
-  }
-});
 
 // Notifications Management
 bot.command('notifications', async (ctx) => {
@@ -622,13 +584,11 @@ bot.action('menu:settings', (ctx) => MenuHandler.handleSettingsMenu(ctx));
 bot.action('menu:shop', (ctx) => MenuHandler.handleShopMenu(ctx));
 bot.action('menu:transfers', (ctx) => MenuHandler.handleTransfersMenu(ctx));
 bot.action('menu:smartnotifications', (ctx) => MenuHandler.handleSmartNotificationsMenu(ctx));
-bot.action('menu:languages', (ctx) => MenuHandler.handleLanguagesMenu(ctx));
 bot.action('menu:backups', (ctx) => MenuHandler.handleBackupsMenu(ctx));
 bot.action('menu:cache', (ctx) => MenuHandler.handleCacheMenu(ctx));
 bot.action('menu:protection', (ctx) => MenuHandler.handleProtectionMenu(ctx));
 bot.action('settings:notifications', (ctx) => MenuHandler.handleNotificationsSettings(ctx));
 bot.action('settings:toggleNotify', (ctx) => MenuHandler.handleToggleNotifications(ctx));
-bot.action('settings:language', (ctx) => MenuHandler.handleLanguageSettings(ctx));
 
 // --- NEW FEATURES MENU ---
 bot.action('menu:newfeatures', async (ctx) => {
@@ -640,7 +600,6 @@ bot.action('menu:newfeatures', async (ctx) => {
       '🛍️ <b>المتجر المتقدم</b> - أوسمة وجوائز وأدوات\n' +
       '💸 <b>النظام المالي</b> - تحويلات وتبرعات\n' +
       '🔔 <b>الإشعارات الذكية</b> - تنبيهات شخصية مخصصة\n' +
-      '🌍 <b>اللغات المتعددة</b> - عربي وإنجليزي وفرنسي\n' +
       '📁 <b>النسخ الاحتياطية</b> - حفظ البيانات تلقائياً\n' +
       '⚡ <b>نظام التخزين المؤقت</b> - أداء أسرع\n' +
       '🛡️ <b>حماية من الإساءة</b> - أمان معزز',
@@ -810,32 +769,6 @@ bot.action(/notify:(adhkar|prayer|games|rewards|events|stats)/, async (ctx) => {
   ctx.answerCbQuery('✅ تم');
 });
 
-// --- NEW LANGUAGE ACTIONS ---
-bot.action('new:language', async (ctx) => {
-  const UIManager = require('./ui/keyboards');
-  const keyboard = UIManager.languageMenuKeyboard();
-  const { language } = await languageManager.getTranslationsForUser(ctx.from.id);
-  const message = languageManager.getLanguagesMenu(language);
-  await ctx.editMessageText(message, { parse_mode: 'HTML', reply_markup: keyboard });
-});
-
-bot.action(/lang:(ar|en|fr)/, async (ctx) => {
-  const lang = ctx.match[1];
-  await languageManager.setUserLanguage(ctx.from.id, lang);
-
-  const messages = {
-    ar: '✅ تم تغيير اللغة إلى العربية',
-    en: '✅ Language changed to English',
-    fr: '✅ La langue a été changée en français'
-  };
-
-  const UIManager = require('./ui/keyboards');
-  const { translations } = await languageManager.getTranslationsForUser(ctx.from.id);
-  const keyboard = UIManager.mainReplyKeyboard(ctx.from.id, translations);
-
-  await ctx.reply(messages[lang], { parse_mode: 'HTML', reply_markup: keyboard.reply_markup });
-  ctx.answerCbQuery('✅');
-});
 
 // --- NEW BACKUP ACTIONS ---
 bot.action('new:backup', async (ctx) => {
@@ -1706,31 +1639,30 @@ bot.action('quote:share', async (ctx) => {
 });
 
 // --- KEYBOARD BUTTON HANDLERS ---
-bot.hears(matchLabel('khatma'), (ctx) => MenuHandler.handleKhatmaMenu(ctx));
-bot.hears(matchLabel('adhkar'), (ctx) => MenuHandler.handleAdhkarMenu(ctx));
-bot.hears(matchLabel('quran'), (ctx) => MenuHandler.handleQuranMenu(ctx));
-bot.hears(matchLabel('quotes'), (ctx) => MenuHandler.handleQuotesMenu(ctx));
-bot.hears(matchLabel('poetry'), (ctx) => MenuHandler.handlePoetryMenu(ctx));
-bot.hears(matchLabel('games'), (ctx) => MenuHandler.handleGamesMenu(ctx));
-bot.hears(matchLabel('economy'), (ctx) => MenuHandler.handleEconomyMenu(ctx));
-bot.hears(matchLabel('profile'), (ctx) => MenuHandler.handleProfileMenu(ctx));
-bot.hears(matchLabel('leaderboard'), (ctx) => MenuHandler.handleLeaderboardMenu(ctx));
-bot.hears(matchLabel('settings'), (ctx) => MenuHandler.handleSettingsMenu(ctx));
-bot.hears(matchLabel('features'), (ctx) => CommandHandler.handleFeaturesMenu(ctx));
-bot.hears(matchLabel('library'), (ctx) => CommandHandler.handleLibrary(ctx));
-bot.hears(matchLabel('stats'), (ctx) => CommandHandler.handleStats(ctx));
-bot.hears(matchLabel('rewards'), (ctx) => CommandHandler.handleRewards(ctx));
-bot.hears(matchLabel('shop'), (ctx) => MenuHandler.handleShopMenu(ctx));
-bot.hears(matchLabel('transfers'), (ctx) => MenuHandler.handleTransfersMenu(ctx));
-bot.hears(matchLabel('smart_notifications'), (ctx) => MenuHandler.handleSmartNotificationsMenu(ctx));
-bot.hears(matchLabel('language_admin'), (ctx) => MenuHandler.handleLanguagesMenu(ctx));
-bot.hears(matchLabel('backups'), (ctx) => MenuHandler.handleBackupsMenu(ctx));
-bot.hears(matchLabel('cache'), (ctx) => MenuHandler.handleCacheMenu(ctx));
-bot.hears(matchLabel('protection'), (ctx) => MenuHandler.handleProtectionMenu(ctx));
-bot.hears(matchLabel('close'), (ctx) => ctx.deleteMessage().catch(() => ctx.reply('✅ تم')));
+bot.hears('🕌 الختمة', (ctx) => MenuHandler.handleKhatmaMenu(ctx));
+bot.hears('📿 الأذكار', (ctx) => MenuHandler.handleAdhkarMenu(ctx));
+bot.hears('📖 القرآن', (ctx) => MenuHandler.handleQuranMenu(ctx));
+bot.hears('💭 الاقتباسات', (ctx) => MenuHandler.handleQuotesMenu(ctx));
+bot.hears('✍️ الشعر', (ctx) => MenuHandler.handlePoetryMenu(ctx));
+bot.hears('🎮 الألعاب', (ctx) => MenuHandler.handleGamesMenu(ctx));
+bot.hears('💰 الاقتصاد', (ctx) => MenuHandler.handleEconomyMenu(ctx));
+bot.hears('👤 حسابي', (ctx) => MenuHandler.handleProfileMenu(ctx));
+bot.hears('🏆 المتصدرين', (ctx) => MenuHandler.handleLeaderboardMenu(ctx));
+bot.hears('⚙️ الإعدادات', (ctx) => MenuHandler.handleSettingsMenu(ctx));
+bot.hears('✨ الميزات', (ctx) => CommandHandler.handleFeaturesMenu(ctx));
+bot.hears('📚 المكتبة', (ctx) => CommandHandler.handleLibrary(ctx));
+bot.hears('📊 إحصائيات', (ctx) => CommandHandler.handleStats(ctx));
+bot.hears('🎁 المكافآت', (ctx) => CommandHandler.handleRewards(ctx));
+bot.hears('🛍️ المتجر', (ctx) => MenuHandler.handleShopMenu(ctx));
+bot.hears('💸 التحويلات والتبرعات', (ctx) => MenuHandler.handleTransfersMenu(ctx));
+bot.hears('🔔 الإشعارات الذكية', (ctx) => MenuHandler.handleSmartNotificationsMenu(ctx));
+bot.hears('📁 النسخ الاحتياطية', (ctx) => MenuHandler.handleBackupsMenu(ctx));
+bot.hears('⚡ التخزين المؤقت', (ctx) => MenuHandler.handleCacheMenu(ctx));
+bot.hears('🛡️ حماية من الإساءة', (ctx) => MenuHandler.handleProtectionMenu(ctx));
+bot.hears('❌ إغلق', (ctx) => ctx.deleteMessage().catch(() => ctx.reply('✅ تم')));
 
 // --- OWNER KEYBOARD BUTTON HANDLERS ---
-bot.hears(matchLabel('owner_panel'), async (ctx) => {
+bot.hears('👑 لوحة المالك', async (ctx) => {
   const UIManager = require('./ui/keyboards');
   if (UIManager.isOwner(ctx.from.id)) {
     await CommandHandler.handleOwnerPanel(ctx);
@@ -2480,11 +2412,6 @@ async function startBot() {
       const RateLimiter = require('./utils/rateLimiter');
       global.rateLimiter = new RateLimiter();
       logger.info('✅ نظام الحماية من الإساءة جاهز');
-
-      // Initialize Language Manager
-      const LanguageManager = require('./utils/languageManager');
-      global.languageManager = new LanguageManager();
-      logger.info('✅ نظام اللغات المتعددة جاهز');
 
       logger.info('✅ جميع الأنظمة الجديدة جاهزة!');
     } catch (error) {

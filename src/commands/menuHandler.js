@@ -795,36 +795,7 @@ ${rankMessage}
   }
 
   static async handleLanguageSettings(ctx) {
-    try {
-      const LanguageManager = require('../utils/languageManager');
-      let languageManager = global.languageManager;
-      if (!languageManager) {
-        languageManager = new LanguageManager();
-        global.languageManager = languageManager;
-      }
-
-      const { language, translations } = await languageManager.getTranslationsForUser(ctx.from.id);
-      const languageInfo = languageManager.getLanguageInfo(language);
-
-      const message = `${translations.language_settings_title}\n\n` +
-        `${translations.current_language.replace('{language}', languageInfo?.name || language)}\n\n` +
-        `${translations.languages_available}\n` +
-        Object.values(languageManager.languages).map((lang) => `• ${lang.name}`).join('\n') +
-        `\n\n${translations.language_choose}\n\n${translations.languages_note}`;
-
-      const buttons = Markup.inlineKeyboard([
-        [Markup.button.callback('⬅️ رجوع', 'menu:settings')]
-      ]);
-
-      try {
-        await ctx.editMessageText(message, { parse_mode: 'HTML', reply_markup: buttons.reply_markup });
-      } catch (e) {
-        await ctx.reply(message, { parse_mode: 'HTML', reply_markup: buttons.reply_markup });
-      }
-    } catch (error) {
-      console.error('Error in handleLanguageSettings:', error);
-      await ctx.reply('❌ حدث خطأ');
-    }
+    await ctx.reply('❌ هذه الميزة غير متاحة');
   }
 
   // إعدادات عامة
@@ -1494,35 +1465,7 @@ ${rankMessage}
   }
 
   static async handleLanguagesMenu(ctx) {
-    try {
-      const UIManager = require('../ui/keyboards');
-      const LanguageManager = require('../utils/languageManager');
-      let languageManager = global.languageManager;
-      if (!languageManager) {
-        languageManager = new LanguageManager();
-        global.languageManager = languageManager;
-      }
-
-      const { language } = await languageManager.getTranslationsForUser(ctx.from.id);
-      const message = languageManager.getLanguagesMenu(language);
-
-      const keyboard = UIManager.languageMenuKeyboard();
-
-      if (ctx.callbackQuery) {
-        await ctx.editMessageText(message, {
-          parse_mode: 'HTML',
-          reply_markup: keyboard.reply_markup
-        });
-      } else {
-        await ctx.reply(message, {
-          parse_mode: 'HTML',
-          reply_markup: keyboard.reply_markup
-        });
-      }
-    } catch (error) {
-      console.error('Error in handleLanguagesMenu:', error);
-      await ctx.reply('❌ حدث خطأ في عرض قائمة اللغات');
-    }
+    await ctx.reply('❌ هذه الميزة غير متاحة');
   }
 
   static async handleBackupsMenu(ctx) {

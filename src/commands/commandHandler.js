@@ -9,32 +9,22 @@ class CommandHandler {
     const user = ctx.from;
 
     try {
-      const LanguageManager = require('../utils/languageManager');
-      let languageManager = global.languageManager;
-      if (!languageManager) {
-        languageManager = new LanguageManager();
-        global.languageManager = languageManager;
-      }
-
       let dbUser = await User.findOne({ userId: user.id });
       if (!dbUser) {
         dbUser = await EconomyManager.createUser(user.id, user);
       }
 
-      const { translations } = await languageManager.getTranslationsForUser(user.id);
-      const name = dbUser.firstName || translations.friend || 'صديقي';
-
       // Check if owner
       const isOwner = UIManager.isOwner(ctx.from.id);
 
       // Simple welcome message with keyboard
-      let message = (translations.welcome_user || '👋 مرحباً {name}!\n\n🎯 اختر من لوحة المفاتيح:').replace('{name}', name);
+      let message = `👋 مرحباً ${dbUser.firstName || 'صديقي'}!\n\n🎯 اختر من لوحة المفاتيح:`;
 
       if (isOwner) {
-        message = (translations.owner_welcome || '👑 أهلاً بك يا مالك البوت {name}!\n\n⚡ لديك صلاحيات كاملة على النظام\n🎯 اختر من لوحة المفاتيح الخاصة:').replace('{name}', name);
+        message = `👑 أهلاً بك يا مالك البوت ${dbUser.firstName}!\n\n⚡ لديك صلاحيات كاملة على النظام\n🎯 اختر من لوحة المفاتيح الخاصة:`;
       }
 
-      const keyboard = UIManager.mainReplyKeyboard(ctx.from.id, translations);
+      const keyboard = UIManager.mainReplyKeyboard(ctx.from.id);
 
       await ctx.reply(message, keyboard);
     } catch (error) {
@@ -44,24 +34,13 @@ class CommandHandler {
   }
 
   static async handleHelp(ctx) {
-    const LanguageManager = require('../utils/languageManager');
-    let languageManager = global.languageManager;
-    if (!languageManager) {
-      languageManager = new LanguageManager();
-      global.languageManager = languageManager;
-    }
+    const helpMessage = `📚 **الأوامر المتاحة:**
 
-    const { translations } = await languageManager.getTranslationsForUser(ctx.from.id);
-
-    const lines = [
-      translations.help_start || '/start - البدء',
-      translations.help_profile || '/profile - ملفك',
-      translations.help_balance || '/balance - رصيدك',
-      translations.help_daily || '/daily - مكافأة يومية',
-      translations.help_leaderboard || '/leaderboard - الترتيب'
-    ];
-
-    const helpMessage = `${translations.help_title || '📚 الأوامر المتاحة:'}\n\n${lines.join('\n')}`;
+/start - البدء
+/profile - ملفك
+/balance - رصيدك
+/daily - مكافأة يومية
+/leaderboard - الترتيب`;
 
     await ctx.reply(helpMessage);
   }
@@ -70,14 +49,14 @@ class CommandHandler {
     try {
       const user = await User.findOne({ userId: ctx.from.id });
       if (!user) {
-        return ctx.reply(ctx.t('user_not_found'));
+        return ctx.reply('❌ لم يتم العثور على ملفك الشخصي');
       }
 
-      const balanceMessage = Formatter.formatBalanceInfo(user, ctx.tr);
+      const balanceMessage = Formatter.formatBalanceInfo(user);
       await ctx.reply(balanceMessage);
     } catch (error) {
       console.error('Error in handleBalance:', error);
-      ctx.reply(ctx.t('error'));
+      ctx.reply('❌ حدث خطأ');
     }
   }
 

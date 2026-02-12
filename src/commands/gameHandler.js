@@ -7,14 +7,14 @@ class GameHandler {
   static async handleRPS(ctx) {
     const buttons = Markup.inlineKeyboard([
       [
-        Markup.button.callback(ctx.t('game_rps_rock'), 'game:rps:rock'),
-        Markup.button.callback(ctx.t('game_rps_paper'), 'game:rps:paper'),
-        Markup.button.callback(ctx.t('game_rps_scissors'), 'game:rps:scissors')
+        Markup.button.callback('🪨 حجر', 'game:rps:rock'),
+        Markup.button.callback('📄 ورق', 'game:rps:paper'),
+        Markup.button.callback('✂️ مقص', 'game:rps:scissors')
       ],
-      [Markup.button.callback(ctx.t('back'), 'menu:games')]
+      [Markup.button.callback('⬅️ رجوع', 'menu:games')]
     ]);
 
-    await ctx.editMessageText(`${ctx.t('game_rps_title')}\n\n${ctx.t('game_rps_choose')}`, buttons);
+    await ctx.editMessageText('🪨 حجر ورق مقص\n\nاختر اختيارك:', buttons);
   }
 
   static async handleRPSChoice(ctx, choice) {
@@ -24,18 +24,18 @@ class GameHandler {
 
       // Add coins if won
       if (result.result === 'win') {
-        await EconomyManager.addCoins(ctx.from.id, result.prize, ctx.t('game_result_win'));
+        await EconomyManager.addCoins(ctx.from.id, result.prize, 'فوز في لعبة');
       }
 
       const buttons = Markup.inlineKeyboard([
-        [Markup.button.callback(ctx.t('game_play_again'), 'game:rps')],
-        [Markup.button.callback(ctx.t('back'), 'menu:games')]
+        [Markup.button.callback('🔄 لعب مرة أخرى', 'game:rps')],
+        [Markup.button.callback('⬅️ رجوع', 'menu:games')]
       ]);
 
       await ctx.editMessageText(message, buttons);
     } catch (error) {
       console.error('Error:', error);
-      ctx.reply(ctx.t('error'));
+      ctx.reply('❌ حدث خطأ');
     }
   }
 
@@ -47,16 +47,16 @@ class GameHandler {
       ctx.session.gameState = { game: 'guess', number: gameNumber, attempts: 0 };
 
       const message = `
-    ${ctx.t('game_guess_title')}
+🔢 لعبة التخمين
 
-    ${ctx.t('game_guess_prompt_1')}
-    ${ctx.t('game_guess_prompt_2')}
+أنا فكرت في رقم من 1 إلى 100
+حاول أن تخمنه!
       `;
 
       await ctx.editMessageText(message);
     } catch (error) {
       console.error('Error:', error);
-      ctx.reply(ctx.t('error'));
+      ctx.reply('❌ حدث خطأ');
     }
   }
 
@@ -64,7 +64,7 @@ class GameHandler {
     try {
       // Initialize session if needed
       ctx.session = ctx.session || {};
-      const questions = GameManager.getQuizQuestions(ctx.lang);
+      const questions = GameManager.getQuizQuestions();
       const question = questions[Math.floor(Math.random() * questions.length)];
 
       ctx.session.gameState = {
@@ -78,12 +78,12 @@ class GameHandler {
         ])
       );
 
-      const localizedMessage = `${ctx.t('game_quiz_title')}\n\n${question.question}`;
+      const message = `🧠 سؤال ثقافي\n\n${question.question}`;
 
-      await ctx.editMessageText(localizedMessage, buttons);
+      await ctx.editMessageText(message, buttons);
     } catch (error) {
       console.error('Error:', error);
-      ctx.reply(ctx.t('error'));
+      ctx.reply('❌ حدث خطأ');
     }
   }
 
@@ -98,27 +98,27 @@ class GameHandler {
       await GameManager.updateGameStats(ctx.from.id, 'اسئلة_ثقافية', result, prize);
 
       if (prize > 0) {
-        await EconomyManager.addCoins(ctx.from.id, prize, ctx.t('game_result_win'));
+        await EconomyManager.addCoins(ctx.from.id, prize, 'إجابة صحيحة');
       }
 
       const message = `
-${ctx.t('game_quiz_title')}
+    🧠 سؤال ثقافي
 
-${ctx.t('game_quiz_correct')} ${correct}
-${ctx.t('game_quiz_answer')} ${answer}
+    ✅ الإجابة الصحيحة: ${correct}
+    📝 إجابتك: ${answer}
 
-${Formatter.formatGameResult(ctx.t('you_name'), result, prize, ctx.tr)}
+    ${Formatter.formatGameResult('أنت', result, prize)}
       `;
 
       const buttons = Markup.inlineKeyboard([
-        [Markup.button.callback(ctx.t('game_quiz_another'), 'game:quiz')],
-        [Markup.button.callback(ctx.t('back'), 'menu:games')]
+        [Markup.button.callback('🔄 سؤال آخر', 'game:quiz')],
+        [Markup.button.callback('⬅️ رجوع', 'menu:games')]
       ]);
 
       await ctx.editMessageText(message, buttons);
     } catch (error) {
       console.error('Error:', error);
-      ctx.reply(ctx.t('error'));
+      ctx.reply('❌ حدث خطأ');
     }
   }
 
@@ -127,18 +127,18 @@ ${Formatter.formatGameResult(ctx.t('you_name'), result, prize, ctx.tr)}
       const result = await GameManager.playDice(ctx.from.id);
 
       if (result.result === 'win') {
-        await EconomyManager.addCoins(ctx.from.id, result.prize, ctx.t('game_result_win'));
+        await EconomyManager.addCoins(ctx.from.id, result.prize, 'فوز في لعبة النرد');
       }
 
       const buttons = Markup.inlineKeyboard([
-        [Markup.button.callback(ctx.t('game_dice_roll_again'), 'game:dice')],
-        [Markup.button.callback(ctx.t('back'), 'menu:games')]
+        [Markup.button.callback('🔄 رول آخر', 'game:dice')],
+        [Markup.button.callback('⬅️ رجوع', 'menu:games')]
       ]);
 
       await ctx.editMessageText(result.message, buttons);
     } catch (error) {
       console.error('Error:', error);
-      ctx.reply(ctx.t('error'));
+      ctx.reply('❌ حدث خطأ');
     }
   }
 
@@ -157,67 +157,47 @@ ${Formatter.formatGameResult(ctx.t('you_name'), result, prize, ctx.tr)}
       }
 
       const message = isSuccess
-        ? ctx.t('game_luck_win', { reward, coins: user.coins })
-        : ctx.t('game_luck_lose');
+        ? `🍀 <b>حظ سعيد!</b> 🎉\n\n✨ لقد فزت بـ <b>${reward}</b> عملة!\n💰 رصيدك الآن: ${user.coins}`
+        : '🍀 <b>لعبة الحظ</b>\n\n😔 لم يحالفك الحظ هذه المرة\nحاول مرة أخرى!';
 
       const buttons = Markup.inlineKeyboard([
-        [Markup.button.callback(ctx.t('game_play_again'), 'game:luck')],
-        [Markup.button.callback(ctx.t('back'), 'menu:games')]
+        [Markup.button.callback('🔄 حاول مرة أخرى', 'game:luck')],
+        [Markup.button.callback('⬅️ رجوع', 'menu:games')]
       ]);
 
       await ctx.editMessageText(message, { parse_mode: 'HTML', reply_markup: buttons.reply_markup });
     } catch (error) {
       console.error('Error in handleLuck:', error);
-      ctx.reply(ctx.t('error'));
+      ctx.reply('❌ حدث خطأ');
     }
   }
 
   static async handleChallenges(ctx) {
     try {
-      const challenges = ctx.lang === 'en'
-        ? [
-          '🏃 Walk 10,000 steps today - Reward: 75 coins',
-          '📖 Read 5 Quran pages - Reward: 100 coins',
-          '🎮 Play 3 different games - Reward: 50 coins',
-          '💰 Collect 500 coins - Reward: 50 extra coins',
-          '🤝 Share the bot with 3 friends - Reward: 150 coins',
-          '⭐ Earn 100 XP - Reward: 75 coins',
-          '📿 Read morning and evening adhkar - Reward: 100 coins'
-        ]
-        : ctx.lang === 'fr'
-          ? [
-            '🏃 Marche 10 000 pas aujourd\'hui - Recompense: 75 pieces',
-            '📖 Lis 5 pages du Coran - Recompense: 100 pieces',
-            '🎮 Joue a 3 jeux differents - Recompense: 50 pieces',
-            '💰 Collecte 500 pieces - Recompense: 50 pieces en plus',
-            '🤝 Partage le bot avec 3 amis - Recompense: 150 pieces',
-            '⭐ Gagne 100 XP - Recompense: 75 pieces',
-            '📿 Lis les adhkar du matin et du soir - Recompense: 100 pieces'
-          ]
-          : [
-            '🏃 امشِ 10,000 خطوة اليوم - مكافأة: 75 عملة',
-            '📖 اقرأ 5 صفحات من القرآن - مكافأة: 100 عملة',
-            '🎮 العب 3 ألعاب مختلفة - مكافأة: 50 عملة',
-            '💰 اجمع 500 عملة - مكافأة: 50 عملة إضافية',
-            '🤝 شارك البوت مع 3 أصدقاء - مكافأة: 150 عملة',
-            '⭐ اكسب 100 نقطة خبرة - مكافأة: 75 عملة',
-            '📿 اقرأ أذكار الصباح والمساء - مكافأة: 100 عملة'
-          ];
+      const challenges = [
+        '🏃 امشِ 10,000 خطوة اليوم - مكافأة: 75 عملة',
+        '📖 اقرأ 5 صفحات من القرآن - مكافأة: 100 عملة',
+        '🎮 العب 3 ألعاب مختلفة - مكافأة: 50 عملة',
+        '💰 اجمع 500 عملة - مكافأة: 50 عملة إضافية',
+        '🤝 شارك البوت مع 3 أصدقاء - مكافأة: 150 عملة',
+        '⭐ اكسب 100 نقطة خبرة - مكافأة: 75 عملة',
+        '📿 اقرأ أذكار الصباح والمساء - مكافأة: 100 عملة'
+      ];
 
       const randomChallenge = challenges[Math.floor(Math.random() * challenges.length)];
 
-      const message = `${ctx.t('game_challenge_title')}\n\n${randomChallenge}\n\n${ctx.t('game_challenge_hint')}`;
+      const message = `🎯 <b>تحديك اليومي</b>\n\n${randomChallenge}\n\n💡 أكمل التحدي للحصول على المكافأة!`;
 
       const buttons = Markup.inlineKeyboard([
-        [Markup.button.callback(ctx.t('game_challenge_another'), 'game:challenges')],
-        [Markup.button.callback(ctx.t('game_challenge_complete'), 'challenge:complete')],
-        [Markup.button.callback(ctx.t('back'), 'menu:games')]
+        [Markup.button.callback('🔄 تحدي آخر', 'game:challenges')],
+        [Markup.button.callback('✅ أكملت', 'challenge:complete')],
+        [Markup.button.callback('⬅️ رجوع', 'menu:games')]
       ]);
 
       await ctx.editMessageText(message, { parse_mode: 'HTML', reply_markup: buttons.reply_markup });
     } catch (error) {
       console.error('Error in handleChallenges:', error);
-      ctx.reply(ctx.t('error'));
+      ctx.reply('❌ حدث خطأ');
     }
   }
 }

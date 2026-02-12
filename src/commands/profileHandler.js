@@ -9,33 +9,31 @@ class ProfileHandler {
     try {
       const user = await User.findOne({ userId: ctx.from.id });
       if (!user) {
-        return ctx.reply(ctx.t('user_not_found'));
+        return ctx.reply('❌ لم يتم العثور على ملفك');
       }
 
-      const unknown = ctx.t('profile_unknown');
-      const noUsername = ctx.t('profile_no_username');
       const message = `
 ╔════════════════════════════════════╗
-║     ${ctx.t('profile_info_title')}     
+    ║     📊 معلومات ملفك     
 ╠════════════════════════════════════╣
-║ ${ctx.t('profile_id_label')} ${user.userId}
-║ ${ctx.t('profile_name_label')} ${user.firstName || unknown} ${user.lastName || ''}
-║ @${user.username || noUsername}
-║ ${ctx.t('profile_level_label')} ${user.level}
-║ ${ctx.t('profile_xp_label')} ${user.xp}
-║ ${ctx.t('profile_coins_label')} ${user.coins}
-║ ${ctx.t('profile_joined_label')} ${new Date(user.createdAt).toLocaleDateString('ar-SA')}
+    ║ 🆔 المعرف: ${user.userId}
+    ║ 📝 الاسم: ${user.firstName || 'غير معروف'} ${user.lastName || ''}
+    ║ @${user.username || 'بدون username'}
+    ║ 🎖️ المستوى: ${user.level}
+    ║ ⭐ النقاط: ${user.xp}
+    ║ 💰 العملات: ${user.coins}
+    ║ 📅 تاريخ الانضمام: ${new Date(user.createdAt).toLocaleDateString('ar-SA')}
 ╚════════════════════════════════════╝
       `;
 
       const buttons = Markup.inlineKeyboard([
-        [Markup.button.callback(ctx.t('back'), 'menu:profile')]
+        [Markup.button.callback('⬅️ رجوع', 'menu:profile')]
       ]);
 
       await ctx.editMessageText(message, buttons);
     } catch (error) {
       console.error('Error:', error);
-      ctx.reply(ctx.t('error'));
+      ctx.reply('❌ حدث خطأ');
     }
   }
 
@@ -44,15 +42,15 @@ class ProfileHandler {
     try {
       const user = await User.findOne({ userId: ctx.from.id });
       if (!user) {
-        return ctx.reply(ctx.t('user_not_found'));
+        return ctx.reply('❌ لم يتم العثور على ملفك');
       }
 
       let message = `
-${ctx.t('profile_badges_title')}
+🏅 شاراتك:
 
 `;
       if (user.badges.length === 0) {
-        message += `${ctx.t('profile_no_badges')}\n\n${ctx.t('profile_no_badges_hint')}`;
+        message += '❌ لم تحصل على أي شارات بعد\n\nابدأ باللعب لتحصل على شارات!';
       } else {
         user.badges.forEach(badge => {
           message += `✅ ${badge}\n`;
@@ -60,13 +58,13 @@ ${ctx.t('profile_badges_title')}
       }
 
       const buttons = Markup.inlineKeyboard([
-        [Markup.button.callback(ctx.t('back'), 'menu:profile')]
+        [Markup.button.callback('⬅️ رجوع', 'menu:profile')]
       ]);
 
       await ctx.editMessageText(message, buttons);
     } catch (error) {
       console.error('Error:', error);
-      ctx.reply(ctx.t('error'));
+      ctx.reply('❌ حدث خطأ');
     }
   }
 
@@ -75,25 +73,25 @@ ${ctx.t('profile_badges_title')}
     try {
       const user = await User.findOne({ userId: ctx.from.id });
       if (!user) {
-        return ctx.reply(ctx.t('user_not_found'));
+        return ctx.reply('❌ لم يتم العثور على ملفك');
       }
 
       const message = `
-${ctx.t('profile_games_title')}
+    📊 إحصائيات الألعاب:
 
-${ctx.t('profile_games_played')} ${user.gamesPlayed.total}
-${ctx.t('profile_games_wins')} ${user.gamesPlayed.wins}
-${ctx.t('profile_games_win_rate')} ${user.gamesPlayed.total > 0 ? Math.round((user.gamesPlayed.wins / user.gamesPlayed.total) * 100) : 0}%
+    🎮 الألعاب الممارسة: ${user.gamesPlayed.total}
+    🏆 الانتصارات: ${user.gamesPlayed.wins}
+    📈 نسبة الفوز: ${user.gamesPlayed.total > 0 ? Math.round((user.gamesPlayed.wins / user.gamesPlayed.total) * 100) : 0}%
       `;
 
       const buttons = Markup.inlineKeyboard([
-        [Markup.button.callback(ctx.t('back'), 'menu:profile')]
+        [Markup.button.callback('⬅️ رجوع', 'menu:profile')]
       ]);
 
       await ctx.editMessageText(message, buttons);
     } catch (error) {
       console.error('Error:', error);
-      ctx.reply(ctx.t('error'));
+      ctx.reply('❌ حدث خطأ');
     }
   }
 
@@ -101,19 +99,19 @@ ${ctx.t('profile_games_win_rate')} ${user.gamesPlayed.total > 0 ? Math.round((us
   static async handleGifts(ctx) {
     try {
       const message = `
-${ctx.t('profile_gifts_title')}
+🎁 الهدايا:
 
-${ctx.t('profile_gifts_none')}
+لا توجد هدايا متاحة حالياً.
       `;
 
       const buttons = Markup.inlineKeyboard([
-        [Markup.button.callback(ctx.t('back'), 'menu:profile')]
+        [Markup.button.callback('⬅️ رجوع', 'menu:profile')]
       ]);
 
       await ctx.editMessageText(message, buttons);
     } catch (error) {
       console.error('Error:', error);
-      ctx.reply(ctx.t('error'));
+      ctx.reply('❌ حدث خطأ');
     }
   }
 }

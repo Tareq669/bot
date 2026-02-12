@@ -1,16 +1,11 @@
 const { GameStats } = require('../database/models');
 const Formatter = require('../ui/formatter');
-const LanguageManager = require('../utils/languageManager');
-
-const languageManager = global.languageManager || new LanguageManager();
-global.languageManager = languageManager;
 
 class GameManager {
   // Rock Paper Scissors Game
   static async playRockPaperScissors(userId, userChoice) {
-    const language = await languageManager.getUserLanguage(userId);
     const choices = ['🪨', '📄', '✂️'];
-    const choiceTexts = language === 'en' ? ['Rock', 'Paper', 'Scissors'] : ['حجر', 'ورق', 'مقص'];
+    const choiceTexts = ['حجر', 'ورق', 'مقص'];
     const idx = Math.floor(Math.random() * 3);
 
     const botChoice = choices[idx];
@@ -36,16 +31,12 @@ class GameManager {
       result: result,
       prize: prize,
       message: `
-${await languageManager.tForUser(userId, 'game_rps_title')}
+🪨 **حجر ورق مقص**
 
-${await languageManager.tForUser(userId, 'rps_you_label')} ${userChoiceStr}
-${await languageManager.tForUser(userId, 'rps_bot_label')} ${botChoice}
+🙂 أنت: ${userChoiceStr}
+🤖 أنا: ${botChoice}
 
-${result === 'win'
-  ? await languageManager.tForUser(userId, 'rps_win_line', { prize })
-  : result === 'lost'
-    ? await languageManager.tForUser(userId, 'rps_loss_line')
-    : await languageManager.tForUser(userId, 'rps_draw_line')}
+${result === 'win' ? `✅ انتصرت! +${prize} عملة` : result === 'lost' ? '❌ خسرت' : '🤝 تعادل'}
       `
     };
   }
@@ -63,13 +54,13 @@ ${result === 'win'
     } else if (userNum > gameNumber) {
       return {
         result: 'playing',
-        hint: await languageManager.tForUser(userId, 'guess_hint_lower'),
+        hint: '📉 الرقم أقل من اختيارك',
         prize: 0
       };
     } else {
       return {
         result: 'playing',
-        hint: await languageManager.tForUser(userId, 'guess_hint_higher'),
+        hint: '📈 الرقم أكثر من اختيارك',
         prize: 0
       };
     }
@@ -82,17 +73,12 @@ ${result === 'win'
       result: result,
       prize: prize,
       message: `
-${await languageManager.tForUser(userId, 'guess_result_title')}
+🎮 لعبة التخمين
 
-${await languageManager.tForUser(userId, 'guess_number_label')} ${gameNumber}
-${await languageManager.tForUser(userId, 'guess_choice_label')} ${userNum}
+🎯 الرقم: ${gameNumber}
+🔢 اختيارك: ${userNum}
 
-${Formatter.formatGameResult(
-  await languageManager.tForUser(userId, 'you_name'),
-  result,
-  prize,
-  (await languageManager.getTranslationsForUser(userId)).translations
-)}
+${Formatter.formatGameResult('أنت', result, prize)}
       `
     };
   }
@@ -114,15 +100,10 @@ ${Formatter.formatGameResult(
       result: result,
       prize: prize,
       message: `
-${await languageManager.tForUser(userId, 'luck_title')}
+🎮 لعبة الحظ
 ${'🍀'.repeat(Math.floor(Math.random() * 10) + 1)}
 
-${Formatter.formatGameResult(
-  await languageManager.tForUser(userId, 'you_name'),
-  result,
-  prize,
-  (await languageManager.getTranslationsForUser(userId)).translations
-)}
+${Formatter.formatGameResult('أنت', result, prize)}
       `
     };
   }
@@ -140,17 +121,12 @@ ${Formatter.formatGameResult(
       prize: prize,
       correctAnswer: correctAnswer,
       message: `
-${await languageManager.tForUser(userId, 'game_quiz_title')}
+🧠 سؤال ثقافي
 
-${await languageManager.tForUser(userId, 'game_quiz_correct')} ${correctAnswer}
-${await languageManager.tForUser(userId, 'game_quiz_answer')} ${userAnswer}
+✅ الإجابة الصحيحة: ${correctAnswer}
+📝 إجابتك: ${userAnswer}
 
-${Formatter.formatGameResult(
-  await languageManager.tForUser(userId, 'you_name'),
-  result,
-  prize,
-  (await languageManager.getTranslationsForUser(userId)).translations
-)}
+${Formatter.formatGameResult('أنت', result, prize)}
       `
     };
   }
@@ -168,16 +144,11 @@ ${Formatter.formatGameResult(
       result: result,
       prize: prize,
       message: `
-${await languageManager.tForUser(userId, 'dice_title')}
+🎲 رول النرد
 
-${await languageManager.tForUser(userId, 'dice_result_label')} ${roll}
+🎲 النتيجة: ${roll}
 
-${Formatter.formatGameResult(
-  await languageManager.tForUser(userId, 'you_name'),
-  result,
-  prize,
-  (await languageManager.getTranslationsForUser(userId)).translations
-)}
+${Formatter.formatGameResult('أنت', result, prize)}
       `
     };
   }
@@ -232,27 +203,7 @@ ${Formatter.formatGameResult(
   }
 
   // Get available questions (mock data)
-  static getQuizQuestions(languageCode = 'ar') {
-    if (languageCode === 'en') {
-      return [
-        {
-          question: 'How many chapters are in the Quran?',
-          options: ['72', '114', '152', '200'],
-          answer: '114'
-        },
-        {
-          question: 'What is the longest chapter in the Quran?',
-          options: ['Al-Fatiha', 'Al-Baqarah', 'Al Imran', 'An-Nisa'],
-          answer: 'Al-Baqarah'
-        },
-        {
-          question: 'How many pillars of Islam are there?',
-          options: ['3', '4', '5', '6'],
-          answer: '5'
-        }
-      ];
-    }
-
+  static getQuizQuestions() {
     return [
       {
         question: 'كم عدد سور القرآن الكريم؟',
