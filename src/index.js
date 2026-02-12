@@ -22,6 +22,7 @@ const LearningSystem = require('./ai/learningSystem');
 const SmartNotifications = require('./ai/smartNotifications');
 const AnalyticsEngine = require('./ai/analyticsEngine');
 const IntegratedAI = require('./ai/integratedAI');
+const ShopSystem = require('./economy/shopSystem');
 
 // Configure HTTPS Agent for Telegram API
 const httpsAgent = new https.Agent({
@@ -1347,10 +1348,11 @@ bot.action('profile:gifts', (ctx) => ProfileHandler.handleGifts(ctx));
 // --- LEADERBOARD FILTERS ---
 bot.action('leaderboard:xp', async (ctx) => {
   try {
-    const users = await user.find().sort({ xp: -1 }).limit(10);
-    const user = await user.findOne({ userId: ctx.from.id });
-    const allUsers = await user.find().sort({ xp: -1 });
-    const userRank = allUsers.findIndex((u) => u.userId === user.userId) + 1;
+    const { User } = require('./database/models');
+    const users = await User.find().sort({ xp: -1 }).limit(10);
+    const currentUser = await User.findOne({ userId: ctx.from.id });
+    const allUsers = await User.find().sort({ xp: -1 });
+    const userRank = allUsers.findIndex((u) => u.userId === currentUser.userId) + 1;
 
     let board = `🏆 **أعلى 10 في النقاط**
 
@@ -1358,7 +1360,7 @@ bot.action('leaderboard:xp', async (ctx) => {
 
     users.forEach((u, i) => {
       const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
-      const userMark = u.userId === user.userId ? ' 👈' : '';
+      const userMark = u.userId === currentUser.userId ? ' 👈' : '';
       board += `${medal} ${u.firstName || 'مستخدم'} - ⭐${u.xp.toLocaleString()}${userMark}\n`;
     });
 
@@ -1369,7 +1371,7 @@ bot.action('leaderboard:xp', async (ctx) => {
       ],
       [Markup.button.callback('⬅️ رجوع', 'menu:main')]
     ]);
-    await ctx.editMessageText(board, buttons);
+    await ctx.editMessageText(board, { reply_markup: buttons.reply_markup });
   } catch (error) {
     ctx.answerCbQuery('❌ خطأ في التحديث');
   }
@@ -1377,10 +1379,11 @@ bot.action('leaderboard:xp', async (ctx) => {
 
 bot.action('leaderboard:coins', async (ctx) => {
   try {
-    const users = await user.find().sort({ coins: -1 }).limit(10);
-    const user = await user.findOne({ userId: ctx.from.id });
-    const allUsers = await user.find().sort({ coins: -1 });
-    const userRank = allUsers.findIndex((u) => u.userId === user.userId) + 1;
+    const { User } = require('./database/models');
+    const users = await User.find().sort({ coins: -1 }).limit(10);
+    const currentUser = await User.findOne({ userId: ctx.from.id });
+    const allUsers = await User.find().sort({ coins: -1 });
+    const userRank = allUsers.findIndex((u) => u.userId === currentUser.userId) + 1;
 
     let board = `💰 **أغنى 10 مستخدمين**
 
@@ -1388,7 +1391,7 @@ bot.action('leaderboard:coins', async (ctx) => {
 
     users.forEach((u, i) => {
       const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
-      const userMark = u.userId === user.userId ? ' 👈' : '';
+      const userMark = u.userId === currentUser.userId ? ' 👈' : '';
       board += `${medal} ${u.firstName || 'مستخدم'} - 💵${u.coins.toLocaleString()}${userMark}\n`;
     });
 
@@ -1399,7 +1402,7 @@ bot.action('leaderboard:coins', async (ctx) => {
       ],
       [Markup.button.callback('⬅️ رجوع', 'menu:main')]
     ]);
-    await ctx.editMessageText(board, buttons);
+    await ctx.editMessageText(board, { reply_markup: buttons.reply_markup });
   } catch (error) {
     ctx.answerCbQuery('❌ خطأ في التحديث');
   }
@@ -1407,10 +1410,11 @@ bot.action('leaderboard:coins', async (ctx) => {
 
 bot.action('leaderboard:level', async (ctx) => {
   try {
-    const users = await user.find().sort({ level: -1, xp: -1 }).limit(10);
-    const user = await user.findOne({ userId: ctx.from.id });
-    const allUsers = await user.find().sort({ level: -1, xp: -1 });
-    const userRank = allUsers.findIndex((u) => u.userId === user.userId) + 1;
+    const { User } = require('./database/models');
+    const users = await User.find().sort({ level: -1, xp: -1 }).limit(10);
+    const currentUser = await User.findOne({ userId: ctx.from.id });
+    const allUsers = await User.find().sort({ level: -1, xp: -1 });
+    const userRank = allUsers.findIndex((u) => u.userId === currentUser.userId) + 1;
 
     let board = `🎖️ **أعلى 10 في المستويات**
 
@@ -1418,7 +1422,7 @@ bot.action('leaderboard:level', async (ctx) => {
 
     users.forEach((u, i) => {
       const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
-      const userMark = u.userId === user.userId ? ' 👈' : '';
+      const userMark = u.userId === currentUser.userId ? ' 👈' : '';
       board += `${medal} ${u.firstName || 'مستخدم'} - 🎖️${u.level} (⭐${u.xp.toLocaleString()})${userMark}\n`;
     });
 
@@ -1429,7 +1433,7 @@ bot.action('leaderboard:level', async (ctx) => {
       ],
       [Markup.button.callback('⬅️ رجوع', 'menu:main')]
     ]);
-    await ctx.editMessageText(board, buttons);
+    await ctx.editMessageText(board, { reply_markup: buttons.reply_markup });
   } catch (error) {
     ctx.answerCbQuery('❌ خطأ في التحديث');
   }
@@ -1446,11 +1450,14 @@ bot.action('stats:view', async (ctx) => {
     const statsMessage = Formatter.formatSmartStats(user);
     await ctx.editMessageText(
       statsMessage,
-      Markup.inlineKeyboard([
-        [Markup.button.callback('🎯 المهام اليومية', 'quests:daily')],
-        [Markup.button.callback('🏅 الإنجازات', 'achievements:view')],
-        [Markup.button.callback('⬅️ رجوع', 'menu:main')]
-      ])
+      {
+        parse_mode: 'HTML',
+        reply_markup: Markup.inlineKeyboard([
+          [Markup.button.callback('🎯 المهام اليومية', 'quests:daily')],
+          [Markup.button.callback('🏅 الإنجازات', 'achievements:view')],
+          [Markup.button.callback('⬅️ رجوع', 'menu:main')]
+        ]).reply_markup
+      }
     );
   } catch (error) {
     ctx.answerCbQuery('❌ خطأ في التحديث');
@@ -1539,7 +1546,6 @@ bot.action('stats:view', async (ctx) => {
     await ctx.editMessageText(
       statsMessage,
       Markup.inlineKeyboard([
-        [Markup.button.callback('🎯 المهام اليومية', 'quests:daily')],
         [Markup.button.callback('🏅 الإنجازات', 'achievements:view')],
         [Markup.button.callback('⬅️ رجوع', 'menu:main')]
       ])
@@ -1834,7 +1840,7 @@ bot.on('text', async (ctx) => {
             [Markup.button.callback('🚫 حظر', `admin:ban:${  foundUser.userId}`)],
             [Markup.button.callback('✅ السماح', `admin:unban:${  foundUser.userId}`)],
             [Markup.button.callback('⬅️ رجوع', 'settings:users')]
-          ]);
+          );
 
           return ctx.reply(userInfo, { parse_mode: 'HTML', reply_markup: buttons.reply_markup });
         }
@@ -1965,7 +1971,7 @@ bot.on('text', async (ctx) => {
 
           ctx.session.ecoAwait = null;
 
-          // Notify sender
+          // Notify the user
           await ctx.reply(
             '✅ <b>تم التحويل بنجاح!</b>\n\n' +
               `💸 حولت ${amount} عملة لـ ${awaiting.targetName}\n` +
@@ -2081,7 +2087,7 @@ bot.on('text', async (ctx) => {
           }
 
           return ctx.reply(
-            '✅ <b>تم بنجاح</b>\n\n' +
+            '✅ تم بنجاح\n' +
               `المستخدم: ${targetUser.firstName}\n` +
               `المبلغ: ${amount} عملة\n` +
               `الرصيد الجديد: ${targetUser.coins} عملة`,
@@ -2130,7 +2136,7 @@ bot.on('text', async (ctx) => {
 
           ctx.session.ownerAwait = null;
           return ctx.reply(
-            '✅ <b>تم التوزيع</b>\n\n' +
+            '✅ تم التوزيع\n' +
               `عدد المستخدمين: ${updated}\n` +
               `المبلغ لكل مستخدم: ${amount} عملة\n` +
               `المجموع الكلي: ${updated * amount} عملة`,
