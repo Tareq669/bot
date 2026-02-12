@@ -1,4 +1,7 @@
 class Formatter {
+  static getLabel(labels, key, fallback) {
+    return (labels && labels[key]) || fallback;
+  }
   // AI Smart Greeting
   static getSmartGreeting(user) {
     const hour = new Date().getHours();
@@ -108,35 +111,46 @@ ${recommendations.map(rec => `║ ${rec}`).join('\n')}
   }
 
   // Format game result
-  static formatGameResult(playerName, result, prize = 0) {
+  static formatGameResult(playerName, result, prize = 0, labels = null) {
     const resultEmoji = result === 'win' ? '🎉' : result === 'draw' ? '🤝' : '😔';
-    const resultText = result === 'win' ? 'انتصار!' : result === 'draw' ? 'تعادل!' : 'هزيمة!';
+    const winText = this.getLabel(labels, 'game_result_win', 'انتصار!');
+    const drawText = this.getLabel(labels, 'game_result_draw', 'تعادل!');
+    const lostText = this.getLabel(labels, 'game_result_lost', 'هزيمة!');
+    const resultText = result === 'win' ? winText : result === 'draw' ? drawText : lostText;
+    const playerLabel = this.getLabel(labels, 'game_result_player', '🎮 اللاعب:');
+    const outcomeLabel = this.getLabel(labels, 'game_result_outcome', '🏆 النتيجة:');
+    const prizeLabel = this.getLabel(labels, 'game_result_prize', '💰 الجائزة:');
 
     const message = `
 ${resultEmoji} ${resultText}
 
-🎮 اللاعب: ${playerName}
-🏆 النتيجة: ${resultText}
-${prize > 0 ? `💰 الجائزة: +${prize} عملات` : ''}
+${playerLabel} ${playerName}
+${outcomeLabel} ${resultText}
+${prize > 0 ? `${prizeLabel} +${prize}` : ''}
     `;
     return message.trim();
   }
 
   // Format balance info
-  static formatBalanceInfo(user) {
+  static formatBalanceInfo(user, labels = null) {
     const safeUser = user || {};
     const coins = Number.isFinite(safeUser.coins) ? safeUser.coins : 0;
     const gamesPlayedTotal = Number.isFinite(safeUser.gamesPlayed?.total)
       ? safeUser.gamesPlayed.total
       : 0;
+    const title = this.getLabel(labels, 'balance_title', '💰 رصيدك المالي');
+    const currentLabel = this.getLabel(labels, 'balance_current_label', '💵 الرصيد الحالي:');
+    const dailyLabel = this.getLabel(labels, 'balance_daily_income_label', '📈 الدخل اليومي:');
+    const spendingLabel = this.getLabel(labels, 'balance_spending_label', '💸 الإنفاق:');
+    const transactionsLabel = this.getLabel(labels, 'balance_transactions_label', '📊 إجمالي المعاملات:');
     const message = `
 ╔════════════════════════════════════╗
-║     💰 رصيدك المالي     
+║     ${title}     
 ╠════════════════════════════════════╣
-║ 💵 الرصيد الحالي: ${coins.toLocaleString()}
-║ 📈 الدخل اليومي: 50
-║ 💸 الإنفاق: ${gamesPlayedTotal * 10}
-║ 📊 إجمالي المعاملات: (من DB)
+║ ${currentLabel} ${coins.toLocaleString()}
+║ ${dailyLabel} 50
+║ ${spendingLabel} ${gamesPlayedTotal * 10}
+║ ${transactionsLabel} (DB)
 ╚════════════════════════════════════╝
     `;
     return message.trim();

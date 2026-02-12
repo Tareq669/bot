@@ -56,6 +56,24 @@ const bot = new Telegraf(process.env.BOT_TOKEN, {
 // Initialize session middleware
 bot.use(session());
 
+// Language middleware
+bot.use(async (ctx, next) => {
+  if (!ctx.from) {
+    return next();
+  }
+
+  const { language, translations } = await languageManager.getTranslationsForUser(ctx.from.id);
+  ctx.lang = language;
+  ctx.tr = translations;
+  ctx.t = (key, vars = {}) => {
+    const fallback = languageManager.getTranslationsForLanguage('ar');
+    const template = translations[key] || fallback[key] || key;
+    return languageManager.formatTemplate(template, vars);
+  };
+
+  return next();
+});
+
 // --- SET BOT COMMANDS MENU ---
 bot.telegram
   .setMyCommands([

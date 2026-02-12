@@ -70,14 +70,14 @@ class CommandHandler {
     try {
       const user = await User.findOne({ userId: ctx.from.id });
       if (!user) {
-        return ctx.reply('❌ لم يتم العثور على ملفك الشخصي');
+        return ctx.reply(ctx.t('user_not_found'));
       }
 
-      const balanceMessage = Formatter.formatBalanceInfo(user);
+      const balanceMessage = Formatter.formatBalanceInfo(user, ctx.tr);
       await ctx.reply(balanceMessage);
     } catch (error) {
       console.error('Error in handleBalance:', error);
-      ctx.reply('❌ حدث خطأ');
+      ctx.reply(ctx.t('error'));
     }
   }
 

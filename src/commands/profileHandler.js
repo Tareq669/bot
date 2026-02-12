@@ -9,31 +9,33 @@ class ProfileHandler {
     try {
       const user = await User.findOne({ userId: ctx.from.id });
       if (!user) {
-        return ctx.reply('❌ لم يتم العثور على ملفك');
+        return ctx.reply(ctx.t('user_not_found'));
       }
 
+      const unknown = ctx.t('profile_unknown');
+      const noUsername = ctx.t('profile_no_username');
       const message = `
 ╔════════════════════════════════════╗
-║     📊 معلومات ملفك     
+║     ${ctx.t('profile_info_title')}     
 ╠════════════════════════════════════╣
-║ 🆔 المعرف: ${user.userId}
-║ 📝 الاسم: ${user.firstName || 'غير معروف'} ${user.lastName || ''}
-║ @${user.username || 'بدون username'}
-║ 🎖️ المستوى: ${user.level}
-║ ⭐ النقاط: ${user.xp}
-║ 💰 العملات: ${user.coins}
-║ 📅 تاريخ الانضمام: ${new Date(user.createdAt).toLocaleDateString('ar-SA')}
+║ ${ctx.t('profile_id_label')} ${user.userId}
+║ ${ctx.t('profile_name_label')} ${user.firstName || unknown} ${user.lastName || ''}
+║ @${user.username || noUsername}
+║ ${ctx.t('profile_level_label')} ${user.level}
+║ ${ctx.t('profile_xp_label')} ${user.xp}
+║ ${ctx.t('profile_coins_label')} ${user.coins}
+║ ${ctx.t('profile_joined_label')} ${new Date(user.createdAt).toLocaleDateString('ar-SA')}
 ╚════════════════════════════════════╝
       `;
 
       const buttons = Markup.inlineKeyboard([
-        [Markup.button.callback('⬅️ رجوع', 'menu:profile')]
+        [Markup.button.callback(ctx.t('back'), 'menu:profile')]
       ]);
 
       await ctx.editMessageText(message, buttons);
     } catch (error) {
       console.error('Error:', error);
-      ctx.reply('❌ حدث خطأ');
+      ctx.reply(ctx.t('error'));
     }
   }
 
@@ -42,15 +44,15 @@ class ProfileHandler {
     try {
       const user = await User.findOne({ userId: ctx.from.id });
       if (!user) {
-        return ctx.reply('❌ لم يتم العثور على ملفك');
+        return ctx.reply(ctx.t('user_not_found'));
       }
 
       let message = `
-🏅 شاراتك:
+${ctx.t('profile_badges_title')}
 
 `;
       if (user.badges.length === 0) {
-        message += '❌ لم تحصل على أي شارات بعد\n\nابدأ باللعب لتحصل على شارات!';
+        message += `${ctx.t('profile_no_badges')}\n\n${ctx.t('profile_no_badges_hint')}`;
       } else {
         user.badges.forEach(badge => {
           message += `✅ ${badge}\n`;
@@ -58,13 +60,13 @@ class ProfileHandler {
       }
 
       const buttons = Markup.inlineKeyboard([
-        [Markup.button.callback('⬅️ رجوع', 'menu:profile')]
+        [Markup.button.callback(ctx.t('back'), 'menu:profile')]
       ]);
 
       await ctx.editMessageText(message, buttons);
     } catch (error) {
       console.error('Error:', error);
-      ctx.reply('❌ حدث خطأ');
+      ctx.reply(ctx.t('error'));
     }
   }
 
@@ -73,25 +75,25 @@ class ProfileHandler {
     try {
       const user = await User.findOne({ userId: ctx.from.id });
       if (!user) {
-        return ctx.reply('❌ لم يتم العثور على ملفك');
+        return ctx.reply(ctx.t('user_not_found'));
       }
 
       const message = `
-📊 إحصائيات الألعاب:
+${ctx.t('profile_games_title')}
 
-🎮 الألعاب الممارسة: ${user.gamesPlayed.total}
-🏆 الانتصارات: ${user.gamesPlayed.wins}
-📈 نسبة الفوز: ${user.gamesPlayed.total > 0 ? Math.round((user.gamesPlayed.wins / user.gamesPlayed.total) * 100) : 0}%
+${ctx.t('profile_games_played')} ${user.gamesPlayed.total}
+${ctx.t('profile_games_wins')} ${user.gamesPlayed.wins}
+${ctx.t('profile_games_win_rate')} ${user.gamesPlayed.total > 0 ? Math.round((user.gamesPlayed.wins / user.gamesPlayed.total) * 100) : 0}%
       `;
 
       const buttons = Markup.inlineKeyboard([
-        [Markup.button.callback('⬅️ رجوع', 'menu:profile')]
+        [Markup.button.callback(ctx.t('back'), 'menu:profile')]
       ]);
 
       await ctx.editMessageText(message, buttons);
     } catch (error) {
       console.error('Error:', error);
-      ctx.reply('❌ حدث خطأ');
+      ctx.reply(ctx.t('error'));
     }
   }
 
@@ -99,19 +101,19 @@ class ProfileHandler {
   static async handleGifts(ctx) {
     try {
       const message = `
-🎁 الهدايا:
+${ctx.t('profile_gifts_title')}
 
-لا توجد هدايا متاحة حالياً.
+${ctx.t('profile_gifts_none')}
       `;
 
       const buttons = Markup.inlineKeyboard([
-        [Markup.button.callback('⬅️ رجوع', 'menu:profile')]
+        [Markup.button.callback(ctx.t('back'), 'menu:profile')]
       ]);
 
       await ctx.editMessageText(message, buttons);
     } catch (error) {
       console.error('Error:', error);
-      ctx.reply('❌ حدث خطأ');
+      ctx.reply(ctx.t('error'));
     }
   }
 }

@@ -1,5 +1,9 @@
 const { User, Transaction } = require('../database/models');
 const Formatter = require('../ui/formatter');
+const LanguageManager = require('../utils/languageManager');
+
+const languageManager = global.languageManager || new LanguageManager();
+global.languageManager = languageManager;
 
 class EconomyManager {
   // Get user balance
@@ -95,7 +99,7 @@ class EconomyManager {
         type: 'transfer',
         amount,
         relatedUserId: toUserId,
-        reason: 'تحويل إلى مستخدم آخر',
+        reason: 'transfer_to_user',
         status: 'completed'
       });
 
@@ -104,7 +108,7 @@ class EconomyManager {
         type: 'earn',
         amount,
         relatedUserId: fromUserId,
-        reason: 'استقبال تحويل',
+        reason: 'transfer_received',
         status: 'completed'
       });
 
@@ -134,9 +138,11 @@ class EconomyManager {
 
         const hoursLeft = Math.ceil((nextClaimTime - now) / (1000 * 60 * 60));
 
+        const onceMessage = await languageManager.tForUser(userId, 'daily_reward_once');
+        const afterMessage = await languageManager.tForUser(userId, 'daily_reward_try_after', { hours: hoursLeft });
         return {
           success: false,
-          message: `⏰ يمكنك الادعاء مرة واحدة يومياً فقط\n⏳ حاول بعد ${hoursLeft} ساعة`,
+          message: `${onceMessage}\n${afterMessage}`,
           nextClaimTime: nextClaimTime
         };
       }
@@ -166,19 +172,19 @@ class EconomyManager {
         userId,
         type: 'reward',
         amount: reward,
-        reason: `مكافأة يومية (يوم ${user.dailyReward.streak})`,
+        reason: `daily_reward_day_${user.dailyReward.streak}`,
         status: 'completed'
       });
 
-      let message = '🎁 <b>مكافأة يومية</b>\n\n';
-      message += `💰 حصلت على <b>${reward}</b> عملة!\n`;
+      let message = await languageManager.tForUser(userId, 'daily_reward_title');
+      message += `\n\n${await languageManager.tForUser(userId, 'daily_reward_received', { reward })}`;
       if (bonus > 0) {
-        message += `🎁 مكافأة إضافية: <b>${bonus}</b> عملة\n`;
+        message += `\n${await languageManager.tForUser(userId, 'daily_reward_bonus', { bonus })}`;
       }
-      message += '⭐ حصلت على <b>50</b> نقطة XP\n\n';
-      message += `⛓️ <b>سلسلتك المتتالية:</b> <b>${user.dailyReward.streak}</b> يوم\n`;
-      message += `💵 <b>رصيدك الجديد:</b> <b>${user.coins}</b> عملة\n\n`;
-      message += '✨ تذكر: ادعِ المكافأة كل يوم للحفاظ على سلسلتك!';
+      message += `\n${await languageManager.tForUser(userId, 'daily_reward_xp', { xp: 50 })}\n`;
+      message += `\n${await languageManager.tForUser(userId, 'daily_reward_streak', { streak: user.dailyReward.streak })}`;
+      message += `\n${await languageManager.tForUser(userId, 'daily_reward_balance', { coins: user.coins })}\n\n`;
+      message += await languageManager.tForUser(userId, 'daily_reward_reminder');
 
       return {
         success: true,
@@ -192,37 +198,69 @@ class EconomyManager {
       console.error('Error claiming daily reward:', error);
       return {
         success: false,
-        message: '❌ حدث خطأ في استرجاع المكافأة'
+        message: await languageManager.tForUser(userId, 'error')
       };
     }
   }
 
   // Shop system - get items
-  static getShopItems() {
+  static getShopItems(languageCode = 'ar') {
     return [
-      { id: 1, name: '⭐ نجمة برّاقة', price: 100, emoji: '⭐' },
-      { id: 2, name: '🎖️ ميدالية ذهبية', price: 250, emoji: '🎖️' },
-      { id: 3, name: '👑 تاج ملكي', price: 500, emoji: '👑' },
-      { id: 4, name: '🎯 درع الشرف', price: 1000, emoji: '🎯' },
-      { id: 5, name: '💎 جوهرة نادرة', price: 2000, emoji: '💎' }
+      {
+        id: 1,
+        name: languageCode === 'en' ? '⭐ Shining Star' : '⭐ نجمة برّاقة',
+        price: 100,
+        emoji: '⭐'
+      },
+      {
+        id: 2,
+        name: languageCode === 'en' ? '🎖️ Golden Medal' : '🎖️ ميدالية ذهبية',
+        price: 250,
+        emoji: '🎖️'
+      },
+      {
+        id: 3,
+        name: languageCode === 'en' ? '👑 Royal Crown' : '👑 تاج ملكي',
+        price: 500,
+        emoji: '👑'
+      },
+      {
+        id: 4,
+        name: languageCode === 'en' ? '🎯 Honor Shield' : '🎯 درع الشرف',
+        price: 1000,
+        emoji: '🎯'
+      },
+      {
+        id: 5,
+        name: languageCode === 'en' ? '💎 Rare Gem' : '💎 جوهرة نادرة',
+        price: 2000,
+        emoji: '💎'
+      }
     ];
   }
 
   // Buy item
   static async buyItem(userId, itemId) {
     try {
-      const items = this.getShopItems();
+      const language = await languageManager.getUserLanguage(userId);
+      const items = this.getShopItems(language);
       const item = items.find(i => i.id === parseInt(itemId));
 
-      if (!item) return { success: false, message: '❌ العنصر غير موجود' };
+      if (!item) {
+        return { success: false, message: await languageManager.tForUser(userId, 'shop_item_not_found') };
+      }
 
       const user = await User.findOne({ userId });
-      if (!user) return { success: false, message: '❌ المستخدم غير موجود' };
+      if (!user) {
+        return { success: false, message: await languageManager.tForUser(userId, 'shop_user_not_found') };
+      }
 
       if (user.coins < item.price) {
         return {
           success: false,
-          message: `❌ رصيدك غير كافي. تحتاج ${item.price - user.coins} عملة أخرى`
+          message: await languageManager.tForUser(userId, 'shop_insufficient_balance', {
+            diff: item.price - user.coins
+          })
         };
       }
 
@@ -244,11 +282,15 @@ class EconomyManager {
 
       return {
         success: true,
-        message: `✅ تم شراء ${item.name}!\n💰 رصيدك الجديد: ${user.coins}`
+        message: await languageManager.tForUser(userId, 'shop_purchase_summary', {
+          item: item.name,
+          price: item.price,
+          coins: user.coins
+        })
       };
     } catch (error) {
       console.error('Error buying item:', error);
-      return { success: false, message: '❌ حدث خطأ في الشراء' };
+      return { success: false, message: await languageManager.tForUser(userId, 'error') };
     }
   }
 
