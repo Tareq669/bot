@@ -2296,54 +2296,59 @@ async function startBot() {
     }
 
       // Start Khatma scheduler (sends notifications to opted-in users)
+      let khatmaScheduler = null;
       try {
         const KhatmaScheduler = require('./utils/khatmaScheduler');
-        const khatmaScheduler = new KhatmaScheduler({ intervalMs: 1000 * 60 * 15 }, bot);
+        khatmaScheduler = new KhatmaScheduler({ intervalMs: 1000 * 60 * 15 }, bot);
         khatmaScheduler.start();
         logger.info('🔔 KhatmaScheduler started — notifying opted-in users');
-
-        // stop scheduler on shutdown
-        process.once('SIGINT', () => {
-          try { khatmaScheduler.stop(); } catch (e) { /* ignore */ }
-        });
-        process.once('SIGTERM', () => {
-          try { khatmaScheduler.stop(); } catch (e) { /* ignore */ }
-        });
       } catch (err) {
         logger.error('❌ Failed to start KhatmaScheduler:', err.message);
       }
 
     // Graceful shutdown
-    process.once('SIGINT', () => {
-      logger.info('🛑 جاري إيقاف البوت...');
-      reconnectManager.stop();
-      connectionMonitor.stopMonitoring();
-      healthMonitor.stopPeriodicCheck();
-      bot.stop('SIGINT');
+    const gracefulShutdown = (signal) => {
+      logger.info(`🛑 جاري إيقاف البوت... (${signal})`);
+      
+      // Stop all services
+      try {
+        if (khatmaScheduler) khatmaScheduler.stop();
+        reconnectManager.stop();
+        connectionMonitor.stopMonitoring();
+        healthMonitor.stopPeriodicCheck();
+      } catch (error) {
+        logger.error('خطأ أثناء إيقاف الخدمات:', error);
+      }
+      
+      // Stop bot
+      bot.stop(signal);
       process.exit(0);
-    });
+    };
 
-    process.once('SIGTERM', () => {
-      logger.info('🛑 جاري إيقاف البوت...');
-      reconnectManager.stop();
-      connectionMonitor.stopMonitoring();
-      healthMonitor.stopPeriodicCheck();
-      bot.stop('SIGTERM');
-      process.exit(0);
-    });
+    process.once('SIGINT', () => gracefulShutdown('SIGINT'));
+    process.once('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
     // معالجة أخطاء غير متوقعة
     process.on('unhandledRejection', (reason, promise) => {
       logger.error('❌ Promise Rejection غير معالج:', reason);
+      healthMonitor.logError();
     });
 
     process.on('uncaughtException', (error) => {
       logger.error('❌ استثناء غير معالج:', error);
-      // إعادة تشغيل البوت تلقائياً
-      setTimeout(() => {
-        logger.info('🔄 جاري إعادة تشغيل البوت...');
-        botStart();
-      }, 5000);
+      healthMonitor.logError();
+      
+      // في بيئة الإنتاج، دع السحابة تتعامل مع إعادة التشغيل
+      if (process.env.NODE_ENV === 'production') {
+        logger.error('💥 البوت سيتوقف. السحابة ستعيد تشغيله تلقائياً...');
+        process.exit(1);
+      } else {
+        // في بيئة التطوير، حاول إعادة التشغيل
+        logger.info('🔄 محاولة إعادة تشغيل البوت...');
+        setTimeout(() => {
+          startBot();
+        }, 5000);
+      }
     });
 
   } catch (error) {
