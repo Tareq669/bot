@@ -1836,7 +1836,7 @@ bot.on('text', async (ctx) => {
             `💰 العملات: ${foundUser.coins || 0}\n` +
             `📅 تاريخ الانضمام: ${new Date(foundUser.joinDate).toLocaleDateString('ar')}`;
 
-          const buttons = Markup.inlineKeyboard([
+          const buttons = Markup.inlineKeyboard(
             [Markup.button.callback('🚫 حظر', `admin:ban:${  foundUser.userId}`)],
             [Markup.button.callback('✅ السماح', `admin:unban:${  foundUser.userId}`)],
             [Markup.button.callback('⬅️ رجوع', 'settings:users')]
