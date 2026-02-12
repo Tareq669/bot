@@ -9,94 +9,94 @@ class UIManager {
 
   // Owner Reply Keyboard - للمالك فقط
   static ownerReplyKeyboard() {
-    return Markup.inlineKeyboard([
+    return Markup.keyboard([
       [
-        Markup.button.callback('🕌 الختمة', 'menu:khatma'),
-        Markup.button.callback('📿 الأذكار', 'menu:adhkar')
+        Markup.button.text('🕌 الختمة'),
+        Markup.button.text('📿 الأذكار')
       ],
       [
-        Markup.button.callback('📖 القرآن', 'menu:quran'),
-        Markup.button.callback('💭 الاقتباسات', 'menu:quotes')
+        Markup.button.text('📖 القرآن'),
+        Markup.button.text('💭 الاقتباسات')
       ],
       [
-        Markup.button.callback('🎮 الألعاب', 'menu:games'),
-        Markup.button.callback('💰 الاقتصاد', 'menu:economy')
+        Markup.button.text('🎮 الألعاب'),
+        Markup.button.text('💰 الاقتصاد')
       ],
       [
-        Markup.button.callback('👤 حسابي', 'menu:profile'),
-        Markup.button.callback('🏆 المتصدرين', 'menu:leaderboard')
+        Markup.button.text('👤 حسابي'),
+        Markup.button.text('🏆 المتصدرين')
       ],
       [
-        Markup.button.callback('✨ الميزات', 'menu:features'),
-        Markup.button.callback('📚 المكتبة', 'menu:library')
+        Markup.button.text('✨ الميزات'),
+        Markup.button.text('📚 المكتبة')
       ],
       [
-        Markup.button.callback('👑 لوحة المالك', 'owner:panel'),
-        Markup.button.callback('⚙️ الإعدادات', 'menu:settings')
+        Markup.button.text('👑 لوحة المالك'),
+        Markup.button.text('⚙️ الإعدادات')
       ],
       [
-        Markup.button.callback('📊 إحصائيات', 'stats:view'),
-        Markup.button.callback('🎁 المكافآت', 'rewards:daily')
+        Markup.button.text('📊 إحصائيات'),
+        Markup.button.text('🎁 المكافآت')
       ],
       [
-        Markup.button.callback('❌ إغلق', 'close')
+        Markup.button.text('❌ إغلق')
       ]
-    ]);
+    ]).resize();
   }
 
   // Main Menu Keyboard - Reply Keyboard
   static mainReplyKeyboard(userId = null) {
     // إذا كان المستخدم مالك، أعطه لوحة مفاتيح خاصة
     if (userId && this.isOwner(userId)) {
-      return this.ownerControlPanel();
+      return this.ownerReplyKeyboard();
     }
 
-    return Markup.inlineKeyboard([
+    return Markup.keyboard([
       [
-        Markup.button.callback('🕌 الختمة', 'menu:khatma'),
-        Markup.button.callback('📿 الأذكار', 'menu:adhkar')
+        Markup.button.text('🕌 الختمة'),
+        Markup.button.text('📿 الأذكار')
       ],
       [
-        Markup.button.callback('📖 القرآن', 'menu:quran'),
-        Markup.button.callback('💭 الاقتباسات', 'menu:quotes')
+        Markup.button.text('📖 القرآن'),
+        Markup.button.text('💭 الاقتباسات')
       ],
       [
-        Markup.button.callback('✍️ الشعر', 'menu:poetry'),
-        Markup.button.callback('🎮 الألعاب', 'menu:games')
+        Markup.button.text('✍️ الشعر'),
+        Markup.button.text('🎮 الألعاب')
       ],
       [
-        Markup.button.callback('💰 الاقتصاد', 'menu:economy'),
-        Markup.button.callback('👤 حسابي', 'menu:profile')
+        Markup.button.text('💰 الاقتصاد'),
+        Markup.button.text('👤 حسابي')
       ],
       [
-        Markup.button.callback('🏆 المتصدرين', 'menu:leaderboard'),
-        Markup.button.callback('⚙️ الإعدادات', 'menu:settings')
+        Markup.button.text('🏆 المتصدرين'),
+        Markup.button.text('⚙️ الإعدادات')
       ],
       [
-        Markup.button.callback('✨ الميزات', 'menu:features'),
-        Markup.button.callback('📚 المكتبة', 'menu:library')
+        Markup.button.text('✨ الميزات'),
+        Markup.button.text('📚 المكتبة')
       ],
       [
-        Markup.button.callback('🛍️ المتجر', 'menu:shop'),
-        Markup.button.callback('💸 التحويلات والتبرعات', 'menu:transfers')
+        Markup.button.text('🛍️ المتجر'),
+        Markup.button.text('💸 التحويلات والتبرعات')
       ],
       [
-        Markup.button.callback('🔔 الإشعارات الذكية', 'menu:smartnotifications'),
-        Markup.button.callback('🌍 إدارة اللغات', 'menu:languages')
+        Markup.button.text('🔔 الإشعارات الذكية'),
+        Markup.button.text('🌍 إدارة اللغات')
       ],
       [
-        Markup.button.callback('📁 النسخ الاحتياطية', 'menu:backups'),
-        Markup.button.callback('⚡ التخزين المؤقت', 'menu:cache')
+        Markup.button.text('📁 النسخ الاحتياطية'),
+        Markup.button.text('⚡ التخزين المؤقت')
       ],
       [
-        Markup.button.callback('🛡️ حماية من الإساءة', 'menu:protection'),
-        Markup.button.callback('📊 إحصائيات', 'stats:view')
+        Markup.button.text('🛡️ حماية من الإساءة'),
+        Markup.button.text('📊 إحصائيات')
       ],
       [
-        Markup.button.callback('🎁 المكافآت', 'rewards:daily'),
-        Markup.button.callback('❌ إغلق', 'close')
+        Markup.button.text('🎁 المكافآت'),
+        Markup.button.text('❌ إغلق')
       ]
-    ]);
+    ]).resize();
   }
 
   // Main Menu Keyboard - Smart UI
