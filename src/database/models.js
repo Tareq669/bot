@@ -16,9 +16,10 @@ const userSchema = new mongoose.Schema({
   totalEarned: { type: Number, default: 0 },
   inventory: [
     {
-      itemId: mongoose.Schema.Types.ObjectId,
-      name: String,
-      purchasedAt: Date
+      itemId: String,
+      itemName: String,
+      quantity: { type: Number, default: 1 },
+      boughtAt: Date
     }
   ],
   dailyQuests: {
