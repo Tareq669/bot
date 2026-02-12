@@ -40,21 +40,32 @@ class GameHandler {
   }
 
   static async handleGuess(ctx) {
-    const gameNumber = Math.floor(Math.random() * 100) + 1;
-    ctx.session.gameState = { game: 'guess', number: gameNumber, attempts: 0 };
+    try {
+      // Initialize session if needed
+      ctx.session = ctx.session || {};
+      
+      const gameNumber = Math.floor(Math.random() * 100) + 1;
+      ctx.session.gameState = { game: 'guess', number: gameNumber, attempts: 0 };
 
-    const message = `
+      const message = `
 🔢 لعبة التخمين
 
 أنا فكرت في رقم من 1 إلى 100
 حاول أن تخمنه!
-    `;
+      `;
 
-    await ctx.editMessageText(message);
+      await ctx.editMessageText(message);
+    } catch (error) {
+      console.error('Error:', error);
+      ctx.reply('❌ حدث خطأ');
+    }
   }
 
   static async handleQuiz(ctx) {
     try {
+      // Initialize session if needed
+      ctx.session = ctx.session || {};
+      
       const questions = GameManager.getQuizQuestions();
       const question = questions[Math.floor(Math.random() * questions.length)];
 
@@ -80,6 +91,9 @@ class GameHandler {
 
   static async handleQuizAnswer(ctx, answer) {
     try {
+      // Initialize session if needed
+      ctx.session = ctx.session || {};
+      
       const correct = ctx.session.gameState?.correct;
       const result = answer === correct ? 'win' : 'lost';
       const prize = result === 'win' ? 100 : 0;
