@@ -1632,7 +1632,7 @@ bot.action('quran:save', async (ctx) => {
 
 bot.action('quote:random', async (ctx) => {
   try {
-    const ContentProvider = require('./src/content/contentProvider');
+    const ContentProvider = require('./content/contentProvider');
     const quote = await ContentProvider.getQuote();
     
     const buttons = Markup.inlineKeyboard([
@@ -1663,8 +1663,8 @@ bot.action('quote:random', async (ctx) => {
 
 bot.action('quote:save', async (ctx) => {
   try {
-    const { User } = require('./src/database/models');
-    const ContentProvider = require('./src/content/contentProvider');
+    const { User } = require('./database/models');
+    const ContentProvider = require('./content/contentProvider');
     
     const user = await User.findOne({ userId: ctx.from.id });
     if (!user) {
@@ -1694,7 +1694,7 @@ bot.action('quote:save', async (ctx) => {
 
 bot.action('quote:share', async (ctx) => {
   try {
-    const ContentProvider = require('./src/content/contentProvider');
+    const ContentProvider = require('./content/contentProvider');
     const quote = await ContentProvider.getQuote();
     
     const shareMessage = `🌟 اقتباس من البوت الإسلامي الذكي🤖\n\n${quote}\n\n📱 استخدم البوت الآن: @بوت_الاقتباسات_الإسلامي`;
@@ -1724,7 +1724,7 @@ bot.action('quote:share', async (ctx) => {
 
 bot.action('quote:favorites', async (ctx) => {
   try {
-    const { User } = require('./src/database/models');
+    const { User } = require('./database/models');
     
     const user = await User.findOne({ userId: ctx.from.id });
     if (!user) {
