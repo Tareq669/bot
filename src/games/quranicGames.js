@@ -62,26 +62,38 @@ class QuranicGames {
       {
         partial: 'الحمد لله رب...',
         complete: 'العالمين',
-        points: 10,
+        reward: 10,
         surah: 'الفاتحة'
       },
       {
         partial: 'بسم الله الرحمن...',
         complete: 'الرحيم',
-        points: 10,
+        reward: 10,
         surah: 'متعدد'
       },
       {
         partial: 'قل هو الله...',
         complete: 'أحد',
-        points: 15,
+        reward: 15,
         surah: 'الإخلاص'
       },
       {
         partial: 'يا أيها الناس إنا خلقناكم من...',
         complete: 'ذكر وأنثى',
-        points: 20,
+        reward: 20,
         surah: 'الحجرات'
+      },
+      {
+        partial: 'إنا أعطيناك...',
+        complete: 'الكوثر',
+        reward: 15,
+        surah: 'الكوثر'
+      },
+      {
+        partial: 'إن مع العسر...',
+        complete: 'يسرا',
+        reward: 10,
+        surah: 'الشرح'
       }
     ];
 
@@ -90,7 +102,7 @@ class QuranicGames {
       gameType: 'complete_verse',
       partial: random.partial,
       correctAnswer: random.complete,
-      reward: random.points,
+      reward: random.reward,
       surah: random.surah
     };
   }
@@ -103,20 +115,32 @@ class QuranicGames {
       {
         correct: 'قل هو الله أحد',
         wrong: 'قل هو الله واحد',
-        points: 15,
+        reward: 15,
         surah: 'الإخلاص'
       },
       {
         correct: 'الحمد لله رب العالمين',
         wrong: 'الحمد لله رب السماوات',
-        points: 15,
+        reward: 15,
         surah: 'الفاتحة'
       },
       {
         correct: 'ربنا آتنا في الدنيا حسنة',
         wrong: 'ربنا آتنا في الحياة حسنة',
-        points: 20,
+        reward: 20,
         surah: 'البقرة'
+      },
+      {
+        correct: 'وما خلقت الجن والإنس إلا ليعبدون',
+        wrong: 'وما خلقت الجن والإنس إلا ليطيعون',
+        reward: 20,
+        surah: 'الذاريات'
+      },
+      {
+        correct: 'فإن مع العسر يسرا',
+        wrong: 'فإن مع الصبر يسرا',
+        reward: 15,
+        surah: 'الشرح'
       }
     ];
 
@@ -128,7 +152,7 @@ class QuranicGames {
       verse: isWrong ? random.wrong : random.correct,
       isCorrect: !isWrong,
       correctVerse: random.correct,
-      reward: random.points,
+      reward: random.reward,
       surah: random.surah
     };
   }
@@ -141,32 +165,38 @@ class QuranicGames {
       {
         question: 'كم عدد سور القرآن الكريم؟',
         options: ['114', '100', '120', '110'],
-        answer: 0,
-        points: 10
+        correctAnswer: 0,
+        reward: 10
       },
       {
         question: 'كم عدد آيات القرآن الكريم تقريباً؟',
-        options: ['6100', '5000', '7000', '4500'],
-        answer: 0,
-        points: 15
+        options: ['6236', '5000', '7000', '4500'],
+        correctAnswer: 0,
+        reward: 15
       },
       {
         question: 'كم عدد أحزاب القرآن الكريم؟',
         options: ['60', '30', '45', '90'],
-        answer: 1,
-        points: 10
+        correctAnswer: 1,
+        reward: 10
       },
       {
         question: 'ما أقصر سورة في القرآن؟',
         options: ['النصر', 'الكوثر', 'الإخلاص', 'الفلق'],
-        answer: 0,
-        points: 10
+        correctAnswer: 1,
+        reward: 10
       },
       {
         question: 'كم سورة مكية في القرآن؟',
         options: ['86', '28', '70', '44'],
-        answer: 0,
-        points: 20
+        correctAnswer: 0,
+        reward: 20
+      },
+      {
+        question: 'ما أطول آية في القرآن؟',
+        options: ['آية الدين', 'آية الكرسي', 'أول آية في البقرة', 'آخر آية في البقرة'],
+        correctAnswer: 0,
+        reward: 15
       }
     ];
 
@@ -175,8 +205,8 @@ class QuranicGames {
       gameType: 'quran_trivia',
       question: random.question,
       options: random.options,
-      correctAnswer: random.answer,
-      reward: random.points
+      correctAnswer: random.correctAnswer,
+      reward: random.reward
     };
   }
 
@@ -185,12 +215,16 @@ class QuranicGames {
    */
   static async surahCount() {
     const verses = [
-      { surah: 'الفاتحة', verses: 7, points: 10 },
-      { surah: 'البقرة', verses: 286, points: 10 },
-      { surah: 'آل عمران', verses: 200, points: 10 },
-      { surah: 'النساء', verses: 176, points: 15 },
-      { surah: 'المائدة', verses: 120, points: 15 },
-      { surah: 'الأنعام', verses: 165, points: 10 }
+      { surah: 'الفاتحة', verses: 7, reward: 10 },
+      { surah: 'البقرة', verses: 286, reward: 15 },
+      { surah: 'آل عمران', verses: 200, reward: 15 },
+      { surah: 'النساء', verses: 176, reward: 15 },
+      { surah: 'المائدة', verses: 120, reward: 15 },
+      { surah: 'الأنعام', verses: 165, reward: 15 },
+      { surah: 'يوسف', verses: 111, reward: 15 },
+      { surah: 'الكهف', verses: 110, reward: 15 },
+      { surah: 'يس', verses: 83, reward: 10 },
+      { surah: 'الرحمن', verses: 78, reward: 10 }
     ];
 
     const random = verses[Math.floor(Math.random() * verses.length)];
@@ -200,7 +234,7 @@ class QuranicGames {
       surah: random.surah,
       correctAnswer: random.verses,
       question: `كم عدد آيات سورة ${random.surah}؟`,
-      reward: random.points
+      reward: random.reward
     };
   }
 
