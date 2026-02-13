@@ -2068,6 +2068,34 @@ bot.on('text', async (ctx) => {
   try {
     const message = ctx.message.text;
 
+    // ⭐ CHECK GAME INPUT FIRST (before all other handlers)
+    if (ctx.session && ctx.session.gameState && ctx.session.gameState.game === 'guess') {
+      const guess = parseInt(message);
+      const number = ctx.session.gameState.number;
+
+      if (isNaN(guess)) {
+        return ctx.reply('❌ رقم صحيح من فضلك');
+      }
+
+      ctx.session.gameState.attempts++;
+
+      if (guess === number) {
+        ctx.reply(`🎉 صحيح! ${number}\n✅ 200 عملة!`);
+        EconomyManager.addCoins(ctx.from.id, 200, 'لعبة تخمين');
+        ctx.session.gameState = null;
+      } else if (guess < number) {
+        ctx.reply(`⬆️ أكبر من ${guess}`);
+      } else {
+        ctx.reply(`⬇️ أقل من ${guess}`);
+      }
+
+      if (ctx.session.gameState && ctx.session.gameState.attempts > 10) {
+        ctx.reply(`❌ انتهت المحاولات! ${number}`);
+        ctx.session.gameState = null;
+      }
+      return;
+    }
+
     // Handle feature awaiting input
     if (ctx.session && ctx.session.featureAwait) {
       const awaiting = ctx.session.featureAwait;
@@ -2580,48 +2608,21 @@ bot.on('text', async (ctx) => {
       }
     }
 
-    // Check if it's a game input
-    if (ctx.session && ctx.session.gameState && ctx.session.gameState.game === 'guess') {
-      const guess = parseInt(message);
-      const number = ctx.session.gameState.number;
+    // Use AI for smart responses
+    const aiResponse = await AIManager.generateSmartResponse(ctx.from.id, message);
+    ctx.reply(aiResponse, { parse_mode: 'HTML' });
 
-      if (isNaN(guess)) {
-        return ctx.reply('❌ رقم صحيح من فضلك');
-      }
+    // Record user interaction and update streak
+    AIManager.recordUserInteraction(ctx.from.id, 'message:sent', 1);
+    await LearningSystem.updateUserStreak(ctx.from.id);
 
-      ctx.session.gameState.attempts++;
-
-      if (guess === number) {
-        ctx.reply(`🎉 صحيح! ${number}\n✅ 200 عملة!`);
-        EconomyManager.addCoins(ctx.from.id, 200, 'لعبة تخمين');
-        ctx.session.gameState = null;
-      } else if (guess < number) {
-        ctx.reply(`⬆️ أكبر من ${guess}`);
-      } else {
-        ctx.reply(`⬇️ أقل من ${guess}`);
-      }
-
-      if (ctx.session.gameState && ctx.session.gameState.attempts > 10) {
-        ctx.reply(`❌ انتهت المحاولات! ${number}`);
-        ctx.session.gameState = null;
-      }
-    } else {
-      // Use AI for smart responses
-      const aiResponse = await AIManager.generateSmartResponse(ctx.from.id, message);
-      ctx.reply(aiResponse, { parse_mode: 'HTML' });
-
-      // Record user interaction and update streak
-      AIManager.recordUserInteraction(ctx.from.id, 'message:sent', 1);
-      await LearningSystem.updateUserStreak(ctx.from.id);
-
-      // Check for notifications
-      const notification = await SmartNotifications.getSmartNotification(ctx.from.id, ctx);
-      if (notification && Math.random() < 0.3) {
-        // 30% chance to show notification
-        setTimeout(() => {
-          ctx.reply(SmartNotifications.formatNotification(notification), { parse_mode: 'HTML' });
-        }, 2000);
-      }
+    // Check for notifications
+    const notification = await SmartNotifications.getSmartNotification(ctx.from.id, ctx);
+    if (notification && Math.random() < 0.3) {
+      // 30% chance to show notification
+      setTimeout(() => {
+        ctx.reply(SmartNotifications.formatNotification(notification), { parse_mode: 'HTML' });
+      }, 2000);
     }
   } catch (error) {
     console.error('Text handler error:', error);
