@@ -270,6 +270,11 @@ ${game.question}
         reward: game.reward
       };
 
+      console.log('📌 Cultural Knowledge Game Started:');
+      console.log(`  Question: ${game.question}`);
+      console.log(`  answerIndex: ${game.answerIndex}`);
+      console.log(`  Correct Answer: ${game.options[game.answerIndex]}`);
+
       const optionsText = game.options.map((opt, idx) => `${String.fromCharCode(65 + idx)}) ${opt}`).join('\n');
       const message = `🧠 <b>أسئلة ثقافية إسلامية</b>
 
@@ -342,17 +347,30 @@ ${optionsText}
         let userIndex = -1;
         const cleanAnswer = String(userAnswer).trim().toUpperCase();
 
+        console.log('🔍 Cultural Knowledge Game Debug:');
+        console.log(`  User Answer: "${userAnswer}" → Clean: "${cleanAnswer}"`);
+        console.log(`  Answer Length: ${cleanAnswer.length}`);
+        console.log(`  First Char Code: ${cleanAnswer.charCodeAt(0)}`);
+        console.log(`  Expected answerIndex: ${gameState.answerIndex}`);
+        console.log(`  Options: ${JSON.stringify(gameState.options)}`);
+
         // التحقق من الأحرف (A, B, C, D)
         if (cleanAnswer.length === 1 && cleanAnswer >= 'A' && cleanAnswer <= 'D') {
           userIndex = cleanAnswer.charCodeAt(0) - 65; // A=0, B=1, C=2, D=3
+          console.log(`  ✅ Detected as letter: userIndex = ${userIndex}`);
         }
         // التحقق من الأرقام (1, 2, 3, 4)
-        else if (cleanAnswer >= '1' && cleanAnswer <= '4') {
+        else if (cleanAnswer.length === 1 && cleanAnswer >= '1' && cleanAnswer <= '4') {
           userIndex = parseInt(cleanAnswer) - 1; // 1→0, 2→1, 3→2, 4→3
+          console.log(`  ✅ Detected as number: userIndex = ${userIndex}`);
+        }
+        else {
+          console.log(`  ❌ Unknown format: userIndex = ${userIndex}`);
         }
 
         isCorrect = userIndex === gameState.answerIndex;
         correctAnswer = gameState.options[gameState.answerIndex] || gameState.answerIndex;
+        console.log(`  Final Result: isCorrect = ${isCorrect}`);
       } else {
         isCorrect = QuranicGames.checkAnswer(userAnswer, gameState.answer, gameState.type);
         correctAnswer = gameState.answer;
