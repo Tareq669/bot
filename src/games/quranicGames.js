@@ -57,7 +57,7 @@ class QuranicGames {
       { clue: 'سورة بدأت بـ الحمد', answer: 'الفاتحة', reward: 10 },
       { clue: 'سورة بدأت بـ بسم الله', answer: 'النمل', reward: 10 },
       { clue: 'سورة تحتوي على آية الكرسي', answer: 'البقرة', reward: 15 },
-      { clue: 'سورة تحتوي x على أطول آية', answer: 'البقرة', reward: 15 },
+      { clue: 'سورة تحتوي على أطول آية', answer: 'البقرة', reward: 15 },
       { clue: 'سورة تحتوي على آية السجدة', answer: 'السجدة', reward: 10 },
       
       // السور المشهورة
@@ -693,6 +693,77 @@ class QuranicGames {
       { question: 'كم عدد الملائكة الكاتبين؟', options: ['1', '2', '3', '4'], answerIndex: 1, reward: 15 },
       { question: 'ما معنى الآية "وعسى أن تكرهون شيئاً وهو خير لكم"؟', options: ['الاستسلام', 'التوكل', 'الرجاء في الله', 'الذهاب'], answerIndex: 2, reward: 15 },
       { question: 'كم عدد دعوات النبي المستجابات؟', options: ['1', '2', '3', 'كل دعواته'], answerIndex: 3, reward: 15 },
+      
+      // 50 سؤال إضافي جديد
+      // أسئلة عن الأئمة والعلماء الآخرين
+      { question: 'من هو الإمام البخاري؟', options: ['عالم حديث', 'فقيه', 'مفسر', 'لغوي'], answerIndex: 0, reward: 15 },
+      { question: 'من هو الإمام مسلم؟', options: ['عالم تفسير', 'عالم حديث', 'عالم فقه', 'عالم نحو'], answerIndex: 1, reward: 15 },
+      { question: 'من هو الإمام الترمذي؟', options: ['عالم أصول', 'عالم حديث', 'عالم كلام', 'عالم بلاغة'], answerIndex: 1, reward: 15 },
+      { question: 'من هو الإمام أحمد بن حنبل؟', options: ['من الأئمة الأربعة', 'من الخلفاء', 'من الصحابة', 'من التابعين'], answerIndex: 0, reward: 15 },
+      { question: 'من هو ابن تيمية؟', options: ['فقيه معاصر', 'عالم دين من زمن سابق', 'صحابي', 'تابعي'], answerIndex: 1, reward: 15 },
+      
+      // أسئلة عن اللغة العربية والقرآن
+      { question: 'كم حرفاً من حروف العربية موجودة في القرآن؟', options: ['22', '25', '28', '30'], answerIndex: 2, reward: 15 },
+      { question: 'ما أكثر حرف تكراراً في القرآن؟', options: ['الألف', 'اللام', 'الراء', 'السين'], answerIndex: 0, reward: 15 },
+      { question: 'كم كلمة في القرآن تبدأ بالبسملة؟', options: ['100', '110', '113', '114'], answerIndex: 3, reward: 15 },
+      { question: 'ما أطول كلمة في القرآن؟', options: ['الاستبرق', 'السلاسل', 'الأرجوان', 'الممسك'], answerIndex: 0, reward: 15 },
+      { question: 'كم مرة تكررت كلمة "الله" في القرآن؟', options: ['2697', '2700', '2708', '2801'], answerIndex: 2, reward: 15 },
+      
+      // أسئلة عن الدول الإسلامية
+      { question: 'ما أول عاصمة إسلامية؟', options: ['الكوفة', 'المدينة المنورة', 'دمشق', 'بغداد'], answerIndex: 1, reward: 15 },
+      { question: 'من فتح مصر الإسلامية؟', options: ['عمرو بن العاص', 'خالد بن الوليد', 'أبو عبيدة', 'معاوية'], answerIndex: 0, reward: 15 },
+      { question: 'من فتح الأندلس؟', options: ['طارق بن زياد', 'قتيبة بن مسلم', 'حسان بن ثابت', 'الوليد بن عبدالملك'], answerIndex: 0, reward: 15 },
+      { question: 'من فتح بيت المقدس؟', options: ['عمرو بن العاص', 'عمر بن الخطاب', 'خالد بن الوليد', 'أبو عبيدة'], answerIndex: 1, reward: 15 },
+      { question: 'متى فتحت مكة؟', options: ['السنة 8 هـ', 'السنة 7 هـ', 'السنة 9 هـ', 'السنة 10 هـ'], answerIndex: 0, reward: 15 },
+      
+      // أسئلة عن الخمس والزكاة
+      { question: 'ما هي الخمس في الإسلام؟', options: ['1/5', '1/4', '1/3', '1/2'], answerIndex: 0, reward: 15 },
+      { question: 'ماذا تشمل الخمس؟', options: ['الذهب فقط', 'الفضة فقط', 'الغنائم والكنوز والمعادن', 'كل المال'], answerIndex: 2, reward: 15 },
+      { question: 'كم نصاب النقود للزكاة؟', options: ['85 جرام', '100 جرام', 'نصاب الذهب', 'نصاب الفضة'], answerIndex: 3, reward: 15 },
+      { question: 'متى تكون الزكاة واجبة؟', options: ['كل شهر', 'كل نصف سنة', 'كل سنة', 'كل سنتين'], answerIndex: 2, reward: 15 },
+      { question: 'من يستحق الزكاة؟', options: ['الأغنياء', 'الفقراء والمساكين', 'الحكام', 'العلماء'], answerIndex: 1, reward: 15 },
+      
+      // أسئلة عن الأخلاق الإسلامية
+      { question: 'ما أفضل الأخلاق في الإسلام؟', options: ['الشجاعة', 'العدل', 'حسن الخلق', 'الذكاء'], answerIndex: 2, reward: 15 },
+      { question: 'ما أسؤ الأخلاق في الإسلام؟', options: ['الخوف', 'الكبر والعجب', 'الكسل', 'الهدوء'], answerIndex: 1, reward: 15 },
+      { question: 'ما حكم كذب الب للطفل؟', options: ['حلال', 'حرام', 'مكروه', 'مندوب'], answerIndex: 1, reward: 15 },
+      { question: 'ما حد الرشوة في الإسلام؟', options: ['حلال', 'حرام', 'مكروه', 'مباح'], answerIndex: 1, reward: 15 },
+      { question: 'ما حكم الغيبة؟', options: ['حلال', 'مستحب', 'حرام', 'مكروه'], answerIndex: 2, reward: 15 },
+      
+      // أسئلة عن العبادات
+      { question: 'ما أركان الحج؟', options: ['2', '3', '4', '5'], answerIndex: 3, reward: 15 },
+      { question: 'ما واجبات الحج؟', options: ['3', '4', '5', '6'], answerIndex: 2, reward: 15 },
+      { question: 'كم عدد الوقفات في الحج؟', options: ['1', '2', '3', '4'], answerIndex: 1, reward: 15 },
+      { question: 'ما سنن الحج؟', options: ['5', '10', '15', '20'], answerIndex: 1, reward: 15 },
+      { question: 'ما عدد المشاعر المقدسة؟', options: ['2', '3', '4', '5'], answerIndex: 1, reward: 15 },
+      
+      // أسئلة عن الأنبياء والرسل الآخرين
+      { question: 'من هو آدم معنا؟', options: ['أول نبي', 'أول إنسان', 'أول خليفة', 'كل ما سبق'], answerIndex: 3, reward: 15 },
+      { question: 'من هو نوح؟', options: ['نبي فقط', 'رسول فقط', 'نبي ورسول', 'لا شيء'], answerIndex: 2, reward: 15 },
+      { question: 'كم سنة دعا نوح قومه؟', options: ['850', '900', '950', '1000'], answerIndex: 1, reward: 15 },
+      { question: 'من هو أبو الأنبياء؟', options: ['آدم', 'نوح', 'إبراهيم', 'موسى'], answerIndex: 2, reward: 15 },
+      { question: 'من أطول الأنبياء عمراً؟', options: ['موسى', 'نوح', 'إبراهيم', 'عيسى'], answerIndex: 1, reward: 15 },
+      
+      // أسئلة عن الآيات المتشابهة
+      { question: 'في كم آية من القرآن ذكرت كلمة "السلام"؟', options: ['30', '40', '50', '60'], answerIndex: 2, reward: 15 },
+      { question: 'كم مرة ذكرت كلمة "الرحمة" في القرآن؟', options: ['70', '80', '90', '100'], answerIndex: 1, reward: 15 },
+      { question: 'كم مرة ذكرت كلمة "القلب" في القرآن؟', options: ['40', '50', '60', '70'], answerIndex: 1, reward: 15 },
+      { question: 'كم مرة ذكرت كلمة "الحجر" في القرآن؟', options: ['5', '10', '15', '20'], answerIndex: 2, reward: 15 },
+      { question: 'كم مرة ذكرت كلمة "العلم" في القرآن؟', options: ['50', '60', '70', '80'], answerIndex: 2, reward: 15 },
+      
+      // أسئلة عن مكة والمدينة
+      { question: 'ما حكم الكذب في مكة والمدينة؟', options: ['حلال', 'أحرم من غيره', 'مثل غيره', 'مستحب'], answerIndex: 1, reward: 15 },
+      { question: 'كم حرم المدينة؟', options: ['3', '5', '7', '10'], answerIndex: 2, reward: 15 },
+      { question: 'ما أول ما بني في المدينة؟', options: ['البيت', 'السوق', 'المسجد', 'البئر'], answerIndex: 2, reward: 15 },
+      { question: 'من أين ماء زمزم؟', options: ['من السماء', 'من الأرض', 'معجزة', 'كل ما سبق'], answerIndex: 2, reward: 15 },
+      { question: 'ما غطاء الكعبة؟', options: ['الستار', 'الكسوة', 'القماش', 'الحرير'], answerIndex: 1, reward: 15 },
+      
+      // أسئلة عن الأيام المميزة
+      { question: 'ما أفضل أيام السنة عند الله؟', options: ['أيام الحج', 'أيام رمضان', 'أيام الربيع', 'أيام الخريف'], answerIndex: 0, reward: 15 },
+      { question: 'ما أفضل ليالي السنة؟', options: ['ليل جمعة', 'ليل قدر', 'ليل عاشوراء', 'ليل حج'], answerIndex: 1, reward: 15 },
+      { question: 'ما فضل يوم عاشوراء؟', options: ['صيام يوم عاشوراء يكفر سنة', 'يقضي الكثير من الذنوب', 'يضاعف الأجر', 'كل ما سبق'], answerIndex: 3, reward: 15 },
+      { question: 'متى يصادف يوم عاشوراء؟', options: ['1 محرم', '9 محرم', '10 محرم', '11 محرم'], answerIndex: 2, reward: 15 },
+      { question: 'ما فضل يوم الجمعة؟', options: ['أفضل أيام الأسبوع', 'يوم القيامة', 'يساوي 1000 سنة', 'كل ما سبق'], answerIndex: 3, reward: 15 }
     ];
 
     const game = games[Math.floor(Math.random() * games.length)];
