@@ -6,9 +6,9 @@
 const QuranicGames = require('./src/games/quranicGames');
 
 async function runTests() {
-  console.log('\n' + '='.repeat(70));
+  console.log(`\n${  '='.repeat(70)}`);
   console.log('🎮 اختبار شامل لجميع الأنظمة العشوائية');
-  console.log('='.repeat(70) + '\n');
+  console.log(`${'='.repeat(70)  }\n`);
 
   try {
     // ========== 1. الألعاب القرآنية ==========
@@ -73,7 +73,7 @@ async function runTests() {
     }
 
     // ========== الملخص ==========
-    console.log('\n' + '='.repeat(70));
+    console.log(`\n${  '='.repeat(70)}`);
     console.log('📊 ملخص الاختبارات');
     console.log('='.repeat(70));
     console.log('✅ 5 ألعاب قرآنية - جميعها تعمل بشكل عشوائي ✓');
@@ -94,7 +94,7 @@ async function runTests() {
     console.log('\n🎉 جميع الأنظمة تعمل بنجاح!');
     console.log('🔀 كل بداية جديدة = محتوى عشوائي مختلف تماماً!');
     console.log('✨ المستخدم لن يرى نفس السؤال أو الذكر مرتين متتالياً');
-    console.log('='.repeat(70) + '\n');
+    console.log(`${'='.repeat(70)  }\n`);
 
   } catch (error) {
     console.error('❌ خطأ في الاختبار:', error.message);

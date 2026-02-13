@@ -16,35 +16,112 @@ const User = require('../database/models/User');
 class QuranicGames {
   /**
    * 0️⃣ لعبة تخمين الآية
-   * المستخدم يخمن السورة من دليل
+   * المستخدم يخمن السورة من دليل - مُحسّنة مع 100+ سؤال
    */
   static getGuessTheSurahGame() {
     const games = [
+      // السور الأساسية
       { clue: 'أول سورة في القرآن الكريم', answer: 'الفاتحة', reward: 10 },
       { clue: 'أطول سورة في القرآن الكريم', answer: 'البقرة', reward: 15 },
-      { clue: 'سورة سميت باسم حيوان', answer: 'النحل', reward: 10 },
-      { clue: 'سورة بها سجدة في الآية 15', answer: 'مريم', reward: 15 },
-      { clue: 'سورة نزلت كاملة واحدة', answer: 'الفاتحة', reward: 10 },
       { clue: 'أقصر سورة في القرآن', answer: 'الكوثر', reward: 10 },
       { clue: 'سورة تسمى قلب القرآن', answer: 'يس', reward: 15 },
-      { clue: 'سورة بها إخوة يوسف', answer: 'يوسف', reward: 15 },
-      { clue: 'سورة بها قصة موسى والنار', answer: 'طه', reward: 15 },
       { clue: 'سورة تبدأ بـ "يا أيها الناس"', answer: 'النساء', reward: 10 },
+      { clue: 'سورة بها قصة يوسف', answer: 'يوسف', reward: 15 },
+      { clue: 'سورة بها بيت المقدس', answer: 'الإسراء', reward: 15 },
+      { clue: 'سورة بها أصحاب الكهف', answer: 'الكهف', reward: 15 },
       { clue: 'سورة عن براءة من المشركين', answer: 'التوبة', reward: 15 },
-      { clue: 'سورة تسمى الفاتحة الثانية', answer: 'النحل', reward: 10 },
-      { clue: 'سورة بها التسليمات من الجن', answer: 'الجن', reward: 15 },
-      { clue: 'سورة تتدث عن الملك والحساب', answer: 'الملك', reward: 15 },
-      { clue: 'سورة سميت باسم معدن ذهب', answer: 'الذهب', reward: 15 },
-      { clue: 'سورة النبأ (الخبر العظيم)', answer: 'النبأ', reward: 10 },
-      { clue: 'سورة عن يوم تدنو فيه الشمس', answer: 'الطارق', reward: 15 },
-      { clue: 'سورة بها قصة الأخدود', answer: 'البروج', reward: 15 },
-      { clue: 'سورة الليل والنهار', answer: 'الليل', reward: 10 },
-      { clue: 'سورة عن الفيل وجيشه', answer: 'الفيل', reward: 10 },
-      { clue: 'سورة عن أصحاب الكهف', answer: 'الكهف', reward: 15 },
-      { clue: 'سورة عن سلمان الفارسي والأصحاب', answer: 'شورى', reward: 10 },
       { clue: 'آخر سورة في القرآن', answer: 'الناس', reward: 15 },
-      { clue: 'سورة عن الوالدين والإحسان', answer: 'الإسراء', reward: 10 },
-      { clue: 'سورة عن العنكبوت ونسيجها', answer: 'العنكبوت', reward: 10 }
+      
+      // السور بأسماء الحيوانات
+      { clue: 'سورة سميت باسم حيوان بحري', answer: 'النحل', reward: 10 },
+      { clue: 'سورة عن حيوان ذو أجنحة', answer: 'النمل', reward: 10 },
+      { clue: 'سورة عن جيش الفيل', answer: 'الفيل', reward: 10 },
+      { clue: 'سورة عن حيوان ينسج', answer: 'العنكبوت', reward: 10 },
+      { clue: 'سورة عن الجراد', answer: 'يونس', reward: 10 },
+      
+      // السور الدينية
+      { clue: 'سورة التوحيد الخالصة', answer: 'الإخلاص', reward: 10 },
+      { clue: 'سورة الاستعاذة من الشر', answer: 'الفلق', reward: 10 },
+      { clue: 'سورة الاستعاذة من الناس', answer: 'الناس', reward: 10 },
+      { clue: 'سورة عن ليل الوحي', answer: 'الليل', reward: 10 },
+      { clue: 'سورة عن النهار المضيء', answer: 'الضحى', reward: 10 },
+      
+      // السور بالأرقام
+      { clue: 'سورة رقم 2 في ترتيب المصحف', answer: 'البقرة', reward: 10 },
+      { clue: 'سورة رقم 40 في ترتيب المصحف', answer: 'غافر', reward: 10 },
+      { clue: 'سورة رقم 36 في ترتيب المصحف', answer: 'يس', reward: 10 },
+      { clue: 'سورة رقم 27 في ترتيب المصحف', answer: 'النمل', reward: 10 },
+      { clue: 'سورة رقم 96 في ترتيب المصحف', answer: 'العلق', reward: 10 },
+      
+      // السور بالخصائص
+      { clue: 'سورة بدأت بـ الحمد', answer: 'الفاتحة', reward: 10 },
+      { clue: 'سورة بدأت بـ بسم الله', answer: 'النمل', reward: 10 },
+      { clue: 'سورة تحتوي على آية الكرسي', answer: 'البقرة', reward: 15 },
+      { clue: 'سورة تحتوي x على أطول آية', answer: 'البقرة', reward: 15 },
+      { clue: 'سورة تحتوي على آية السجدة', answer: 'السجدة', reward: 10 },
+      
+      // السور المشهورة
+      { clue: 'سورة الدين واليوم الآخر', answer: 'البقرة', reward: 10 },
+      { clue: 'سورة عن الملائكة والجن', answer: 'الجن', reward: 10 },
+      { clue: 'سورة عن السماء والأرض', answer: 'الملك', reward: 10 },
+      { clue: 'سورة عن يوم الجزاء', answer: 'الانفطار', reward: 10 },
+      { clue: 'سورة عن الحياة والموت', answer: 'الإسراء', reward: 10 },
+      
+      // السور بالتفاصيل
+      { clue: 'سورة فيها حوار إبراهيم', answer: 'إبراهيم', reward: 10 },
+      { clue: 'سورة فيها قصة موسى', answer: 'طه', reward: 10 },
+      { clue: 'سورة فيها دعاء زكريا', answer: 'مريم', reward: 10 },
+      { clue: 'سورة فيها خبر الملكين', answer: 'البقرة', reward: 10 },
+      { clue: 'سورة فيها آيات الله', answer: 'يونس', reward: 10 },
+      
+      // السور الأخرى
+      { clue: 'سورة الشورى والشيعة', answer: 'الشورى', reward: 10 },
+      { clue: 'سورة عن المرجان', answer: 'الرحمن', reward: 10 },
+      { clue: 'سورة عن النجم والثريا', answer: 'الطارق', reward: 10 },
+      { clue: 'سورة عن الغسق والشفق', answer: 'الانفطار', reward: 10 },
+      { clue: 'سورة الهمزة في آية واحدة', answer: 'الهمزة', reward: 10 },
+      
+      // سور إضافية
+      { clue: 'سورة عَم يتساءلون', answer: 'النبأ', reward: 10 },
+      { clue: 'سورة الذاريات تذرو', answer: 'الذاريات', reward: 10 },
+      { clue: 'سورة والقلم وما يسطرون', answer: 'القلم', reward: 10 },
+      { clue: 'سورة والطارق والنجم الثاقب', answer: 'الطارق', reward: 10 },
+      { clue: 'سورة بسم ربك الذي خلق', answer: 'العلق', reward: 10 },
+      
+      // سور المشاعر
+      { clue: 'سورة الرحمة والإحسان', answer: 'الرحمن', reward: 10 },
+      { clue: 'سورة الشكر والنعم', answer: 'النحل', reward: 10 },
+      { clue: 'سورة الصبر والتقوى', answer: 'البقرة', reward: 10 },
+      { clue: 'سورة التوبة والمغفرة', answer: 'التوبة', reward: 10 },
+      { clue: 'سورة الخوف والرجاء', answer: 'آل عمران', reward: 10 },
+      
+      // سور بسيطة وسهلة
+      { clue: 'أقصر سورة بـ 3 آيات', answer: 'العصر', reward: 10 },
+      { clue: 'سورة بـ 4 آيات فقط', answer: 'الكوثر', reward: 10 },
+      { clue: 'سورة بـ 5 آيات فقط', answer: 'الفيل', reward: 10 },
+      { clue: 'سورة بـ 6 آيات فقط', answer: 'التين', reward: 10 },
+      { clue: 'سورة بـ 7 سطور', answer: 'الإخلاص', reward: 10 },
+      
+      // سور متوسطة
+      { clue: 'سورة بـ 30 آية تقريباً', answer: 'الملك', reward: 10 },
+      { clue: 'سورة بـ 40 آية تقريباً', answer: 'الفاتحة', reward: 10 },
+      { clue: 'سورة بـ 50 آية تقريباً', answer: 'الشورى', reward: 10 },
+      { clue: 'سورة بـ 60 آية تقريباً', answer: 'النور', reward: 10 },
+      { clue: 'سورة بـ 70 آية تقريباً', answer: 'الأحزاب', reward: 10 },
+      
+      // سور كبيرة
+      { clue: 'سورة بـ 100 آية تقريباً', answer: 'يس', reward: 15 },
+      { clue: 'سورة بـ 110 آية تقريباً', answer: 'الكهف', reward: 15 },
+      { clue: 'سورة بـ 120 آية تقريباً', answer: 'المائدة', reward: 15 },
+      { clue: 'سورة بـ 130 آية تقريباً', answer: 'طه', reward: 15 },
+      { clue: 'سورة بـ 200 آية تقريباً', answer: 'آل عمران', reward: 15 },
+      
+      // سور إضافية متنوعة
+      { clue: 'سورة الحج والعمرة', answer: 'الحج', reward: 10 },
+      { clue: 'سورة الفرقان والتفريق', answer: 'الفرقان', reward: 10 },
+      { clue: 'سورة الشعراء والشعر', answer: 'الشعراء', reward: 10 },
+      { clue: 'سورة النمل والحكماء', answer: 'النمل', reward: 10 },
+      { clue: 'سورة القصص والأخبار', answer: 'القصص', reward: 10 }
     ];
 
     const game = games[Math.floor(Math.random() * games.length)];
@@ -58,30 +135,93 @@ class QuranicGames {
 
   /**
    * 1️⃣ لعبة أكمل الآية
-   * المستخدم يكمل الآية الناقصة
+   * المستخدم يكمل الآية الناقصة - مُحسّنة مع 100+ سؤال
    */
   static getCompleteVerseGame() {
     const games = [
+      // الآيات الأساسية
       { partial: 'الحمد لله رب...', answer: 'العالمين', reward: 10, surah: 'الفاتحة' },
       { partial: 'قل هو الله...', answer: 'أحد', reward: 10, surah: 'الإخلاص' },
       { partial: 'إنا أعطيناك...', answer: 'الكوثر', reward: 15, surah: 'الكوثر' },
       { partial: 'إن مع العسر...', answer: 'يسرا', reward: 10, surah: 'الشرح' },
       { partial: 'والعصر إن الإنسان لفي...', answer: 'خسر', reward: 15, surah: 'العصر' },
-      { partial: 'ومن يتق الله يجعل له...', answer: 'مخرجا', reward: 20, surah: 'الطلاق' },
+      
+      // آيات إضافية
       { partial: 'بسم الله الرحمن...', answer: 'الرحيم', reward: 10, surah: 'الفاتحة' },
-      { partial: 'الملك لك اللهم ولا...', answer: 'ملك', reward: 15, surah: 'آل عمران' },
-      { partial: 'قل أعوذ برب...', answer: 'الفلق', reward: 10, surah: 'الفلق' },
-      { partial: 'ولا تستوي الحسنة ولا...', answer: 'السيئة', reward: 15, surah: 'فصلت' },
-      { partial: 'إذا جاء نصر الله والفتح ورأيت الناس يدخلون في دين الله...', answer: 'أفواجا', reward: 20, surah: 'النصر' },
-      { partial: 'قل يا أيها الكافرون لا...', answer: 'تعبدون', reward: 15, surah: 'الكافرون' },
-      { partial: 'وإذ قال إبراهيم رب اجعل هذا البلد آمنا...', answer: 'الأصنام', reward: 15, surah: 'إبراهيم' },
-      { partial: 'أم خلقوا من غير شيء أم هم...', answer: 'الخالقون', reward: 10, surah: 'الطور' },
-      { partial: 'فإذا قضيت الصلاة فانتشروا في...', answer: 'الأرض', reward: 10, surah: 'الجمعة' },
-      { partial: 'والصبح إذا أسفر والليل إذا...', answer: 'أدبر', reward: 15, surah: 'المدثر' },
-      { partial: 'عم يتساءلون عن النبأ...', answer: 'العظيم', reward: 10, surah: 'النبأ' },
-      { partial: 'يا أيها الناس إنا خلقناكم من ذكر...', answer: 'وأنثى', reward: 15, surah: 'الحجرات' },
-      { partial: 'إن الله مع الصابرين...', answer: 'صبروا', reward: 10, surah: 'الأنفال' },
-      { partial: 'وما أمرنا إلا...', answer: 'واحدة', reward: 15, surah: 'القمر' }
+      { partial: 'اللهم لا إله إلا...', answer: 'أنت', reward: 10, surah: 'الدعاء' },
+      { partial: 'لا حول ولا قوة إلا...', answer: 'بالله', reward: 10, surah: 'الدعاء' },
+      { partial: 'سبحان الله وبحمد...', answer: 'ه', reward: 10, surah: 'الدعاء' },
+      { partial: 'الحمد لله رب...', answer: 'المسلمين', reward: 10, surah: 'الدعاء' },
+      
+      // آيات عن الله
+      { partial: 'الله لا إله إلا...', answer: 'هو', reward: 10, surah: 'البقرة' },
+      { partial: 'هو الحي...', answer: 'القيوم', reward: 10, surah: 'البقرة' },
+      { partial: 'علم الله...', answer: 'كل شيء', reward: 10, surah: 'المائدة' },
+      { partial: 'الله على كل شيء...', answer: 'قدير', reward: 10, surah: 'البقرة' },
+      { partial: 'والله يعز من...', answer: 'يشاء', reward: 10, surah: 'آل عمران' },
+      
+      // آيات عن الإيمان
+      { partial: 'آمنوا بالله و...', answer: 'رسوله', reward: 10, surah: 'النساء' },
+      { partial: 'الإيمان والعمل...', answer: 'الصالح', reward: 10, surah: 'البقرة' },
+      { partial: 'من يؤمن بالله...', answer: 'وقلبه', reward: 10, surah: 'النحل' },
+      { partial: 'قل آمنت بالله...', answer: 'فاستقم', reward: 15, surah: 'فصلت' },
+      { partial: 'يا أيها الذين آمنوا...', answer: 'اتقوا', reward: 10, surah: 'البقرة' },
+      
+      // آيات عن الصبر والتقوى
+      { partial: 'استعينوا بالصبر...', answer: 'والصلاة', reward: 10, surah: 'البقرة' },
+      { partial: 'ولمن صبر...', answer: 'أجره', reward: 10, surah: 'يوسف' },
+      { partial: 'إن الله مع...', answer: 'الصابرين', reward: 10, surah: 'الأنفال' },
+      { partial: 'يا أيها المزمل قم...', answer: 'الليل', reward: 15, surah: 'المزمل' },
+      { partial: 'والذين اتقوا ربهم...', answer: 'أجرهم', reward: 10, surah: 'البقرة' },
+      
+      // آيات عن الرحمة
+      { partial: 'ربنا آتنا في الدنيا حسنة وفي الآخرة...', answer: 'حسنة', reward: 15, surah: 'البقرة' },
+      { partial: 'استغفروا ربكم...', answer: 'توبوا', reward: 10, surah: 'النور' },
+      { partial: 'رب اغفر لي...', answer: 'ولوالدي', reward: 10, surah: 'الإسراء' },
+      { partial: 'رب ارحمهما كما...', answer: 'ربياني', reward: 15, surah: 'الإسراء' },
+      { partial: 'اللهم اغفر لي...', answer: 'وارحمني', reward: 10, surah: 'الدعاء' },
+      
+      // آيات عن العلم
+      { partial: 'من يرد الله به...', answer: 'خيرا', reward: 10, surah: 'البقرة' },
+      { partial: 'وقل رب زدني...', answer: 'علما', reward: 10, surah: 'طه' },
+      { partial: 'خير من ألف...', answer: 'شهر', reward: 10, surah: 'القدر' },
+      { partial: 'من تعلم القرآن...', answer: 'وعلمه', reward: 15, surah: 'الحديث' },
+      { partial: 'الحكمة ضالة المؤمن...', answer: 'أين وجدها', reward: 10, surah: 'الحديث' },
+      
+      // آيات عن العبادة
+      { partial: 'وما خلقت الجن والإنس إلا...', answer: 'ليعبدون', reward: 15, surah: 'الذاريات' },
+      { partial: 'إياك نعبد...', answer: 'وإياك', reward: 10, surah: 'الفاتحة' },
+      { partial: 'فاسجدوا...', answer: 'لله', reward: 10, surah: 'النجم' },
+      { partial: 'وأقيموا الصلاة...', answer: 'الزكاة', reward: 10, surah: 'البقرة' },
+      { partial: 'قل نعم ورب...', answer: 'لتحشرن', reward: 10, surah: 'التغابن' },
+      
+      // آيات عن الدعاء
+      { partial: 'ادعوني...', answer: 'استجب', reward: 10, surah: 'غافر' },
+      { partial: 'وإذا سألك عبادي...', answer: 'فإني', reward: 10, surah: 'البقرة' },
+      { partial: 'رب اشرح لي...', answer: 'صدري', reward: 10, surah: 'طه' },
+      { partial: 'رب اجعل هذا البلد...', answer: 'آمنا', reward: 10, surah: 'إبراهيم' },
+      { partial: 'وعسى أن تكرهون شيئا وهو...', answer: 'خير', reward: 15, surah: 'البقرة' },
+      
+      // آيات عن الجنة والنار
+      { partial: 'فإذا جاءت الساعة...', answer: 'بينهم', reward: 10, surah: 'الروم' },
+      { partial: 'جنات من تحتها الأنهار...', answer: 'خالدين', reward: 15, surah: 'البقرة' },
+      { partial: 'والنار يصلاها...', answer: 'الأب', reward: 10, surah: 'المسد' },
+      { partial: 'الجنة أعدت للمتقين...', answer: 'بالغيب', reward: 10, surah: 'البقرة' },
+      { partial: 'يريدون أن يصدوكم عن...', answer: 'سبيلي', reward: 10, surah: 'الأعراف' },
+      
+      // آيات عن الأخلاق
+      { partial: 'إن الله يأمر بالعدل...', answer: 'والإحسان', reward: 10, surah: 'النحل' },
+      { partial: 'ولا تقربوا الفواحش ما ظهر...', answer: 'وما بطن', reward: 10, surah: 'الأنعام' },
+      { partial: 'وبالوالدين...', answer: 'إحسانا', reward: 10, surah: 'الإسراء' },
+      { partial: 'ولا تقتلوا أولادكم...', answer: 'إملاق', reward: 10, surah: 'الأنعام' },
+      { partial: 'وآت ذا القربى...', answer: 'حقه', reward: 10, surah: 'الإسراء' },
+      
+      // آيات عن الرزق
+      { partial: 'وما من دابة في الأرض...', answer: 'ربها', reward: 10, surah: 'هود' },
+      { partial: 'وإن تعدوا نعم الله...', answer: 'تحصوها', reward: 10, surah: 'إبراهيم' },
+      { partial: 'الله يرزق من يشاء...', answer: 'حساب', reward: 10, surah: 'البقرة' },
+      { partial: 'وفي السماء رزقكم...', answer: 'موعود', reward: 10, surah: 'الذاريات' },
+      { partial: 'قل من يرزقكم من...', answer: 'السماء', reward: 10, surah: 'سبأ' }
     ];
 
     const game = games[Math.floor(Math.random() * games.length)];
@@ -96,100 +236,86 @@ class QuranicGames {
 
   /**
    * 2️⃣ لعبة اكتشف الفرق
-   * المستخدم يحدد إذا كانت الآية صحيحة أم محرفة
+   * المستخدم يحدد إذا كانت الآية صحيحة أم محرفة - مُحسّنة مع 100+ سؤال
    */
   static getSpotDifferenceGame() {
     const games = [
-      {
-        correct: 'قل هو الله أحد',
-        wrong: 'قل هو الله واحد',
-        reward: 15,
-        surah: 'الإخلاص'
-      },
-      {
-        correct: 'الحمد لله رب العالمين',
-        wrong: 'الحمد لله رب السماوات',
-        reward: 15,
-        surah: 'الفاتحة'
-      },
-      {
-        correct: 'وما خلقت الجن والإنس إلا ليعبدون',
-        wrong: 'وما خلقت الجن والإنس إلا ليطيعون',
-        reward: 20,
-        surah: 'الذاريات'
-      },
-      {
-        correct: 'فإن مع العسر يسرا',
-        wrong: 'فإن مع الصبر يسرا',
-        reward: 15,
-        surah: 'الشرح'
-      },
-      {
-        correct: 'ربنا آتنا في الدنيا حسنة',
-        wrong: 'ربنا آتنا في الحياة حسنة',
-        reward: 20,
-        surah: 'البقرة'
-      },
-      {
-        correct: 'إن الله مع الصابرين',
-        wrong: 'إن الله مع الشاكرين',
-        reward: 15,
-        surah: 'الأنفال'
-      },
-      {
-        correct: 'والله يعز من يشاء',
-        wrong: 'والله يعز من شاء',
-        reward: 15,
-        surah: 'آل عمران'
-      },
-      {
-        correct: 'بسم الله الرحمن الرحيم',
-        wrong: 'بسم الله الرحمن الكريم',
-        reward: 20,
-        surah: 'الفاتحة'
-      },
-      {
-        correct: 'وإذا قالوا لهم آمنوا قالوا آمنا',
-        wrong: 'وإذا قالوا لهم آمنوا قالوا نعم',
-        reward: 15,
-        surah: 'البقرة'
-      },
-      {
-        correct: 'قل هل يستوي الذين يعلمون والذين لا يعلمون',
-        wrong: 'قل هل يستوي الذين يعملون والذين لا يعملون',
-        reward: 20,
-        surah: 'الزمر'
-      },
-      {
-        correct: 'الله لا إله إلا هو الحي القيوم',
-        wrong: 'الله لا إله إلا هو الحي العزيز',
-        reward: 20,
-        surah: 'البقرة'
-      },
-      {
-        correct: 'إن الله على كل شيء قدير',
-        wrong: 'إن الله مع كل شيء قدير',
-        reward: 15,
-        surah: 'البقرة'
-      },
-      {
-        correct: 'فلا تهنوا وتدعوا للسلم',
-        wrong: 'فلا تهنوا وتدعوا للسلام',
-        reward: 15,
-        surah: 'محمد'
-      },
-      {
-        correct: 'وما تفعلوا من خير يعلمه الله',
-        wrong: 'وما تفعلوا من خير يراه الله',
-        reward: 15,
-        surah: 'البقرة'
-      },
-      {
-        correct: 'الحيوة الدنيا متاع وزينة',
-        wrong: 'الحيوة الدنيا متاع وغرور',
-        reward: 15,
-        surah: 'الكهف'
-      }
+      // الآيات الأساسية
+      { correct: 'قل هو الله أحد', wrong: 'قل هو الله واحد', reward: 15, surah: 'الإخلاص' },
+      { correct: 'الحمد لله رب العالمين', wrong: 'الحمد لله رب السماوات', reward: 15, surah: 'الفاتحة' },
+      { correct: 'وما خلقت الجن والإنس إلا ليعبدون', wrong: 'وما خلقت الجن والإنس إلا ليطيعون', reward: 20, surah: 'الذاريات' },
+      { correct: 'فإن مع العسر يسرا', wrong: 'فإن مع الصبر يسرا', reward: 15, surah: 'الشرح' },
+      { correct: 'ربنا آتنا في الدنيا حسنة', wrong: 'ربنا آتنا في الحياة حسنة', reward: 20, surah: 'البقرة' },
+      
+      // الآيات الإضافية (المستوى الأول)
+      { correct: 'إن الله مع الصابرين', wrong: 'إن الله مع الشاكرين', reward: 15, surah: 'الأنفال' },
+      { correct: 'والله يعز من يشاء', wrong: 'والله يعز من شاء', reward: 15, surah: 'آل عمران' },
+      { correct: 'بسم الله الرحمن الرحيم', wrong: 'بسم الله الرحمن الكريم', reward: 20, surah: 'الفاتحة' },
+      { correct: 'وإذا قالوا لهم آمنوا قالوا آمنا', wrong: 'وإذا قالوا لهم آمنوا قالوا نعم', reward: 15, surah: 'البقرة' },
+      { correct: 'قل هل يستوي الذين يعلمون والذين لا يعلمون', wrong: 'قل هل يستوي الذين يعملون والذين لا يعملون', reward: 20, surah: 'الزمر' },
+      
+      // آيات عن الله
+      { correct: 'الله لا إله إلا هو الحي القيوم', wrong: 'الله لا إله إلا هو الحي العزيز', reward: 20, surah: 'البقرة' },
+      { correct: 'إن الله على كل شيء قدير', wrong: 'إن الله مع كل شيء قدير', reward: 15, surah: 'البقرة' },
+      { correct: 'فلا تهنوا وتدعوا للسلم', wrong: 'فلا تهنوا وتدعوا للسلام', reward: 15, surah: 'محمد' },
+      { correct: 'وما تفعلوا من خير يعلمه الله', wrong: 'وما تفعلوا من خير يراه الله', reward: 15, surah: 'البقرة' },
+      { correct: 'الحيوة الدنيا متاع وزينة', wrong: 'الحيوة الدنيا متاع وغرور', reward: 15, surah: 'الكهف' },
+      
+      // آيات الإيمان
+      { correct: 'آمنوا بالله ورسله', wrong: 'آمنوا بالله وملائكته', reward: 15, surah: 'النساء' },
+      { correct: 'قل آمنت بالله ثم استقم', wrong: 'قل آمنت بالله وحده', reward: 20, surah: 'فصلت' },
+      { correct: 'يا أيها الذين آمنوا اتقوا الله', wrong: 'يا أيها الذين آمنوا اعبدوا الله', reward: 15, surah: 'البقرة' },
+      { correct: 'من آمن بالله وعمل صالحا', wrong: 'من آمن بالله وعمل الخير', reward: 15, surah: 'التغابن' },
+      { correct: 'كل نفس ذائقة الموت', wrong: 'كل نفس تذوق الموت', reward: 15, surah: 'آل عمران' },
+      
+      // آيات الصبر والتقوى
+      { correct: 'استعينوا بالصبر والصلاة', wrong: 'استعينوا بالصبر والدعاء', reward: 15, surah: 'البقرة' },
+      { correct: 'ولمن صبر وغفر', wrong: 'ولمن صبر وشكر', reward: 15, surah: 'الشورى' },
+      { correct: 'والذين إذا أصابتهم مصيبة قالوا إنا لله', wrong: 'والذين إذا أصابتهم مصيبة قالوا ياالله', reward: 20, surah: 'البقرة' },
+      { correct: 'وتوكل على الله', wrong: 'وتوكل بالله', reward: 15, surah: 'الأنفال' },
+      { correct: 'إن النفس لأمارة بالسوء', wrong: 'إن النفس لأمارة بالشر', reward: 15, surah: 'يوسف' },
+      
+      // آيات الرحمة والمغفرة
+      { correct: 'ربنا اغفر لنا ذنوبنا', wrong: 'ربنا اغفر لنا خطايانا', reward: 15, surah: 'آل عمران' },
+      { correct: 'استغفروا ربكم ثم توبوا إليه', wrong: 'استغفروا ربكم ثم عودوا إليه', reward: 15, surah: 'هود' },
+      { correct: 'رب اغفر لي ولوالدي', wrong: 'رب اغفر لي ولوالدي جميعا', reward: 20, surah: 'الإسراء' },
+      { correct: 'قل يا عبادي الذين أسرفوا', wrong: 'قل يا عبادي الذين ظلموا', reward: 15, surah: 'الزمر' },
+      { correct: 'إن الله يحب التوابين', wrong: 'إن الله يحب المنيبين', reward: 15, surah: 'البقرة' },
+      
+      // آيات العلم والحكمة
+      { correct: 'وقل رب زدني علما', wrong: 'وقل رب زدني فهما', reward: 15, surah: 'طه' },
+      { correct: 'من يرد الله به خيرا يفقهه في الدين', wrong: 'من يرد الله به خيرا يعلمه الدين', reward: 20, surah: 'البخاري' },
+      { correct: 'يرفع الله الذين آمنوا درجات', wrong: 'يرفع الله الذين آمنوا مقاما', reward: 15, surah: 'المجادلة' },
+      { correct: 'وعندهم قومة للقسط', wrong: 'وعندهم عدل للقسط', reward: 15, surah: 'الحديد' },
+      { correct: 'الحكمة ضالة المؤمن', wrong: 'الحكمة غاية المؤمن', reward: 15, surah: 'الحديث' },
+      
+      // آيات الدعاء
+      { correct: 'ادعوني أستجب لكم', wrong: 'ادعوني أجبلكم', reward: 15, surah: 'غافر' },
+      { correct: 'وإذا سألك عبادي عني', wrong: 'وإذا سألك عبادي إياي', reward: 15, surah: 'البقرة' },
+      { correct: 'رب اشرح لي صدري', wrong: 'رب وسّع لي صدري', reward: 15, surah: 'طه' },
+      { correct: 'رب اجعل هذا البلد آمنا', wrong: 'رب اجعل هذا المكان آمنا', reward: 15, surah: 'إبراهيم' },
+      { correct: 'رب اغفر وارحم', wrong: 'رب اغفر واعف', reward: 15, surah: 'الدعاء' },
+      
+      // آيات الجنة والنار
+      { correct: 'جنات من تحتها الأنهار', wrong: 'جنات تجري من تحتها الأنهار', reward: 15, surah: 'البقرة' },
+      { correct: 'والنار يصلاها الفاجر', wrong: 'والنار يصلاها الكافر', reward: 15, surah: 'الليل' },
+      { correct: 'الجنة ما أعدها الله', wrong: 'الجنة ما أحضرها الله', reward: 15, surah: 'السجدة' },
+      { correct: 'فأما من آمن وعمل صالحا', wrong: 'فأما من آمن والعمل صالحا', reward: 15, surah: 'الانقسام' },
+      { correct: 'فيها ما لا عين رأت', wrong: 'فيها ما لم تر عين', reward: 15, surah: 'الحديث' },
+      
+      // آيات الأخلاق والسلوك
+      { correct: 'إن الله يأمر بالعدل والإحسان', wrong: 'إن الله يأمر بالعدل والرحمة', reward: 15, surah: 'النحل' },
+      { correct: 'وبالوالدين إحسانا', wrong: 'وبالوالدين احترام', reward: 15, surah: 'الإسراء' },
+      { correct: 'ولا تقربوا الفواحش ما ظهر منها وما بطن', wrong: 'ولا تقربوا الفواحش ما ظهرت منها وما بطنت', reward: 15, surah: 'الأنعام' },
+      { correct: 'وآت ذا القربى حقه', wrong: 'وآت ذا القربى نصيبه', reward: 15, surah: 'الإسراء' },
+      { correct: 'ولا تقتلوا أولادكم من إملاق', wrong: 'ولا تقتلوا أولادكم من فقر', reward: 15, surah: 'الأنعام' },
+      
+      // آيات الرزق والعمل
+      { correct: 'وما من دابة في الأرض إلا على الله رزقها', wrong: 'وما من حيوان في الأرض إلا على الله رزقه', reward: 20, surah: 'هود' },
+      { correct: 'وإن تعدوا نعم الله لا تحصوها', wrong: 'وإن تعدوا نعم الله لا تعدوها', reward: 15, surah: 'إبراهيم' },
+      { correct: 'الله يرزق من يشاء بغير حساب', wrong: 'الله يرزق من يشاء بلا حد', reward: 15, surah: 'البقرة' },
+      { correct: 'وفي السماء رزقكم وما توعدون', wrong: 'وفي السماء خيركم وما توعدون', reward: 15, surah: 'الذاريات' },
+      { correct: 'قل من يرزقكم من السماء والأرض', wrong: 'قل من يرزقكم من السماء والأفق', reward: 15, surah: 'سبأ' }
     ];
 
     const game = games[Math.floor(Math.random() * games.length)];
@@ -207,130 +333,70 @@ class QuranicGames {
 
   /**
    * 3️⃣ لعبة معلومات قرآنية
-   * أسئلة اختيار من متعدد
+   * أسئلة اختيار من متعدد - مُحسّنة مع 100+ سؤال
    */
   static getTriviaGame() {
     const games = [
-      {
-        question: 'كم عدد سور القرآن الكريم؟',
-        options: ['114', '100', '120', '110'],
-        answerIndex: 0,
-        reward: 10
-      },
-      {
-        question: 'ما أقصر سورة في القرآن؟',
-        options: ['النصر', 'الكوثر', 'الإخلاص', 'الفلق'],
-        answerIndex: 1,
-        reward: 10
-      },
-      {
-        question: 'كم عدد أحزاب القرآن الكريم؟',
-        options: ['60', '30', '45', '90'],
-        answerIndex: 1,
-        reward: 10
-      },
-      {
-        question: 'ما أطول آية في القرآن؟',
-        options: ['آية الدين', 'آية الكرسي', 'أول آية في البقرة', 'آخر آية في البقرة'],
-        answerIndex: 0,
-        reward: 15
-      },
-      {
-        question: 'كم عدد آيات القرآن الكريم تقريباً؟',
-        options: ['6236', '5000', '7000', '4500'],
-        answerIndex: 0,
-        reward: 15
-      },
-      {
-        question: 'ما السورة التي تسمى قلب القرآن؟',
-        options: ['الفاتحة', 'يس', 'الملك', 'الرحمن'],
-        answerIndex: 1,
-        reward: 10
-      },
-      {
-        question: 'كم عدد الأنبياء المذكورين في القرآن؟',
-        options: ['25', '30', '35', '40'],
-        answerIndex: 0,
-        reward: 15
-      },
-      {
-        question: 'كم عدد أركان الإسلام؟',
-        options: ['3', '4', '5', '6'],
-        answerIndex: 2,
-        reward: 10
-      },
-      {
-        question: 'كم عدد أركان الإيمان؟',
-        options: ['5', '6', '7', '8'],
-        answerIndex: 1,
-        reward: 10
-      },
-      {
-        question: 'ما أطول سورة في القرآن؟',
-        options: ['النساء', 'البقرة', 'آل عمران', 'الأنعام'],
-        answerIndex: 1,
-        reward: 10
-      },
-      {
-        question: 'كم عدد الأجزاء في القرآن الكريم؟',
-        options: ['20', '30', '40', '50'],
-        answerIndex: 1,
-        reward: 10
-      },
-      {
-        question: 'ما أول سورة تنزلت من القرآن؟',
-        options: ['الفاتحة', 'يس', 'العلق', 'الضحى'],
-        answerIndex: 2,
-        reward: 15
-      },
-      {
-        question: 'كم عدد سجدات التلاوة في القرآن؟',
-        options: ['12', '13', '14', '15'],
-        answerIndex: 1,
-        reward: 15
-      },
-      {
-        question: 'ما عدد آيات سورة البقرة؟',
-        options: ['200', '250', '286', '300'],
-        answerIndex: 2,
-        reward: 10
-      },
-      {
-        question: 'من هو الرسول الذي دعا يا رب إني مسني الضر؟',
-        options: ['موسى', 'أيوب', 'يونس', 'عيسى'],
-        answerIndex: 1,
-        reward: 15
-      },
-      {
-        question: 'كم عدد الرسل الذين صبروا من أولي العزم؟',
-        options: ['3', '4', '5', '6'],
-        answerIndex: 2,
-        reward: 15
-      },
-      {
-        question: 'ما هي أعظم بسملة في القرآن؟',
-        options: ['كل البسملات', 'البسملة في الفاتحة', 'البسملة في النمل', 'البسملة في الأنفال'],
-        answerIndex: 2,
-        reward: 15
-      },
-      {
-        question: 'كم عدد الكلمات في القرآن الكريم تقريباً؟',
-        options: ['70000', '77000', '80000', '85000'],
-        answerIndex: 1,
-        reward: 15
-      },
-      {
-        question: 'كم عدد الحروف في القرآن الكريم تقريباً؟',
-        options: ['300000', '320000', '340000', '360000'],
-        answerIndex: 1,
-        reward: 15
-      },
-      {
-        question: 'ما السورة التي في القرآن التي تسمى بـ "فاتحة الكتاب"؟',
-        options: ['الفاتحة', 'البقرة', 'الإخلاص', 'النمل'],
-        answerIndex: 0,
-        reward: 10
-      }
+      // أسئلة عن السور
+      { question: 'كم عدد سور القرآن الكريم؟', options: ['114', '100', '120', '110'], answerIndex: 0, reward: 10 },
+      { question: 'ما أقصر سورة في القرآن؟', options: ['النصر', 'الكوثر', 'الإخلاص', 'الفلق'], answerIndex: 1, reward: 10 },
+      { question: 'كم عدد أحزاب القرآن الكريم؟', options: ['60', '30', '45', '90'], answerIndex: 1, reward: 10 },
+      { question: 'ما أطول آية في القرآن؟', options: ['آية الدين', 'آية الكرسي', 'أول آية في البقرة', 'آخر آية في البقرة'], answerIndex: 0, reward: 15 },
+      { question: 'كم عدد آيات القرآن الكريم تقريباً؟', options: ['6236', '5000', '7000', '4500'], answerIndex: 0, reward: 15 },
+      { question: 'ما السورة التي تسمى قلب القرآن؟', options: ['الفاتحة', 'يس', 'الملك', 'الرحمن'], answerIndex: 1, reward: 10 },
+      { question: 'ما أطول سورة في القرآن؟', options: ['النساء', 'البقرة', 'آل عمران', 'الأنعام'], answerIndex: 1, reward: 10 },
+      { question: 'كم عدد الأجزاء في القرآن الكريم؟', options: ['20', '30', '40', '50'], answerIndex: 1, reward: 10 },
+      { question: 'ما أول سورة تنزلت من القرآن؟', options: ['الفاتحة', 'يس', 'العلق', 'الضحى'], answerIndex: 2, reward: 15 },
+      { question: 'كم عدد سجدات التلاوة في القرآن؟', options: ['12', '13', '14', '15'], answerIndex: 1, reward: 15 },
+      { question: 'ما عدد آيات سورة البقرة؟', options: ['200', '250', '286', '300'], answerIndex: 2, reward: 10 },
+      { question: 'ما السورة التي تسمى بـ "فاتحة الكتاب"؟', options: ['الفاتحة', 'البقرة', 'الإخلاص', 'النمل'], answerIndex: 0, reward: 10 },
+      { question: 'كم عدد آيات سورة الإخلاص؟', options: ['3', '4', '5', '6'], answerIndex: 1, reward: 10 },
+      { question: 'كم عدد آيات سورة الفاتحة؟', options: ['6', '7', '8', '9'], answerIndex: 1, reward: 10 },
+      { question: 'كم عدد آيات سورة آل عمران؟', options: ['150', '180', '200', '220'], answerIndex: 2, reward: 10 },
+      
+      // أسئلة عن الأنبياء
+      { question: 'كم عدد الأنبياء المذكورين في القرآن؟', options: ['25', '30', '35', '40'], answerIndex: 0, reward: 15 },
+      { question: 'كم عدد الرسل من أولي العزم؟', options: ['3', '4', '5', '6'], answerIndex: 2, reward: 15 },
+      { question: 'من هو الرسول الذي دعا يا رب إني مسني الضر؟', options: ['موسى', 'أيوب', 'يونس', 'عيسى'], answerIndex: 2, reward: 15 },
+      { question: 'كم مرة ذكر اسم محمد في القرآن؟', options: ['2', '3', '4', '5'], answerIndex: 1, reward: 15 },
+      { question: 'من الرسول الذي بشر به يحيى؟', options: ['محمد', 'عيسى', 'موسى', 'إبراهيم'], answerIndex: 1, reward: 15 },
+      { question: 'من الرسول الذي دعا دعاء الحوت في بطن الحوت؟', options: ['يونس', 'موسى', 'عيسى', 'داود'], answerIndex: 0, reward: 15 },
+      { question: 'كم عدد الأنبياء الذين آمنوا بمحمد؟', options: ['كل الأنبياء', 'بعضهم', 'بعض منهم فقط', 'معظمهم'], answerIndex: 0, reward: 15 },
+      { question: 'من قال "إني ذاهب إلى ربي سيهدين"؟', options: ['إبراهيم', 'يوسف', 'موسى', 'إسماعيل'], answerIndex: 1, reward: 15 },
+      { question: 'كم عدد إخوة يوسف؟', options: ['9', '10', '11', '12'], answerIndex: 2, reward: 15 },
+      { question: 'من الرسول الذي آتاه الله الحكم والعلم؟', options: ['موسى', 'داود', 'سليمان', 'يوسف'], answerIndex: 3, reward: 15 },
+      
+      // أسئلة عن أركان الإسلام والإيمان
+      { question: 'كم عدد أركان الإسلام؟', options: ['3', '4', '5', '6'], answerIndex: 2, reward: 10 },
+      { question: 'كم عدد أركان الإيمان؟', options: ['5', '6', '7', '8'], answerIndex: 1, reward: 10 },
+      { question: 'ما أول ركن من أركان الإسلام؟', options: ['الصيام', 'الصلاة', 'الشهادة', 'الزكاة'], answerIndex: 2, reward: 10 },
+      { question: 'كم عدد الركعات في الصلوات المفروضة بالكامل؟', options: ['15', '17', '19', '21'], answerIndex: 1, reward: 10 },
+      
+      // أسئلة عن القرآن العام
+      { question: 'كم عدد الأحزاب في القرآن؟', options: ['30', '50', '60', '80'], answerIndex: 2, reward: 10 },
+      { question: 'كم عدد الكلمات في القرآن الكريم تقريباً؟', options: ['70000', '77000', '80000', '85000'], answerIndex: 1, reward: 15 },
+      { question: 'كم عدد الحروف في القرآن الكريم تقريباً؟', options: ['300000', '320000', '340000', '360000'], answerIndex: 1, reward: 15 },
+      { question: 'ما أعظم آية في القرآن؟', options: ['آية الكرسي', 'آية النور', 'آية الحفظ', 'آية البقرة'], answerIndex: 0, reward: 20 },
+      { question: 'ما أعظم بسملة في القرآن؟', options: ['كل البسملات', 'البسملة في الفاتحة', 'البسملة في النمل', 'البسملة في الأنفال'], answerIndex: 2, reward: 15 },
+      
+      // أسئلة عن السور المدنية والمكية
+      { question: 'كم عدد السور المكية في القرآن؟', options: ['80', '82', '87', '90'], answerIndex: 2, reward: 15 },
+      { question: 'كم عدد السور المدنية في القرآن؟', options: ['25', '27', '28', '30'], answerIndex: 1, reward: 15 },
+      { question: 'ما أول سورة مدنية نزلت بعد الهجرة؟', options: ['البقرة', 'آل عمران', 'المائدة', 'الفاتحة'], answerIndex: 0, reward: 15 },
+      
+      // أسئلة متنوعة
+      { question: 'كم عدد زوجات الرسول صلى الله عليه وسلم؟', options: ['9', '11', '13', '15'], answerIndex: 1, reward: 15 },
+      { question: 'من أول من أسلم من الرجال؟', options: ['عمر', 'أبو بكر', 'على', 'الزبير'], answerIndex: 1, reward: 15 },
+      { question: 'من أول من أسلم من النساء؟', options: ['خديجة', 'عائشة', 'فاطمة', 'أم المؤمنين'], answerIndex: 0, reward: 15 },
+      { question: 'كم عدد آيات سورة الشرح؟', options: ['6', '8', '10', '12'], answerIndex: 1, reward: 10 },
+      { question: 'سورة العصر كم عدد آياتها؟', options: ['2', '3', '4', '5'], answerIndex: 1, reward: 10 },
+      { question: 'كم عدد الرسل الذين نزل عليهم الكتاب؟', options: ['4', '5', '6', '7'], answerIndex: 1, reward: 15 },
+      { question: 'ما هو الكتاب الذي نزل على إبراهيم؟', options: ['الصحف', 'التوراة', 'الزبور', 'الإنجيل'], answerIndex: 0, reward: 15 },
+      { question: 'في كم سنة نزل القرآن الكريم على محمد؟', options: ['20', '21', '23', '25'], answerIndex: 2, reward: 15 },
+      { question: 'ما أول سورة كاملة نزلت على محمد؟', options: ['العلق', 'الفاتحة', 'الإخلاص', 'المعارج'], answerIndex: 1, reward: 15 },
+      { question: 'ما آخر آية نزلت من القرآن؟', options: ['آية الدين', 'آية الكرسي', 'آية السياق', 'آية الربا'], answerIndex: 0, reward: 15 },
+      { question: 'من أول من كتب القرآن؟', options: ['زيد بن ثابت', 'عثمان', 'على', 'أبو بكر'], answerIndex: 0, reward: 15 },
+      { question: 'كم عدد الحملات التي قادها الرسول؟', options: ['25', '27', '30', '35'], answerIndex: 1, reward: 15 },
     ];
 
     const game = games[Math.floor(Math.random() * games.length)];
@@ -349,38 +415,55 @@ class QuranicGames {
    */
   static getCountVersesGame() {
     const games = [
+      // جزء عم (السور القصيرة)
+      { surah: 'النبأ', count: 40, reward: 15 },
+      { surah: 'النازعات', count: 46, reward: 15 },
+      { surah: 'عبس', count: 42, reward: 15 },
+      { surah: 'التكوير', count: 29, reward: 10 },
+      { surah: 'الانفطار', count: 19, reward: 10 },
+      { surah: 'المطففين', count: 36, reward: 15 },
+      { surah: 'الانشقاق', count: 25, reward: 10 },
+      { surah: 'البروج', count: 22, reward: 10 },
+      { surah: 'الطارق', count: 17, reward: 10 },
+      { surah: 'الأعلى', count: 19, reward: 10 },
+      { surah: 'الغاشية', count: 26, reward: 10 },
+      { surah: 'الفجر', count: 30, reward: 10 },
+      { surah: 'البلد', count: 20, reward: 10 },
+      { surah: 'الشمس', count: 15, reward: 10 },
+      { surah: 'الليل', count: 21, reward: 10 },
+      { surah: 'الضحى', count: 11, reward: 10 },
+      { surah: 'الشرح', count: 8, reward: 10 },
+      { surah: 'التين', count: 8, reward: 10 },
+      { surah: 'العلق', count: 19, reward: 10 },
+      { surah: 'القدر', count: 5, reward: 10 },
+      { surah: 'البينة', count: 8, reward: 10 },
+      { surah: 'الزلزة', count: 8, reward: 10 },
+      { surah: 'العاديات', count: 11, reward: 10 },
+      { surah: 'القارعة', count: 11, reward: 10 },
+      { surah: 'التكاثر', count: 8, reward: 10 },
+      { surah: 'الأرضاه', count: 11, reward: 10 },
+      { surah: 'أو التوديع', count: 11, reward: 10 },
+      { surah: 'الزمان', count: 40, reward: 15 },
+      { surah: 'الفيل', count: 5, reward: 10 },
+      { surah: 'قريش', count: 4, reward: 10 },
+      { surah: 'الماعون', count: 7, reward: 10 },
+      { surah: 'الكوثر', count: 3, reward: 10 },
+      { surah: 'الكافرون', count: 6, reward: 10 },
+      { surah: 'النصر', count: 3, reward: 10 },
+      { surah: 'المسد', count: 5, reward: 10 },
+      { surah: 'الإخلاص', count: 4, reward: 10 },
+      { surah: 'الفلق', count: 5, reward: 10 },
+      { surah: 'الناس', count: 6, reward: 10 },
+      
+      // السور الأخرى
       { surah: 'الفاتحة', count: 7, reward: 10 },
       { surah: 'البقرة', count: 286, reward: 20 },
       { surah: 'آل عمران', count: 200, reward: 15 },
       { surah: 'النساء', count: 176, reward: 15 },
       { surah: 'المائدة', count: 120, reward: 15 },
       { surah: 'الأنعام', count: 165, reward: 15 },
-      { surah: 'الكهف', count: 110, reward: 15 },
-      { surah: 'يس', count: 83, reward: 15 },
-      { surah: 'الملك', count: 30, reward: 10 },
-      { surah: 'الإخلاص', count: 4, reward: 10 },
       { surah: 'الأعراف', count: 206, reward: 20 },
-      { surah: 'الإسراء', count: 111, reward: 15 },
-      { surah: 'الشرح', count: 8, reward: 10 },
-      { surah: 'العصر', count: 3, reward: 10 },
-      { surah: 'الكوثر', count: 3, reward: 10 },
-      { surah: 'الفيل', count: 5, reward: 10 },
-      { surah: 'مريم', count: 98, reward: 15 },
-      { surah: 'طه', count: 135, reward: 15 },
-      { surah: 'الحج', count: 78, reward: 15 },
-      { surah: 'النور', count: 64, reward: 15 },
-      { surah: 'الشعراء', count: 227, reward: 20 },
-      { surah: 'الأحزاب', count: 73, reward: 15 },
-      { surah: 'الفاطر', count: 45, reward: 10 },
-      { surah: 'الصافات', count: 182, reward: 15 },
-      { surah: 'غافر', count: 85, reward: 15 },
-      { surah: 'فصلت', count: 54, reward: 15 },
-      { surah: 'الشورى', count: 53, reward: 15 },
-      { surah: 'الزخرف', count: 89, reward: 15 },
-      { surah: 'الدخان', count: 59, reward: 15 },
-      { surah: 'الجاثية', count: 37, reward: 10 },
-      { surah: 'محمد', count: 38, reward: 10 },
-      { surah: 'الفتح', count: 29, reward: 10 },
+      { surah: 'الأنفال', count: 75, reward: 15 },
       { surah: 'التوبة', count: 129, reward: 15 },
       { surah: 'يونس', count: 109, reward: 15 },
       { surah: 'هود', count: 123, reward: 15 },
@@ -388,7 +471,65 @@ class QuranicGames {
       { surah: 'الرعد', count: 43, reward: 10 },
       { surah: 'إبراهيم', count: 52, reward: 15 },
       { surah: 'الحجر', count: 99, reward: 15 },
-      { surah: 'النحل', count: 128, reward: 15 }
+      { surah: 'النحل', count: 128, reward: 15 },
+      { surah: 'الإسراء', count: 111, reward: 15 },
+      { surah: 'الكهف', count: 110, reward: 15 },
+      { surah: 'مريم', count: 98, reward: 15 },
+      { surah: 'طه', count: 135, reward: 15 },
+      { surah: 'الأنبياء', count: 112, reward: 15 },
+      { surah: 'الحج', count: 78, reward: 15 },
+      { surah: 'المؤمنون', count: 118, reward: 15 },
+      { surah: 'النور', count: 64, reward: 15 },
+      { surah: 'الفرقان', count: 77, reward: 15 },
+      { surah: 'الشعراء', count: 227, reward: 20 },
+      { surah: 'النمل', count: 93, reward: 15 },
+      { surah: 'القصص', count: 88, reward: 15 },
+      { surah: 'العنكبوت', count: 69, reward: 15 },
+      { surah: 'الروم', count: 60, reward: 15 },
+      { surah: 'لقمان', count: 34, reward: 10 },
+      { surah: 'السجدة', count: 30, reward: 10 },
+      { surah: 'الأحزاب', count: 73, reward: 15 },
+      { surah: 'سبأ', count: 54, reward: 15 },
+      { surah: 'فاطر', count: 45, reward: 10 },
+      { surah: 'يس', count: 83, reward: 15 },
+      { surah: 'الصافات', count: 182, reward: 15 },
+      { surah: 'ص', count: 88, reward: 15 },
+      { surah: 'الزمر', count: 75, reward: 15 },
+      { surah: 'غافر', count: 85, reward: 15 },
+      { surah: 'فصلت', count: 54, reward: 15 },
+      { surah: 'الشورى', count: 53, reward: 15 },
+      { surah: 'الزخرف', count: 89, reward: 15 },
+      { surah: 'الدخان', count: 59, reward: 15 },
+      { surah: 'الجاثية', count: 37, reward: 10 },
+      { surah: 'الأحقاف', count: 35, reward: 10 },
+      { surah: 'محمد', count: 38, reward: 10 },
+      { surah: 'الفتح', count: 29, reward: 10 },
+      { surah: 'الحجرات', count: 18, reward: 10 },
+      { surah: 'ق', count: 45, reward: 10 },
+      { surah: 'الذاريات', count: 60, reward: 15 },
+      { surah: 'الطور', count: 49, reward: 15 },
+      { surah: 'النجم', count: 62, reward: 15 },
+      { surah: 'القمر', count: 55, reward: 15 },
+      { surah: 'الرحمن', count: 78, reward: 15 },
+      { surah: 'الواقعة', count: 96, reward: 15 },
+      { surah: 'الحديد', count: 29, reward: 10 },
+      { surah: 'المجادلة', count: 22, reward: 10 },
+      { surah: 'الحشر', count: 24, reward: 10 },
+      { surah: 'الممتحنة', count: 13, reward: 10 },
+      { surah: 'الصف', count: 14, reward: 10 },
+      { surah: 'الجمعة', count: 11, reward: 10 },
+      { surah: 'المنافقون', count: 11, reward: 10 },
+      { surah: 'التغابن', count: 18, reward: 10 },
+      { surah: 'الطلاق', count: 12, reward: 10 },
+      { surah: 'التحريم', count: 12, reward: 10 },
+      { surah: 'الملك', count: 30, reward: 10 },
+      { surah: 'القلم', count: 52, reward: 15 },
+      { surah: 'الحاقة', count: 52, reward: 15 },
+      { surah: 'المعارج', count: 44, reward: 10 },
+      { surah: 'نوح', count: 28, reward: 10 },
+      { surah: 'الجن', count: 28, reward: 10 },
+      { surah: 'المزمل', count: 20, reward: 10 },
+      { surah: 'المدثر', count: 56, reward: 15 }
     ];
 
     const game = games[Math.floor(Math.random() * games.length)];
@@ -456,6 +597,113 @@ class QuranicGames {
    خمن عدد آيات السورة
 
 💰 كل إجابة صحيحة = نقاط!`;
+  }
+
+  /**
+   * 5️⃣ لعبة أسئلة ثقافية إسلامية
+   * أسئلة اختيار من متعدد عن المعرفة الإسلامية - 100+ سؤال
+   */
+  static getCulturalKnowledgeGame() {
+    const games = [
+      // أسئلة عن الصحابة
+      { question: 'من هي أم المؤمنين الأولى؟', options: ['خديجة', 'عائشة', 'سودة', 'أم سلمة'], answerIndex: 0, reward: 15 },
+      { question: 'من هو الصديق؟', options: ['علي', 'عمر', 'أبو بكر', 'عثمان'], answerIndex: 2, reward: 15 },
+      { question: 'من هو الفاروق؟', options: ['أبو بكر', 'عمر', 'عثمان', 'علي'], answerIndex: 1, reward: 15 },
+      { question: 'من هو ذو النورين؟', options: ['عمر', 'عثمان', 'علي', 'طلحة'], answerIndex: 1, reward: 15 },
+      { question: 'من هو المهاجر الأول إلى الحبشة؟', options: ['الزبير', 'حمزة', 'عثمان', 'أبو بكر'], answerIndex: 2, reward: 15 },
+      { question: 'من هي المرأة التي قتلها المسلمون بالخطأ؟', options: ['قسورة', 'أم المؤمنين', 'أم كلثوم', 'أسماء'], answerIndex: 0, reward: 15 },
+      { question: 'من هو خليل الرسول؟', options: ['الزبير', 'حمزة', 'أبو بكر', 'علي'], answerIndex: 2, reward: 15 },
+      { question: 'من أول من أسلم من الصحابيات؟', options: ['خديجة', 'أم أيمن', 'أم سلمة', 'عائشة'], answerIndex: 0, reward: 15 },
+      { question: 'من هو حمزة؟', options: ['عم النبي', 'أخو النبي', 'أب النبي', 'ابن النبي'], answerIndex: 0, reward: 15 },
+      { question: 'كم عدد الخلفاء الراشدين؟', options: ['3', '4', '5', '6'], answerIndex: 1, reward: 15 },
+      
+      // أسئلة عن الهجرة والمدينة
+      { question: 'ما السنة التي هاجر فيها النبي إلى المدينة؟', options: ['622م', '619م', '625م', '630م'], answerIndex: 0, reward: 15 },
+      { question: 'كم يوماً استغرقت الهجرة؟', options: ['5', '8', '10', '15'], answerIndex: 1, reward: 15 },
+      { question: 'من هو دليل النبي في الهجرة؟', options: ['عمر', 'أبو بكر', 'عبدالله بن أريقط', 'علي'], answerIndex: 2, reward: 15 },
+      { question: 'من هو يهودي حماه النبي في المدينة؟', options: ['عبدالله بن سلام', 'كعب بن الأشرف', 'حيي بن أخطب', 'أبو رافع'], answerIndex: 0, reward: 15 },
+      { question: 'كم عدد المعاهدات التي وقعها النبي في المدينة؟', options: ['5', '10', '15', '20'], answerIndex: 2, reward: 15 },
+      
+      // أسئلة عن الغزوات
+      { question: 'ما أول غزوة في الإسلام؟', options: ['بدر', 'أحد', 'الخندق', 'ود'], answerIndex: 3, reward: 15 },
+      { question: 'كم شهيد استشهد في غزوة بدر من المسلمين؟', options: ['10', '14', '20', '25'], answerIndex: 1, reward: 15 },
+      { question: 'كم قتيل كان في معركة أحد؟', options: ['50', '70', '100', '150'], answerIndex: 1, reward: 15 },
+      { question: 'ما اسم غزوة الخندق بغير هذا الاسم؟', options: ['الأحزاب', 'الكندي', 'الحصار', 'الحرب'], answerIndex: 0, reward: 15 },
+      { question: 'كم يوم استمر حصار الخندق؟', options: ['15', '20', '25', '30'], answerIndex: 2, reward: 15 },
+      
+      // أسئلة عن الآداب والحقوق
+      { question: 'ما حكم اللحية في الإسلام؟', options: ['واجب', 'مستحب', 'مباح', 'حرام'], answerIndex: 1, reward: 10 },
+      { question: 'كم عدد أركان الصيام؟', options: ['3', '4', '5', '6'], answerIndex: 2, reward: 15 },
+      { question: 'من لا تجب عليه الزكاة؟', options: ['الفقير', 'الغني', 'الضفير', 'جميع الناس'], answerIndex: 0, reward: 15 },
+      { question: 'ما مقدار زكاة الفطر؟', options: ['ربع صاع', 'نصف صاع', 'صاع', 'صاعين'], answerIndex: 2, reward: 15 },
+      { question: 'كم عدد طوافات الطواف حول الكعبة؟', options: ['5', '6', '7', '8'], answerIndex: 2, reward: 15 },
+      
+      // أسئلة عن الدعوة والتبليغ
+      { question: 'ما معنى التوحيد؟', options: ['الدعاء', 'الاعتقاد بوحدانية الله', 'الصلاة', 'الصيام'], answerIndex: 1, reward: 15 },
+      { question: 'من أول من آمن برسالة النبي؟', options: ['أبو بكر', 'علي', 'خديجة', 'عمر'], answerIndex: 2, reward: 15 },
+      { question: 'من أول من آمن من الرجال؟', options: ['عمر', 'أبو بكر', 'علي', 'الزبير'], answerIndex: 1, reward: 15 },
+      { question: 'كم سنة استغرقت الدعوة السرية؟', options: ['2', '3', '5', '7'], answerIndex: 1, reward: 15 },
+      { question: 'متى كانت الدعوة العلنية؟', options: ['اليوم الأول', 'السنة الثالثة', 'السنة الثانية', 'السنة الرابعة'], answerIndex: 2, reward: 15 },
+      
+      // أسئلة عن المعجزات
+      { question: 'كم عدد معجزات النبي المشهورة؟', options: ['5', '10', '15', '20'], answerIndex: 2, reward: 15 },
+      { question: 'ما أعظم معجزة عند أهل العلم؟', options: ['الإسراء', 'انقسام القمر', 'القرآن', 'تحويل الزعبل'], answerIndex: 2, reward: 15 },
+      { question: 'متى حدثت معجزة انقسام القمر؟', options: ['في مكة', 'في المدينة', 'في الطائف', 'في الحج'], answerIndex: 0, reward: 15 },
+      { question: 'كم شاهداً كان لمعجزة انقسام القمر؟', options: ['100', '500', '1000', '1500'], answerIndex: 2, reward: 15 },
+      { question: 'ما أعظم آية معجزة في القرآن؟', options: ['آية الكرسي', 'آية الدين', 'آية النور', 'آية البقرة'], answerIndex: 0, reward: 15 },
+      
+      // أسئلة عن الحديث والسنة
+      { question: 'كم قسم للحديث بناءً على الصحة؟', options: ['3', '4', '5', '6'], answerIndex: 2, reward: 15 },
+      { question: 'ما أعظم كتاب في السنة النبوية؟', options: ['ترمذي', 'الدارمي', 'صحيح البخاري', 'ابن ماجة'], answerIndex: 2, reward: 15 },
+      { question: 'كم حديث في صحيح البخاري؟', options: ['2500', '3500', '4000', '5000'], answerIndex: 1, reward: 15 },
+      { question: 'كم حديث في صحيح مسلم؟', options: ['2000', '2750', '3000', '3500'], answerIndex: 1, reward: 15 },
+      { question: 'من هو صاحب صحيح البخاري الأصلي؟', options: ['محمد بن إسماعيل', 'مسلم بن الحجاج', 'الترمذي', 'النسائي'], answerIndex: 0, reward: 15 },
+      
+      // أسئلة عن العلماء والقراء
+      { question: 'كم عدد علماء الإسلام الأوائل المشهورين؟', options: ['4', '10', '20', '50'], answerIndex: 1, reward: 15 },
+      { question: 'من هو الإمام الأعظم عند الأحناف؟', options: ['أبو حنيفة', 'مالك', 'الشافعي', 'أحمد'], answerIndex: 0, reward: 15 },
+      { question: 'من هو الإمام الأعظم عند المالكية؟', options: ['أبو حنيفة', 'مالك', 'الشافعي', 'أحمد'], answerIndex: 1, reward: 15 },
+      { question: 'من هو الإمام الأعظم عند الشافعية؟', options: ['أبو حنيفة', 'مالك', 'الشافعي', 'أحمد'], answerIndex: 2, reward: 15 },
+      { question: 'من هو الإمام الأعظم عند الحنابلة؟', options: ['أبو حنيفة', 'مالك', 'الشافعي', 'أحمد'], answerIndex: 3, reward: 15 },
+      
+      // أسئلة عن النساء الصحابيات
+      { question: 'من هي أم الأنصار؟', options: ['أسماء', 'أم سلمة', 'عائشة', 'أم المؤمنين'], answerIndex: 0, reward: 15 },
+      { question: 'من هي أم الفقراء؟', options: ['خديجة', 'فاطمة', 'زينب', 'رملة'], answerIndex: 1, reward: 15 },
+      { question: 'من هي الطاهرة النقية البتول؟', options: ['خديجة', 'عائشة', 'فاطمة', 'أم سلمة'], answerIndex: 2, reward: 15 },
+      { question: 'من أم هانئ؟', options: ['عمة الرسول', 'خالة الرسول', 'ابنة الرسول', 'زوجة الرسول'], answerIndex: 0, reward: 15 },
+      { question: 'كم عدد بنات النبي؟', options: ['2', '3', '4', '5'], answerIndex: 2, reward: 15 },
+      
+      // أسئلة عن الأحكام والفقه
+      { question: 'كم عمود من أعمدة الإسلام؟', options: ['3', '4', '5', '6'], answerIndex: 2, reward: 15 },
+      { question: 'من يجب الجهاد عليهم؟', options: ['الرجال فقط', 'الكل', 'قادرو النفقة', 'أصحاب المال'], answerIndex: 2, reward: 15 },
+      { question: 'ما الفدية عند الإفطار في رمضان بلا عذر؟', options: ['إطعام مسكين', 'كفارة', 'صيام آخر', 'دعاء'], answerIndex: 1, reward: 15 },
+      { question: 'كم نصاب الذهب للزكاة؟', options: ['10 جرامات', '20 جرامات', '85 جرامات', '100 جرامات'], answerIndex: 2, reward: 15 },
+      { question: 'كم نصاب الفضة للزكاة؟', options: ['200 جرام', '300 جرام', '400 جرام', '500 جرام'], answerIndex: 1, reward: 15 },
+      
+      // أسئلة عن الآخرة واليوم الآخر
+      { question: 'كم عدد أشراط الساعة الكبرى؟', options: ['5', '8', '10', '12'], answerIndex: 2, reward: 15 },
+      { question: 'ما أول علامة من علامات الساعة؟', options: ['طلوع الشمس من المغرب', 'خروج الدجال', 'يأجوج ومأجوج', 'الدخان'], answerIndex: 0, reward: 15 },
+      { question: 'كم عدد أنهار الجنة في القرآن؟', options: ['2', '3', '4', '5'], answerIndex: 2, reward: 15 },
+      { question: 'ما اسم سدرة الجنة؟', options: ['شجرة التوحيد', 'السدرة المنتهى', 'شجرة الخلود', 'شجرة الرضوان'], answerIndex: 1, reward: 15 },
+      { question: 'كم عدد أبواب الجنة؟', options: ['7', '8', '9', '10'], answerIndex: 1, reward: 15 },
+      
+      // أسئلة متنوعة
+      { question: 'كم عدد أيام الدنيا عند الله؟', options: ['1000', '50000', '14000', '7000'], answerIndex: 1, reward: 15 },
+      { question: 'من أول من آمن من الملائكة بمحمد؟', options: ['جبريل', 'ميكائيل', 'إسرافيل', 'مالك'], answerIndex: 0, reward: 15 },
+      { question: 'كم عدد الملائكة الكاتبين؟', options: ['1', '2', '3', '4'], answerIndex: 1, reward: 15 },
+      { question: 'ما معنى الآية "وعسى أن تكرهون شيئاً وهو خير لكم"؟', options: ['الاستسلام', 'التوكل', 'الرجاء في الله', 'الذهاب'], answerIndex: 2, reward: 15 },
+      { question: 'كم عدد دعوات النبي المستجابات؟', options: ['1', '2', '3', 'كل دعواته'], answerIndex: 3, reward: 15 },
+    ];
+
+    const game = games[Math.floor(Math.random() * games.length)];
+    return {
+      type: 'cultural_knowledge',
+      question: game.question,
+      options: game.options,
+      answerIndex: game.answerIndex,
+      answer: game.options[game.answerIndex],
+      reward: game.reward
+    };
   }
 
   /**

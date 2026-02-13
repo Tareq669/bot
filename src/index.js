@@ -1225,6 +1225,9 @@ bot.action(/qgame:trivia_(.+)/, async (ctx) => {
 // لعبة عد الآيات
 bot.action('qgame:count', async (ctx) => await QuranicGamesHandler.startCountVersesGame(ctx));
 
+// لعبة الأسئلة الثقافية الإسلامية
+bot.action('qgame:cultural', async (ctx) => await QuranicGamesHandler.startCulturalKnowledge(ctx));
+
 // --- KEYBOARD BUTTON HANDLERS - MUST BE BEFORE bot.on('text') ---
 bot.hears('🕌 الختمة', (ctx) => MenuHandler.handleKhatmaMenu(ctx));
 bot.hears('📿 الأذكار', (ctx) => MenuHandler.handleAdhkarMenu(ctx));

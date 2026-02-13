@@ -23,6 +23,7 @@ class QuranicGamesHandler {
         [Markup.button.callback('🔍 اكتشف الفرق', 'qgame:spot')],
         [Markup.button.callback('🧠 معلومات قرآنية', 'qgame:trivia')],
         [Markup.button.callback('📊 عد الآيات', 'qgame:count')],
+        [Markup.button.callback('🎓 أسئلة ثقافية', 'qgame:cultural')],
         [Markup.button.callback('⬅️ رجوع', 'menu:games')]
       ]);
 
@@ -252,6 +253,51 @@ ${game.question}
   }
 
   /**
+   * 5️⃣ لعبة الأسئلة الثقافية الإسلامية
+   */
+  static async startCulturalKnowledge(ctx) {
+    try {
+      if (ctx.callbackQuery) await ctx.answerCbQuery();
+
+      ctx.session = ctx.session || {};
+      const game = QuranicGames.getCulturalKnowledgeGame();
+
+      ctx.session.gameState = {
+        game: 'quranic',
+        type: game.type,
+        answer: game.answer,
+        reward: game.reward
+      };
+
+      const optionsText = game.options.map((opt, idx) => `${String.fromCharCode(65 + idx)}) ${opt}`).join('\n');
+      const message = `🧠 <b>أسئلة ثقافية إسلامية</b>
+
+❓ <b>السؤال:</b>
+${game.question}
+
+<b>الإجابات:</b>
+${optionsText}
+
+💡 أرسل الحرف (A, B, C, D) أو رقم الخيار (1, 2, 3, 4)`;
+
+      const buttons = Markup.inlineKeyboard([
+        [Markup.button.callback('🔄 سؤال آخر', 'qgame:cultural')],
+        [Markup.button.callback('⬅️ رجوع', 'game:quranic')]
+      ]);
+
+      await ctx.editMessageText(message, {
+        parse_mode: 'HTML',
+        reply_markup: buttons.reply_markup
+      });
+    } catch (error) {
+      if (error.response?.error_code !== 400 || !error.response?.description?.includes('message is not modified')) {
+        console.error('❌ CulturalKnowledge error:', error);
+        await ctx.reply('❌ حدث خطأ').catch(() => {});
+      }
+    }
+  }
+
+  /**
    * معالجة الإجابة
    */
   static async processAnswer(ctx, userAnswer) {
@@ -297,10 +343,12 @@ ${game.question}
       }
 
       const gameTypeMap = {
+        'guess_surah': 'guess',
         'complete_verse': 'complete',
         'spot_difference': 'spot',
         'trivia': 'trivia',
-        'count_verses': 'count'
+        'count_verses': 'count',
+        'cultural_knowledge': 'cultural'
       };
 
       const buttons = Markup.inlineKeyboard([
