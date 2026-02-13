@@ -510,7 +510,6 @@ ${adhkar.text || 'لا توجد نصوص متاحة'}
       }
     }
   }
-  }
 
   static async handleQuranMenu(ctx) {
     try {
