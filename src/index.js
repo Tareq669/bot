@@ -6,6 +6,7 @@ const Database = require('./database/db');
 const CommandHandler = require('./commands/commandHandler');
 const MenuHandler = require('./commands/menuHandler');
 const GameHandler = require('./commands/gameHandler');
+const QuranicGamesHandler = require('./commands/quranicGamesHandler');
 const EconomyHandler = require('./commands/economyHandler');
 const EconomyManager = require('./economy/economyManager');
 const ContentHandler = require('./commands/contentHandler');
@@ -1225,23 +1226,26 @@ bot.action('game:dice', (ctx) => GameHandler.handleDice(ctx));
 bot.action('game:luck', (ctx) => GameHandler.handleLuck(ctx));
 bot.action('game:challenges', (ctx) => GameHandler.handleChallenges(ctx));
 
-// --- QURANIC GAMES HANDLERS ---
-bot.action('game:quranic', async (ctx) => await GameHandler.handleQuranicMenu(ctx));
-bot.action('qgame:guess_verse', async (ctx) => await GameHandler.handleGuessVerse(ctx));
-bot.action('qgame:complete_verse', async (ctx) => await GameHandler.handleCompleteVerse(ctx));
-bot.action('qgame:spot_difference', async (ctx) => await GameHandler.handleSpotDifference(ctx));
-bot.action('qgame:spot_correct', async (ctx) => {
-  await GameHandler.processQuranicAnswer(ctx, 'true');
-});
-bot.action('qgame:spot_wrong', async (ctx) => {
-  await GameHandler.processQuranicAnswer(ctx, 'false');
-});
-bot.action('qgame:trivia', async (ctx) => await GameHandler.handleTriviaQuestion(ctx));
-bot.action(/qgame:trivia_answer:(.+)/, async (ctx) => {
+// --- QURANIC GAMES HANDLERS (نظام جديد متكامل) ---
+bot.action('game:quranic', async (ctx) => await QuranicGamesHandler.showMenu(ctx));
+
+// لعبة أكمل الآية
+bot.action('qgame:complete', async (ctx) => await QuranicGamesHandler.startCompleteVerse(ctx));
+
+// لعبة اكتشف الفرق
+bot.action('qgame:spot', async (ctx) => await QuranicGamesHandler.startSpotDifference(ctx));
+bot.action('qgame:spot_true', async (ctx) => await QuranicGamesHandler.processAnswer(ctx, 'true'));
+bot.action('qgame:spot_false', async (ctx) => await QuranicGamesHandler.processAnswer(ctx, 'false'));
+
+// لعبة معلومات قرآنية
+bot.action('qgame:trivia', async (ctx) => await QuranicGamesHandler.startTriviaGame(ctx));
+bot.action(/qgame:trivia_(.+)/, async (ctx) => {
   const answer = ctx.match[1];
-  await GameHandler.processQuranicAnswer(ctx, answer);
+  await QuranicGamesHandler.processAnswer(ctx, answer);
 });
-bot.action('qgame:surah_count', async (ctx) => await GameHandler.handleSurahCount(ctx));
+
+// لعبة عد الآيات
+bot.action('qgame:count', async (ctx) => await QuranicGamesHandler.startCountVersesGame(ctx));
 
 // --- KEYBOARD BUTTON HANDLERS - MUST BE BEFORE bot.on('text') ---
 bot.hears('🕌 الختمة', (ctx) => MenuHandler.handleKhatmaMenu(ctx));
@@ -1267,11 +1271,11 @@ bot.hears('🛡️ حماية من الإساءة', (ctx) => MenuHandler.handleP
 
 // --- TEXT HANDLER FOR QURANIC GAMES (AFTER hears) ---
 bot.on('text', async (ctx) => {
-  // Only handle quranic game answers
+  // معالجة إجابات الألعاب القرآنية  
   if (ctx.session?.gameState && ctx.session.gameState.game === 'quranic') {
     const userAnswer = ctx.message.text;
-    await GameHandler.processQuranicAnswer(ctx, userAnswer);
-    return; // Stop processing here
+    await QuranicGamesHandler.processAnswer(ctx, userAnswer);
+    return;
   }
   
   // Let other handlers process the message
