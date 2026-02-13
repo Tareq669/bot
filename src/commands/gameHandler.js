@@ -430,6 +430,12 @@ class GameHandler {
         return ctx.answerCbQuery('❌ لا توجد لعبة جارية');
       }
 
+      // التحقق من وجود البيانات المطلوبة
+      if (!gameState.correctAnswer || gameState.reward === undefined) {
+        console.error('Missing gameState data:', gameState);
+        return ctx.reply('❌ حدث خطأ في بيانات اللعبة. حاول البدء بلعبة جديدة.');
+      }
+
       const isCorrect = userAnswer.trim().toLowerCase() === gameState.correctAnswer.toString().toLowerCase();
       const reward = isCorrect ? gameState.reward : 0;
 
@@ -437,7 +443,7 @@ class GameHandler {
       await QuranicGames.recordGameResult(ctx.from.id, gameState.type, gameState.reward, isCorrect);
 
       // Add coins if won
-      if (isCorrect) {
+      if (isCorrect && reward > 0) {
         await EconomyManager.addCoins(ctx.from.id, reward, `فوز في لعبة قرآنية: ${gameState.type}`);
       }
 
@@ -459,7 +465,7 @@ class GameHandler {
       ctx.session.gameState = null;
     } catch (error) {
       console.error('Error processing quranic answer:', error);
-      ctx.answerCbQuery('❌ حدث خطأ');
+      ctx.reply('❌ حدث خطأ في معالجة الإجابة');
     }
   }
 }
