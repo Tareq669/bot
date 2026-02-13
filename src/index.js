@@ -1697,10 +1697,12 @@ bot.action('quote:share', async (ctx) => {
     const ContentProvider = require('./content/contentProvider');
     const quote = await ContentProvider.getQuote();
     
-    const shareMessage = `🌟 اقتباس من البوت الإسلامي الذكي🤖\n\n${quote}\n\n📱 استخدم البوت الآن: @بوت_الاقتباسات_الإسلامي`;
+    const shareMessage = `🌟 اقتباس من البوت الإسلامي الذكي 🤖\n\n${quote}\n\n� <i>شارك هذا الاقتباس مع أصدقائك!</i>`;
     
     const buttons = Markup.inlineKeyboard([
-      [Markup.button.switchInline('📤 شارك مع صديق', quote)]
+      [Markup.button.callback('❤️ حفظ', 'quote:save')],
+      [Markup.button.callback('اقتباس آخر', 'quote:random')],
+      [Markup.button.callback('⬅️ رجوع', 'menu:quotes')]
     ]);
 
     try {
@@ -1715,7 +1717,7 @@ bot.action('quote:share', async (ctx) => {
       });
     }
     
-    await ctx.answerCbQuery('📤 تم تحضير الاقتباس للمشاركة!');
+    await ctx.answerCbQuery('📤 تم تحضير الاقتباس - نسخ والصقه لمشاركته!');
   } catch (error) {
     console.error('Error in quote:share:', error);
     await ctx.answerCbQuery('❌ حدث خطأ في مشاركة الاقتباس');
