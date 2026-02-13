@@ -51,17 +51,37 @@ class GameHandler {
       const gameNumber = Math.floor(Math.random() * 100) + 1;
       ctx.session.gameState = { game: 'guess', number: gameNumber, attempts: 0 };
 
-      const message = `
-🔢 لعبة التخمين
+      const message = `🔢 <b>لعبة التخمين</b>\n\nأنا فكرت في رقم من 1 إلى 100\nحاول أن تخمنه!`;
 
-أنا فكرت في رقم من 1 إلى 100
-حاول أن تخمنه!
-      `;
+      const buttons = Markup.inlineKeyboard([
+        [Markup.button.callback('⬅️ رجوع', 'menu:games')]
+      ]);
 
-      await ctx.editMessageText(message);
+      try {
+        await ctx.editMessageText(message, {
+          parse_mode: 'HTML',
+          reply_markup: buttons.reply_markup
+        });
+      } catch (editError) {
+        // If edit fails, use reply instead
+        if (editError.response?.error_code === 400) {
+          await ctx.reply(message, {
+            parse_mode: 'HTML',
+            reply_markup: buttons.reply_markup
+          });
+        } else {
+          throw editError;
+        }
+      }
+
+      await ctx.answerCbQuery('🎮 لعبة التخمين بدأت! أرسل رقم');
     } catch (error) {
-      console.error('Error:', error);
-      ctx.reply('❌ حدث خطأ');
+      console.error('Guess game error:', error);
+      try {
+        await ctx.reply('❌ حدث خطأ في بدء اللعبة');
+      } catch (e) {
+        console.error('Reply error:', e);
+      }
     }
   }
 
