@@ -1225,6 +1225,34 @@ bot.action('game:dice', (ctx) => GameHandler.handleDice(ctx));
 bot.action('game:luck', (ctx) => GameHandler.handleLuck(ctx));
 bot.action('game:challenges', (ctx) => GameHandler.handleChallenges(ctx));
 
+// --- QURANIC GAMES HANDLERS ---
+bot.action('game:quranic', (ctx) => GameHandler.handleQuranicMenu(ctx));
+bot.action('qgame:guess_verse', (ctx) => GameHandler.handleGuessVerse(ctx));
+bot.action('qgame:complete_verse', (ctx) => GameHandler.handleCompleteVerse(ctx));
+bot.action('qgame:spot_diff', (ctx) => GameHandler.handleSpotDifference(ctx));
+bot.action('qgame:spot_correct', async (ctx) => {
+  await GameHandler.processQuranicAnswer(ctx, 'true');
+});
+bot.action('qgame:spot_wrong', async (ctx) => {
+  await GameHandler.processQuranicAnswer(ctx, 'false');
+});
+bot.action('qgame:trivia', (ctx) => GameHandler.handleTriviaQuestion(ctx));
+bot.action(/qgame:trivia_answer:(.+)/, (ctx) => {
+  const answer = ctx.match[1];
+  GameHandler.processQuranicAnswer(ctx, answer);
+});
+bot.action('qgame:surah_count', (ctx) => GameHandler.handleSurahCount(ctx));
+
+// --- TEXT HANDLERS FOR QURANIC GAMES ---
+bot.on('text', async (ctx) => {
+  if (!ctx.session?.gameState || ctx.session.gameState.game !== 'quranic') {
+    return;
+  }
+
+  const userAnswer = ctx.message.text;
+  await GameHandler.processQuranicAnswer(ctx, userAnswer);
+});
+
 // --- ECONOMY HANDLERS ---
 bot.action('eco:balance', (ctx) => EconomyHandler.handleBalance(ctx));
 bot.action('eco:shop', (ctx) => EconomyHandler.handleShop(ctx));

@@ -175,10 +175,11 @@ class UIManager {
         Markup.button.callback('🧠 أسئلة ثقافية', 'game:quiz')
       ],
       [
-        Markup.button.callback('🎲 رول النرد', 'game:dice'),
-        Markup.button.callback('🎯 تحديات عشوائية', 'game:challenges')
+        Markup.button.callback('📖 الألعاب القرآنية', 'game:quranic'),
+        Markup.button.callback('🎲 رول النرد', 'game:dice')
       ],
       [
+        Markup.button.callback('🎯 تحديات عشوائية', 'game:challenges'),
         Markup.button.callback('⬅️ رجوع', 'menu:main')
       ]
     ]);

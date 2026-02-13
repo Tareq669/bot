@@ -1,7 +1,9 @@
 const GameManager = require('../games/gameManager');
 const EconomyManager = require('../economy/economyManager');
+const QuranicGames = require('../games/quranicGames');
 const Formatter = require('../ui/formatter');
 const Markup = require('telegraf/markup');
+const { User } = require('../database/models');
 
 class GameHandler {
   static async handleRPS(ctx) {
@@ -200,6 +202,228 @@ class GameHandler {
       ctx.reply('❌ حدث خطأ');
     }
   }
-}
 
-module.exports = GameHandler;
+  // ======== QURANIC GAMES ========
+
+  static async handleQuranicMenu(ctx) {
+    try {
+      const message = QuranicGames.formatGamesList();
+
+      const buttons = Markup.inlineKeyboard([
+        [Markup.button.callback('🎯 تخمين الآية', 'qgame:guess_verse')],
+        [Markup.button.callback('✍️ أكمل الآية', 'qgame:complete_verse')],
+        [Markup.button.callback('🔍 اكتشف الفرق', 'qgame:spot_diff')],
+        [Markup.button.callback('🧠 معلومات قرآنية', 'qgame:trivia')],
+        [Markup.button.callback('📊 عد الآيات', 'qgame:surah_count')],
+        [Markup.button.callback('⬅️ رجوع', 'menu:games')]
+      ]);
+
+      await ctx.editMessageText(message, {
+        parse_mode: 'HTML',
+        reply_markup: buttons.reply_markup
+      });
+    } catch (error) {
+      console.error('Error in handleQuranicMenu:', error);
+      ctx.reply('❌ حدث خطأ');
+    }
+  }
+
+  static async handleGuessVerse(ctx) {
+    try {
+      ctx.session = ctx.session || {};
+      const game = await QuranicGames.guessTheVerse();
+
+      ctx.session.gameState = {
+        game: 'quranic',
+        type: 'guess_verse',
+        correctAnswer: game.correctAnswer,
+        reward: game.points
+      };
+
+      const message = `🎯 <b>تخمين الآية</b>\n\n<b>الدليل:</b> ${game.clue}\n\n💡 أرسل اسم السورة للإجابة`;
+
+      const buttons = Markup.inlineKeyboard([
+        [Markup.button.callback('🔄 لعبة أخرى', 'qgame:guess_verse')],
+        [Markup.button.callback('⬅️ رجوع', 'game:quranic')]
+      ]);
+
+      await ctx.editMessageText(message, {
+        parse_mode: 'HTML',
+        reply_markup: buttons.reply_markup
+      });
+    } catch (error) {
+      console.error('Error in handleGuessVerse:', error);
+      ctx.reply('❌ حدث خطأ');
+    }
+  }
+
+  static async handleCompleteVerse(ctx) {
+    try {
+      ctx.session = ctx.session || {};
+      const game = await QuranicGames.completeTheVerse();
+
+      ctx.session.gameState = {
+        game: 'quranic',
+        type: 'complete_verse',
+        correctAnswer: game.correctAnswer,
+        reward: game.points,
+        surah: game.surah
+      };
+
+      const message = `✍️ <b>أكمل الآية</b>\n\n📍 <b>السورة:</b> ${game.surah}\n\n<b>الآية:</b> <code>${game.partial}...</code>\n\n💡 أرسل باقي الآية`;
+
+      const buttons = Markup.inlineKeyboard([
+        [Markup.button.callback('🔄 لعبة أخرى', 'qgame:complete_verse')],
+        [Markup.button.callback('⬅️ رجوع', 'game:quranic')]
+      ]);
+
+      await ctx.editMessageText(message, {
+        parse_mode: 'HTML',
+        reply_markup: buttons.reply_markup
+      });
+    } catch (error) {
+      console.error('Error in handleCompleteVerse:', error);
+      ctx.reply('❌ حدث خطأ');
+    }
+  }
+
+  static async handleSpotDifference(ctx) {
+    try {
+      ctx.session = ctx.session || {};
+      const game = await QuranicGames.spotTheDifference();
+
+      ctx.session.gameState = {
+        game: 'quranic',
+        type: 'spot_difference',
+        isCorrect: game.isCorrect,
+        correctVerse: game.correctVerse,
+        reward: game.points,
+        surah: game.surah
+      };
+
+      const message = `🔍 <b>اكتشف الفرق</b>\n\n📍 <b>السورة:</b> ${game.surah}\n\n<b>هل الآية صحيحة؟</b>\n<code>${game.verse}</code>`;
+
+      const buttons = Markup.inlineKeyboard([
+        [
+          Markup.button.callback('✅ صحيحة', 'qgame:spot_correct'),
+          Markup.button.callback('❌ خاطئة', 'qgame:spot_wrong')
+        ],
+        [Markup.button.callback('🔄 لعبة أخرى', 'qgame:spot_diff')],
+        [Markup.button.callback('⬅️ رجوع', 'game:quranic')]
+      ]);
+
+      await ctx.editMessageText(message, {
+        parse_mode: 'HTML',
+        reply_markup: buttons.reply_markup
+      });
+    } catch (error) {
+      console.error('Error in handleSpotDifference:', error);
+      ctx.reply('❌ حدث خطأ');
+    }
+  }
+
+  static async handleTriviaQuestion(ctx) {
+    try {
+      ctx.session = ctx.session || {};
+      const game = QuranicGames.qurranTrivia();
+
+      ctx.session.gameState = {
+        game: 'quranic',
+        type: 'trivia',
+        correctAnswer: game.options[game.answer],
+        reward: game.points
+      };
+
+      const message = `🧠 <b>معلومات قرآنية</b>\n\n<b>السؤال:</b>\n${game.question}`;
+
+      const buttons = Markup.inlineKeyboard(
+        game.options.map(option => [
+          Markup.button.callback(option, `qgame:trivia_answer:${option}`)
+        ]).concat([
+          [Markup.button.callback('🔄 سؤال آخر', 'qgame:trivia')],
+          [Markup.button.callback('⬅️ رجوع', 'game:quranic')]
+        ])
+      );
+
+      await ctx.editMessageText(message, {
+        parse_mode: 'HTML',
+        reply_markup: buttons.reply_markup
+      });
+    } catch (error) {
+      console.error('Error in handleTriviaQuestion:', error);
+      ctx.reply('❌ حدث خطأ');
+    }
+  }
+
+  static async handleSurahCount(ctx) {
+    try {
+      ctx.session = ctx.session || {};
+      const game = await QuranicGames.surahCount();
+
+      ctx.session.gameState = {
+        game: 'quranic',
+        type: 'surah_count',
+        correctAnswer: game.correctAnswer,
+        reward: game.points,
+        surah: game.surah
+      };
+
+      const message = `📊 <b>عد الآيات</b>\n\n<b>السؤال:</b>\n${game.question}\n\n💡 أرسل الرقم`;
+
+      const buttons = Markup.inlineKeyboard([
+        [Markup.button.callback('🔄 لعبة أخرى', 'qgame:surah_count')],
+        [Markup.button.callback('⬅️ رجوع', 'game:quranic')]
+      ]);
+
+      await ctx.editMessageText(message, {
+        parse_mode: 'HTML',
+        reply_markup: buttons.reply_markup
+      });
+    } catch (error) {
+      console.error('Error in handleSurahCount:', error);
+      ctx.reply('❌ حدث خطأ');
+    }
+  }
+
+  static async processQuranicAnswer(ctx, userAnswer) {
+    try {
+      ctx.session = ctx.session || {};
+      const gameState = ctx.session.gameState;
+
+      if (!gameState || gameState.game !== 'quranic') {
+        return ctx.answerCbQuery('❌ لا توجد لعبة جارية');
+      }
+
+      const isCorrect = userAnswer.trim().toLowerCase() === gameState.correctAnswer.toString().toLowerCase();
+      const reward = isCorrect ? gameState.reward : 0;
+
+      // Record in database
+      await QuranicGames.recordGameResult(ctx.from.id, gameState.type, gameState.reward, isCorrect);
+
+      // Add coins if won
+      if (isCorrect) {
+        await EconomyManager.addCoins(ctx.from.id, reward, `فوز في لعبة قرآنية: ${gameState.type}`);
+      }
+
+      const resultMessage = isCorrect
+        ? `✅ <b>إجابة صحيحة!</b>\n\n🎉 لقد فزت بـ <b>${reward}</b> نقطة!`
+        : `❌ <b>إجابة خاطئة</b>\n\n😔 الإجابة الصحيحة: <code>${gameState.correctAnswer}</code>`;
+
+      const buttons = Markup.inlineKeyboard([
+        [Markup.button.callback('🔄 لعبة أخرى', `qgame:${gameState.type}`)],
+        [Markup.button.callback('⬅️ رجوع', 'game:quranic')]
+      ]);
+
+      await ctx.reply(resultMessage, {
+        parse_mode: 'HTML',
+        reply_markup: buttons.reply_markup
+      });
+
+      // Clear game state
+      ctx.session.gameState = null;
+    } catch (error) {
+      console.error('Error processing quranic answer:', error);
+      ctx.answerCbQuery('❌ حدث خطأ');
+    }
+  }
+}
