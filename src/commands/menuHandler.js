@@ -487,13 +487,14 @@ ${adhkar.text || 'لا توجد نصوص متاحة'}
         return ctx.reply('❌ خطأ: لم نتمكن من تحديد المستخدم');
       }
 
-      const message = `<b>قصائد عربية أصيلة</b>
+      const message = `<b>📖 مكتبة الشعر العربي</b>
 
-اختر من القصائد أدناه:`;
+اختر من الخيارات أدناه واستمتع بأروع الأشعار العربية الأصيلة:`;
 
       const buttons = Markup.inlineKeyboard([
-        [Markup.button.callback('قصيدة عشوائية', 'poetry:random')],
-        [Markup.button.callback('رجوع', 'menu:main')]
+        [Markup.button.callback('🌟 قصيدة عشوائية', 'poetry:random')],
+        [Markup.button.callback('❤️ المفضلة', 'poetry:favorites')],
+        [Markup.button.callback('⬅️ رجوع', 'menu:main')]
       ]);
 
       await ctx.reply(message, {
@@ -508,6 +509,7 @@ ${adhkar.text || 'لا توجد نصوص متاحة'}
         console.error('Failed to send error message:', e);
       }
     }
+  }
   }
 
   static async handleQuranMenu(ctx) {

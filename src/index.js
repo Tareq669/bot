@@ -1786,6 +1786,163 @@ bot.action('quote:favorites', async (ctx) => {
 
 bot.action('menu:quotes', (ctx) => MenuHandler.handleQuotesMenu(ctx));
 
+// --- POETRY SYSTEM HANDLERS ---
+bot.action('poetry:random', async (ctx) => {
+  try {
+    const ContentProvider = require('./content/contentProvider');
+    const poem = await ContentProvider.getPoetry();
+    
+    const buttons = Markup.inlineKeyboard([
+      [Markup.button.callback('❤️ حفظ', 'poetry:save')],
+      [Markup.button.callback('📤 شارك', 'poetry:share')],
+      [Markup.button.callback('قصيدة جديدة', 'poetry:random')],
+      [Markup.button.callback('⬅️ رجوع', 'menu:poetry')]
+    ]);
+
+    try {
+      await ctx.editMessageText(`📖 <b>قصيدة عربية أصيلة</b>\n\n${poem}`, {
+        parse_mode: 'HTML',
+        reply_markup: buttons.reply_markup
+      });
+    } catch (e) {
+      await ctx.reply(`📖 <b>قصيدة عربية أصيلة</b>\n\n${poem}`, {
+        parse_mode: 'HTML',
+        reply_markup: buttons.reply_markup
+      });
+    }
+    
+    await ctx.answerCbQuery('✨ قصيدة جديدة!');
+  } catch (error) {
+    console.error('Error in poetry:random:', error);
+    await ctx.answerCbQuery('❌ حدث خطأ في جلب القصيدة');
+  }
+});
+
+bot.action('poetry:save', async (ctx) => {
+  try {
+    const { User } = require('./database/models');
+    const ContentProvider = require('./content/contentProvider');
+    
+    const user = await User.findOne({ userId: ctx.from.id });
+    if (!user) {
+      return ctx.answerCbQuery('❌ لم يتم العثور على ملفك');
+    }
+
+    const poem = await ContentProvider.getPoetry();
+    
+    // Initialize saved poems if not exists
+    if (!user.savedPoems) {
+      user.savedPoems = [];
+    }
+
+    // Check if poem already saved
+    if (!user.savedPoems.includes(poem)) {
+      user.savedPoems.push(poem);
+      await user.save();
+      await ctx.answerCbQuery('❤️ تم حفظ القصيدة في المفضلة!');
+    } else {
+      await ctx.answerCbQuery('ℹ️ هذه القصيدة محفوظة بالفعل');
+    }
+  } catch (error) {
+    console.error('Error in poetry:save:', error);
+    await ctx.answerCbQuery('❌ حدث خطأ في حفظ القصيدة');
+  }
+});
+
+bot.action('poetry:share', async (ctx) => {
+  try {
+    const ContentProvider = require('./content/contentProvider');
+    const poem = await ContentProvider.getPoetry();
+    
+    const shareMessage = `📖 قصيدة عربية أصيلة 🎭\n\n${poem}\n\n💡 <i>شارك هذه القصيدة مع أصدقائك!</i>`;
+    
+    const buttons = Markup.inlineKeyboard([
+      [Markup.button.callback('❤️ حفظ', 'poetry:save')],
+      [Markup.button.callback('قصيدة أخرى', 'poetry:random')],
+      [Markup.button.callback('⬅️ رجوع', 'menu:poetry')]
+    ]);
+
+    try {
+      await ctx.editMessageText(shareMessage, {
+        parse_mode: 'HTML',
+        reply_markup: buttons.reply_markup
+      });
+    } catch (e) {
+      await ctx.reply(shareMessage, {
+        parse_mode: 'HTML',
+        reply_markup: buttons.reply_markup
+      });
+    }
+    
+    await ctx.answerCbQuery('📤 تم تحضير القصيدة - نسخ والصقها لمشاركتها!');
+  } catch (error) {
+    console.error('Error in poetry:share:', error);
+    await ctx.answerCbQuery('❌ حدث خطأ في مشاركة القصيدة');
+  }
+});
+
+bot.action('poetry:favorites', async (ctx) => {
+  try {
+    const { User } = require('./database/models');
+    
+    const user = await User.findOne({ userId: ctx.from.id });
+    if (!user) {
+      return ctx.answerCbQuery('❌ لم يتم العثور على ملفك');
+    }
+
+    if (!user.savedPoems || user.savedPoems.length === 0) {
+      const message = `❤️ <b>القصائد المحفوظة</b>\n\nلم تحفظ أي قصائد بعد، ابدأ بحفظ القصائد التي تعجbب بها!`;
+
+      const buttons = Markup.inlineKeyboard([
+        [Markup.button.callback('🌟 قصيدة جديدة', 'poetry:random')],
+        [Markup.button.callback('⬅️ رجوع', 'menu:poetry')]
+      ]);
+
+      try {
+        await ctx.editMessageText(message, {
+          parse_mode: 'HTML',
+          reply_markup: buttons.reply_markup
+        });
+      } catch (e) {
+        await ctx.reply(message, {
+          parse_mode: 'HTML',
+          reply_markup: buttons.reply_markup
+        });
+      }
+      return ctx.answerCbQuery('لا توجد قصائد محفوظة');
+    }
+
+    // Display saved poems (first 3)
+    const savedPoems = user.savedPoems.slice(0, 3);
+    const poemsText = savedPoems.map((p, i) => `${i+1}. ${p}`).join('\n\n');
+    const message = `❤️ <b>القصائد المحفوظة</b> (${user.savedPoems.length})\n\n${poemsText}`;
+
+    const buttons = Markup.inlineKeyboard([
+      [Markup.button.callback('🌟 قصيدة جديدة', 'poetry:random')],
+      [Markup.button.callback('⬅️ رجوع', 'menu:poetry')]
+    ]);
+
+    try {
+      await ctx.editMessageText(message, {
+        parse_mode: 'HTML',
+        reply_markup: buttons.reply_markup
+      });
+    } catch (e) {
+      await ctx.reply(message, {
+        parse_mode: 'HTML',
+        reply_markup: buttons.reply_markup
+      });
+    }
+
+    await ctx.answerCbQuery('❤️ عرض القصائد المحفوظة');
+  } catch (error) {
+    console.error('Error in poetry:favorites:', error);
+    await ctx.answerCbQuery('❌ حدث خطأ في عرض القصائد المحفوظة');
+  }
+});
+
+bot.action('menu:poetry', (ctx) => MenuHandler.handlePoetryMenu(ctx));
+
 // --- KEYBOARD BUTTON HANDLERS ---
 bot.hears('🕌 الختمة', (ctx) => MenuHandler.handleKhatmaMenu(ctx));
 bot.hears('📿 الأذكار', (ctx) => MenuHandler.handleAdhkarMenu(ctx));
