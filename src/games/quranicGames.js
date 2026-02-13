@@ -1,10 +1,10 @@
 /**
  * 🎮 نظام الألعاب القرآنية المتكامل
  * Integrated Quranic Games System
- * 
+ *
  * يحتوي على 4 ألعاب:
  * 1. أكمل الآية - Complete the Verse
- * 2. اكتشف الفرق - Spot the Difference  
+ * 2. اكتشف الفرق - Spot the Difference
  * 3. معلومات قرآنية - Quran Trivia
  * 4. عد الآيات - Count Verses
  */
@@ -26,7 +26,7 @@ class QuranicGames {
       { partial: 'والعصر إن الإنسان لفي...', answer: 'خسر', reward: 15, surah: 'العصر' },
       { partial: 'ومن يتق الله يجعل له...', answer: 'مخرجا', reward: 20, surah: 'الطلاق' }
     ];
-    
+
     const game = games[Math.floor(Math.random() * games.length)];
     return {
       type: 'complete_verse',
@@ -74,10 +74,10 @@ class QuranicGames {
         surah: 'البقرة'
       }
     ];
-    
+
     const game = games[Math.floor(Math.random() * games.length)];
     const isCorrect = Math.random() < 0.5; // 50% صحيحة، 50% خاطئة
-    
+
     return {
       type: 'spot_difference',
       question: isCorrect ? game.correct : game.wrong,
@@ -131,7 +131,7 @@ class QuranicGames {
         reward: 10
       }
     ];
-    
+
     const game = games[Math.floor(Math.random() * games.length)];
     return {
       type: 'trivia',
@@ -159,7 +159,7 @@ class QuranicGames {
       { surah: 'الملك', count: 30, reward: 10 },
       { surah: 'الإخلاص', count: 4, reward: 10 }
     ];
-    
+
     const game = games[Math.floor(Math.random() * games.length)];
     return {
       type: 'count_verses',
@@ -231,7 +231,7 @@ class QuranicGames {
     // تنظيف الإجابات
     const cleanUser = String(userAnswer).trim().toLowerCase();
     const cleanCorrect = String(correctAnswer).trim().toLowerCase();
-    
+
     if (gameType === 'spot_difference') {
       // للعبة اكتشف الفرق: true/false
       return cleanUser === cleanCorrect;

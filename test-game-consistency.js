@@ -107,9 +107,9 @@ Object.keys(gameStates).forEach(key => {
   const gameState = gameStates[key];
   const hasCorrectAnswer = gameState.correctAnswer !== undefined && gameState.correctAnswer !== null;
   const hasReward = gameState.reward !== undefined;
-  
+
   const validationPassed = hasCorrectAnswer && hasReward;
-  
+
   console.log(`${validationPassed ? '✅' : '❌'} ${key}:`);
   console.log(`   correctAnswer: ${hasCorrectAnswer ? '✅' : '❌'} (${gameState.correctAnswer})`);
   console.log(`   reward: ${hasReward ? '✅' : '❌'} (${gameState.reward})`);

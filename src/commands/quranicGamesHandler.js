@@ -239,7 +239,7 @@ ${game.question}
       }
 
       let resultMessage = '';
-      
+
       if (isCorrect) {
         resultMessage = `✅ <b>إجابة صحيحة!</b>
 
@@ -248,7 +248,7 @@ ${game.question}
         resultMessage = `❌ <b>إجابة خاطئة</b>
 
 💡 الإجابة الصحيحة: <code>${gameState.answer}</code>`;
-        
+
         if (gameState.type === 'spot_difference' && gameState.correctVerse) {
           resultMessage += `\n\n📖 الآية الصحيحة:\n<code>${gameState.correctVerse}</code>`;
         }

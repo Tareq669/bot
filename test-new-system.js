@@ -12,10 +12,10 @@ console.log('  question:', game1.question);
 console.log('  answer:', game1.answer);
 console.log('  reward:', game1.reward);
 console.log('  surah:', game1.surah);
-console.log('  ✅ البيانات صحيحة:', 
+console.log('  ✅ البيانات صحيحة:',
   game1.type === 'complete_verse' &&
-  game1.question && 
-  game1.answer && 
+  game1.question &&
+  game1.answer &&
   game1.reward
 );
 
@@ -76,7 +76,7 @@ console.log('  نصية (complete_verse):');
 console.log('    "العالمين" === "العالمين":', QuranicGames.checkAnswer('العالمين', 'العالمين', 'complete_verse'));
 console.log('    "العالمين" === "الرحيم" (false):', !QuranicGames.checkAnswer('العالمين', 'الرحيم', 'complete_verse'));
 
-// Boolean answers (spot_difference)  
+// Boolean answers (spot_difference)
 console.log('  بوليان (spot_difference):');
 console.log('    "true" === true:', QuranicGames.checkAnswer('true', true, 'spot_difference'));
 console.log('    "false" === false:', QuranicGames.checkAnswer('false', false, 'spot_difference'));
@@ -92,12 +92,12 @@ console.log('    "100" === 200 (false):', !QuranicGames.checkAnswer('100', 200, 
 console.log('\n📝 اختبار قائمة الألعاب:');
 const gamesList = QuranicGames.getGamesList();
 console.log(gamesList);
-const hasAllGames = 
+const hasAllGames =
   gamesList.includes('أكمل الآية') &&
   gamesList.includes('اكتشف الفرق') &&
   gamesList.includes('معلومات قرآنية') &&
   gamesList.includes('عد الآيات');
 console.log('  ✅ القائمة تحتوي على جميع الألعاب:', hasAllGames);
 
-console.log('\n' + '='.repeat(60));
+console.log(`\n${  '='.repeat(60)}`);
 console.log('🎉 جميع الاختبارات نجحت! النظام الجديد جاهز للعمل\n');
