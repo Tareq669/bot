@@ -1243,14 +1243,38 @@ bot.action(/qgame:trivia_answer:(.+)/, (ctx) => {
 });
 bot.action('qgame:surah_count', (ctx) => GameHandler.handleSurahCount(ctx));
 
-// --- TEXT HANDLERS FOR QURANIC GAMES ---
-bot.on('text', async (ctx) => {
-  if (!ctx.session?.gameState || ctx.session.gameState.game !== 'quranic') {
-    return;
-  }
+// --- KEYBOARD BUTTON HANDLERS - MUST BE BEFORE bot.on('text') ---
+bot.hears('🕌 الختمة', (ctx) => MenuHandler.handleKhatmaMenu(ctx));
+bot.hears('📿 الأذكار', (ctx) => MenuHandler.handleAdhkarMenu(ctx));
+bot.hears('📖 القرآن', (ctx) => MenuHandler.handleQuranMenu(ctx));
+bot.hears('💭 الاقتباسات', (ctx) => MenuHandler.handleQuotesMenu(ctx));
+bot.hears('✍️ الشعر', (ctx) => MenuHandler.handlePoetryMenu(ctx));
+bot.hears('🎮 الألعاب', (ctx) => MenuHandler.handleGamesMenu(ctx));
+bot.hears('💰 الاقتصاد', (ctx) => MenuHandler.handleEconomyMenu(ctx));
+bot.hears('👤 حسابي', (ctx) => MenuHandler.handleProfileMenu(ctx));
+bot.hears('🏆 المتصدرين', (ctx) => MenuHandler.handleLeaderboardMenu(ctx));
+bot.hears('⚙️ الإعدادات', (ctx) => MenuHandler.handleSettingsMenu(ctx));
+bot.hears('✨ الميزات', (ctx) => CommandHandler.handleFeaturesMenu(ctx));
+bot.hears('📚 المكتبة', (ctx) => CommandHandler.handleLibrary(ctx));
+bot.hears('📊 إحصائيات', (ctx) => CommandHandler.handleStats(ctx));
+bot.hears('🎁 المكافآت', (ctx) => CommandHandler.handleRewards(ctx));
+bot.hears('🛍️ المتجر', (ctx) => MenuHandler.handleShopMenu(ctx));
+bot.hears('💸 التحويلات والتبرعات', (ctx) => MenuHandler.handleTransfersMenu(ctx));
+bot.hears('🔔 الإشعارات الذكية', (ctx) => MenuHandler.handleSmartNotificationsMenu(ctx));
+bot.hears('📁 النسخ الاحتياطية', (ctx) => MenuHandler.handleBackupsMenu(ctx));
+bot.hears('⚡ التخزين المؤقت', (ctx) => MenuHandler.handleCacheMenu(ctx));
+bot.hears('🛡️ حماية من الإساءة', (ctx) => MenuHandler.handleProtectionMenu(ctx));
 
-  const userAnswer = ctx.message.text;
-  await GameHandler.processQuranicAnswer(ctx, userAnswer);
+// --- TEXT HANDLER FOR QURANIC GAMES (AFTER hears) ---
+bot.on('text', async (ctx) => {
+  // Only handle quranic game answers
+  if (ctx.session?.gameState && ctx.session.gameState.game === 'quranic') {
+    const userAnswer = ctx.message.text;
+    await GameHandler.processQuranicAnswer(ctx, userAnswer);
+    return; // Stop processing here
+  }
+  
+  // Let other handlers process the message
 });
 
 // --- ECONOMY HANDLERS ---
@@ -2042,27 +2066,7 @@ bot.action('poetry:copy', async (ctx) => {
 bot.action('menu:poetry', (ctx) => MenuHandler.handlePoetryMenu(ctx));
 
 // --- KEYBOARD BUTTON HANDLERS ---
-bot.hears('🕌 الختمة', (ctx) => MenuHandler.handleKhatmaMenu(ctx));
-bot.hears('📿 الأذكار', (ctx) => MenuHandler.handleAdhkarMenu(ctx));
-bot.hears('📖 القرآن', (ctx) => MenuHandler.handleQuranMenu(ctx));
-bot.hears('💭 الاقتباسات', (ctx) => MenuHandler.handleQuotesMenu(ctx));
-bot.hears('✍️ الشعر', (ctx) => MenuHandler.handlePoetryMenu(ctx));
-bot.hears('🎮 الألعاب', (ctx) => MenuHandler.handleGamesMenu(ctx));
-bot.hears('💰 الاقتصاد', (ctx) => MenuHandler.handleEconomyMenu(ctx));
-bot.hears('👤 حسابي', (ctx) => MenuHandler.handleProfileMenu(ctx));
-bot.hears('🏆 المتصدرين', (ctx) => MenuHandler.handleLeaderboardMenu(ctx));
-bot.hears('⚙️ الإعدادات', (ctx) => MenuHandler.handleSettingsMenu(ctx));
-bot.hears('✨ الميزات', (ctx) => CommandHandler.handleFeaturesMenu(ctx));
-bot.hears('📚 المكتبة', (ctx) => CommandHandler.handleLibrary(ctx));
-bot.hears('📊 إحصائيات', (ctx) => CommandHandler.handleStats(ctx));
-bot.hears('🎁 المكافآت', (ctx) => CommandHandler.handleRewards(ctx));
-bot.hears('🛍️ المتجر', (ctx) => MenuHandler.handleShopMenu(ctx));
-bot.hears('💸 التحويلات والتبرعات', (ctx) => MenuHandler.handleTransfersMenu(ctx));
-bot.hears('🔔 الإشعارات الذكية', (ctx) => MenuHandler.handleSmartNotificationsMenu(ctx));
-bot.hears('📁 النسخ الاحتياطية', (ctx) => MenuHandler.handleBackupsMenu(ctx));
-bot.hears('⚡ التخزين المؤقت', (ctx) => MenuHandler.handleCacheMenu(ctx));
-bot.hears('🛡️ حماية من الإساءة', (ctx) => MenuHandler.handleProtectionMenu(ctx));
-bot.hears('❌ إغلق', (ctx) => ctx.deleteMessage().catch(() => ctx.reply('✅ تم')));
+
 
 // --- OWNER KEYBOARD BUTTON HANDLERS ---
 bot.hears('👑 لوحة المالك', async (ctx) => {
