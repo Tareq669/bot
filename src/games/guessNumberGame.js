@@ -43,6 +43,10 @@ class GuessNumberGame {
         parse_mode: 'HTML'
       });
 
+      if (ctx.callbackQuery) {
+        await ctx.answerCbQuery('🎮 اللعبة بدأت! أرسل رقم من 1-100').catch(() => {});
+      }
+
       console.log('✅ [GUESS GAME] تم بدء اللعبة بنجاح');
     } catch (error) {
       console.error('❌ [GUESS GAME] خطأ في البدء:', error.message);
@@ -58,6 +62,16 @@ class GuessNumberGame {
       // تحقق من وجود لعبة نشطة
       if (!ctx.session?.guessGame?.active) {
         console.log('⚠️ [GUESS GAME] لا توجد لعبة نشطة');
+        const Markup = require('telegraf/markup');
+        const buttons = Markup.inlineKeyboard([
+          [Markup.button.callback('🔢 بدء لعبة التخمين', 'game:guess')],
+          [Markup.button.callback('⬅️ رجوع للألعاب', 'menu:games')]
+        ]);
+
+        await ctx.reply('❌ لا توجد لعبة تخمين جارية. اضغط للبدء من جديد:', {
+          parse_mode: 'HTML',
+          reply_markup: buttons.reply_markup
+        }).catch(() => {});
         return;
       }
 

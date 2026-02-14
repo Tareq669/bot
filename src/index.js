@@ -1255,7 +1255,7 @@ bot.hears('⚡ التخزين المؤقت', (ctx) => MenuHandler.handleCacheMen
 bot.hears('🛡️ حماية من الإساءة', (ctx) => MenuHandler.handleProtectionMenu(ctx));
 
 // --- TEXT HANDLER FOR QURANIC GAMES (AFTER hears) ---
-bot.on('text', async (ctx) => {
+bot.on('text', async (ctx, next) => {
   // معالجة إجابات الألعاب القرآنية
   if (ctx.session?.gameState && ctx.session.gameState.game === 'quranic') {
     const userAnswer = ctx.message.text;
@@ -1264,6 +1264,9 @@ bot.on('text', async (ctx) => {
   }
 
   // Let other handlers process the message
+  if (typeof next === 'function') {
+    return next();
+  }
 });
 
 // --- ECONOMY HANDLERS ---
