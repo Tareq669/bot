@@ -10,10 +10,10 @@ console.log('🎮 اختبار نظام لعبة التخمين\n');
 const mockCtx = {
   from: { id: 123456 },
   session: {},
-  reply: async (message, options) => {
+  reply: async (message, _options) => {
     console.log('📤 الرد:', message.substring(0, 80));
   },
-  editMessageText: async (message, options) => {
+  editMessageText: async (message, _options) => {
     console.log('✏️ تعديل:', message.substring(0, 80));
   },
   answerCbQuery: async (message) => {
