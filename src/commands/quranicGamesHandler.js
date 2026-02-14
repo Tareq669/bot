@@ -8,6 +8,11 @@ const EconomyManager = require('../economy/economyManager');
 const { Markup } = require('telegraf');
 
 class QuranicGamesHandler {
+  static normalizeReward(reward) {
+    const safeReward = Number.isFinite(reward) ? reward : 0;
+    return Math.min(Math.max(safeReward, 5), 10);
+  }
+
   /**
    * قائمة الألعاب القرآنية
    */
@@ -54,7 +59,7 @@ class QuranicGamesHandler {
         game: 'quranic',
         type: game.type,
         answer: game.answer,
-        reward: game.reward
+        reward: this.normalizeReward(game.reward)
       };
 
       const message = `🎯 <b>تخمين السورة</b>
@@ -94,7 +99,7 @@ class QuranicGamesHandler {
         game: 'quranic',
         type: game.type,
         answer: game.answer,
-        reward: game.reward
+        reward: this.normalizeReward(game.reward)
       };
 
       const message = `✍️ <b>أكمل الآية</b>
@@ -136,7 +141,7 @@ class QuranicGamesHandler {
         game: 'quranic',
         type: game.type,
         answer: String(game.answer),
-        reward: game.reward,
+        reward: this.normalizeReward(game.reward),
         correctVerse: game.correctVerse
       };
 
@@ -182,7 +187,7 @@ class QuranicGamesHandler {
         game: 'quranic',
         type: game.type,
         answer: game.answer,
-        reward: game.reward
+        reward: this.normalizeReward(game.reward)
       };
 
       const message = `🧠 <b>معلومات قرآنية</b>
@@ -225,7 +230,7 @@ ${game.question}`;
         game: 'quranic',
         type: game.type,
         answer: String(game.answer),
-        reward: game.reward
+        reward: this.normalizeReward(game.reward)
       };
 
       const message = `📊 <b>عد الآيات</b>
@@ -267,7 +272,7 @@ ${game.question}
         type: game.type,
         answerIndex: game.answerIndex,
         options: game.options,
-        reward: game.reward
+        reward: this.normalizeReward(game.reward)
       };
 
       console.log('📌 Cultural Knowledge Game Started:');

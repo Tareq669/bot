@@ -117,9 +117,9 @@ class GuessNumberGame {
       console.log('✅ [GUESS GAME] إجابة صحيحة!');
 
       // حساب الجائزة
-      let reward = 200;
-      if (game.attempts <= 3) reward = 500;
-      else if (game.attempts <= 5) reward = 300;
+      let reward = 20;
+      if (game.attempts <= 3) reward = 50;
+      else if (game.attempts <= 5) reward = 30;
 
       const message = `
 🎉 <b>مبروك! أنت محق!</b>

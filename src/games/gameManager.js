@@ -21,7 +21,7 @@ class GameManager {
     const result = this.determineRPS(userIdx, idx);
     let prize = 0;
 
-    if (result === 'win') prize = Math.floor(Math.random() * 100) + 50;
+    if (result === 'win') prize = Math.floor(Math.random() * 21) + 10;
 
     await this.updateGameStats(userId, 'حجر_ورق_مقص', result, prize);
 
@@ -50,7 +50,7 @@ ${result === 'win' ? `✅ انتصرت! +${prize} عملة` : result === 'lost' 
 
     if (userNum === gameNumber) {
       result = 'win';
-      prize = Math.floor(Math.random() * 200) + 100;
+      prize = Math.floor(Math.random() * 21) + 20;
     } else if (userNum > gameNumber) {
       return {
         result: 'playing',
@@ -91,7 +91,7 @@ ${Formatter.formatGameResult('أنت', result, prize)}
 
     if (random > 0.7) {
       result = 'win';
-      prize = Math.floor(Math.random() * 500) + 200;
+      prize = Math.floor(Math.random() * 31) + 20;
     }
 
     await this.updateGameStats(userId, 'الحظ', result, prize);
@@ -112,7 +112,7 @@ ${Formatter.formatGameResult('أنت', result, prize)}
   static async playQuiz(userId, quizData) {
     const { correctAnswer, userAnswer } = quizData;
     const result = correctAnswer === userAnswer ? 'win' : 'lost';
-    const prize = result === 'win' ? 100 : 0;
+    const prize = result === 'win' ? 20 : 0;
 
     await this.updateGameStats(userId, 'اسئلة_ثقافية', result, prize);
 
@@ -135,7 +135,7 @@ ${Formatter.formatGameResult('أنت', result, prize)}
   static async playDice(userId) {
     const roll = Math.floor(Math.random() * 6) + 1;
     const result = roll >= 4 ? 'win' : 'lost';
-    const prize = result === 'win' ? Math.floor(Math.random() * 150) + 50 : 0;
+    const prize = result === 'win' ? Math.floor(Math.random() * 16) + 10 : 0;
 
     await this.updateGameStats(userId, 'رول_نرد', result, prize);
 

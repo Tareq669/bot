@@ -85,7 +85,7 @@ class GameHandler {
       ctx.session = ctx.session || {};
       const correct = ctx.session.gameState?.correct;
       const result = answer === correct ? 'win' : 'lost';
-      const prize = result === 'win' ? 100 : 0;
+      const prize = result === 'win' ? 20 : 0;
 
       await GameManager.updateGameStats(ctx.from.id, 'اسئلة_ثقافية', result, prize);
 
@@ -146,7 +146,7 @@ class GameHandler {
       const user = await User.findOne({ userId: ctx.from.id });
 
       const isSuccess = Math.random() > 0.5;
-      const reward = isSuccess ? Math.floor(Math.random() * 91) + 10 : 0; // 10-100
+      const reward = isSuccess ? Math.floor(Math.random() * 31) + 10 : 0; // 10-40
 
       if (isSuccess && user) {
         user.coins += reward;
@@ -176,13 +176,13 @@ class GameHandler {
   static async handleChallenges(ctx) {
     try {
       const challenges = [
-        '🏃 امشِ 10,000 خطوة اليوم - مكافأة: 75 عملة',
-        '📖 اقرأ 5 صفحات من القرآن - مكافأة: 100 عملة',
-        '🎮 العب 3 ألعاب مختلفة - مكافأة: 50 عملة',
-        '💰 اجمع 500 عملة - مكافأة: 50 عملة إضافية',
-        '🤝 شارك البوت مع 3 أصدقاء - مكافأة: 150 عملة',
-        '⭐ اكسب 100 نقطة خبرة - مكافأة: 75 عملة',
-        '📿 اقرأ أذكار الصباح والمساء - مكافأة: 100 عملة'
+        '🏃 امشِ 10,000 خطوة اليوم - مكافأة: 40 عملة',
+        '📖 اقرأ 5 صفحات من القرآن - مكافأة: 50 عملة',
+        '🎮 العب 3 ألعاب مختلفة - مكافأة: 30 عملة',
+        '💰 اجمع 500 عملة - مكافأة: 30 عملة إضافية',
+        '🤝 شارك البوت مع 3 أصدقاء - مكافأة: 60 عملة',
+        '⭐ اكسب 100 نقطة خبرة - مكافأة: 40 عملة',
+        '📿 اقرأ أذكار الصباح والمساء - مكافأة: 50 عملة'
       ];
 
       const randomChallenge = challenges[Math.floor(Math.random() * challenges.length)];
