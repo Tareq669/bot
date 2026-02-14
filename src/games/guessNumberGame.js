@@ -9,7 +9,7 @@ class GuessNumberGame {
   static async startGame(ctx) {
     try {
       console.log('🎮 بدء لعبة تخمين:', { userId: ctx.from.id });
-      
+
       // Initialize session properly
       if (!ctx.session) {
         ctx.session = {};

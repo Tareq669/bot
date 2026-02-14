@@ -25,7 +25,7 @@ async function runTest() {
   try {
     console.log('1️⃣ بدء اللعبة...');
     await GuessNumberGame.startGame(mockCtx);
-    
+
     const gameState = mockCtx.session.guessGame;
     console.log('✅ تم بدء اللعبة');
     console.log(`📊 الرقم السري: ${gameState.number}`);
@@ -33,19 +33,19 @@ async function runTest() {
 
     // اختبار تخمينات مختلفة
     console.log('2️⃣ اختبار التخمينات...');
-    
+
     // تخمين منخفض
     console.log('\n📝 التخمين الأول: 10');
     await GuessNumberGame.processGuess(mockCtx, '10');
-    
+
     // تخمين عالي
     console.log('\n📝 التخمين الثاني: 90');
     await GuessNumberGame.processGuess(mockCtx, '90');
-    
+
     // تخمين صحيح
     console.log(`\n📝 التخمين الصحيح: ${gameState.number}`);
     await GuessNumberGame.processGuess(mockCtx, String(gameState.number));
-    
+
     console.log('\n✅ الاختبار انتهى بنجاح!');
   } catch (error) {
     console.error('❌ خطأ في الاختبار:', error);
