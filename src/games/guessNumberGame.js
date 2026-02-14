@@ -158,6 +158,21 @@ class GuessNumberGame {
       console.error('❌ خطأ في معالجة الإجابة الصحيحة:', error);
       ctx.session.guessGame = null;
       await ctx.reply('❌ حدث خطأ').catch(err => console.error('Reply error:', err));
+    }
+  }
+
+  /**
+   * معالجة انتهاء اللعبة
+   */
+  static async handleGameOver(ctx, game) {
+    try {
+      // Clear game state FIRST
+      ctx.session.guessGame = null;
+
+      const message = `
+❌ <b>انتهت محاولاتك!</b>
+
+🔍 الرقم الصحيح كان: <code>${game.number}</code>
 📊 عدد محاولاتك: <b>${game.attempts}</b>
 
 💡 حاول مرة أخرى!
@@ -169,9 +184,6 @@ class GuessNumberGame {
         [Markup.button.callback('⬅️ رجوع للألعاب', 'menu:games')]
       ]);
 
-      // Clear game state
-      ctx.session.guessGame = null;
-
       await ctx.reply(message, {
         parse_mode: 'HTML',
         reply_markup: buttons.reply_markup
@@ -179,7 +191,7 @@ class GuessNumberGame {
     } catch (error) {
       console.error('❌ خطأ في معالجة نهاية اللعبة:', error);
       ctx.session.guessGame = null;
-      await ctx.reply('❌ حدث خطأ');
+      await ctx.reply('❌ حدث خطأ').catch(err => console.error('Reply error:', err));
     }
   }
 
