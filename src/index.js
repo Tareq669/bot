@@ -802,53 +802,55 @@ bot.action(/notify:(adhkar|prayer|games|rewards|events|auction|stats)/, async (c
   }
 
   switch (type) {
-    case 'adhkar':
-    const { User } = require('./database/models');
-    const user = await User.findOne({ userId: ctx.from.id });
-    if (!user) {
-      await ctx.answerCbQuery('❌');
-      return ctx.reply('❌ لم يتم العثور على ملفك');
+    case 'adhkar': {
+      const user = await User.findOne({ userId: ctx.from.id });
+      if (!user) {
+        await ctx.answerCbQuery('❌');
+        return ctx.reply('❌ لم يتم العثور على ملفك');
+      }
+      user.notifications = user.notifications || { enabled: true };
+      const fieldMap = {
+        adhkar: 'adhkarReminder',
+        prayer: 'prayerReminder',
+        games: 'gameUpdates',
+        rewards: 'rewardUpdates',
+        events: 'eventReminder',
+        auction: 'auctionUpdates'
+      };
+      const field = fieldMap[type];
+      const titleMap = {
+        adhkar: '🕌 إشعارات الأذكار',
+        prayer: '⏰ إشعارات الصلاة',
+        games: '🎮 إشعارات الألعاب',
+        rewards: '💰 إشعارات المكافآت',
+        events: '🔔 إشعارات الأحداث',
+        auction: '🏷️ إشعارات المزاد',
+        stats: '📊 إحصائياتي'
+      };
+      if (type === 'stats') {
+        const userStats = await require('./database/db').User.findById(ctx.from.id);
+        const statsMessage =
+          '📊 <b>إحصائياتك</b>\n\n' +
+          `💰 عملات: ${userStats.coins}\n` +
+          `⭐ نقاط: ${userStats.xp}\n` +
+          `🎮 الألعاب المكملة: ${userStats.gamesPlayed}\n` +
+          `📖 القرآن المقروء: ${userStats.quranPages} صفحة`;
+        await ctx.reply(statsMessage, { parse_mode: 'HTML' });
+        return ctx.answerCbQuery('✅ تم');
+      }
+      // Show enable/disable menu for this notification
+      const enabled = !!user.notifications[field];
+      const state = enabled ? '✅ مفعّل' : '❌ معطّل';
+      const notifyMessage = `${titleMap[type]}\n\nالحالة الحالية: ${state}\n\nيمكنك تفعيل أو تعطيل الإشعارات لهذا القسم فقط.`;
+      const keyboard = require('./ui/keyboards').notificationToggleKeyboard(type, enabled);
+      await ctx.editMessageText(notifyMessage, { parse_mode: 'HTML', reply_markup: keyboard.reply_markup });
+      await ctx.answerCbQuery('');
+      break;
     }
-    user.notifications = user.notifications || { enabled: true };
-    const fieldMap = {
-      adhkar: 'adhkarReminder',
-      prayer: 'prayerReminder',
-      games: 'gameUpdates',
-      rewards: 'rewardUpdates',
-      events: 'eventReminder',
-      auction: 'auctionUpdates'
-    };
-    const field = fieldMap[type];
-    const titleMap = {
-      adhkar: '🕌 إشعارات الأذكار',
-      prayer: '⏰ إشعارات الصلاة',
-      games: '🎮 إشعارات الألعاب',
-      rewards: '💰 إشعارات المكافآت',
-      events: '🔔 إشعارات الأحداث',
-      auction: '🏷️ إشعارات المزاد',
-      stats: '📊 إحصائياتي'
-    };
-    if (type === 'stats') {
-      const userStats = await require('./database/db').User.findById(ctx.from.id);
-      const message =
-        '📊 <b>إحصائياتك</b>\n\n' +
-        `💰 عملات: ${userStats.coins}\n` +
-        `⭐ نقاط: ${userStats.xp}\n` +
-        `🎮 الألعاب المكملة: ${userStats.gamesPlayed}\n` +
-        `📖 القرآن المقروء: ${userStats.quranPages} صفحة`;
-      await ctx.reply(message, { parse_mode: 'HTML' });
-      return ctx.answerCbQuery('✅ تم');
-    }
-    // Show enable/disable menu for this notification
-    const enabled = !!user.notifications[field];
-    const state = enabled ? '✅ مفعّل' : '❌ معطّل';
-    const message = `${titleMap[type]}\n\nالحالة الحالية: ${state}\n\nيمكنك تفعيل أو تعطيل الإشعارات لهذا القسم فقط.`;
-    const keyboard = require('./ui/keyboards').notificationToggleKeyboard(type, enabled);
-    await ctx.editMessageText(message, { parse_mode: 'HTML', reply_markup: keyboard.reply_markup });
-    await ctx.answerCbQuery('');
-  });
+    default:
+      break;
+  }
 });
-
 // --- NEW CACHE ACTIONS ---
 bot.action('new:cache', async (ctx) => {
   const UIManager = require('./ui/keyboards');
@@ -1356,6 +1358,11 @@ bot.action('eco:transfer', async (ctx) => {
     ctx.session.ecoAwait = { type: 'transfer' };
     await ctx.answerCbQuery('✅ جاهز');
     // ...existing code...
+
+    const message =
+      '💸 <b>تحويل العملات</b>\n\n' +
+      'أدخل معرف المستخدم الذي تريد التحويل له:\n\n' +
+      '<code>@username</code> أو <code>معرّفه الرقمي</code>';
 
     await ctx.editMessageText(message, {
       parse_mode: 'HTML',
