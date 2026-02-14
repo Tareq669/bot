@@ -2868,6 +2868,7 @@ async function startBot() {
 
     let khatmaScheduler = null;
     let auctionInterval = null;
+    let auctionReminderInterval = null;
 
     try {
       const KhatmaScheduler = require('./utils/khatmaScheduler');
@@ -2889,6 +2890,11 @@ async function startBot() {
           logger.error('❌ Auction finalize error:', err.message);
         });
       }, 60 * 1000);
+      auctionReminderInterval = setInterval(() => {
+        AuctionManager.sendTimeLeftNotifications(bot).catch((err) => {
+          logger.error('❌ Auction reminder error:', err.message);
+        });
+      }, 5 * 60 * 60 * 1000);
       logger.info('✅ نظام المزاد جاهز');
     } catch (err) {
       logger.error('❌ Failed to start AuctionManager:', err.message);
@@ -2913,6 +2919,9 @@ async function startBot() {
         if (auctionInterval) {
           clearInterval(auctionInterval);
           logger.info('✅ تم إيقاف AuctionManager');
+        }
+        if (auctionReminderInterval) {
+          clearInterval(auctionReminderInterval);
         }
         if (reconnectManager) {
           reconnectManager.stop();

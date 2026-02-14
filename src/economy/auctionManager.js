@@ -4,17 +4,49 @@ const EconomyManager = require('./economyManager');
 const AUCTION_DURATION_MS = 24 * 60 * 60 * 1000;
 const MIN_INCREMENT = 25;
 
-const AUCTION_ITEMS = [
-  { id: 1, name: '⭐ تذكرة نجمة', basePrice: 500 },
-  { id: 2, name: '👑 تاج ملكي', basePrice: 1000 },
-  { id: 3, name: '💎 جوهرة فريدة', basePrice: 2000 },
-  { id: 4, name: '🎖️ وسام شرف', basePrice: 750 },
-  { id: 5, name: '✨ أضاءة سحرية', basePrice: 600 }
+const SLOT_COUNT = 5;
+
+const AUCTION_POOL = [
+  { name: '⭐ تذكرة نجمة', basePrice: 500 },
+  { name: '👑 تاج ملكي', basePrice: 1000 },
+  { name: '💎 جوهرة فريدة', basePrice: 2000 },
+  { name: '🎖️ وسام شرف', basePrice: 750 },
+  { name: '✨ أضاءة سحرية', basePrice: 600 },
+  { name: '🛡️ درع أسطوري', basePrice: 2200 },
+  { name: '🗡️ سيف ضياء', basePrice: 1800 },
+  { name: '🔮 بلورة الحكمة', basePrice: 1400 },
+  { name: '🏺 كأس الندرة', basePrice: 1200 },
+  { name: '🧿 تعويذة الحماية', basePrice: 900 },
+  { name: '👑 تاج الملوك', basePrice: 2500 },
+  { name: '💠 حجر السماء', basePrice: 1600 },
+  { name: '🌙 قلادة الهلال', basePrice: 1100 },
+  { name: '🔥 شعلة الفخر', basePrice: 1300 },
+  { name: '⚡ صاعقة المجد', basePrice: 2100 },
+  { name: '🧭 بوصلة الكنوز', basePrice: 1500 },
+  { name: '📿 مسبحة نفيسة', basePrice: 800 },
+  { name: '🏆 كأس البطولات', basePrice: 1700 },
+  { name: '🪙 عملة نادرة', basePrice: 1900 },
+  { name: '🎟️ بطاقة كبار الشخصيات', basePrice: 2300 }
 ];
 
 class AuctionManager {
   static getItems() {
-    return AUCTION_ITEMS;
+    return AUCTION_POOL;
+  }
+
+  static async broadcastMessage(bot, message) {
+    if (!bot) return;
+    const users = await User.find({ isBanned: { $ne: true } }).select('userId');
+    for (const user of users) {
+      if (!user.userId) continue;
+      await bot.telegram.sendMessage(user.userId, message, { parse_mode: 'HTML' }).catch(() => {});
+    }
+  }
+
+  static pickItem(excludedNames = []) {
+    const pool = AUCTION_POOL.filter((item) => !excludedNames.includes(item.name));
+    const list = pool.length ? pool : AUCTION_POOL;
+    return list[Math.floor(Math.random() * list.length)];
   }
 
   static formatTimeLeft(endAt) {
@@ -28,9 +60,9 @@ class AuctionManager {
     return `${hours} ساعة و${minutes} دقيقة`;
   }
 
-  static async createAuction(item) {
+  static async createAuction(item, bot) {
     const endAt = new Date(Date.now() + AUCTION_DURATION_MS);
-    return Auction.create({
+    const auction = await Auction.create({
       itemId: item.id,
       itemName: item.name,
       basePrice: item.basePrice,
@@ -38,13 +70,23 @@ class AuctionManager {
       status: 'active',
       endAt
     });
+
+    await this.broadcastMessage(
+      bot,
+      `🆕 <b>مزاد جديد</b>\n\n🏷️ العنصر: ${item.name}\n💰 السعر الابتدائي: ${item.basePrice} عملة`
+    );
+
+    return auction;
   }
 
   static async ensureActiveAuctions(bot) {
     const now = Date.now();
 
-    for (const item of AUCTION_ITEMS) {
-      const active = await Auction.findOne({ itemId: item.id, status: 'active' });
+    const activeAuctions = await Auction.find({ status: 'active' });
+    const activeNames = activeAuctions.map((auction) => auction.itemName);
+
+    for (let slot = 1; slot <= SLOT_COUNT; slot += 1) {
+      const active = await Auction.findOne({ itemId: slot, status: 'active' });
 
       if (active && active.endAt.getTime() <= now) {
         await this.finalizeAuction(active, bot);
@@ -52,7 +94,9 @@ class AuctionManager {
 
       const stillActive = await Auction.findOne({ itemId: item.id, status: 'active' });
       if (!stillActive) {
-        await this.createAuction(item);
+        const picked = this.pickItem(activeNames);
+        activeNames.push(picked.name);
+        await this.createAuction({ id: slot, ...picked }, bot);
       }
     }
   }
@@ -73,7 +117,13 @@ class AuctionManager {
     const winnerId = auction.highestBid?.userId;
     const winnerAmount = auction.highestBid?.amount || 0;
 
-    if (!winnerId) return;
+    if (!winnerId) {
+      await this.broadcastMessage(
+        bot,
+        `⏹️ <b>انتهى المزاد</b>\n\n🏷️ العنصر: ${auction.itemName}\nلم يتم تسجيل مزايدات.`
+      );
+      return;
+    }
 
     const user = await User.findOne({ userId: winnerId });
     if (!user) return;
@@ -99,6 +149,13 @@ class AuctionManager {
         )
         .catch(() => {});
     }
+
+    const winnerName = user.firstName || (user.username ? `@${user.username}` : `مستخدم ${winnerId}`);
+    await this.broadcastMessage(
+      bot,
+      `✅ <b>انتهى المزاد</b>\n\n🏷️ العنصر: ${auction.itemName}\n` +
+        `🏆 الفائز: ${winnerName}\n💰 السعر النهائي: ${winnerAmount} عملة`
+    );
   }
 
   static async getActiveAuctions(bot) {
@@ -152,6 +209,15 @@ class AuctionManager {
     auction.bids.push({ userId, amount });
     await auction.save();
 
+    const bidder = await User.findOne({ userId }).select('firstName username');
+    const bidderName = bidder?.firstName || (bidder?.username ? `@${bidder.username}` : `مستخدم ${userId}`);
+
+    await this.broadcastMessage(
+      bot,
+      `📣 <b>مزايدة جديدة</b>\n\n` +
+        `👤 ${bidderName}\n🏷️ ${auction.itemName}\n💰 ${amount} عملة`
+    );
+
     return {
       ok: true,
       message:
@@ -174,6 +240,32 @@ class AuctionManager {
       `${lines.join('\n')}\n\n` +
       `💰 أرسل رقم العنصر للمزايدة أو اكتب (إلغاء)`
     );
+  }
+
+  static async sendTimeLeftNotifications(bot) {
+    const auctions = await Auction.find({ status: 'active' });
+    const now = Date.now();
+    const reminderWindowMs = 5 * 60 * 60 * 1000;
+
+    for (const auction of auctions) {
+      const timeLeft = auction.endAt.getTime() - now;
+      if (timeLeft <= 0) continue;
+
+      const lastReminder = auction.lastReminderAt?.getTime() || 0;
+      if (now - lastReminder < reminderWindowMs) continue;
+
+      if (timeLeft <= reminderWindowMs) {
+        auction.lastReminderAt = new Date();
+        await auction.save();
+
+        await this.broadcastMessage(
+          bot,
+          `⏳ <b>تنبيه مزاد</b>\n\n` +
+            `تبقى وقت قليل على: ${auction.itemName}\n` +
+            `⏰ المتبقي: ${this.formatTimeLeft(auction.endAt)}`
+        );
+      }
+    }
   }
 }
 

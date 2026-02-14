@@ -22,6 +22,7 @@ const auctionSchema = new mongoose.Schema({
   bids: { type: [bidSchema], default: [] },
   endAt: { type: Date, required: true },
   lastBidAt: { type: Date },
+  lastReminderAt: { type: Date },
   createdAt: { type: Date, default: Date.now }
 });
 
