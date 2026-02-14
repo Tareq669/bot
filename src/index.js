@@ -201,7 +201,7 @@ bot.command('transfer', async (ctx) => {
 // Notifications Management
 bot.command('notifications', async (ctx) => {
   try {
-    const msg4 = `🔔 <b>إدارة الإشعارات</b>\n\n${ctx.message.from.first_name}\n\nاستخدم الخيارات التالية:\n✅ تفعيل\n❌ تعطيل\n\n/notif on|off`;
+    const msg4 = `🔔 <b>إدارة الإشعارات</b>\n\n${ctx.message.from.first_name}\n\nاستخدم الخيارات التالية:\n✅ تفعيل\n❌ تعطيل\n\n/notif 1 (تشغيل)\n/notif 2 (إيقاف)`;
     ctx.reply(msg4, { parse_mode: 'HTML' });
   } catch (error) {
     ctx.reply('❌ خدمة الإشعارات غير متاحة');
@@ -219,19 +219,19 @@ bot.command('notif', async (ctx) => {
 
     user.notifications = user.notifications || { enabled: true };
 
-    if (action === 'on') {
+    if (action === 'on' || action === '1') {
       user.notifications.enabled = true;
       await user.save();
       return ctx.reply('✅ تم تفعيل الإشعارات');
     }
 
-    if (action === 'off') {
+    if (action === 'off' || action === '2') {
       user.notifications.enabled = false;
       await user.save();
       return ctx.reply('❌ تم تعطيل الإشعارات');
     }
 
-    return ctx.reply('استخدم: /notif on|off');
+    return ctx.reply('استخدم: /notif 1 للتفعيل أو /notif 2 للتعطيل');
   } catch (error) {
     ctx.reply('❌ حدث خطأ في تحديث الإشعارات');
   }
