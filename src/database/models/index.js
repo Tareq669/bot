@@ -8,6 +8,7 @@ const Content = require('./Content');
 const Config = require('./Config');
 const Team = require('./Team');
 const Event = require('./Event');
+const Auction = require('./Auction');
 
 module.exports = {
   User,
@@ -17,5 +18,6 @@ module.exports = {
   Content,
   Config,
   Team,
-  Event
+  Event,
+  Auction
 };

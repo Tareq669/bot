@@ -1296,21 +1296,13 @@ bot.action('eco:transfer', async (ctx) => {
 
 bot.action('eco:auction', async (ctx) => {
   try {
-    const items = [
-      { id: 1, name: '⭐ تذكرة نجمة', basePrice: 500 },
-      { id: 2, name: '👑 تاج ملكي', basePrice: 1000 },
-      { id: 3, name: '💎 جوهرة فريدة', basePrice: 2000 },
-      { id: 4, name: '🎖️ وسام شرف', basePrice: 750 },
-      { id: 5, name: '✨ أضاءة سحرية', basePrice: 600 }
-    ];
+    const AuctionManager = require('./economy/auctionManager');
 
     ctx.session = ctx.session || {};
     ctx.session.ecoAwait = { type: 'auction_select' };
-    ctx.session.auctionItems = items;
 
-    const message = `🎪 <b>سوق المزاد</b>\n\n${items
-      .map((i) => `${i.id}. ${i.name} - ${i.basePrice} عملة`)
-      .join('\n')}\n\n💰 أرسل رقم العنصر للمزايدة أو اكتب (إلغاء)`;
+    const auctions = await AuctionManager.getActiveAuctions(bot);
+    const message = AuctionManager.formatAuctionList(auctions);
 
     await ctx.editMessageText(message, {
       parse_mode: 'HTML',
@@ -2175,22 +2167,29 @@ bot.on('text', async (ctx) => {
           const input = message.trim();
           if (input === '/cancel' || input === 'إلغاء') {
             ctx.session.ecoAwait = null;
-            ctx.session.auctionItems = null;
             return ctx.reply('❌ تم إلغاء المزاد');
           }
 
           const choice = parseInt(input, 10);
-          const items = ctx.session.auctionItems || [];
-          const item = items.find((i) => i.id === choice);
-
-          if (!item) {
+          if (isNaN(choice)) {
             return ctx.reply('❌ رقم غير صحيح. أرسل رقم عنصر صحيح من القائمة.');
           }
 
-          ctx.session.ecoAwait = { type: 'auction_bid', itemId: item.id };
+          const AuctionManager = require('./economy/auctionManager');
+          const auction = await AuctionManager.getAuctionByItemId(choice);
+
+          if (!auction) {
+            return ctx.reply('❌ لا يوجد مزاد نشط لهذا الرقم حالياً. افتح المزاد من جديد.');
+          }
+
+          const minBid = auction.highestBid?.amount
+            ? auction.highestBid.amount + auction.minIncrement
+            : auction.basePrice;
+
+          ctx.session.ecoAwait = { type: 'auction_bid', itemId: auction.itemId };
           return ctx.reply(
-            `💰 اختر مبلغ المزايدة على ${item.name}\n` +
-              `الحد الأدنى: ${item.basePrice} عملة\n` +
+            `💰 اختر مبلغ المزايدة على ${auction.itemName}\n` +
+              `الحد الأدنى: ${minBid} عملة\n` +
               'اكتب المبلغ أو أرسل (إلغاء)'
           );
         }
@@ -2199,41 +2198,25 @@ bot.on('text', async (ctx) => {
           const input = message.trim();
           if (input === '/cancel' || input === 'إلغاء') {
             ctx.session.ecoAwait = null;
-            ctx.session.auctionItems = null;
             return ctx.reply('❌ تم إلغاء المزاد');
           }
 
           const amount = parseInt(input, 10);
-          const items = ctx.session.auctionItems || [];
-          const item = items.find((i) => i.id === awaiting.itemId);
-
-          if (!item) {
-            ctx.session.ecoAwait = null;
-            ctx.session.auctionItems = null;
-            return ctx.reply('❌ العنصر غير موجود. ابدأ المزاد من جديد.');
+          if (isNaN(amount)) {
+            return ctx.reply('❌ المبلغ غير صحيح. أدخل رقم صحيح.');
           }
 
-          if (isNaN(amount) || amount < item.basePrice) {
-            return ctx.reply(`❌ المزايدة يجب أن تكون ${item.basePrice} عملة على الأقل.`);
-          }
+          const AuctionManager = require('./economy/auctionManager');
+          const result = await AuctionManager.placeBid(ctx.from.id, awaiting.itemId, amount, bot);
 
-          const updatedBalance = await EconomyManager.removeCoins(
-            ctx.from.id,
-            amount,
-            `مزايدة على ${item.name}`
-          );
-
-          if (updatedBalance === null) {
-            return ctx.reply('❌ رصيدك غير كافٍ لهذه المزايدة.');
+          if (!result.ok) {
+            return ctx.reply(result.message);
           }
 
           ctx.session.ecoAwait = null;
-          ctx.session.auctionItems = null;
-
           return ctx.reply(
-            `✅ تم تسجيل مزايدتك على ${item.name}\n` +
-              `💰 تم خصم: ${amount} عملة\n` +
-              `💳 رصيدك المتبقي: ${updatedBalance} عملة`
+            `${result.message}\n` +
+              `💳 رصيدك المتبقي: ${result.balance} عملة`
           );
         }
 
@@ -2884,6 +2867,7 @@ async function startBot() {
     // Start Khatma scheduler (sends notifications to opted-in users)
 
     let khatmaScheduler = null;
+    let auctionInterval = null;
 
     try {
       const KhatmaScheduler = require('./utils/khatmaScheduler');
@@ -2895,6 +2879,19 @@ async function startBot() {
       logger.info('🔔 KhatmaScheduler started — notifying opted-in users');
     } catch (err) {
       logger.error('❌ Failed to start KhatmaScheduler:', err.message);
+    }
+
+    try {
+      const AuctionManager = require('./economy/auctionManager');
+      await AuctionManager.ensureActiveAuctions(bot);
+      auctionInterval = setInterval(() => {
+        AuctionManager.finalizeExpiredAuctions(bot).catch((err) => {
+          logger.error('❌ Auction finalize error:', err.message);
+        });
+      }, 60 * 1000);
+      logger.info('✅ نظام المزاد جاهز');
+    } catch (err) {
+      logger.error('❌ Failed to start AuctionManager:', err.message);
     }
 
     // Graceful shutdown with timeout
@@ -2912,6 +2909,10 @@ async function startBot() {
         if (khatmaScheduler) {
           khatmaScheduler.stop();
           logger.info('✅ تم إيقاف KhatmaScheduler');
+        }
+        if (auctionInterval) {
+          clearInterval(auctionInterval);
+          logger.info('✅ تم إيقاف AuctionManager');
         }
         if (reconnectManager) {
           reconnectManager.stop();
