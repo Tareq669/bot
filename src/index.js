@@ -847,8 +847,6 @@ bot.action(/notify:(adhkar|prayer|games|rewards|events|auction|stats)/, async (c
     await ctx.editMessageText(notifyMessage, { parse_mode: 'HTML', reply_markup: keyboard.reply_markup });
     await ctx.answerCbQuery('');
   }
-
-}
 // --- NEW CACHE ACTIONS ---
 bot.action('new:cache', async (ctx) => {
   const UIManager = require('./ui/keyboards');
