@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const Auction = require('./models/Auction');
 
 /**
  * نموذج المستخدم
@@ -136,5 +137,6 @@ module.exports = {
   Group,
   Transaction,
   ShopItem,
-  GameStats
+  GameStats,
+  Auction
 };
