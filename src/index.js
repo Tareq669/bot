@@ -1297,14 +1297,20 @@ bot.action('eco:transfer', async (ctx) => {
 bot.action('eco:auction', async (ctx) => {
   try {
     const items = [
-      '⭐ تذكرة نجمة - 500 عملة',
-      '👑 تاج ملكي - 1000 عملة',
-      '💎 جوهرة فريدة - 2000 عملة',
-      '🎖️ وسام شرف - 750 عملة',
-      '✨ أضاءة سحرية - 600 عملة'
+      { id: 1, name: '⭐ تذكرة نجمة', basePrice: 500 },
+      { id: 2, name: '👑 تاج ملكي', basePrice: 1000 },
+      { id: 3, name: '💎 جوهرة فريدة', basePrice: 2000 },
+      { id: 4, name: '🎖️ وسام شرف', basePrice: 750 },
+      { id: 5, name: '✨ أضاءة سحرية', basePrice: 600 }
     ];
 
-    const message = `🎪 <b>سوق المزاد</b>\n\n${items.map((i, idx) => `${idx + 1}. ${i}`).join('\n')}\n\n💰 اختر عنصراً للمزايدة عليه`;
+    ctx.session = ctx.session || {};
+    ctx.session.ecoAwait = { type: 'auction_select' };
+    ctx.session.auctionItems = items;
+
+    const message = `🎪 <b>سوق المزاد</b>\n\n${items
+      .map((i) => `${i.id}. ${i.name} - ${i.basePrice} عملة`)
+      .join('\n')}\n\n💰 أرسل رقم العنصر للمزايدة أو اكتب (إلغاء)`;
 
     await ctx.editMessageText(message, {
       parse_mode: 'HTML',
@@ -2162,8 +2168,75 @@ bot.on('text', async (ctx) => {
     if (ctx.session && ctx.session.ecoAwait) {
       const awaiting = ctx.session.ecoAwait;
       const { User } = require('./database/models');
+      const EconomyManager = require('./economy/economyManager');
 
       try {
+        if (awaiting.type === 'auction_select') {
+          const input = message.trim();
+          if (input === '/cancel' || input === 'إلغاء') {
+            ctx.session.ecoAwait = null;
+            ctx.session.auctionItems = null;
+            return ctx.reply('❌ تم إلغاء المزاد');
+          }
+
+          const choice = parseInt(input, 10);
+          const items = ctx.session.auctionItems || [];
+          const item = items.find((i) => i.id === choice);
+
+          if (!item) {
+            return ctx.reply('❌ رقم غير صحيح. أرسل رقم عنصر صحيح من القائمة.');
+          }
+
+          ctx.session.ecoAwait = { type: 'auction_bid', itemId: item.id };
+          return ctx.reply(
+            `💰 اختر مبلغ المزايدة على ${item.name}\n` +
+              `الحد الأدنى: ${item.basePrice} عملة\n` +
+              'اكتب المبلغ أو أرسل (إلغاء)'
+          );
+        }
+
+        if (awaiting.type === 'auction_bid') {
+          const input = message.trim();
+          if (input === '/cancel' || input === 'إلغاء') {
+            ctx.session.ecoAwait = null;
+            ctx.session.auctionItems = null;
+            return ctx.reply('❌ تم إلغاء المزاد');
+          }
+
+          const amount = parseInt(input, 10);
+          const items = ctx.session.auctionItems || [];
+          const item = items.find((i) => i.id === awaiting.itemId);
+
+          if (!item) {
+            ctx.session.ecoAwait = null;
+            ctx.session.auctionItems = null;
+            return ctx.reply('❌ العنصر غير موجود. ابدأ المزاد من جديد.');
+          }
+
+          if (isNaN(amount) || amount < item.basePrice) {
+            return ctx.reply(`❌ المزايدة يجب أن تكون ${item.basePrice} عملة على الأقل.`);
+          }
+
+          const updatedBalance = await EconomyManager.removeCoins(
+            ctx.from.id,
+            amount,
+            `مزايدة على ${item.name}`
+          );
+
+          if (updatedBalance === null) {
+            return ctx.reply('❌ رصيدك غير كافٍ لهذه المزايدة.');
+          }
+
+          ctx.session.ecoAwait = null;
+          ctx.session.auctionItems = null;
+
+          return ctx.reply(
+            `✅ تم تسجيل مزايدتك على ${item.name}\n` +
+              `💰 تم خصم: ${amount} عملة\n` +
+              `💳 رصيدك المتبقي: ${updatedBalance} عملة`
+          );
+        }
+
         if (awaiting.type === 'transfer') {
           // Handle coin transfer - find target user
           const targetId = message.trim();
