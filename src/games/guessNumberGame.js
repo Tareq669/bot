@@ -103,7 +103,7 @@ class GuessNumberGame {
   static async handleCorrectGuess(ctx, game) {
     try {
       const EconomyManager = require('../economy/economyManager');
-      
+
       // Calculate reward based on attempts
       let reward = 200;
       if (game.attempts <= 3) reward = 500; // Bonus for quick guess
@@ -182,7 +182,7 @@ class GuessNumberGame {
   static async sendHint(ctx, game, guess) {
     try {
       let hint = '';
-      
+
       if (guess < game.number) {
         hint = `⬆️ الرقم أكبر من ${guess}`;
       } else {
@@ -192,7 +192,7 @@ class GuessNumberGame {
       // Calculate distance for better hint
       const distance = Math.abs(game.number - guess);
       let proximity = '';
-      
+
       if (distance <= 5) {
         proximity = ' 🔥 قريب جداً!';
       } else if (distance <= 15) {
