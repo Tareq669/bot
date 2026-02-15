@@ -654,7 +654,51 @@ class UIManager {
     ]);
   }
 
-  // Notifications Settings
+
+  // Keyboard for specific notification type menu
+  static notificationTypeMenuKeyboard(type) {
+    const typeNames = {
+      'adhkar': 'الأذكار 🕌',
+      'prayer': 'الصلاة ⏰',
+      'games': 'الألعاب 🎮',
+      'rewards': 'المكافآت 💰',
+      'events': 'الأحداث 🔔',
+      'stats': 'الإحصائيات 📊',
+      'auction': 'المزاد 🏷️'
+    };
+
+    return Markup.inlineKeyboard([
+      [
+        Markup.button.callback(`🔔 تفعيل إشعارات ${typeNames[type]}`, `notify:toggle:${type}:true`)
+      ],
+      [
+        Markup.button.callback(`🔕 تعطيل إشعارات ${typeNames[type]}`, `notify:toggle:${type}:false`)
+      ],
+      [
+        Markup.button.callback('⚙️ إعدادات الوقت', `notify:time:${type}`)
+      ],
+      [
+        Markup.button.callback('🔙 رجوع', 'notify:main')
+      ]
+    ]);
+  }
+
+  // Keyboard for toggling a specific notification type (legacy, renamed to avoid duplicate)
+  static notificationToggleKeyboardLegacy(type, enabled) {
+    return Markup.inlineKeyboard([
+      [
+        Markup.button.callback(
+          enabled ? '🔔 الإشعارات مفعلة' : '🔕 الإشعارات معطلة',
+          `toggleNotify:${type}`
+        )
+      ],
+      [
+        Markup.button.callback('🔙 رجوع', `notify:menu:${type}`)
+      ]
+    ]);
+  }
+
+
   static notificationsMenuKeyboard() {
     return Markup.inlineKeyboard([
       [
