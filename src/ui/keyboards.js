@@ -61,7 +61,7 @@ class UIManager {
       'stats': 'إحصائياتي',
       'auction': 'إشعارات المزاد'
     };
-    
+
     return Markup.inlineKeyboard([
       [
         Markup.button.callback(`🔔 تفعيل ${displayNames[type]}`, `notify:toggle:${type}:true`)
@@ -89,7 +89,7 @@ class UIManager {
       'stats': 'إحصائياتي',
       'auction': 'إشعارات المزاد'
     };
-    
+
     return Markup.inlineKeyboard([
       [
         Markup.button.callback(
