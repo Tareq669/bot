@@ -628,6 +628,32 @@ bot.action('menu:cache', (ctx) => MenuHandler.handleCacheMenu(ctx));
 bot.action('menu:protection', (ctx) => MenuHandler.handleProtectionMenu(ctx));
 bot.action('settings:notifications', (ctx) => MenuHandler.handleNotificationsSettings(ctx));
 bot.action('settings:toggleNotify', (ctx) => MenuHandler.handleToggleNotifications(ctx));
+
+// إشعارات متقدمة
+bot.action('notify:menu', async (ctx) => {
+  const NotificationsHandler = require('./commands/notificationsHandler');
+  await NotificationsHandler.handleNotificationsMenu(ctx);
+});
+
+// تبديل الإشعارات
+bot.action(/^notify:toggle:(.+)$/, async (ctx) => {
+  const NotificationsHandler = require('./commands/notificationsHandler');
+  const type = ctx.match[1];
+  await NotificationsHandler.handleToggleNotification(ctx, type);
+});
+
+// سجل الإشعارات
+bot.action('notify:logs', async (ctx) => {
+  const NotificationsHandler = require('./commands/notificationsHandler');
+  await NotificationsHandler.handleNotificationLogs(ctx);
+});
+
+// حذف السجل
+bot.action('notify:clear', async (ctx) => {
+  const NotificationsHandler = require('./commands/notificationsHandler');
+  await NotificationsHandler.handleClearLogs(ctx);
+});
+
 bot.action('menu:newfeatures', async (ctx) => {
   const UIManager = require('./ui/keyboards');
   const keyboard = UIManager.newFeaturesMenuKeyboard();
@@ -2936,6 +2962,13 @@ async function startBot() {
       const notificationSystem = new NotificationSystem(bot);
       notificationSystem.initialize();
       logger.info('✅ نظام الإشعارات الذكية جاهز');
+
+      // Initialize Advanced Notification System
+      const AdvancedNotificationSystem = require('./features/advancedNotificationSystem');
+      const advancedNotificationSystem = new AdvancedNotificationSystem(bot);
+      advancedNotificationSystem.initialize();
+      global.advancedNotifications = advancedNotificationSystem;
+      logger.info('✅ نظام الإشعارات المتقدم جاهز');
 
       // Initialize Backup System
       const BackupSystem = require('./utils/backupSystem');
