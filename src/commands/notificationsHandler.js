@@ -1,303 +1,254 @@
-/**
- * Notifications Handler
- * معالج إعدادات الإشعارات
- */
-
-const Markup = require('telegraf/markup');
-const User = require('../database/models/User');
+const { Markup } = require('telegraf');
+const { User } = require('../database/models');
 
 class NotificationsHandler {
   /**
-   * عرض قائمة الإعدادات
+   * عرض قائمة إعدادات الإشعارات
    */
   static async handleNotificationsMenu(ctx) {
     try {
       const userId = ctx.from.id;
-      let user = await User.findOne({ userId });
+      const user = await User.findOne({ userId });
 
-      // إنشاء مستخدم جديد إذا لم يكن موجوداً
       if (!user) {
-        user = new User({
-          userId,
-          firstName: ctx.from.first_name || 'مستخدم',
-          username: ctx.from.username,
-          notifications: {
-            enabled: true,
-            adhkarReminder: false,
-            prayerReminder: false,
-            eventReminder: false,
-            motivational: false,
-            gameUpdates: false,
-            rewardUpdates: false,
-            auctionUpdates: false,
-            dailySummary: false
-          }
-        });
-        await user.save();
+        await ctx.answerCbQuery('❌ لم يتم العثور على ملفك');
+        return ctx.reply('❌ لم يتم العثور على ملفك');
       }
 
-      // تهيئة الإعدادات الافتراضية إذا لم تكن موجودة
-      if (!user.notifications) {
-        user.notifications = {
-          enabled: true,
-          adhkarReminder: false,
-          prayerReminder: false,
-          eventReminder: false,
-          motivational: false,
-          gameUpdates: false,
-          rewardUpdates: false,
-          auctionUpdates: false,
-          dailySummary: false
-        };
-        await user.save();
-      }
+      // تهيئة الإشعارات إذا لم تكن موجودة
+      user.notifications = user.notifications || {
+        enabled: true,
+        adhkarReminder: false,
+        prayerReminder: false,
+        eventReminder: false,
+        motivational: false,
+        gameUpdates: false,
+        rewardUpdates: false,
+        auctionUpdates: false
+      };
 
-      const notifications = user.notifications;
-      const keyboard = this.getNotificationsKeyboard(notifications);
-      const statusText = this.getNotificationStatusText(notifications);
+      const buttons = [];
 
-      // حذف أي رسالة قديمة إذا كانت موجودة
-      try {
-        if (ctx.callbackQuery && ctx.callbackQuery.message) {
-          await ctx.deleteMessage(ctx.callbackQuery.message.message_id).catch(() => {});
+      // زر تفعيل/تعطيل الإشعارات العامة
+      const allEnabled = user.notifications.enabled;
+      buttons.push([
+        Markup.button.callback(
+          allEnabled ? '🔕关闭 الإشعارات' : '🔔开启 الإشعارات',
+          'notify:toggle:all'
+        )
+      ]);
+
+      // أزرار الإشعارات المختلفة
+      const notificationTypes = [
+        { id: 'adhkar', name: '🕌 أذكار', field: 'adhkarReminder' },
+        { id: 'prayer', name: '⏰ أوقات الصلاة', field: 'prayerReminder' },
+        { id: 'events', name: '🔔 الأحداث', field: 'eventReminder' },
+        { id: 'motivational', name: '💭 التحفيز', field: 'motivational' },
+        { id: 'games', name: '🎮 الألعاب', field: 'gameUpdates' },
+        { id: 'rewards', name: '💰 المكافآت', field: 'rewardUpdates' },
+        { id: 'auction', name: '🏷️ المزاد', field: 'auctionUpdates' }
+      ];
+
+      for (const type of notificationTypes) {
+        if (user.notifications.enabled) {
+          const isEnabled = user.notifications[type.field];
+          buttons.push([
+            Markup.button.callback(
+              `${isEnabled ? '✅' : '❌'} ${type.name}`,
+              `notify:toggle:${type.id}`
+            )
+          ]);
         }
-      } catch (e) {
-        // تجاهل الأخطاء
       }
 
-      await ctx.reply(
-        `🔔 <b>إعدادات الإشعارات</b>\n\n${statusText}`,
-        {
+      // زر عرض السجل
+      if (user.notificationsLog && user.notificationsLog.length > 0) {
+        buttons.push([
+          Markup.button.callback('📋 عرض سجل الإشعارات', 'notify:logs')
+        ]);
+      }
+
+      // زر العودة
+      buttons.push([
+        Markup.button.callback('⬅️ رجوع', 'menu:settings')
+      ]);
+
+      const keyboard = Markup.inlineKeyboard(buttons);
+
+      const message = `🔔 <b>إعدادات الإشعارات</b>
+
+${user.notifications.enabled ? 'الإشعارات مفعلة ✅' : 'الإشعارات معطلة ❌'}
+
+اختر الإشعارات التي تريد استلامها:`;
+
+      if (ctx.callbackQuery) {
+        await ctx.editMessageText(message, {
           parse_mode: 'HTML',
-          ...keyboard
-        }
-      );
+          reply_markup: keyboard
+        });
+        await ctx.answerCbQuery();
+      } else {
+        await ctx.reply(message, {
+          parse_mode: 'HTML',
+          reply_markup: keyboard
+        });
+      }
     } catch (error) {
       console.error('Error in handleNotificationsMenu:', error);
-      await ctx.reply('❌ حدث خطأ');
+      await ctx.answerCbQuery('❌ حدث خطأ');
     }
   }
 
   /**
-   * إنشاء لوحة مفاتيح الإعدادات
+   * تبديل إشعار محدد
    */
-  static getNotificationsKeyboard(notifications) {
-    const enabled = notifications?.enabled !== false;
-    const adhkar = notifications?.adhkarReminder === true;
-    const prayer = notifications?.prayerReminder === true;
-    const events = notifications?.eventReminder === true;
-    const motivation = notifications?.motivational === true;
-    const games = notifications?.gameUpdates === true;
-    const rewards = notifications?.rewardUpdates === true;
-    const auction = notifications?.auctionUpdates === true;
-    const summary = notifications?.dailySummary === true;
-
-    return Markup.inlineKeyboard([
-      [
-        Markup.button.callback(
-          `🔔 الإشعارات العامة: ${enabled ? '✅' : '❌'}`,
-          'notify:toggle:main'
-        )
-      ],
-      [
-        Markup.button.callback(
-          `📿 أذكار الصباح والمساء: ${adhkar ? '✅' : '❌'}`,
-          'notify:toggle:adhkar'
-        )
-      ],
-      [
-        Markup.button.callback(
-          `🕌 أوقات الصلاة: ${prayer ? '✅' : '❌'}`,
-          'notify:toggle:prayer'
-        )
-      ],
-      [
-        Markup.button.callback(
-          `📖 ختمة القرآن: ${events ? '✅' : '❌'}`,
-          'notify:toggle:events'
-        )
-      ],
-      [
-        Markup.button.callback(
-          `💪 الرسائل التحفيزية: ${motivation ? '✅' : '❌'}`,
-          'notify:toggle:motivational'
-        )
-      ],
-      [
-        Markup.button.callback(
-          `🎮 تحديثات الألعاب: ${games ? '✅' : '❌'}`,
-          'notify:toggle:games'
-        )
-      ],
-      [
-        Markup.button.callback(
-          `🎁 المكافآت: ${rewards ? '✅' : '❌'}`,
-          'notify:toggle:rewards'
-        )
-      ],
-      [
-        Markup.button.callback(
-          `🏷️ المزادات: ${auction ? '✅' : '❌'}`,
-          'notify:toggle:auction'
-        )
-      ],
-      [
-        Markup.button.callback(
-          `📊 الملخص اليومي: ${summary ? '✅' : '❌'}`,
-          'notify:toggle:summary'
-        )
-      ],
-      [
-        Markup.button.callback('📜 سجل الإشعارات', 'notify:logs'),
-        Markup.button.callback('❌ حذف السجل', 'notify:clear')
-      ],
-      [
-        Markup.button.callback('⬅️ رجوع', 'menu:settings')
-      ]
-    ]);
-  }
-
-  /**
-   * الحصول على نص حالة الإشعارات
-   */
-  static getNotificationStatusText(notifications) {
-    const enabled = notifications?.enabled !== false;
-    const text = enabled
-      ? '✅ <b>الإشعارات مفعلة</b>\n\nاختر ما تريد تفعيله أو إلغاؤه:'
-      : '❌ <b>الإشعارات معطلة</b>\n\nفعّل الإشعارات أولاً!';
-
-    return text;
-  }
-
-  /**
-   * تبديل إشعار معين
-   */
-  static async handleToggleNotification(ctx, notificationType) {
+  static async handleToggleNotification(ctx, type) {
     try {
       const userId = ctx.from.id;
+      const user = await User.findOne({ userId });
 
-      // Map notification types
-      const typeMap = {
-        main: 'enabled',
-        adhkar: 'adhkarReminder',
-        prayer: 'prayerReminder',
-        events: 'eventReminder',
-        motivational: 'motivational',
-        games: 'gameUpdates',
-        rewards: 'rewardUpdates',
-        auction: 'auctionUpdates',
-        summary: 'dailySummary'
+      if (!user) {
+        await ctx.answerCbQuery('❌ لم يتم العثور على ملفك');
+        return ctx.reply('❌ لم يتم العثور على ملفك');
+      }
+
+      // تهيئة الإشعارات إذا لم تكن موجودة
+      user.notifications = user.notifications || {
+        enabled: true,
+        adhkarReminder: false,
+        prayerReminder: false,
+        eventReminder: false,
+        motivational: false,
+        gameUpdates: false,
+        rewardUpdates: false,
+        auctionUpdates: false
       };
 
-      const dbField = typeMap[notificationType];
-      if (!dbField) {
-        await ctx.answerCbQuery('❌ نوع الإشعار غير صحيح');
-        return;
-      }
+      let message = '';
+      let success = true;
 
-      // الحصول على المستخدم الحالي
-      let user = await User.findOne({ userId });
-
-      // إنشاء مستخدم جديد إذا لم يكن موجوداً
-      if (!user) {
-        user = new User({
-          userId,
-          firstName: ctx.from.first_name || 'مستخدم',
-          username: ctx.from.username,
-          notifications: {
-            enabled: true,
-            adhkarReminder: false,
-            prayerReminder: false,
-            eventReminder: false,
-            motivational: false,
-            gameUpdates: false,
-            rewardUpdates: false,
-            auctionUpdates: false,
-            dailySummary: false
-          }
-        });
-        await user.save();
-      }
-
-      // تهيئة الإعدادات الافتراضية إذا لم تكن موجودة
-      if (!user.notifications) {
-        user.notifications = {
-          enabled: true,
-          adhkarReminder: false,
-          prayerReminder: false,
-          eventReminder: false,
-          motivational: false,
-          gameUpdates: false,
-          rewardUpdates: false,
-          auctionUpdates: false,
-          dailySummary: false
-        };
-      }
-
-      // تبديل القيمة الحالية
-      const currentValue = user.notifications[dbField] || false;
-      const newValue = !currentValue;
-
-      // تحديث قاعدة البيانات
-      if (dbField === 'enabled') {
-        // تعطيل أو تفعيل الإشعارات الرئيسية
-        await User.findOneAndUpdate(
-          { userId },
-          {
-            $set: {
-              'notifications.enabled': newValue,
-              'notifications.adhkarReminder': newValue,
-              'notifications.prayerReminder': newValue,
-              'notifications.eventReminder': newValue,
-              'notifications.motivational': newValue,
-              'notifications.gameUpdates': newValue,
-              'notifications.rewardUpdates': newValue,
-              'notifications.auctionUpdates': newValue,
-              'notifications.dailySummary': newValue
-            }
-          }
-        );
-        await ctx.answerCbQuery(newValue ? '✅ تم تفعيل جميع الإشعارات' : '❌ تم تعطيل جميع الإشعارات');
+      // تبديل الإشعارات العامة
+      if (type === 'all') {
+        user.notifications.enabled = !user.notifications.enabled;
+        message = user.notifications.enabled
+          ? '✅ تم تفعيل الإشعارات بنجاح'
+          : '❌ تم تعطيل الإشعارات';
       } else {
-        // تحديث إعداد معين
-        await User.findOneAndUpdate(
-          { userId },
+        // التحقق من أن الإشعارات العامة مفعلة
+        if (!user.notifications.enabled) {
+          await ctx.answerCbQuery('⚠️ يرجى تفعيل الإشعارات أولاً');
+          return;
+        }
+
+        // تبديل الإشعار المحدد
+        const fieldMap = {
+          adhkar: 'adhkarReminder',
+          prayer: 'prayerReminder',
+          events: 'eventReminder',
+          motivational: 'motivational',
+          games: 'gameUpdates',
+          rewards: 'rewardUpdates',
+          auction: 'auctionUpdates'
+        };
+
+        const field = fieldMap[type];
+        if (field) {
+          user.notifications[field] = !user.notifications[field];
+
+          const nameMap = {
+            adhkar: '🕌 أذكار',
+            prayer: '⏰ أوقات الصلاة',
+            events: '🔔 الأحداث',
+            motivational: '💭 التحفيز',
+            games: '🎮 الألعاب',
+            rewards: '💰 المكافآت',
+            auction: '🏷️ المزاد'
+          };
+
+          const state = user.notifications[field] ? 'مفعل ✅' : 'معطل ❌';
+          message = `${nameMap[type]}: ${state}`;
+        } else {
+          success = false;
+        }
+      }
+
+      if (success) {
+        await user.save();
+
+        // عرض القائمة المحدثة
+        await ctx.editMessageText(
+          `🔔 <b>إعدادات الإشعارات</b>
+
+${user.notifications.enabled ? 'الإشعارات مفعلة ✅' : 'الإشعارات معطلة ❌'}
+
+اختر الإشعارات التي تريد استلامها:`,
           {
-            $set: {
-              'notifications.enabled': true,
-              [`notifications.${dbField}`]: newValue
-            }
+            parse_mode: 'HTML',
+            reply_markup: this.buildNotificationKeyboard(user)
           }
         );
-        await ctx.answerCbQuery(newValue ? '✅ تم التفعيل' : '❌ تم التعطيل');
+
+        await ctx.answerCbQuery(message);
+      } else {
+        await ctx.answerCbQuery('❌ نوع إشعار غير صالح');
       }
-
-      // حذف الرسالة القديمة
-      try {
-        if (ctx.callbackQuery && ctx.callbackQuery.message) {
-          await ctx.deleteMessage(ctx.callbackQuery.message.message_id).catch(() => {});
-        }
-      } catch (e) {
-        // تجاهل الأخطاء
-      }
-
-      // إرسال رسالة محدثة
-      const updatedUser = await User.findOne({ userId });
-      const notifications = updatedUser?.notifications || {};
-      const keyboard = this.getNotificationsKeyboard(notifications);
-      const statusText = this.getNotificationStatusText(notifications);
-
-      await ctx.reply(
-        `🔔 <b>إعدادات الإشعارات</b>\n\n${statusText}`,
-        {
-          parse_mode: 'HTML',
-          ...keyboard
-        }
-      );
     } catch (error) {
       console.error('Error in handleToggleNotification:', error);
       await ctx.answerCbQuery('❌ حدث خطأ');
     }
+  }
+
+  /**
+   * بناء لوحة المفاتيح للإشعارات
+   */
+  static buildNotificationKeyboard(user) {
+    const buttons = [];
+
+    // زر تفعيل/تعطيل الإشعارات العامة
+    const allEnabled = user.notifications.enabled;
+    buttons.push([
+      Markup.button.callback(
+        allEnabled ? '🔕关闭 الإشعارات' : '🔔开启 الإشعارات',
+        'notify:toggle:all'
+      )
+    ]);
+
+    // أزرار الإشعارات المختلفة
+    if (user.notifications.enabled) {
+      const notificationTypes = [
+        { id: 'adhkar', name: '🕌 أذكار', field: 'adhkarReminder' },
+        { id: 'prayer', name: '⏰ أوقات الصلاة', field: 'prayerReminder' },
+        { id: 'events', name: '🔔 الأحداث', field: 'eventReminder' },
+        { id: 'motivational', name: '💭 التحفيز', field: 'motivational' },
+        { id: 'games', name: '🎮 الألعاب', field: 'gameUpdates' },
+        { id: 'rewards', name: '💰 المكافآت', field: 'rewardUpdates' },
+        { id: 'auction', name: '🏷️ المزاد', field: 'auctionUpdates' }
+      ];
+
+      for (const type of notificationTypes) {
+        const isEnabled = user.notifications[type.field];
+        buttons.push([
+          Markup.button.callback(
+            `${isEnabled ? '✅' : '❌'} ${type.name}`,
+            `notify:toggle:${type.id}`
+          )
+        ]);
+      }
+    }
+
+    // زر عرض السجل
+    if (user.notificationsLog && user.notificationsLog.length > 0) {
+      buttons.push([
+        Markup.button.callback('📋 عرض سجل الإشعارات', 'notify:logs')
+      ]);
+    }
+
+    // زر العودة
+    buttons.push([
+      Markup.button.callback('⬅️ رجوع', 'menu:settings')
+    ]);
+
+    return Markup.inlineKeyboard(buttons);
   }
 
   /**
@@ -308,27 +259,45 @@ class NotificationsHandler {
       const userId = ctx.from.id;
       const user = await User.findOne({ userId });
 
-      if (!user || !user.notificationsLog || user.notificationsLog.length === 0) {
-        await ctx.reply('📭 لا يوجد سجل إشعارات');
+      if (!user) {
+        await ctx.answerCbQuery('❌ لم يتم العثور على ملفك');
         return;
       }
 
+      if (!user.notificationsLog || user.notificationsLog.length === 0) {
+        await ctx.answerCbQuery('📋 لا توجد إشعارات سابقة');
+        return ctx.editMessageText(
+          '📋 <b>سجل الإشعارات</b>\n\nلا توجد إشعارات سابقة',
+          { parse_mode: 'HTML' }
+        );
+      }
+
+      // ترتيب الإشعارات من الأحدث للأقدم
       const logs = user.notificationsLog
-        .sort((a, b) => b.timestamp - a.timestamp)
+        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
         .slice(0, 10);
 
-      let message = '📜 <b>سجل الإشعارات</b>\n\n';
+      let message = '📋 <b>آخر الإشعارات</b>\n\n';
 
-      logs.forEach((log, index) => {
+      for (const log of logs) {
         const date = new Date(log.timestamp).toLocaleString('ar-SA');
-        const status = log.read ? '✅' : '🔔';
-        message += `${status} <b>${index + 1}.</b> ${log.message}\n📅 ${date}\n\n`;
-      });
+        message += `• ${log.message}\n`;
+        message += `  📅 ${date}\n\n`;
+      }
 
-      await ctx.reply(message, { parse_mode: 'HTML' });
+      const keyboard = Markup.inlineKeyboard([
+        [Markup.button.callback('🗑️ حذف السجل', 'notify:clear')],
+        [Markup.button.callback('⬅️ رجوع', 'notify:menu')]
+      ]);
+
+      await ctx.editMessageText(message, {
+        parse_mode: 'HTML',
+        reply_markup: keyboard
+      });
+      await ctx.answerCbQuery();
     } catch (error) {
       console.error('Error in handleNotificationLogs:', error);
-      await ctx.reply('❌ حدث خطأ');
+      await ctx.answerCbQuery('❌ حدث خطأ');
     }
   }
 
@@ -338,14 +307,23 @@ class NotificationsHandler {
   static async handleClearLogs(ctx) {
     try {
       const userId = ctx.from.id;
+      const user = await User.findOne({ userId });
 
-      await User.findOneAndUpdate(
-        { userId },
-        { $set: { notificationsLog: [] } }
+      if (!user) {
+        await ctx.answerCbQuery('❌ لم يتم العثور على ملفك');
+        return;
+      }
+
+      user.notificationsLog = [];
+      await user.save();
+
+      await ctx.editMessageText(
+        '✅ تم حذف سجل الإشعارات',
+        Markup.inlineKeyboard([
+          [Markup.button.callback('⬅️ رجوع', 'notify:menu')]
+        ])
       );
-
-      await ctx.answerCbQuery('✅ تم حذف السجل');
-      await this.handleNotificationsMenu(ctx);
+      await ctx.answerCbQuery('✅ تم الحذف');
     } catch (error) {
       console.error('Error in handleClearLogs:', error);
       await ctx.answerCbQuery('❌ حدث خطأ');

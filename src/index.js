@@ -632,26 +632,32 @@ bot.action('settings:toggleNotify', (ctx) => {
   NotificationsHandler.handleNotificationsMenu(ctx);
 });
 
-// إشعارات متقدمة
+// معالجات الإشعارات
 bot.action('notify:menu', async (ctx) => {
   const NotificationsHandler = require('./commands/notificationsHandler');
   await NotificationsHandler.handleNotificationsMenu(ctx);
 });
 
-// تبديل الإشعارات
+// تبديل الإشعار العام
+bot.action('notify:toggle:all', async (ctx) => {
+  const NotificationsHandler = require('./commands/notificationsHandler');
+  await NotificationsHandler.handleToggleNotification(ctx, 'all');
+});
+
+// تبديل الإشعارات الفردية
 bot.action(/^notify:toggle:(.+)$/, async (ctx) => {
   const NotificationsHandler = require('./commands/notificationsHandler');
   const type = ctx.match[1];
   await NotificationsHandler.handleToggleNotification(ctx, type);
 });
 
-// سجل الإشعارات
+// عرض سجل الإشعارات
 bot.action('notify:logs', async (ctx) => {
   const NotificationsHandler = require('./commands/notificationsHandler');
   await NotificationsHandler.handleNotificationLogs(ctx);
 });
 
-// حذف السجل
+// حذف سجل الإشعارات
 bot.action('notify:clear', async (ctx) => {
   const NotificationsHandler = require('./commands/notificationsHandler');
   await NotificationsHandler.handleClearLogs(ctx);
@@ -773,6 +779,7 @@ bot.action('new:notifications', async (ctx) => {
   );
 });
 
+// تبديل الإشعارات (القديم)
 bot.action(/notify:(adhkar|prayer|games|rewards|events|auction|stats)/, async (ctx) => {
   const type = ctx.match[1];
   const { User } = require('./database/models');
