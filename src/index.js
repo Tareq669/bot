@@ -1431,6 +1431,15 @@ bot.hears('🔔 الإشعارات الذكية', (ctx) => MenuHandler.handleSma
 bot.hears('📁 النسخ الاحتياطية', (ctx) => MenuHandler.handleBackupsMenu(ctx));
 bot.hears('⚡ التخزين المؤقت', (ctx) => MenuHandler.handleCacheMenu(ctx));
 bot.hears('🛡️ حماية من الإساءة', (ctx) => MenuHandler.handleProtectionMenu(ctx));
+bot.hears('❌ إغلق', async (ctx) => {
+  try {
+    await ctx.reply('✅ تم إغلاق لوحة المفاتيح', {
+      reply_markup: { remove_keyboard: true }
+    });
+  } catch (error) {
+    console.error('Error closing keyboard:', error);
+  }
+});
 
 // --- TEXT HANDLER FOR QURANIC GAMES (AFTER hears) ---
 bot.on('text', async (ctx, next) => {
