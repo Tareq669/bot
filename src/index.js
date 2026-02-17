@@ -8,7 +8,6 @@ const MenuHandler = require('./commands/menuHandler');
 const GameHandler = require('./commands/gameHandler');
 const QuranicGamesHandler = require('./commands/quranicGamesHandler');
 const EconomyHandler = require('./commands/economyHandler');
-const EconomyManager = require('./economy/economyManager');
 const ContentHandler = require('./commands/contentHandler');
 const ProfileHandler = require('./commands/profileHandler');
 const { logger } = require('./utils/helpers');
@@ -2365,7 +2364,6 @@ bot.on('text', async (ctx) => {
     if (ctx.session && ctx.session.ecoAwait) {
       const awaiting = ctx.session.ecoAwait;
       const { User } = require('./database/models');
-      const EconomyManager = require('./economy/economyManager');
 
       try {
         if (awaiting.type === 'auction_select') {
