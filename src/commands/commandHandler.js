@@ -3,6 +3,7 @@ const UIManager = require('../ui/keyboards');
 const Formatter = require('../ui/formatter');
 const { User } = require('../database/models');
 const EconomyManager = require('../economy/economyManager');
+const { isGroup, isAdmin } = require('../utils/groupHelper');
 
 class CommandHandler {
   static async handleStart(ctx) {
@@ -17,14 +18,46 @@ class CommandHandler {
       // Check if owner
       const isOwner = UIManager.isOwner(ctx.from.id);
 
-      // Simple welcome message with keyboard
-      let message = `👋 مرحباً ${dbUser.firstName || 'صديقي'}!\n\n🎯 اختر من لوحة المفاتيح:`;
-
-      if (isOwner) {
-        message = `👑 أهلاً بك يا مالك البوت ${dbUser.firstName}!\n\n⚡ لديك صلاحيات كاملة على النظام\n🎯 اختر من لوحة المفاتيح الخاصة:`;
+      // Check if in group
+      const inGroup = isGroup(ctx);
+      let isAdminInGroup = false;
+      if (inGroup) {
+        isAdminInGroup = await isAdmin(ctx, ctx.telegram);
       }
 
-      const keyboard = UIManager.mainReplyKeyboard(ctx.from.id);
+      let message = '';
+      let keyboard = null;
+
+      if (inGroup) {
+        // Group-specific menu
+        if (isAdminInGroup) {
+          message = `👋 مرحباً ${dbUser.firstName}!\n\n🎯 أنت في مجموعة: ${ctx.chat.title}\n⚙️ إليك خيارات إدارة المجموعة:`;
+
+          keyboard = Markup.keyboard([
+            ['📊 إحصائيات المجموعة'],
+            ['👥 الأعضاء', '👮 الأدمنز'],
+            ['🛡️ الحماية', '⚙️ الإعدادات'],
+            ['📋 القواعد', '🏆 الترتيب']
+          ]).resize();
+        } else {
+          message = `👋 مرحباً ${dbUser.firstName}!\n\n🎯 أنت في مجموعة: ${ctx.chat.title}\n💡 استخدم الأوامر المتاحة:`;
+
+          keyboard = Markup.keyboard([
+            ['📊 إحصائيات المجموعة'],
+            ['👥 الأعضاء', '🏆 الترتيب'],
+            ['⭐ نقاطي']
+          ]).resize();
+        }
+      } else {
+        // Private chat menu
+        message = `👋 مرحباً ${dbUser.firstName}!\n\n🎯 اختر من لوحة المفاتيح:`;
+
+        if (isOwner) {
+          message = `👑 أهلاً بك يا مالك البوت ${dbUser.firstName}!\n\n⚡ لديك صلاحيات كاملة على النظام\n🎯 اختر من لوحة المفاتيح الخاصة:`;
+        }
+
+        keyboard = UIManager.mainReplyKeyboard(ctx.from.id);
+      }
 
       await ctx.reply(message, keyboard);
     } catch (error) {
@@ -62,6 +95,31 @@ class CommandHandler {
 
   static async handleLeaderboard(ctx) {
     try {
+      // Check if in group
+      if (isGroup(ctx)) {
+        // Group leaderboard
+        const groupId = ctx.chat.id;
+        const { GroupMember } = require('../database/models/GroupManagement');
+        const members = await GroupMember.find({ groupId, isActive: true })
+          .sort({ points: -1 })
+          .limit(10);
+
+        if (members.length === 0) {
+          return ctx.reply('❌ لا توجد بيانات في لائحة المتصدرين');
+        }
+
+        let message = '🏆 <b>لائحة المتصدرين</b>\n\n';
+        const emojis = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
+
+        members.forEach((member, index) => {
+          message += `${emojis[index]} ${member.firstName || member.username}\n`;
+          message += `   └ ${member.points} نقطة | مستوى ${member.level}\n`;
+        });
+
+        return ctx.reply(message, { parse_mode: 'HTML' });
+      }
+
+      // Private chat leaderboard
       const users = await User.find().sort({ xp: -1 });
       if (users.length === 0) {
         return ctx.reply('❌ لا توجد بيانات في اللوحة الصدارة');
@@ -73,6 +131,71 @@ class CommandHandler {
       console.error('Error in handleLeaderboard:', error);
       ctx.reply('❌ حدث خطأ');
     }
+  }
+
+  // ===== GROUP SPECIFIC HANDLERS =====
+
+  static async handleGroupStats(ctx) {
+    if (!isGroup(ctx)) {
+      return ctx.reply('❌ هذا الأمر للمجموعات فقط');
+    }
+
+    const { GroupCommands } = require('./groupCommands');
+    return GroupCommands.handleStats(ctx);
+  }
+
+  static async handleGroupMembers(ctx) {
+    if (!isGroup(ctx)) {
+      return ctx.reply('❌ هذا الأمر للمجموعات فقط');
+    }
+
+    const { GroupCommands } = require('./groupCommands');
+    return GroupCommands.handleMembers(ctx);
+  }
+
+  static async handleGroupAdmins(ctx) {
+    if (!isGroup(ctx)) {
+      return ctx.reply('❌ هذا الأمر للمجموعات فقط');
+    }
+
+    const { GroupCommands } = require('./groupCommands');
+    return GroupCommands.handleAdmins(ctx);
+  }
+
+  static async handleGroupProtection(ctx) {
+    if (!isGroup(ctx)) {
+      return ctx.reply('❌ هذا الأمر للمجموعات فقط');
+    }
+
+    const { GroupCommands } = require('./groupCommands');
+    return GroupCommands.handleProtection(ctx);
+  }
+
+  static async handleGroupSettings(ctx) {
+    if (!isGroup(ctx)) {
+      return ctx.reply('❌ هذا الأمر للمجموعات فقط');
+    }
+
+    const { GroupCommands } = require('./groupCommands');
+    return GroupCommands.handleSettings(ctx);
+  }
+
+  static async handleGroupRules(ctx) {
+    if (!isGroup(ctx)) {
+      return ctx.reply('❌ هذا الأمر للمجموعات فقط');
+    }
+
+    const { GroupCommands } = require('./groupCommands');
+    return GroupCommands.handleRules(ctx);
+  }
+
+  static async handleMyPoints(ctx) {
+    if (!isGroup(ctx)) {
+      return ctx.reply('❌ هذا الأمر للمجموعات فقط');
+    }
+
+    const { GroupCommands } = require('./groupCommands');
+    return GroupCommands.handleMyPoints(ctx);
   }
 
   static async handleDailyReward(ctx) {

@@ -1385,6 +1385,26 @@ bot.hears('📁 النسخ الاحتياطية', (ctx) => MenuHandler.handleBac
 bot.hears('⚡ التخزين المؤقت', (ctx) => MenuHandler.handleCacheMenu(ctx));
 bot.hears('🛡️ حماية من الإساءة', (ctx) => MenuHandler.handleProtectionMenu(ctx));
 
+// --- GROUP KEYBOARD BUTTON HANDLERS ---
+bot.hears('📊 إحصائيات المجموعة', (ctx) => CommandHandler.handleGroupStats(ctx));
+bot.hears('👥 الأعضاء', (ctx) => CommandHandler.handleGroupMembers(ctx));
+bot.hears('👮 الأدمنز', (ctx) => CommandHandler.handleGroupAdmins(ctx));
+bot.hears('🛡️ الحماية', (ctx) => CommandHandler.handleGroupProtection(ctx));
+bot.hears('⚙️ الإعدادات', async (ctx) => {
+  const { isGroup, isAdmin, sendPrivateChatError, sendNotAdminError } = require('./utils/groupHelper');
+  if (!isGroup(ctx)) {
+    return sendPrivateChatError(ctx);
+  }
+  const adminStatus = await isAdmin(ctx, ctx.telegram);
+  if (!adminStatus) {
+    return sendNotAdminError(ctx);
+  }
+  return CommandHandler.handleGroupSettings(ctx);
+});
+bot.hears('📋 القواعد', (ctx) => CommandHandler.handleGroupRules(ctx));
+bot.hears('🏆 الترتيب', (ctx) => CommandHandler.handleLeaderboard(ctx));
+bot.hears('⭐ نقاطي', (ctx) => CommandHandler.handleMyPoints(ctx));
+
 // --- TEXT HANDLER FOR QURANIC GAMES (AFTER hears) ---
 bot.on('text', async (ctx, next) => {
   // معالجة إجابات الألعاب القرآنية
