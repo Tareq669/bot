@@ -189,10 +189,17 @@ class NotificationsHandler {
 
       // Check if this is a callback query (inline button press)
       if (ctx.callbackQuery && ctx.callbackQuery.message) {
-        await ctx.editMessageReplyMarkup(keyboard.reply_markup, {
-          chat_id: ctx.chat.id,
-          message_id: ctx.callbackQuery.message.message_id
-        });
+        try {
+          await ctx.editMessageReplyMarkup(keyboard.reply_markup, {
+            chat_id: ctx.chat.id,
+            message_id: ctx.callbackQuery.message.message_id
+          });
+        } catch (error) {
+          // Ignore "message not modified" error
+          if (!error.message.includes('not modified')) {
+            console.error('Error updating keyboard:', error);
+          }
+        }
       } else {
         // If not a callback, send updated message
         await ctx.reply(
