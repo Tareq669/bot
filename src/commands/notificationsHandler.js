@@ -122,7 +122,7 @@ class NotificationsHandler {
    */
   static getNotificationStatusText(notifications) {
     const enabled = notifications.enabled !== false;
-    let text = enabled
+    const text = enabled
       ? '✅ <b>الإشعارات مفعلة</b>\n\nاختر ما تريد تفعيله أو إلغاؤه:'
       : '❌ <b>الإشعارات معطلة</b>\n\nفعّل الإشعارات أولاً!';
 
