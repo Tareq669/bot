@@ -13,17 +13,57 @@ class NotificationsHandler {
   static async handleNotificationsMenu(ctx) {
     try {
       const userId = ctx.from.id;
-      const user = await User.findOne({ userId });
+      let user = await User.findOne({ userId });
 
+      // إنشاء مستخدم جديد إذا لم يكن موجوداً
       if (!user) {
-        await ctx.reply('❌ لم يتم العثور على حسابك!');
-        return;
+        user = new User({
+          userId,
+          firstName: ctx.from.first_name || 'مستخدم',
+          username: ctx.from.username,
+          notifications: {
+            enabled: true,
+            adhkarReminder: false,
+            prayerReminder: false,
+            eventReminder: false,
+            motivational: false,
+            gameUpdates: false,
+            rewardUpdates: false,
+            auctionUpdates: false,
+            dailySummary: false
+          }
+        });
+        await user.save();
       }
 
-      const notifications = user.notifications || {};
-      const keyboard = this.getNotificationsKeyboard(notifications);
+      // تهيئة الإعدادات الافتراضية إذا لم تكن موجودة
+      if (!user.notifications) {
+        user.notifications = {
+          enabled: true,
+          adhkarReminder: false,
+          prayerReminder: false,
+          eventReminder: false,
+          motivational: false,
+          gameUpdates: false,
+          rewardUpdates: false,
+          auctionUpdates: false,
+          dailySummary: false
+        };
+        await user.save();
+      }
 
+      const notifications = user.notifications;
+      const keyboard = this.getNotificationsKeyboard(notifications);
       const statusText = this.getNotificationStatusText(notifications);
+
+      // حذف أي رسالة قديمة إذا كانت موجودة
+      try {
+        if (ctx.callbackQuery && ctx.callbackQuery.message) {
+          await ctx.deleteMessage(ctx.callbackQuery.message.message_id).catch(() => {});
+        }
+      } catch (e) {
+        // تجاهل الأخطاء
+      }
 
       await ctx.reply(
         `🔔 <b>إعدادات الإشعارات</b>\n\n${statusText}`,
@@ -42,15 +82,15 @@ class NotificationsHandler {
    * إنشاء لوحة مفاتيح الإعدادات
    */
   static getNotificationsKeyboard(notifications) {
-    const enabled = notifications.enabled !== false;
-    const adhkar = notifications.adhkarReminder === true;
-    const prayer = notifications.prayerReminder === true;
-    const events = notifications.eventReminder === true;
-    const motivation = notifications.motivational === true;
-    const games = notifications.gameUpdates === true;
-    const rewards = notifications.rewardUpdates === true;
-    const auction = notifications.auctionUpdates === true;
-    const summary = notifications.dailySummary === true;
+    const enabled = notifications?.enabled !== false;
+    const adhkar = notifications?.adhkarReminder === true;
+    const prayer = notifications?.prayerReminder === true;
+    const events = notifications?.eventReminder === true;
+    const motivation = notifications?.motivational === true;
+    const games = notifications?.gameUpdates === true;
+    const rewards = notifications?.rewardUpdates === true;
+    const auction = notifications?.auctionUpdates === true;
+    const summary = notifications?.dailySummary === true;
 
     return Markup.inlineKeyboard([
       [
@@ -121,7 +161,7 @@ class NotificationsHandler {
    * الحصول على نص حالة الإشعارات
    */
   static getNotificationStatusText(notifications) {
-    const enabled = notifications.enabled !== false;
+    const enabled = notifications?.enabled !== false;
     const text = enabled
       ? '✅ <b>الإشعارات مفعلة</b>\n\nاختر ما تريد تفعيله أو إلغاؤه:'
       : '❌ <b>الإشعارات معطلة</b>\n\nفعّل الإشعارات أولاً!';
@@ -135,12 +175,6 @@ class NotificationsHandler {
   static async handleToggleNotification(ctx, notificationType) {
     try {
       const userId = ctx.from.id;
-      const user = await User.findOne({ userId });
-
-      if (!user) {
-        await ctx.answerCbQuery('❌ لم يتم العثور على حسابك');
-        return;
-      }
 
       // Map notification types
       const typeMap = {
@@ -161,7 +195,31 @@ class NotificationsHandler {
         return;
       }
 
-      // Ensure notifications object exists
+      // الحصول على المستخدم الحالي
+      let user = await User.findOne({ userId });
+
+      // إنشاء مستخدم جديد إذا لم يكن موجوداً
+      if (!user) {
+        user = new User({
+          userId,
+          firstName: ctx.from.first_name || 'مستخدم',
+          username: ctx.from.username,
+          notifications: {
+            enabled: true,
+            adhkarReminder: false,
+            prayerReminder: false,
+            eventReminder: false,
+            motivational: false,
+            gameUpdates: false,
+            rewardUpdates: false,
+            auctionUpdates: false,
+            dailySummary: false
+          }
+        });
+        await user.save();
+      }
+
+      // تهيئة الإعدادات الافتراضية إذا لم تكن موجودة
       if (!user.notifications) {
         user.notifications = {
           enabled: true,
@@ -176,57 +234,66 @@ class NotificationsHandler {
         };
       }
 
-      // Toggle the notification setting
+      // تبديل القيمة الحالية
       const currentValue = user.notifications[dbField] || false;
       const newValue = !currentValue;
 
-      // If disabling main notifications, disable all
-      if (dbField === 'enabled' && !newValue) {
+      // تحديث قاعدة البيانات
+      if (dbField === 'enabled') {
+        // تعطيل أو تفعيل الإشعارات الرئيسية
         await User.findOneAndUpdate(
           { userId },
-          { $set: { 'notifications.enabled': false } }
+          {
+            $set: {
+              'notifications.enabled': newValue,
+              'notifications.adhkarReminder': newValue,
+              'notifications.prayerReminder': newValue,
+              'notifications.eventReminder': newValue,
+              'notifications.motivational': newValue,
+              'notifications.gameUpdates': newValue,
+              'notifications.rewardUpdates': newValue,
+              'notifications.auctionUpdates': newValue,
+              'notifications.dailySummary': newValue
+            }
+          }
         );
-        await ctx.answerCbQuery('❌ تم تعطيل جميع الإشعارات');
+        await ctx.answerCbQuery(newValue ? '✅ تم تفعيل جميع الإشعارات' : '❌ تم تعطيل جميع الإشعارات');
       } else {
-        // Update the specific notification setting
+        // تحديث إعداد معين
         await User.findOneAndUpdate(
           { userId },
-          { 
-            $set: { 
+          {
+            $set: {
               'notifications.enabled': true,
-              [`notifications.${dbField}`]: newValue 
-            } 
+              [`notifications.${dbField}`]: newValue
+            }
           }
         );
         await ctx.answerCbQuery(newValue ? '✅ تم التفعيل' : '❌ تم التعطيل');
       }
 
-      // Refresh - get updated user
+      // حذف الرسالة القديمة
+      try {
+        if (ctx.callbackQuery && ctx.callbackQuery.message) {
+          await ctx.deleteMessage(ctx.callbackQuery.message.message_id).catch(() => {});
+        }
+      } catch (e) {
+        // تجاهل الأخطاء
+      }
+
+      // إرسال رسالة محدثة
       const updatedUser = await User.findOne({ userId });
-      const notifications = updatedUser.notifications || {};
+      const notifications = updatedUser?.notifications || {};
       const keyboard = this.getNotificationsKeyboard(notifications);
       const statusText = this.getNotificationStatusText(notifications);
 
-      // Check if this is a callback query (inline button press)
-      if (ctx.callbackQuery && ctx.callbackQuery.message) {
-        try {
-          await ctx.editMessageReplyMarkup(keyboard.reply_markup, {
-            chat_id: ctx.chat.id,
-            message_id: ctx.callbackQuery.message.message_id
-          });
-        } catch (error) {
-          // Ignore "message not modified" error
-          if (!error.message.includes('not modified')) {
-            console.error('Error updating keyboard:', error);
-          }
+      await ctx.reply(
+        `🔔 <b>إعدادات الإشعارات</b>\n\n${statusText}`,
+        {
+          parse_mode: 'HTML',
+          ...keyboard
         }
-      } else {
-        // If not a callback, send updated message
-        await ctx.reply(
-          `🔔 <b>إعدادات الإشعارات</b>\n\n${statusText}`,
-          { parse_mode: 'HTML', ...keyboard }
-        );
-      }
+      );
     } catch (error) {
       console.error('Error in handleToggleNotification:', error);
       await ctx.answerCbQuery('❌ حدث خطأ');
@@ -282,18 +349,6 @@ class NotificationsHandler {
     } catch (error) {
       console.error('Error in handleClearLogs:', error);
       await ctx.answerCbQuery('❌ حدث خطأ');
-    }
-  }
-
-  /**
-   * إرسال إشعار تجريبي
-   */
-  static async sendTestNotification(ctx) {
-    try {
-      const message = '🧪 <b>إشعار تجريبي</b>\n\nتم استلام الإشعار بنجاح! ✅';
-      await ctx.reply(message, { parse_mode: 'HTML' });
-    } catch (error) {
-      console.error('Error in sendTestNotification:', error);
     }
   }
 }
