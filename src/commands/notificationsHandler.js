@@ -161,8 +161,23 @@ class NotificationsHandler {
         return;
       }
 
+      // Ensure notifications object exists
+      if (!user.notifications) {
+        user.notifications = {
+          enabled: true,
+          adhkarReminder: false,
+          prayerReminder: false,
+          eventReminder: false,
+          motivational: false,
+          gameUpdates: false,
+          rewardUpdates: false,
+          auctionUpdates: false,
+          dailySummary: false
+        };
+      }
+
       // Toggle the notification setting
-      const currentValue = user.notifications?.[dbField] || false;
+      const currentValue = user.notifications[dbField] || false;
       const newValue = !currentValue;
 
       // If disabling main notifications, disable all
@@ -176,14 +191,19 @@ class NotificationsHandler {
         // Update the specific notification setting
         await User.findOneAndUpdate(
           { userId },
-          { $set: { [`notifications.${dbField}`]: newValue } }
+          { 
+            $set: { 
+              'notifications.enabled': true,
+              [`notifications.${dbField}`]: newValue 
+            } 
+          }
         );
         await ctx.answerCbQuery(newValue ? '✅ تم التفعيل' : '❌ تم التعطيل');
       }
 
-      // Refresh the keyboard
+      // Refresh - get updated user
       const updatedUser = await User.findOne({ userId });
-      const notifications = updatedUser?.notifications || {};
+      const notifications = updatedUser.notifications || {};
       const keyboard = this.getNotificationsKeyboard(notifications);
       const statusText = this.getNotificationStatusText(notifications);
 
