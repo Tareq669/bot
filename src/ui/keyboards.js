@@ -31,6 +31,9 @@ class UIManager {
         Markup.button.text('📚 المكتبة')
       ],
       [
+        Markup.button.text('🆕 مميزات إضافية')
+      ],
+      [
         Markup.button.text('👑 لوحة المالك'),
         Markup.button.text('⚙️ الإعدادات')
       ],
@@ -75,6 +78,9 @@ class UIManager {
       [
         Markup.button.text('✨ الميزات'),
         Markup.button.text('📚 المكتبة')
+      ],
+      [
+        Markup.button.text('🆕 مميزات إضافية')
       ],
       [
         Markup.button.text('🛍️ المتجر'),

@@ -1397,6 +1397,25 @@ bot.hears('🏆 المتصدرين', (ctx) => MenuHandler.handleLeaderboardMenu(
 bot.hears('⚙️ الإعدادات', (ctx) => MenuHandler.handleSettingsMenu(ctx));
 bot.hears('✨ الميزات', (ctx) => CommandHandler.handleFeaturesMenu(ctx));
 bot.hears('📚 المكتبة', (ctx) => CommandHandler.handleLibrary(ctx));
+bot.hears('🆕 مميزات إضافية', async (ctx) => {
+  const UIManager = require('./ui/keyboards');
+  const keyboard = UIManager.extraFeaturesKeyboard();
+  await ctx.reply(
+    '🆕 <b>المميزات الإضافية</b>\n\n' +
+      '📖 <b>تفسير القرآن</b> - فهم معاني الآيات\n' +
+      '🎵 <b>دروس التجويد</b> - تعلم أحكام التجويد\n' +
+      '❓ <b>اختبار قرآني</b> - اختبر معلوماتك القرآنية\n\n' +
+      '🌅 <b>أذكار الصباح</b> - ابدأ يومك بالذكر\n' +
+      '🌙 <b>أذكار المساء</b> - اختم يومك بالذكر\n' +
+      '🤲 <b>عداد الاستغفار</b> - احصِ استغفارك\n' +
+      '📿 <b>السبحة الرقمية</b> - سبّح الله\n\n' +
+      '🎯 <b>لعبة المعلومات</b> - معلومات إسلامية\n' +
+      '🧩 <b>لعبة الكلمات</b> - ألغاز قرآنية\n' +
+      '🔍 <b>تحديد السورة</b> - خمّن السورة\n' +
+      '🏁 <b>سباق الحفظ</b> - تنافس في الحفظ',
+    { parse_mode: 'HTML', reply_markup: keyboard }
+  );
+});
 bot.hears('📊 إحصائيات', (ctx) => CommandHandler.handleStats(ctx));
 bot.hears('🎁 المكافآت', (ctx) => CommandHandler.handleRewards(ctx));
 bot.hears('🛍️ المتجر', (ctx) => MenuHandler.handleShopMenu(ctx));
