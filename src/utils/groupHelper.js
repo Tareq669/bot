@@ -1,0 +1,186 @@
+/**
+ * مسhelper للتمييز بين المجموعات والدردشات الخاصة
+ * Group/Private Chat Helper
+ */
+
+/**
+ * التحقق مما إذا كانت الدردشة مجموعة
+ * @param {Object} ctx - سياق التلغرام
+ * @returns {boolean} - true إذا كانت مجموعة
+ */
+function isGroup(ctx) {
+  return ctx.chat && (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup');
+}
+
+/**
+ * التحقق مما إذا كانت الدردشة خاصة
+ * @param {Object} ctx - سياق التلغرام
+ * @returns {boolean} - true إذا كانت دردشة خاصة
+ */
+function isPrivate(ctx) {
+  return ctx.chat && ctx.chat.type === 'private';
+}
+
+/**
+ * التحقق مما إذا كان المستخدم أدمن في المجموعة
+ * @param {Object} ctx - سياق التلغرام
+ * @param {Object} bot - نسخة البوت
+ * @returns {Promise<boolean>} - true إذا كان المستخدم أدمن
+ */
+async function isAdmin(ctx, bot) {
+  if (isPrivate(ctx)) return false;
+
+  try {
+    const chatMember = await bot.telegram.getChatMember(ctx.chat.id, ctx.from.id);
+    return ['creator', 'administrator'].includes(chatMember.status);
+  } catch (error) {
+    console.error('خطأ في التحقق من الأدمن:', error);
+    return false;
+  }
+}
+
+/**
+ * التحقق مما إذا كان المستخدم مالك المجموعة
+ * @param {Object} ctx - سياق التلغرام
+ * @param {Object} bot - نسخة البوت
+ * @returns {Promise<boolean>} - true إذا كان المستخدم مالك
+ */
+async function isOwner(ctx, bot) {
+  if (isPrivate(ctx)) return false;
+
+  try {
+    const chatMember = await bot.telegram.getChatMember(ctx.chat.id, ctx.from.id);
+    return chatMember.status === 'creator';
+  } catch (error) {
+    console.error('خطأ في التحقق من المالك:', error);
+    return false;
+  }
+}
+
+/**
+ * التحقق مما إذا كان المستخدم أدمن أو مالك
+ * @param {Object} ctx - سياق التلغرام
+ * @param {Object} bot - نسخة البوت
+ * @returns {Promise<boolean>} - true إذا كان أدمن أو مالك
+ */
+async function isAdminOrOwner(ctx, bot) {
+  return isAdmin(ctx, bot) || isOwner(ctx, bot);
+}
+
+/**
+ * إرسال رسالة خطأ للدردشة الخاصة
+ * @param {Object} ctx - سياق التلغرام
+ */
+async function sendPrivateChatError(ctx) {
+  const message = `
+🚫 <b>هذا الأمر للمجموعات فقط</b>
+
+📌 هذا الأمر يعمل فقط في المجموعات وليس في الدردشة الخاصة.
+
+💡 للتفاعل مع البوت في المجموعات، أضف البوت إلى مجموعتك واستخدم الأمر هناك.
+`;
+
+  await ctx.reply(message, { parse_mode: 'HTML' });
+}
+
+/**
+ * إرسال رسالة خطأ لعدم وجود صلاحيات
+ * @param {Object} ctx - سياق التلغرام
+ */
+async function sendNotAdminError(ctx) {
+  const message = `
+🚫 <b>ليس لديك صلاحيات</b>
+
+📌 هذا الأمر يتطلب صلاحيات الأدمن أو المالك على الأقل.
+
+💡 يرجى التواصل مع مالك المجموعة للحصول على الصلاحيات اللازمة.
+`;
+
+  await ctx.reply(message, { parse_mode: 'HTML' });
+}
+
+/**
+ * التحقق من المجموعة والأدمن معاً
+ * @param {Object} ctx - سياق التلغرام
+ * @param {Object} bot - نسخة البوت
+ * @returns {Promise<{isGroup: boolean, isAdmin: boolean}>}
+ */
+async function checkGroupAndAdmin(ctx, bot) {
+  return {
+    isGroup: isGroup(ctx),
+    isAdmin: await isAdmin(ctx, bot)
+  };
+}
+
+/**
+ * الحصول على معرف الدردشة
+ * @param {Object} ctx - سياق التلغرام
+ * @returns {number} - معرف الدردشة
+ */
+function getChatId(ctx) {
+  return ctx.chat.id;
+}
+
+/**
+ * الحصول على معرف المستخدم
+ * @param {Object} ctx - سياق التلغرام
+ * @returns {number} - معرف المستخدم
+ */
+function getUserId(ctx) {
+  return ctx.from.id;
+}
+
+/**
+ * الحصول على اسم المستخدم
+ * @param {Object} ctx - سياق التلغرام
+ * @returns {string} - اسم المستخدم
+ */
+function getUserName(ctx) {
+  return ctx.from.first_name + (ctx.from.last_name ? ` ${  ctx.from.last_name}` : '');
+}
+
+/**
+ * التحقق مما إذا كانت الرسالة رد على رسالة أخرى
+ * @param {Object} ctx - سياق التلغرام
+ * @returns {boolean} - true إذا كانت رد
+ */
+function isReply(ctx) {
+  return ctx.message && ctx.message.reply_to_message;
+}
+
+/**
+ * الحصول على المستخدم الذي تم الرد عليه
+ * @param {Object} ctx - سياق التلغرام
+ * @returns {Object|null} - بيانات المستخدم أو null
+ */
+function getRepliedUser(ctx) {
+  if (!isReply(ctx)) return null;
+  return ctx.message.reply_to_message.from;
+}
+
+/**
+ * التحقق مما إذا كان المستخدم مالك البوت
+ * @param {Object} ctx - سياق التلغرام
+ * @param {string} ownerId - معرف مالك البوت
+ * @returns {boolean} - true إذا كان مالك البوت
+ */
+function isBotOwner(ctx, ownerId) {
+  return String(ctx.from.id) === String(ownerId);
+}
+
+module.exports = {
+  isGroup,
+  isPrivate,
+  isAdmin,
+  isOwner,
+  isAdminOrOwner,
+  sendPrivateChatError,
+  sendNotAdminError,
+  checkGroupAndAdmin,
+  getChatId,
+  getUserId,
+  getUserName,
+  isReply,
+  getRepliedUser,
+  isBotOwner
+};

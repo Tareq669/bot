@@ -4,6 +4,7 @@
  */
 const { GroupSettings, GroupMember, GroupStats } = require('../database/models/GroupManagement');
 const groupHandlers = require('../handlers/groupHandlers');
+const { isGroup, isAdmin, sendPrivateChatError, sendNotAdminError } = require('../utils/groupHelper');
 
 /**
  * تسجيل أوامر المجموعات
@@ -56,6 +57,17 @@ function registerGroupCommands(bot) {
  * رفع مستخدم إلى مشرف
  */
 async function handlePromote(ctx) {
+  // التحقق من أنها مجموعة
+  if (!isGroup(ctx)) {
+    return sendPrivateChatError(ctx);
+  }
+
+  // التحقق من أن المستخدم أدمن
+  const adminStatus = await isAdmin(ctx, ctx.telegram);
+  if (!adminStatus) {
+    return sendNotAdminError(ctx);
+  }
+
   if (!ctx.message.reply_to_message && !ctx.message.text.split(' ')[1]) {
     return ctx.reply('⚠️ يرجى الرد على رسالة المستخدم أو تحديد معرفه');
   }
@@ -80,6 +92,17 @@ async function handlePromote(ctx) {
  * تنزيل مستخدم من مشرف
  */
 async function handleDemote(ctx) {
+  // التحقق من أنها مجموعة
+  if (!isGroup(ctx)) {
+    return sendPrivateChatError(ctx);
+  }
+
+  // التحقق من أن المستخدم أدمن
+  const adminStatus = await isAdmin(ctx, ctx.telegram);
+  if (!adminStatus) {
+    return sendNotAdminError(ctx);
+  }
+
   if (!ctx.message.reply_to_message && !ctx.message.text.split(' ')[1]) {
     return ctx.reply('⚠️ يرجى الرد على رسالة المستخدم أو تحديد معرفه');
   }
@@ -104,6 +127,17 @@ async function handleDemote(ctx) {
  * طرد مستخدم
  */
 async function handleKick(ctx) {
+  // التحقق من أنها مجموعة
+  if (!isGroup(ctx)) {
+    return sendPrivateChatError(ctx);
+  }
+
+  // التحقق من أن المستخدم أدمن
+  const adminStatus = await isAdmin(ctx, ctx.telegram);
+  if (!adminStatus) {
+    return sendNotAdminError(ctx);
+  }
+
   if (!ctx.message.reply_to_message && !ctx.message.text.split(' ')[1]) {
     return ctx.reply('⚠️ يرجى الرد على رسالة المستخدم أو تحديد معرفه');
   }
@@ -128,6 +162,17 @@ async function handleKick(ctx) {
  * حظر مستخدم
  */
 async function handleBan(ctx) {
+  // التحقق من أنها مجموعة
+  if (!isGroup(ctx)) {
+    return sendPrivateChatError(ctx);
+  }
+
+  // التحقق من أن المستخدم أدمن
+  const adminStatus = await isAdmin(ctx, ctx.telegram);
+  if (!adminStatus) {
+    return sendNotAdminError(ctx);
+  }
+
   if (!ctx.message.reply_to_message && !ctx.message.text.split(' ')[1]) {
     return ctx.reply('⚠️ يرجى الرد على رسالة المستخدم أو تحديد معرفه');
   }
@@ -176,6 +221,17 @@ async function handleUnban(ctx) {
  * كتم مستخدم
  */
 async function handleMute(ctx) {
+  // التحقق من أنها مجموعة
+  if (!isGroup(ctx)) {
+    return sendPrivateChatError(ctx);
+  }
+
+  // التحقق من أن المستخدم أدمن
+  const adminStatus = await isAdmin(ctx, ctx.telegram);
+  if (!adminStatus) {
+    return sendNotAdminError(ctx);
+  }
+
   if (!ctx.message.reply_to_message && !ctx.message.text.split(' ')[1]) {
     return ctx.reply('⚠️ يرجى الرد على رسالة المستخدم أو تحديد معرفه');
   }
@@ -230,6 +286,11 @@ async function handleUnmute(ctx) {
  * عرض معلومات المجموعة
  */
 async function handleGroupInfo(ctx) {
+  // التحقق من أنها مجموعة
+  if (!isGroup(ctx)) {
+    return sendPrivateChatError(ctx);
+  }
+
   const groupId = ctx.chat.id;
   const info = await groupHandlers.getGroupInfo(groupId, ctx.telegram);
 
@@ -254,6 +315,11 @@ async function handleGroupInfo(ctx) {
  * عرض قائمة الأعضاء
  */
 async function handleMembers(ctx) {
+  // التحقق من أنها مجموعة
+  if (!isGroup(ctx)) {
+    return sendPrivateChatError(ctx);
+  }
+
   const groupId = ctx.chat.id;
 
   const members = await GroupMember.find({ groupId, isActive: true })
@@ -279,6 +345,11 @@ async function handleMembers(ctx) {
  * عرض قائمة الأدمنز
  */
 async function handleAdmins(ctx) {
+  // التحقق من أنها مجموعة
+  if (!isGroup(ctx)) {
+    return sendPrivateChatError(ctx);
+  }
+
   const groupId = ctx.chat.id;
 
   try {
@@ -323,6 +394,17 @@ async function handleModerators(ctx) {
  * عرض إعدادات المجموعة
  */
 async function handleSettings(ctx) {
+  // التحقق من أنها مجموعة
+  if (!isGroup(ctx)) {
+    return sendPrivateChatError(ctx);
+  }
+
+  // التحقق من أن المستخدم أدمن
+  const adminStatus = await isAdmin(ctx, ctx.telegram);
+  if (!adminStatus) {
+    return sendNotAdminError(ctx);
+  }
+
   const groupId = ctx.chat.id;
   const settings = await GroupSettings.findOne({ groupId });
 
@@ -359,6 +441,17 @@ async function handleSettings(ctx) {
  * إعداد رسالة الترحيب
  */
 async function handleWelcome(ctx) {
+  // التحقق من أنها مجموعة
+  if (!isGroup(ctx)) {
+    return sendPrivateChatError(ctx);
+  }
+
+  // التحقق من أن المستخدم أدمن
+  const adminStatus = await isAdmin(ctx, ctx.telegram);
+  if (!adminStatus) {
+    return sendNotAdminError(ctx);
+  }
+
   const groupId = ctx.chat.id;
   const args = ctx.message.text.split(' ');
 
@@ -414,6 +507,17 @@ async function handleWelcome(ctx) {
  * إعداد رسالة الوداع
  */
 async function handleFarewell(ctx) {
+  // التحقق من أنها مجموعة
+  if (!isGroup(ctx)) {
+    return sendPrivateChatError(ctx);
+  }
+
+  // التحقق من أن المستخدم أدمن
+  const adminStatus = await isAdmin(ctx, ctx.telegram);
+  if (!adminStatus) {
+    return sendNotAdminError(ctx);
+  }
+
   const groupId = ctx.chat.id;
   const args = ctx.message.text.split(' ');
 
@@ -466,6 +570,11 @@ async function handleFarewell(ctx) {
  * عرض وإعداد القواعد
  */
 async function handleRules(ctx) {
+  // التحقق من أنها مجموعة
+  if (!isGroup(ctx)) {
+    return sendPrivateChatError(ctx);
+  }
+
   const groupId = ctx.chat.id;
   const args = ctx.message.text.split(' ');
 
@@ -532,6 +641,17 @@ async function handleRules(ctx) {
  * إعدادات الحماية
  */
 async function handleProtection(ctx) {
+  // التحقق من أنها مجموعة
+  if (!isGroup(ctx)) {
+    return sendPrivateChatError(ctx);
+  }
+
+  // التحقق من أن المستخدم أدمن
+  const adminStatus = await isAdmin(ctx, ctx.telegram);
+  if (!adminStatus) {
+    return sendNotAdminError(ctx);
+  }
+
   const groupId = ctx.chat.id;
   const settings = await GroupSettings.findOne({ groupId });
   const protection = settings?.protection || {};
@@ -630,6 +750,11 @@ async function handleAntiFlood(ctx) {
  * عرض الإحصائيات
  */
 async function handleStats(ctx) {
+  // التحقق من أنها مجموعة
+  if (!isGroup(ctx)) {
+    return sendPrivateChatError(ctx);
+  }
+
   const groupId = ctx.chat.id;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -657,6 +782,11 @@ async function handleStats(ctx) {
  * عرض قائمة المتصدرين
  */
 async function handleLeaderboard(ctx) {
+  // التحقق من أنها مجموعة
+  if (!isGroup(ctx)) {
+    return sendPrivateChatError(ctx);
+  }
+
   const groupId = ctx.chat.id;
 
   const topMembers = await GroupMember.find({ groupId, isActive: true })
@@ -683,6 +813,11 @@ async function handleLeaderboard(ctx) {
  * عرض نقاط المستخدم الحالي
  */
 async function handleMyPoints(ctx) {
+  // التحقق من أنها مجموعة
+  if (!isGroup(ctx)) {
+    return sendPrivateChatError(ctx);
+  }
+
   const userId = ctx.from.id;
   const groupId = ctx.chat.id;
 
