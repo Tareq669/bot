@@ -593,7 +593,44 @@ class UIManager {
       ],
       [
         Markup.button.callback('🛡️ حماية من الإساءة', 'new:ratelimiter'),
+        Markup.button.callback('🆕 مميزات جديدة', 'new:extra')
+      ],
+      [
         Markup.button.callback('⬅️ رجوع', 'menu:main')
+      ]
+    ]);
+  }
+
+  // Extra New Features Menu
+  static extraFeaturesKeyboard() {
+    return Markup.inlineKeyboard([
+      [
+        Markup.button.callback('📖 تفسير القرآن', 'feature:tafsir'),
+        Markup.button.callback('🎯 دروس التجويد', 'feature:tajweed')
+      ],
+      [
+        Markup.button.callback('❓ اختبار قرآني', 'feature:qquiz'),
+        Markup.button.callback('🌅 أذكار الصباح', 'feature:morning')
+      ],
+      [
+        Markup.button.callback('🌙 أذكار المساء', 'feature:evening'),
+        Markup.button.callback('🤲 استغفار', 'feature:istighfar')
+      ],
+      [
+        Markup.button.callback('🔢 تسبيح إلكتروني', 'feature:tasbih'),
+        Markup.button.callback('🎯 مسابقة إسلامية', 'feature:trivia')
+      ],
+      [
+        Markup.button.callback('🧩 لغز كلمات', 'feature:puzzle'),
+        Markup.button.callback('📖 تعرف على السورة', 'feature:surah')
+      ],
+      [
+        Markup.button.callback('🏃 سباق القرآن', 'feature:race'),
+        Markup.button.callback('🛡️ الإشراف', 'feature:admin')
+      ],
+      [
+        Markup.button.callback('📢 إذاعة', 'feature:broadcast'),
+        Markup.button.callback('⬅️ رجوع', 'menu:newfeatures')
       ]
     ]);
   }

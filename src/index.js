@@ -642,7 +642,113 @@ bot.action('menu:newfeatures', async (ctx) => {
       '🔔 <b>الإشعارات الذكية</b> - تنبيهات شخصية مخصصة\n' +
       '📁 <b>النسخ الاحتياطية</b> - حفظ البيانات تلقائياً\n' +
       '⚡ <b>نظام التخزين المؤقت</b> - أداء أسرع\n' +
-      '🛡️ <b>حماية من الإساءة</b> - أمان معزز',
+      '🛡️ <b>حماية من الإساءة</b> - أمان معزز\n' +
+      '🆕 <b>مميزات إضافية</b> - أذكار وألعاب جديدة',
+    { parse_mode: 'HTML', reply_markup: keyboard }
+  );
+});
+
+// --- EXTRA NEW FEATURES MENU ---
+bot.action('new:extra', async (ctx) => {
+  const UIManager = require('./ui/keyboards');
+  const keyboard = UIManager.extraFeaturesKeyboard();
+  await ctx.editMessageText(
+    '🆕 <b>المميزات الإضافية</b>\n\n' +
+      '📖 <b>التفسير</b> - تفسير القرآن الكريم\n' +
+      '🎯 <b>التجويد</b> - دروس التجويد\n' +
+      '❓ <b>اختبار قرآني</b> - أسئلة متنوعة\n' +
+      '🌅 <b>أذكار الصباح</b> - أذكار اليوم\n' +
+      '🌙 <b>أذكار المساء</b> - أذكار المساء\n' +
+      '🤲 <b>الاستغفار</b> - عداد الاستغفار\n' +
+      '🔢 <b>التسبيح</b> - تسبيح إلكتروني\n' +
+      '🎯 <b>المسابقات</b> - مسابقات إسلامية\n' +
+      '🧩 <b>الألغاز</b> - ألغاز كلمات\n' +
+      '📖 <b>السور</b> - تعرف على السور\n' +
+      '🏃 <b>السباق</b> - سباق القرآن\n' +
+      '🛡️ <b>الإشراف</b> - أدوات الإدارة',
+    { parse_mode: 'HTML', reply_markup: keyboard }
+  );
+});
+
+// --- NEW FEATURES ACTIONS ---
+bot.action('feature:tafsir', async (ctx) => {
+  const NewFeaturesHandler = require('./commands/newFeaturesHandler');
+  await NewFeaturesHandler.handleTafsir(ctx);
+});
+
+bot.action('feature:tajweed', async (ctx) => {
+  const NewFeaturesHandler = require('./commands/newFeaturesHandler');
+  await NewFeaturesHandler.handleTajweed(ctx);
+});
+
+bot.action('feature:qquiz', async (ctx) => {
+  const NewFeaturesHandler = require('./commands/newFeaturesHandler');
+  await NewFeaturesHandler.handleQuranQuiz(ctx, 'easy');
+});
+
+bot.action('feature:morning', async (ctx) => {
+  const NewFeaturesHandler = require('./commands/newFeaturesHandler');
+  await NewFeaturesHandler.handleMorningAdhkar(ctx);
+});
+
+bot.action('feature:evening', async (ctx) => {
+  const NewFeaturesHandler = require('./commands/newFeaturesHandler');
+  await NewFeaturesHandler.handleEveningAdhkar(ctx);
+});
+
+bot.action('feature:istighfar', async (ctx) => {
+  const NewFeaturesHandler = require('./commands/newFeaturesHandler');
+  await NewFeaturesHandler.handleIstighfar(ctx);
+});
+
+bot.action('feature:tasbih', async (ctx) => {
+  const NewFeaturesHandler = require('./commands/newFeaturesHandler');
+  await NewFeaturesHandler.handleTasbih(ctx);
+});
+
+bot.action('feature:trivia', async (ctx) => {
+  const NewFeaturesHandler = require('./commands/newFeaturesHandler');
+  await NewFeaturesHandler.handleTriviaGame(ctx, 'all');
+});
+
+bot.action('feature:puzzle', async (ctx) => {
+  const NewFeaturesHandler = require('./commands/newFeaturesHandler');
+  await NewFeaturesHandler.handleWordPuzzle(ctx);
+});
+
+bot.action('feature:surah', async (ctx) => {
+  const NewFeaturesHandler = require('./commands/newFeaturesHandler');
+  await NewFeaturesHandler.handleSurahGame(ctx);
+});
+
+bot.action('feature:race', async (ctx) => {
+  const NewFeaturesHandler = require('./commands/newFeaturesHandler');
+  await NewFeaturesHandler.handleRacingGame(ctx);
+});
+
+bot.action('feature:admin', async (ctx) => {
+  const NewFeaturesHandler = require('./commands/newFeaturesHandler');
+  await NewFeaturesHandler.handleAutoModSettings(ctx, {});
+});
+
+bot.action('feature:broadcast', async (ctx) => {
+  const NewFeaturesHandler = require('./commands/newFeaturesHandler');
+  await NewFeaturesHandler.handleBroadcast(ctx);
+});
+
+bot.action('new:features', async (ctx) => {
+  const UIManager = require('./ui/keyboards');
+  const keyboard = UIManager.newFeaturesMenuKeyboard();
+  await ctx.editMessageText(
+    '✨ <b>المميزات الجديدة في البوت</b>\n\n' +
+      '🎮 <b>الألعاب القرآنية</b> - ألعاب تفاعلية قرآنية ممتعة\n' +
+      '🛍️ <b>المتجر المتقدم</b> - أوسمة وجوائز وأدوات\n' +
+      '💸 <b>النظام المالي</b> - تحويلات وتبرعات\n' +
+      '🔔 <b>الإشعارات الذكية</b> - تنبيهات شخصية مخصصة\n' +
+      '📁 <b>النسخ الاحتياطية</b> - حفظ البيانات تلقائياً\n' +
+      '⚡ <b>نظام التخزين المؤقت</b> - أداء أسرع\n' +
+      '🛡️ <b>حماية من الإساءة</b> - أمان معزز\n' +
+      '🆕 <b>مميزات إضافية</b> - أذكار وألعاب جديدة',
     { parse_mode: 'HTML', reply_markup: keyboard }
   );
 });
