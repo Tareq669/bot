@@ -29,7 +29,7 @@ class NotificationsHandler {
         `🔔 <b>إعدادات الإشعارات</b>\n\n${statusText}`,
         {
           parse_mode: 'HTML',
-          reply_markup: keyboard
+          ...keyboard
         }
       );
     } catch (error) {
