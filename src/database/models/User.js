@@ -161,7 +161,28 @@ const userSchema = new mongoose.Schema({
     motivational: { type: Boolean, default: false },
     gameUpdates: { type: Boolean, default: false },
     rewardUpdates: { type: Boolean, default: false },
-    auctionUpdates: { type: Boolean, default: false }
+    auctionUpdates: { type: Boolean, default: false },
+    // إعدادات الإشعارات المخصصة
+    timezone: { type: String, default: 'Asia/Riyadh' },
+    adhkarMorningTime: { type: String, default: '06:00' },
+    adhkarEveningTime: { type: String, default: '21:00' },
+    quranReminder: { type: Boolean, default: false },
+    quranReminderTime: { type: String, default: '05:00' },
+    khatmaReminder: { type: Boolean, default: false },
+    khatmaReminderInterval: { type: Number, default: 5 },
+    gameNotifications: {
+      guessNumber: { type: Boolean, default: false, time: '10:00' },
+      quiz: { type: Boolean, default: false, time: '14:00' },
+      memory: { type: Boolean, default: false, time: '18:00' },
+      math: { type: Boolean, default: false, time: '20:00' },
+      word: { type: Boolean, default: false, time: '22:00' }
+    },
+    auctionNotifications: {
+      enabled: { type: Boolean, default: false },
+      startAlert: { type: Boolean, default: true },
+      endAlert: { type: Boolean, default: true },
+      hourlyUpdate: { type: Boolean, default: true }
+    }
   },
 
   notificationsLog: [{

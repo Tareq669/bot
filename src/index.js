@@ -638,6 +638,75 @@ bot.action('notify:menu', async (ctx) => {
   await NotificationsHandler.handleNotificationsMenu(ctx);
 });
 
+// قوائم الإشعارات الفرعية
+bot.action('notify:menu:adhkar', async (ctx) => {
+  const NotificationsHandler = require('./commands/notificationsHandler');
+  await NotificationsHandler.handleAdhkarMenu(ctx);
+});
+
+bot.action('notify:menu:quran', async (ctx) => {
+  const NotificationsHandler = require('./commands/notificationsHandler');
+  await NotificationsHandler.handleQuranMenu(ctx);
+});
+
+bot.action('notify:menu:khatma', async (ctx) => {
+  const NotificationsHandler = require('./commands/notificationsHandler');
+  await NotificationsHandler.handleKhatmaMenu(ctx);
+});
+
+bot.action('notify:menu:games', async (ctx) => {
+  const NotificationsHandler = require('./commands/notificationsHandler');
+  await NotificationsHandler.handleGamesMenu(ctx);
+});
+
+bot.action('notify:menu:auction', async (ctx) => {
+  const NotificationsHandler = require('./commands/notificationsHandler');
+  await NotificationsHandler.handleAuctionMenu(ctx);
+});
+
+// طلب تغيير الوقت
+bot.action('notify:set:morning', async (ctx) => {
+  const NotificationsHandler = require('./commands/notificationsHandler');
+  await NotificationsHandler.requestNotificationTime(ctx, 'morning');
+});
+
+bot.action('notify:set:evening', async (ctx) => {
+  const NotificationsHandler = require('./commands/notificationsHandler');
+  await NotificationsHandler.requestNotificationTime(ctx, 'evening');
+});
+
+bot.action('notify:set:quranTime', async (ctx) => {
+  const NotificationsHandler = require('./commands/notificationsHandler');
+  await NotificationsHandler.requestNotificationTime(ctx, 'quranTime');
+});
+
+bot.action('notify:set:khatmaInterval', async (ctx) => {
+  const NotificationsHandler = require('./commands/notificationsHandler');
+  await NotificationsHandler.requestNotificationTime(ctx, 'khatmaInterval');
+});
+
+bot.action('notify:settings:timezone', async (ctx) => {
+  const NotificationsHandler = require('./commands/notificationsHandler');
+  await NotificationsHandler.requestNotificationTime(ctx, 'timezone');
+});
+
+// معالجة إدخال الوقت
+bot.on('message', async (ctx) => {
+  const userId = ctx.from.id;
+  const message = ctx.message?.text;
+
+  if (!message || message.startsWith('/')) return;
+
+  const { User } = require('./database/models');
+  const user = await User.findOne({ userId });
+
+  if (user?.awaitingInput?.type?.startsWith('notifyTime:')) {
+    const type = user.awaitingInput.type.replace('notifyTime:', '');
+    const NotificationsHandler = require('./commands/notificationsHandler');
+    await NotificationsHandler.handleTimeInput(ctx, message, type);
+  }
+});
+
 // تبديل الإشعار العام
 bot.action('notify:toggle:all', async (ctx) => {
   const NotificationsHandler = require('./commands/notificationsHandler');
