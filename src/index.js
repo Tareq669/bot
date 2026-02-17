@@ -627,7 +627,10 @@ bot.action('menu:backups', (ctx) => MenuHandler.handleBackupsMenu(ctx));
 bot.action('menu:cache', (ctx) => MenuHandler.handleCacheMenu(ctx));
 bot.action('menu:protection', (ctx) => MenuHandler.handleProtectionMenu(ctx));
 bot.action('settings:notifications', (ctx) => MenuHandler.handleNotificationsSettings(ctx));
-bot.action('settings:toggleNotify', (ctx) => MenuHandler.handleToggleNotifications(ctx));
+bot.action('settings:toggleNotify', (ctx) => {
+  const NotificationsHandler = require('./commands/notificationsHandler');
+  NotificationsHandler.handleNotificationsMenu(ctx);
+});
 
 // إشعارات متقدمة
 bot.action('notify:menu', async (ctx) => {

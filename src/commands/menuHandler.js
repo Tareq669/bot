@@ -207,8 +207,8 @@ ${smartTip}`;
 
       // Initialize khatmaProgress if needed
       if (!user.khatmaProgress) {
-        user.khatmaProgress = { 
-          currentPage: 1, 
+        user.khatmaProgress = {
+          currentPage: 1,
           percentComplete: 0,
           startDate: new Date(),
           completionCount: 0
@@ -234,9 +234,9 @@ ${smartTip}`;
 
       // Initialize khatmaProgress if needed
       if (!user.khatmaProgress) {
-        user.khatmaProgress = { 
-          currentPage: 1, 
-          percentComplete: 0, 
+        user.khatmaProgress = {
+          currentPage: 1,
+          percentComplete: 0,
           startDate: new Date(),
           completionCount: 0,
           daysActive: 0
@@ -352,8 +352,8 @@ ${user.khatmaProgress.percentComplete > 50 ? '🎯 أحسنت! أنت في ال�
 
       // Initialize khatmaProgress if needed
       if (!user.khatmaProgress) {
-        user.khatmaProgress = { 
-          currentPage: 1, 
+        user.khatmaProgress = {
+          currentPage: 1,
           percentComplete: 0,
           startDate: new Date(),
           completionCount: 0,
@@ -814,15 +814,9 @@ ${rankMessage}
 
   static async handleToggleNotifications(ctx) {
     try {
-      const user = await User.findOne({ userId: ctx.from.id });
-      if (!user) return ctx.reply('❌ لم يتم العثور على ملفك');
-
-      user.preferences = user.preferences || {};
-      user.preferences.notifications = !user.preferences.notifications;
-      await user.save();
-
-      await ctx.answerCbQuery(user.preferences.notifications ? '✅ تم تفعيل الإشعارات' : '❌ تم إيقاف الإشعارات');
-      return this.handleNotificationsSettings(ctx);
+      // استخدام معالج الإشعارات الجديد
+      const NotificationsHandler = require('./notificationsHandler');
+      await NotificationsHandler.handleNotificationsMenu(ctx);
     } catch (error) {
       console.error('Error in handleToggleNotifications:', error);
       await ctx.answerCbQuery('❌ حدث خطأ');
@@ -1467,32 +1461,9 @@ ${rankMessage}
 
   static async handleSmartNotificationsMenu(ctx) {
     try {
-      const UIManager = require('../ui/keyboards');
-      const message = `🔔 <b>الإشعارات الذكية</b>
-
-يمكنك تفعيل:
-• 🕌 إشعارات الأذكار اليومية
-• ⏰ إشعارات أوقات الصلاة
-• 🎮 إشعارات الألعاب
-• 💰 إشعارات المكافآت
-• 🏆 إشعارات الأحداث الخاصة
-• 📊 إشعارات الإحصائيات
-
-⚠️ هذه الميزة قيد التطوير`;
-
-      const keyboard = UIManager.notificationsMenuKeyboard();
-
-      if (ctx.callbackQuery) {
-        await ctx.editMessageText(message, {
-          parse_mode: 'HTML',
-          reply_markup: keyboard.reply_markup
-        });
-      } else {
-        await ctx.reply(message, {
-          parse_mode: 'HTML',
-          reply_markup: keyboard.reply_markup
-        });
-      }
+      // استخدام معالج الإشعارات الجديد
+      const NotificationsHandler = require('./notificationsHandler');
+      await NotificationsHandler.handleNotificationsMenu(ctx);
     } catch (error) {
       console.error('Error in handleSmartNotificationsMenu:', error);
       await ctx.reply('❌ حدث خطأ في عرض قائمة الإشعارات');
