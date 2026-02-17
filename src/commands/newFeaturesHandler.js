@@ -75,6 +75,7 @@ class NewFeaturesHandler {
   static async handleQuranQuiz(ctx, difficulty = 'easy') {
     try {
       const quiz = QuranQuizFeature.generateQuiz(difficulty);
+      if (!ctx.session) ctx.session = {};
       ctx.session.quiz = quiz;
 
       let message = `❓ **سؤال قرآني** (${difficulty === 'easy' ? 'سهل' : difficulty === 'medium' ? 'متوسط' : 'صعب'})\n\n`;
@@ -308,6 +309,7 @@ class NewFeaturesHandler {
   static async handleTriviaGame(ctx, category = 'all') {
     try {
       const question = IslamicTriviaGame.getQuestion(category);
+      if (!ctx.session) ctx.session = {};
       ctx.session.game = { type: 'trivia', question };
 
       let message = '🎯 **مسابقة إسلامية**\n';
@@ -333,6 +335,7 @@ class NewFeaturesHandler {
   static async handleWordPuzzle(ctx) {
     try {
       const puzzle = WordPuzzleGame.getRandomPuzzle();
+      if (!ctx.session) ctx.session = {};
       ctx.session.game = { type: 'puzzle', puzzle };
 
       let message = '🧩 **لغز كلمات**\n\n';
@@ -356,6 +359,7 @@ class NewFeaturesHandler {
   static async handleSurahGame(ctx) {
     try {
       const quiz = SurahIdentificationGame.getSurahQuiz();
+      if (!ctx.session) ctx.session = {};
       ctx.session.game = { type: 'surah', quiz };
 
       let message = '📖 **تعرف على السورة**\n\n';
@@ -380,6 +384,7 @@ class NewFeaturesHandler {
   static async handleRacingGame(ctx) {
     try {
       const race = await RacingGame.startRace(ctx.from.id);
+      if (!ctx.session) ctx.session = {};
       ctx.session.game = { type: 'race', race };
 
       let message = '🏃 **سباق القرآن**\n\n';
