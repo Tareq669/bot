@@ -183,7 +183,8 @@ class NotificationsHandler {
 
       // Refresh the keyboard
       const updatedUser = await User.findOne({ userId });
-      const keyboard = this.getNotificationsKeyboard(updatedUser.notifications);
+      const notifications = updatedUser?.notifications || {};
+      const keyboard = this.getNotificationsKeyboard(notifications);
 
       await ctx.editMessageReplyMarkup(keyboard.reply_markup, {
         chat_id: ctx.chat.id,
