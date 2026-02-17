@@ -185,11 +185,21 @@ class NotificationsHandler {
       const updatedUser = await User.findOne({ userId });
       const notifications = updatedUser?.notifications || {};
       const keyboard = this.getNotificationsKeyboard(notifications);
+      const statusText = this.getNotificationStatusText(notifications);
 
-      await ctx.editMessageReplyMarkup(keyboard.reply_markup, {
-        chat_id: ctx.chat.id,
-        message_id: ctx.message.message_id
-      });
+      // Check if this is a callback query (inline button press)
+      if (ctx.callbackQuery && ctx.callbackQuery.message) {
+        await ctx.editMessageReplyMarkup(keyboard.reply_markup, {
+          chat_id: ctx.chat.id,
+          message_id: ctx.callbackQuery.message.message_id
+        });
+      } else {
+        // If not a callback, send updated message
+        await ctx.reply(
+          `🔔 <b>إعدادات الإشعارات</b>\n\n${statusText}`,
+          { parse_mode: 'HTML', ...keyboard }
+        );
+      }
     } catch (error) {
       console.error('Error in handleToggleNotification:', error);
       await ctx.answerCbQuery('❌ حدث خطأ');
