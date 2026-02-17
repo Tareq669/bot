@@ -158,11 +158,13 @@ class UIManager {
       // الصف الثاني عشر: المكافآت والإغلاق
       [
         Markup.button.callback('🎁 المكافآت', 'rewards:daily'),
+        Markup.button.callback('🆕 الإضافية', 'new:extra')
+      ],
+      [
         Markup.button.callback('❌ إغلق', 'close')
       ]
     ]);
   }
-
   // Games Menu
   static gamesMenuKeyboard() {
     return Markup.inlineKeyboard([
