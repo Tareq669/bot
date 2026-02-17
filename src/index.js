@@ -628,8 +628,6 @@ bot.action('menu:cache', (ctx) => MenuHandler.handleCacheMenu(ctx));
 bot.action('menu:protection', (ctx) => MenuHandler.handleProtectionMenu(ctx));
 bot.action('settings:notifications', (ctx) => MenuHandler.handleNotificationsSettings(ctx));
 bot.action('settings:toggleNotify', (ctx) => MenuHandler.handleToggleNotifications(ctx));
-
-// --- NEW FEATURES MENU ---
 bot.action('menu:newfeatures', async (ctx) => {
   const UIManager = require('./ui/keyboards');
   const keyboard = UIManager.newFeaturesMenuKeyboard();
@@ -645,7 +643,6 @@ bot.action('menu:newfeatures', async (ctx) => {
     { parse_mode: 'HTML', reply_markup: keyboard }
   );
 });
-
 bot.action('menu:premiumfeatures', async (ctx) => {
   const UIManager = require('./ui/keyboards');
   const keyboard = UIManager.premiumFeaturesKeyboard();
@@ -653,6 +650,85 @@ bot.action('menu:premiumfeatures', async (ctx) => {
     parse_mode: 'HTML',
     reply_markup: keyboard
   });
+});
+
+// --- EXTRA FEATURES ACTIONS ---
+bot.action('new:extra', async (ctx) => {
+  const UIManager = require('./ui/keyboards');
+  const keyboard = UIManager.extraFeaturesKeyboard();
+  await ctx.editMessageText(
+    '🆕 <b>المميزات الإضافية</b>\n\n' +
+      '📖 <b>تفسير القرآن</b> - فهم معاني الآيات\n' +
+      '🎵 <b>دروس التجويد</b> - تعلم أحكام التجويد\n' +
+      '❓ <b>اختبار قرآني</b> - اختبر معلوماتك القرآنية\n\n' +
+      '🌅 <b>أذكار الصباح</b> - ابدأ يومك بالذكر\n' +
+      '🌙 <b>أذكار المساء</b> - اختم يومك بالذكر\n' +
+      '🤲 <b>عداد الاستغفار</b> - احصِ استغفارك\n' +
+      '📿 <b>السبحة الرقمية</b> - سبّح الله\n\n' +
+      '🎯 <b>لعبة المعلومات</b> - معلومات إسلامية\n' +
+      '🧩 <b>لعبة الكلمات</b> - ألغاز قرآنية\n' +
+      '🔍 <b>تحديد السورة</b> - خمّن السورة\n' +
+      '🏁 <b>سباق الحفظ</b> - تنافس في الحفظ',
+    { parse_mode: 'HTML', reply_markup: keyboard }
+  );
+});
+
+// Quran Features
+bot.action('feature:tafsir', async (ctx) => {
+  const NewFeaturesHandler = require('./commands/newFeaturesHandler');
+  await NewFeaturesHandler.handleTafsir(ctx);
+});
+
+bot.action('feature:tajweed', async (ctx) => {
+  const NewFeaturesHandler = require('./commands/newFeaturesHandler');
+  await NewFeaturesHandler.handleTajweed(ctx);
+});
+
+bot.action('feature:qquiz', async (ctx) => {
+  const NewFeaturesHandler = require('./commands/newFeaturesHandler');
+  await NewFeaturesHandler.handleQuranQuiz(ctx);
+});
+
+// Adhkar Features
+bot.action('feature:morning', async (ctx) => {
+  const NewFeaturesHandler = require('./commands/newFeaturesHandler');
+  await NewFeaturesHandler.handleMorningAdhkar(ctx);
+});
+
+bot.action('feature:evening', async (ctx) => {
+  const NewFeaturesHandler = require('./commands/newFeaturesHandler');
+  await NewFeaturesHandler.handleEveningAdhkar(ctx);
+});
+
+bot.action('feature:istighfar', async (ctx) => {
+  const NewFeaturesHandler = require('./commands/newFeaturesHandler');
+  await NewFeaturesHandler.handleIstighfar(ctx);
+});
+
+bot.action('feature:tasbih', async (ctx) => {
+  const NewFeaturesHandler = require('./commands/newFeaturesHandler');
+  await NewFeaturesHandler.handleTasbih(ctx);
+});
+
+// Games Features
+bot.action('feature:trivia', async (ctx) => {
+  const NewFeaturesHandler = require('./commands/newFeaturesHandler');
+  await NewFeaturesHandler.handleTriviaGame(ctx);
+});
+
+bot.action('feature:puzzle', async (ctx) => {
+  const NewFeaturesHandler = require('./commands/newFeaturesHandler');
+  await NewFeaturesHandler.handleWordPuzzle(ctx);
+});
+
+bot.action('feature:surah', async (ctx) => {
+  const NewFeaturesHandler = require('./commands/newFeaturesHandler');
+  await NewFeaturesHandler.handleSurahGame(ctx);
+});
+
+bot.action('feature:race', async (ctx) => {
+  const NewFeaturesHandler = require('./commands/newFeaturesHandler');
+  await NewFeaturesHandler.handleRacingGame(ctx);
 });
 
 // --- NEW QGAMES ACTIONS ---

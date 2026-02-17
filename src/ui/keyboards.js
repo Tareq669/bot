@@ -575,7 +575,10 @@ class UIManager {
   static newFeaturesMenuKeyboard() {
     return Markup.inlineKeyboard([
       [
-        Markup.button.callback('🎮 الألعاب القرآنية', 'new:qgames'),
+        Markup.button.callback('🆕 مميزات إضافية', 'new:extra')
+      ],
+      [
+        Markup.button.callback('� الألعاب القرآنية', 'new:qgames'),
         Markup.button.callback('🛍️ المتجر', 'new:shop')
       ],
       [
@@ -595,6 +598,38 @@ class UIManager {
       ],
       [
         Markup.button.callback('⬅️ رجوع', 'menu:main')
+      ]
+    ]);
+  }
+
+  // Extra Features Keyboard
+  static extraFeaturesKeyboard() {
+    return Markup.inlineKeyboard([
+      [
+        Markup.button.callback('📖 تفسير القرآن', 'feature:tafsir'),
+        Markup.button.callback('🎵 دروس التجويد', 'feature:tajweed')
+      ],
+      [
+        Markup.button.callback('❓ اختبار قرآني', 'feature:qquiz')
+      ],
+      [
+        Markup.button.callback('🌅 أذكار الصباح', 'feature:morning'),
+        Markup.button.callback('🌙 أذكار المساء', 'feature:evening')
+      ],
+      [
+        Markup.button.callback('🤲 عداد الاستغفار', 'feature:istighfar'),
+        Markup.button.callback('📿 السبحة الرقمية', 'feature:tasbih')
+      ],
+      [
+        Markup.button.callback('🎯 لعبة المعلومات', 'feature:trivia'),
+        Markup.button.callback('🧩 لعبة الكلمات', 'feature:puzzle')
+      ],
+      [
+        Markup.button.callback('🔍 تحديد السورة', 'feature:surah'),
+        Markup.button.callback('🏁 سباق الحفظ', 'feature:race')
+      ],
+      [
+        Markup.button.callback('⬅️ رجوع', 'menu:newfeatures')
       ]
     ]);
   }
