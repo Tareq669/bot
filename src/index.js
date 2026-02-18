@@ -11,6 +11,7 @@ const EconomyHandler = require('./commands/economyHandler');
 const ContentHandler = require('./commands/contentHandler');
 const ProfileHandler = require('./commands/profileHandler');
 const GroupProtection = require('./commands/groupCommands');
+const GroupController = require('./controllers/groupController');
 const { logger } = require('./utils/helpers');
 const ReconnectManager = require('./utils/reconnect');
 const connectionMonitor = require('./utils/connectionMonitor');
@@ -112,6 +113,9 @@ bot.command('teams', (ctx) => CommandHandler.handleTeams(ctx));
 
 // --- GROUP PROTECTION COMMANDS ---
 GroupProtection.registerProtectionCommands(bot);
+
+// --- GROUP CONTROLLER ---
+GroupController.registerGroupController(bot);
 
 // --- AI SMART COMMANDS ---
 bot.command('dashboard', async (ctx) => {
