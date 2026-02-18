@@ -875,12 +875,33 @@ const groupStatsSchema = new mongoose.Schema({
   generatedAt: {
     type: Date,
     default: Date.now
+  },
+
+  // الإحصائيات اليومية المباشرة (للتحديث التلقائي السريع)
+  daily: {
+    messages: {
+      type: Number,
+      default: 0
+    },
+    activeUsers: {
+      type: Number,
+      default: 0
+    },
+    interactions: {
+      type: Number,
+      default: 0
+    },
+    lastUpdated: {
+      type: Date,
+      default: Date.now
+    }
   }
 }, { minimize: false });
 
 // فهارس GroupStats
 groupStatsSchema.index({ groupId: 1, date: -1 });
 groupStatsSchema.index({ groupId: 1, period: 1, date: -1 });
+groupStatsSchema.index({ groupId: 1, 'daily.lastUpdated': -1 });
 
 /**
  * ============================================

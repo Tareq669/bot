@@ -143,6 +143,10 @@ async function handleGroupMessage(ctx, bot) {
 
   // تحديث إحصائيات الرسائل
   await updateMessageStats(groupId, message);
+
+  // تحديث الإحصائيات اليومية التلقائي
+  const isNewActivity = await checkIsNewActivityToday(groupId, userId);
+  await updateDailyStats(groupId, userId, isNewActivity);
 }
 
 /**
@@ -280,6 +284,61 @@ async function updateGroupStats(groupId, type) {
     { $inc: update },
     { upsert: true }
   );
+}
+
+/**
+ * تحديث الإحصائيات اليومية التلقائي
+ * يُستدعى عند كل رسالة في المجموعة
+ */
+async function updateDailyStats(groupId, userId, isNewActivity = false) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // تحديث عدد الرسائل اليومية
+  await GroupStats.findOneAndUpdate(
+    { groupId, date: today },
+    {
+      $inc: {
+        'daily.messages': 1,
+        'daily.interactions': 1
+      },
+      $set: {
+        'daily.lastUpdated': new Date()
+      }
+    },
+    { upsert: true }
+  );
+
+  // تحديث عدد المستخدمين النشطين (إذا كان نشاط جديد)
+  if (isNewActivity) {
+    await GroupStats.findOneAndUpdate(
+      { groupId, date: today },
+      {
+        $inc: { 'daily.activeUsers': 1 }
+      },
+      { upsert: true }
+    );
+  }
+}
+
+/**
+ * التحقق مما إذا كان المستخدم نشطاً اليوم
+ */
+async function checkIsNewActivityToday(groupId, userId) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  // البحث عن آخر نشاط للمستخدم
+  const member = await GroupMember.findOne({ userId, groupId });
+
+  if (!member || !member.lastActive) {
+    return true; // مستخدم جديد أو لم يكن نشطاً من قبل
+  }
+
+  // التحقق إذا كان آخر نشاط اليوم
+  return member.lastActive < today;
 }
 
 /**
@@ -792,5 +851,8 @@ module.exports = {
   updateFarewellSettings,
   getGroupMainKeyboard,
   getProtectionKeyboard,
-  getSettingsKeyboard
+  getSettingsKeyboard,
+  // دوال الإحصائيات الجديدة
+  updateDailyStats,
+  checkIsNewActivityToday
 };

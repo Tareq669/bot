@@ -51,6 +51,29 @@ function registerGroupCommands(bot) {
   bot.command('رتب', handleRank);
   bot.command('عاقب', handlePenalty);
   bot.command('حظر_autan', handleFakeBan);
+
+  // ============ أوامر الإحصائيات الجديدة ============
+  // أوامر الإحصائيات اليومية
+  bot.command('daily', handleDailyStats);
+  bot.command('اليوم', handleDailyStats);
+
+  // قائمة الأعضاء
+  bot.command('members', handleGroupMembersList);
+  bot.command('قائمة_الاعضاء', handleGroupMembersList);
+
+  // جدول الترتيب
+  bot.command('leaderboard', handleLeaderboard);
+  bot.command('الترتيب', handleLeaderboard);
+  bot.command('leaderboard_daily', (ctx) => handleLeaderboard(ctx, 'daily'));
+  bot.command('leaderboard_weekly', (ctx) => handleLeaderboard(ctx, 'weekly'));
+  bot.command('leaderboard_monthly', (ctx) => handleLeaderboard(ctx, 'monthly'));
+  bot.command('ترتيب_يومي', (ctx) => handleLeaderboard(ctx, 'daily'));
+  bot.command('ترتيب_أسبوعي', (ctx) => handleLeaderboard(ctx, 'weekly'));
+  bot.command('ترتيب_شهري', (ctx) => handleLeaderboard(ctx, 'monthly'));
+
+  // الملف الشخصي
+  bot.command('myprofile', handleMyProfile);
+  bot.command('ملفي', handleMyProfile);
 }
 
 /**
@@ -843,33 +866,148 @@ async function handleStats(ctx) {
 
 /**
  * عرض قائمة المتصدرين
+ * @param {Object} ctx - سياق التلجرام
+ * @param {string} period - الفترة (daily, weekly, monthly, all)
  */
-async function handleLeaderboard(ctx) {
+async function handleLeaderboard(ctx, period = 'all') {
   // التحقق من أنها مجموعة
   if (!isGroup(ctx)) {
     return sendPrivateChatError(ctx);
   }
 
   const groupId = ctx.chat.id;
+  const userId = ctx.from.id;
 
-  const topMembers = await GroupMember.find({ groupId, isActive: true })
-    .sort({ points: -1 })
-    .limit(10);
+  // تحديد عنوان الجدول حسب الفترة
+  const periodTitles = {
+    daily: 'اليوم',
+    weekly: 'هذا الأسبوع',
+    monthly: 'هذا الشهر',
+    all: 'الكل'
+  };
 
-  if (topMembers.length === 0) {
-    return ctx.reply('❌ لا توجد بيانات');
+  const title = periodTitles[period] || 'الكل';
+
+  let members;
+  let userRank = null;
+
+  if (period === 'daily') {
+    // للترتيب اليومي، نستخدم إحصائيات اليوم
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const stats = await GroupStats.findOne({ groupId, date: today });
+
+    // نستخدم قائمة topParticipants من الإحصائيات
+    const topParticipants = stats?.topParticipants || [];
+
+    // إذا لم تكن هناك بيانات، نستخدم الأعضاء النشطين
+    if (topParticipants.length === 0) {
+      members = await GroupMember.find({ groupId, isActive: true })
+        .sort({ 'activity.messagesCount': -1 })
+        .limit(10);
+    } else {
+      // تحويل topParticipants إلى شكل مماثل
+      members = topParticipants.slice(0, 10).map(p => ({
+        username: p.username,
+        points: p.messageCount,
+        userId: p.userId
+      }));
+    }
+
+    // حساب ترتيب المستخدم
+    const userIndex = topParticipants.findIndex(p => p.userId === userId);
+    if (userIndex !== -1) {
+      userRank = userIndex + 1;
+    }
+  } else if (period === 'weekly') {
+    // للأسبوع، نبحث في آخر 7 أيام
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+
+    members = await GroupMember.find({
+      groupId,
+      isActive: true,
+      'activity.lastMessageAt': { $gte: weekAgo }
+    })
+      .sort({ points: -1 })
+      .limit(10);
+
+    // حساب ترتيب المستخدم
+    const allMembers = await GroupMember.find({
+      groupId,
+      isActive: true,
+      'activity.lastMessageAt': { $gte: weekAgo }
+    })
+      .sort({ points: -1 });
+
+    const userIndex = allMembers.findIndex(m => m.userId === userId);
+    if (userIndex !== -1) {
+      userRank = userIndex + 1;
+    }
+  } else if (period === 'monthly') {
+    // للشهر، نبحث في آخر 30 يوم
+    const monthAgo = new Date();
+    monthAgo.setDate(monthAgo.getDate() - 30);
+
+    members = await GroupMember.find({
+      groupId,
+      isActive: true,
+      'activity.lastMessageAt': { $gte: monthAgo }
+    })
+      .sort({ points: -1 })
+      .limit(10);
+
+    // حساب ترتيب المستخدم
+    const allMembers = await GroupMember.find({
+      groupId,
+      isActive: true,
+      'activity.lastMessageAt': { $gte: monthAgo }
+    })
+      .sort({ points: -1 });
+
+    const userIndex = allMembers.findIndex(m => m.userId === userId);
+    if (userIndex !== -1) {
+      userRank = userIndex + 1;
+    }
+  } else {
+    // للكل (الإجمالي)
+    members = await GroupMember.find({ groupId, isActive: true })
+      .sort({ points: -1 })
+      .limit(10);
+
+    // حساب ترتيب المستخدم
+    const allMembers = await GroupMember.find({ groupId, isActive: true })
+      .sort({ points: -1 });
+
+    const userIndex = allMembers.findIndex(m => m.userId === userId);
+    if (userIndex !== -1) {
+      userRank = userIndex + 1;
+    }
   }
 
-  let text = '🏆 <b>قائمة المتصدرين</b>\n\n';
+  if (!members || members.length === 0) {
+    return ctx.reply('❌ لا توجد بيانات للترتيب');
+  }
 
-  const emojis = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
+  let text = `🏆 الترتيب العام (${title})\n\n`;
 
-  topMembers.forEach((member, index) => {
-    text += `${emojis[index]} ${member.firstName || member.username}\n`;
-    text += `   └ ${member.points} نقطة | ${member.level} مستوى\n`;
+  const emojis = ['🥇', '🥈', '🥉'];
+
+  members.forEach((member, index) => {
+    const username = member.username ? `@${member.username}` : member.firstName || 'مستخدم';
+    const points = member.points || 0;
+    const medal = index < 3 ? emojis[index] : `${index + 1}⃣`;
+
+    text += `${medal} ${index + 1}. ${username} - ${points} نقطة\n`;
   });
 
-  await ctx.reply(text, { parse_mode: 'HTML' });
+  // إضافة ترتيب المستخدم الحالي
+  if (userRank && userRank > 10) {
+    text += `\n📍 ترتيبك: ${userRank}`;
+  }
+
+  await ctx.reply(text);
 }
 
 /**
@@ -1058,6 +1196,141 @@ function extractUserId(text) {
   return null;
 }
 
+// ============ دوال الإحصائيات الجديدة ============
+
+/**
+ * عرض إحصائيات اليوم
+ * 📊 إحصائيات اليوم
+ * • 💬 الرسائل: 150
+ * • 👥 النشطون: 25
+ * • ❤️ التفاعلات: 80
+ * • 🕐 آخر تحديث: HH:MM
+ */
+async function handleDailyStats(ctx) {
+  // التحقق من أنها مجموعة
+  if (!isGroup(ctx)) {
+    return sendPrivateChatError(ctx);
+  }
+
+  const groupId = ctx.chat.id;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // جلب إحصائيات اليوم
+  const stats = await GroupStats.findOne({ groupId, date: today });
+
+  const dailyMessages = stats?.daily?.messages || 0;
+  const dailyActiveUsers = stats?.daily?.activeUsers || 0;
+  const dailyInteractions = stats?.daily?.interactions || 0;
+  const lastUpdated = stats?.daily?.lastUpdated
+    ? new Date(stats.daily.lastUpdated).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })
+    : '---';
+
+  const text = `📊 إحصائيات اليوم
+
+• 💬 الرسائل: ${dailyMessages}
+• 👥 النشطون: ${dailyActiveUsers}
+• ❤️ التفاعلات: ${dailyInteractions}
+• 🕐 آخر تحديث: ${lastUpdated}`;
+
+  await ctx.reply(text);
+}
+
+/**
+ * عرض قائمة أعضاء المجموعة
+ * 👥 أعضاء المجموعة (3)
+ * 1. 👤 اسم المستخدم @username
+ *    نقاط: 500 | joined: 2024-01-15
+ */
+async function handleGroupMembersList(ctx) {
+  // التحقق من أنها مجموعة
+  if (!isGroup(ctx)) {
+    return sendPrivateChatError(ctx);
+  }
+
+  const groupId = ctx.chat.id;
+
+  // جلب قائمة الأعضاء مرتبة حسب النقاط
+  const members = await GroupMember.find({ groupId, isActive: true })
+    .sort({ points: -1 })
+    .limit(20);
+
+  if (members.length === 0) {
+    return ctx.reply('❌ لا يوجد أعضاء مسجلين في هذه المجموعة');
+  }
+
+  let text = `👥 أعضاء المجموعة (${members.length})\n\n`;
+
+  members.forEach((member, index) => {
+    const username = member.username ? `@${member.username}` : 'بدون يوزر';
+    const joinedDate = member.joinedAt
+      ? new Date(member.joinedAt).toLocaleDateString('ar-SA')
+      : 'غير معروف';
+
+    text += `${index + 1}. 👤 ${member.firstName || 'مستخدم'} ${username}\n`;
+    text += `   نقاط: ${member.points} | انضم: ${joinedDate}\n\n`;
+  });
+
+  await ctx.reply(text);
+}
+
+/**
+ * عرض الملف الشخصي للمستخدم
+ * 👤 ملفي الشخصي
+ * • نقاطي: 500 🪙
+ * • ترتيبي: 3 🥉
+ * • انضممت: 2024-01-15 📅
+ *
+ * 📊 إحصائياتي:
+ * • الرسائل: 150 💬
+ * • التفاعلات: 80 ❤️
+ */
+async function handleMyProfile(ctx) {
+  const userId = ctx.from.id;
+  const groupId = ctx.chat?.id;
+
+  // إذا لم تكن في مجموعة، اعرض رسالة خطأ
+  if (!groupId) {
+    return ctx.reply('⚠️ يرجى استخدام هذا الأمر في مجموعة');
+  }
+
+  // جلب بيانات المستخدم من المجموعة
+  const member = await GroupMember.findOne({ userId, groupId });
+
+  if (!member) {
+    return ctx.reply('❌ لم يتم العثور على بياناتك في هذه المجموعة');
+  }
+
+  // حساب الترتيب
+  const rank = await GroupMember.countDocuments({
+    groupId,
+    isActive: true,
+    points: { $gt: member.points }
+  }) + 1;
+
+  // تنسيق التاريخ
+  const joinedDate = member.joinedAt
+    ? new Date(member.joinedAt).toLocaleDateString('ar-SA')
+    : 'غير معروف';
+
+  // medals for rank
+  const rankMedal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '';
+
+  const text = `👤 ملفي الشخصي
+
+• نقاطي: ${member.points} 🪙
+• ترتيبي: ${rank} ${rankMedal}
+• انضممت: ${joinedDate} 📅
+
+📊 إحصائياتي:
+• الرسائل: ${member.activity?.messagesCount || 0} 💬
+• الميديا: ${member.activity?.mediaCount || 0} 📷
+• المستوي: ${member.level} ⭐
+• الخبرة: ${member.xp} ✨`;
+
+  await ctx.reply(text);
+}
+
 /**
  * لوحة الإعدادات
  */
@@ -1102,5 +1375,9 @@ module.exports = {
   handlePenalty,
   handleFakeBan,
   handleOwner,
-  handleRefreshAdmins
+  handleRefreshAdmins,
+  // دوال الإحصائيات الجديدة
+  handleDailyStats,
+  handleGroupMembersList,
+  handleMyProfile
 };
