@@ -175,7 +175,6 @@ class ProtectionManager {
     const chatId = ctx.chat.id;
     const userId = ctx.from?.id;
     const messageText = ctx.message?.text || '';
-    const message = ctx.message;
 
     if (!userId) return;
 

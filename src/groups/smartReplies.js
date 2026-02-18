@@ -188,7 +188,6 @@ class SmartRepliesManager {
     const userId = ctx.from?.id;
     const userName = ctx.from?.first_name || ctx.from?.username || 'مستخدم';
     const messageText = ctx.message?.text || '';
-    const messageId = ctx.message?.message_id;
 
     // التحقق من صلاحيات الأدمن
     const isAdmin = await this.isUserAdmin(ctx, userId);
@@ -440,7 +439,7 @@ class SmartRepliesManager {
     replyList += `عدد الردود: ${settings.replies.length}\n`;
     replyList += '━━━━━━━━━━━━━━━━━━\n\n';
 
-    settings.replies.forEach((reply, index) => {
+    settings.replies.forEach((reply) => {
       const keywords = reply.keywords.join(', ');
       const shortReply = reply.replyText.length > 50
         ? `${reply.replyText.substring(0, 50)  }...`

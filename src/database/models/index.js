@@ -1,5 +1,3 @@
-const mongoose = require('mongoose');
-
 const User = require('./User');
 const Group = require('./Group');
 const Transaction = require('./Transaction');

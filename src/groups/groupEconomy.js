@@ -298,10 +298,8 @@ async function pay(ctx, targetUsername, amount) {
 
     // إذا بدأ بـ @ يتم البحث عن العضو في المجموعة
     if (targetUsername.startsWith('@')) {
-      const username = targetUsername.substring(1).toLowerCase();
-
       // البحث في الأعضاء
-      const targetMember = await GroupMember.findOne({
+      await GroupMember.findOne({
         groupId,
         $or: [
           { userId: senderId } // هذا للتوضيح فقط، سنبحث بطريقة أخرى

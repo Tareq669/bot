@@ -80,8 +80,6 @@ class GroupPanel {
    * إعداد المعالجات الخاصة بالـ callbacks
    */
   setupCallbacks() {
-    const { Markup } = require('telegraf');
-
     // لوحة التحكم الرئيسية
     this.bot.action('group:panel', async (ctx) => {
       await ctx.answerCbQuery();
@@ -289,7 +287,6 @@ class GroupPanel {
    */
   async notifyAdminsAboutPermissions(ctx) {
     try {
-      const chatId = ctx.chat.id;
       const chatTitle = ctx.chat.title;
 
       const message = `
@@ -403,7 +400,7 @@ class GroupPanel {
       }
 
       const chatId = ctx.chat.id;
-      const settings = await this.getGroupSettings(chatId);
+      await this.getGroupSettings(chatId);
 
       const { Markup } = require('telegraf');
 

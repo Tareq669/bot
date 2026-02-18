@@ -217,7 +217,7 @@ async function startGuessGame(ctx) {
   activeGames.set(groupId, gameData);
 
   // إرسال رسالة اللعبة
-  const gameMessage = await ctx.reply(
+  await ctx.reply(
     'لعبة تخمين الرقم!\n\n' +
     `اخترت الرقم بين ${  GAME_CONFIG.GUESS_MIN  } و ${  GAME_CONFIG.GUESS_MAX  }\n` +
     `المكافأة: ${  GAME_CONFIG.GUESS_REWARD  } Coins\n` +

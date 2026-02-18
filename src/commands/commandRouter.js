@@ -82,7 +82,6 @@ class CommandRouter {
    */
   static async routeCommand(ctx, command, handler) {
     const chatType = ctx.chat.type;
-    const commandLower = command.toLowerCase();
 
     // فحص نوع المحادثة
     if (chatType === 'private') {
