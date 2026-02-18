@@ -2002,29 +2002,7 @@ bot.action('leaderboard:level', async (ctx) => {
 });
 
 // --- SMART STATS & REWARDS HANDLERS ---
-bot.action('stats:view', async (ctx) => {
-  try {
-    const user = await user.findOne({ userId: ctx.from.id });
-    if (!user) {
-      return ctx.answerCbQuery('❌ لم يتم العثور على ملفك');
-    }
-
-    const statsMessage = Formatter.formatSmartStats(user);
-    await ctx.editMessageText(
-      statsMessage,
-      {
-        parse_mode: 'HTML',
-        reply_markup: Markup.inlineKeyboard([
-          [Markup.button.callback('🎯 المهام اليومية', 'quests:daily')],
-          [Markup.button.callback('🏅 الإنجازات', 'achievements:view')],
-          [Markup.button.callback('⬅️ رجوع', 'menu:main')]
-        ]).reply_markup
-      }
-    );
-  } catch (error) {
-    ctx.answerCbQuery('❌ خطأ في التحديث');
-  }
-});
+// Note: stats:view is already registered at line 1387
 
 // --- AI ACHIEVEMENTS & NOTIFICATIONS ---
 bot.action('achievements:view', async (ctx) => {
@@ -2096,140 +2074,9 @@ bot.action('behavior:analyze', async (ctx) => {
   }
 });
 
-// --- SMART STATS & REWARDS HANDLERS ---
-bot.action('stats:view', async (ctx) => {
-  try {
-    const user = await user.findOne({ userId: ctx.from.id });
-    if (!user) {
-      return ctx.answerCbQuery('❌ لم يتم العثور على ملفك');
-    }
-
-    const statsMessage = Formatter.formatSmartStats(user);
-    await ctx.editMessageText(
-      statsMessage,
-      Markup.inlineKeyboard([
-        [Markup.button.callback('🏅 الإنجازات', 'achievements:view')],
-        [Markup.button.callback('⬅️ رجوع', 'menu:main')]
-      ])
-    );
-  } catch (error) {
-    ctx.answerCbQuery('❌ خطأ في التحديث');
-  }
-});
-
-bot.action('rewards:daily', async (ctx) => {
-  try {
-    const user = await user.findOne({ userId: ctx.from.id });
-    if (!user) return ctx.answerCbQuery('❌ خطأ');
-
-    const lastDaily = new Date(user.lastDailyReward);
-    const now = new Date();
-    const hoursDiff = (now - lastDaily) / (1000 * 60 * 60);
-
-    if (hoursDiff >= 24) {
-      const reward = 50;
-      user.coins += reward;
-      user.xp += 10;
-      user.lastDailyReward = new Date();
-      await user.save();
-
-      await ctx.editMessageText(
-        `🎁 **مكافأتك اليومية**
-
-✅ حصلت على:
-• 💰 ${reward} عملة
-• ⭐ 10 نقاط
-
-العودة غداً لأخذ المكافأة التالية!`,
-        Markup.inlineKeyboard([[Markup.button.callback('⬅️ رجوع', 'menu:main')]])
-      );
-    } else {
-      const hoursLeft = Math.ceil(24 - hoursDiff);
-      await ctx.answerCbQuery(`⏰ العودة في ${hoursLeft} ساعة`);
-    }
-  } catch (error) {
-    ctx.answerCbQuery('❌ خطأ');
-  }
-});
-
-bot.action('achievements:view', async (ctx) => {
-  try {
-    const user = await user.findOne({ userId: ctx.from.id });
-    const achievementsMsg = Formatter.formatAchievements(user);
-
-    await ctx.editMessageText(
-      achievementsMsg,
-      Markup.inlineKeyboard([
-        [Markup.button.callback('📊 الإحصائيات', 'stats:view')],
-        [Markup.button.callback('⬅️ رجوع', 'menu:main')]
-      ])
-    );
-  } catch (error) {
-    ctx.answerCbQuery('❌ خطأ');
-  }
-});
-
-bot.action('quests:daily', async (ctx) => {
-  try {
-    const user = await user.findOne({ userId: ctx.from.id });
-    const questsMsg = Formatter.formatDailyQuests(user);
-
-    await ctx.editMessageText(
-      questsMsg,
-      Markup.inlineKeyboard([
-        [Markup.button.callback('🎮 الألعاب', 'menu:games')],
-        [Markup.button.callback('📖 الختمة', 'menu:khatma')],
-        [Markup.button.callback('⬅️ رجوع', 'menu:main')]
-      ])
-    );
-  } catch (error) {
-    ctx.answerCbQuery('❌ خطأ');
-  }
-});
-
-// --- KHATMA ACTIONS ---
-bot.action('khatma:add5', async (ctx) => {
-  const user = await user.findOne({ userId: ctx.from.id });
-  if (user && user.khatmaProgress.currentPage < 604) {
-    const pagesToAdd = Math.min(5, 604 - user.khatmaProgress.currentPage);
-    user.khatmaProgress.currentPage += pagesToAdd;
-    user.khatmaProgress.percentComplete = Math.round((user.khatmaProgress.currentPage / 604) * 100);
-    user.khatmaProgress.lastRead = new Date();
-    user.xp += pagesToAdd * 2;
-    await user.save();
-    await ctx.answerCbQuery(`✅ تم إضافة ${pagesToAdd} صفحات!`);
-  }
-  await MenuHandler.handleKhatmaMenu(ctx);
-});
-
-bot.action('khatma:addpage', async (ctx) => {
-  const user = await user.findOne({ userId: ctx.from.id });
-  if (user && user.khatmaProgress.currentPage < 604) {
-    user.khatmaProgress.currentPage += 1;
-    user.khatmaProgress.percentComplete = Math.round((user.khatmaProgress.currentPage / 604) * 100);
-    user.khatmaProgress.lastRead = new Date();
-    user.xp += 2;
-    await user.save();
-    await ctx.answerCbQuery('✅ تم إضافة صفحة! +2 نقاط');
-  }
-  await MenuHandler.handleKhatmaMenu(ctx);
-});
-
-bot.action('khatma:reset', async (ctx) => {
-  const user = await user.findOne({ userId: ctx.from.id });
-  if (user && user.khatmaProgress.currentPage >= 604) {
-    user.khatmaProgress.currentPage = 1;
-    user.khatmaProgress.percentComplete = 0;
-    user.khatmaProgress.completionCount += 1;
-    user.khatmaProgress.startDate = new Date();
-    user.xp += 100;
-    user.coins += 50;
-    await user.save();
-    await ctx.answerCbQuery('✅ مبروك! أكملت الختمة! +100 نقطة + 50 عملة');
-  } else {
-    await ctx.answerCbQuery('❌ لم تكملها بعد!');
-  }
-});
+// Note: stats:view is already registered at line 1387
+// Note: rewards:daily, achievements:view, quests:daily are already registered above
+// Note: khatma:add5, khatma:addpage, khatma:reset are already registered above
 
 // --- SMART CONTENT HANDLERS ---
 bot.action('adhkar:favorite', async (ctx) => {
