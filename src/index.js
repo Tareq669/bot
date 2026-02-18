@@ -6,8 +6,6 @@ const Database = require('./database/db');
 const CommandHandler = require('./commands/commandHandler');
 const MenuHandler = require('./commands/menuHandler');
 const GameHandler = require('./commands/gameHandler');
-const GroupHandlers = require('./handlers/groupHandlers');
-const GroupCommands = require('./commands/groupCommands');
 const QuranicGamesHandler = require('./commands/quranicGamesHandler');
 const EconomyHandler = require('./commands/economyHandler');
 const ContentHandler = require('./commands/contentHandler');
@@ -111,28 +109,6 @@ bot.command('referral', (ctx) => CommandHandler.handleReferral(ctx));
 bot.command('events', (ctx) => CommandHandler.handleEvents(ctx));
 bot.command('library', (ctx) => CommandHandler.handleLibrary(ctx));
 bot.command('teams', (ctx) => CommandHandler.handleTeams(ctx));
-
-// --- GROUP MANAGEMENT COMMANDS ---
-bot.command('اعدادات', (ctx) => GroupCommands.handleSettings(ctx));
-bot.command('معلومات_المجموعة', (ctx) => GroupCommands.handleGroupInfo(ctx));
-bot.command('الاعضاء', (ctx) => GroupCommands.handleMembers(ctx));
-bot.command('الادمنز', (ctx) => GroupCommands.handleAdmins(ctx));
-bot.command('حماية', (ctx) => GroupCommands.handleProtection(ctx));
-bot.command('ترحيب', (ctx) => GroupCommands.handleWelcome(ctx));
-bot.command('وداع', (ctx) => GroupCommands.handleFarewell(ctx));
-bot.command('قواعد', (ctx) => GroupCommands.handleRules(ctx));
-bot.command('احصائيات', (ctx) => GroupCommands.handleStats(ctx));
-bot.command('ترتيب', (ctx) => GroupCommands.handleLeaderboard(ctx));
-bot.command('نقاطي', (ctx) => GroupCommands.handleMyPoints(ctx));
-bot.command('رفع', (ctx) => GroupCommands.handlePromote(ctx));
-bot.command('تنزيل', (ctx) => GroupCommands.handleDemote(ctx));
-bot.command('طرد', (ctx) => GroupCommands.handleKick(ctx));
-bot.command('حظر', (ctx) => GroupCommands.handleBan(ctx));
-bot.command('كتم', (ctx) => GroupCommands.handleMute(ctx));
-bot.command('الغاء_حظر', (ctx) => GroupCommands.handleUnban(ctx));
-bot.command('الغاء_الكتم', (ctx) => GroupCommands.handleUnmute(ctx));
-bot.command('مالك', (ctx) => GroupCommands.handleOwner(ctx));
-bot.command('تحديث_الادمنز', (ctx) => GroupCommands.handleRefreshAdmins(ctx));
 
 // --- AI SMART COMMANDS ---
 bot.command('dashboard', async (ctx) => {
@@ -1386,26 +1362,6 @@ bot.hears('🔔 الإشعارات الذكية', (ctx) => MenuHandler.handleSma
 bot.hears('📁 النسخ الاحتياطية', (ctx) => MenuHandler.handleBackupsMenu(ctx));
 bot.hears('⚡ التخزين المؤقت', (ctx) => MenuHandler.handleCacheMenu(ctx));
 bot.hears('🛡️ حماية من الإساءة', (ctx) => MenuHandler.handleProtectionMenu(ctx));
-
-// --- GROUP KEYBOARD BUTTON HANDLERS ---
-bot.hears('📊 إحصائيات المجموعة', (ctx) => CommandHandler.handleGroupStats(ctx));
-bot.hears('👥 الأعضاء', (ctx) => CommandHandler.handleGroupMembers(ctx));
-bot.hears('👮 الأدمنز', (ctx) => CommandHandler.handleGroupAdmins(ctx));
-bot.hears('🛡️ الحماية', (ctx) => CommandHandler.handleGroupProtection(ctx));
-bot.hears('⚙️ الإعدادات', async (ctx) => {
-  const { isGroup, isAdmin, sendPrivateChatError, sendNotAdminError } = require('./utils/groupHelper');
-  if (!isGroup(ctx)) {
-    return sendPrivateChatError(ctx);
-  }
-  const adminStatus = await isAdmin(ctx, ctx.telegram);
-  if (!adminStatus) {
-    return sendNotAdminError(ctx);
-  }
-  return CommandHandler.handleGroupSettings(ctx);
-});
-bot.hears('📋 القواعد', (ctx) => CommandHandler.handleGroupRules(ctx));
-bot.hears('🏆 الترتيب', (ctx) => CommandHandler.handleLeaderboard(ctx));
-bot.hears('⭐ نقاطي', (ctx) => CommandHandler.handleMyPoints(ctx));
 
 // --- TEXT HANDLER FOR QURANIC GAMES (AFTER hears) ---
 bot.on('text', async (ctx, next) => {
@@ -2888,10 +2844,6 @@ const botStart = async () => {
           logger.info('✅ تم تشغيل البوت بنجاح!');
           logger.info('✅ البوت يعمل الآن!');
           logger.info('🎯 البوت مستعد و ينتظر الرسائل...');
-
-          // تهيئة معالجات المجموعات
-          GroupHandlers.initGroupHandlers(bot);
-          logger.info('✅ تم تهيئة نظام إدارة المجموعات');
         })
         .catch((error) => {
           logger.error('❌ فشل في بدء البوت:', error.message);
