@@ -11,6 +11,12 @@ const EconomyHandler = require('./commands/economyHandler');
 const ContentHandler = require('./commands/contentHandler');
 const ProfileHandler = require('./commands/profileHandler');
 const GroupProtection = require('./commands/groupCommands');
+const GroupRules = require('./commands/groupRules');
+const WelcomeFarewell = require('./commands/welcomeFarewell');
+const ScheduledMessages = require('./commands/scheduledMessages');
+const KeywordAlerts = require('./commands/keywordAlerts');
+const Permissions = require('./commands/permissions');
+const AdminPanel = require('./commands/adminPanel');
 const { logger } = require('./utils/helpers');
 const ReconnectManager = require('./utils/reconnect');
 const connectionMonitor = require('./utils/connectionMonitor');
@@ -39,7 +45,7 @@ const bot = new Telegraf(process.env.BOT_TOKEN, {
   polling: {
     timeout: 30,
     limit: 100,
-    allowedUpdates: ['message', 'callback_query', 'inline_query']
+    allowedUpdates: ['message', 'callback_query', 'inline_query', 'chat_member']
   }
 });
 
@@ -62,7 +68,26 @@ bot.telegram
     { command: 'profile', description: '👤 حسابي' },
     { command: 'leaderboard', description: '🏆 المتصدرين' },
     { command: 'notifications', description: '🔔 الإشعارات' },
-    { command: 'help', description: '❓ المساعدة' }
+    { command: 'help', description: '❓ المساعدة' },
+    // أوامر التحذيرات
+    { command: 'تحذير', description: '⚠️ تحذير مستخدم' },
+    { command: 'رفع_تحذير', description: '✅ رفع تحذير' },
+    { command: 'تحذيراتي', description: '📋 تحذيراتي' },
+    { command: 'تحذيرات', description: '📋 تحذيرات مستخدم' },
+    { command: 'مسح_التحذيرات', description: '🗑️ مسح التحذيرات' },
+    { command: 'حد_التحذيرات', description: '⚙️ حد التحذيرات' },
+    { command: 'اجراء_تلقائي', description: '🔧 الإجراء التلقائي' },
+    // أوامر القواعد والترحيب
+    { command: 'قواعد', description: '📋 قواعد المجموعة' },
+    { command: 'تعيين_قواعد', description: '📝 تعيين القواعد' },
+    { command: 'مسح_القواعد', description: '🗑️ مسح القواعد' },
+    { command: 'طلب_قبول', description: '⚠️ طلب قبول القواعد' },
+    { command: 'ترحيب', description: '👋 رسالة الترحيب' },
+    { command: 'وداع', description: '👋 رسالة الوداع' },
+    { command: 'ترحيب_تشغيل', description: '✅ تفعيل الترحيب' },
+    { command: 'ترحيب_إيقاف', description: '❌ إيقاف الترحيب' },
+    { command: 'وداع_تشغيل', description: '✅ تفعيل الوداع' },
+    { command: 'وداع_إيقاف', description: '❌ إيقاف الوداع' }
   ])
   .catch((err) => {
     logger.error('خطأ في تعيين قائمة الأوامر:', err);
@@ -112,6 +137,184 @@ bot.command('teams', (ctx) => CommandHandler.handleTeams(ctx));
 
 // --- GROUP PROTECTION COMMANDS ---
 GroupProtection.registerProtectionCommands(bot);
+GroupProtection.registerWarningCommands(bot);
+
+// --- GROUP RULES COMMANDS ---
+bot.command('قواعد', (ctx) => GroupRules.handleRulesCommand(ctx));
+bot.command('تعيين_قواعد', (ctx) => GroupRules.handleRulesCommand(ctx));
+bot.command('مسح_القواعد', (ctx) => GroupRules.handleRulesCommand(ctx));
+bot.command('طلب_قبول', (ctx) => GroupRules.handleRulesCommand(ctx));
+
+// --- WELCOME/FAREWELL COMMANDS ---
+bot.command('ترحيب', (ctx) => WelcomeFarewell.handleWelcomeFarewellCommand(ctx));
+bot.command('وداع', (ctx) => WelcomeFarewell.handleWelcomeFarewellCommand(ctx));
+bot.command('ترحيب_تشغيل', (ctx) => WelcomeFarewell.handleWelcomeFarewellCommand(ctx));
+bot.command('ترحيب_إيقاف', (ctx) => WelcomeFarewell.handleWelcomeFarewellCommand(ctx));
+bot.command('وداع_تشغيل', (ctx) => WelcomeFarewell.handleWelcomeFarewellCommand(ctx));
+bot.command('وداع_إيقاف', (ctx) => WelcomeFarewell.handleWelcomeFarewellCommand(ctx));
+
+// --- PERMISSIONS COMMANDS ---
+bot.command('الاذونات', (ctx) => Permissions.permissionsCommands.عرضالأذونات(ctx));
+bot.command('permissions', (ctx) => Permissions.permissionsCommands.showPermissions(ctx));
+bot.command('تحديث_الاذونات', (ctx) => Permissions.permissionsCommands.تحديثالأذونات(ctx));
+bot.command('updatepermissions', (ctx) => Permissions.permissionsCommands.updatePermissionsCommand(ctx));
+bot.command('تحديث_الاذونات', (ctx) => Permissions.permissionsCommands.تحديثالأذونات(ctx));
+bot.command('resetpermissions', (ctx) => Permissions.permissionsCommands.resetPermissionsCommand(ctx));
+
+// --- ADMIN PANEL COMMANDS ---
+bot.command('لوحة_التحكم', (ctx) => AdminPanel.لوحةالتحكم(ctx));
+bot.command('adminpanel', (ctx) => AdminPanel.adminPanelMain(ctx));
+bot.command('اعدادات_المجموعة', (ctx) => AdminPanel.اعداداتالمجموعة(ctx));
+bot.command('groupsettings', (ctx) => AdminPanel.adminSettingsPanel(ctx));
+
+// --- CALLBACK QUERY HANDLER FOR RULES ---
+bot.on('callback_query', async (ctx) => {
+  try {
+    await GroupRules.handleRulesAcceptance(ctx);
+    await AdminPanel.handleAdminCallback(ctx);
+  } catch (error) {
+    console.error('Error in callback query:', error);
+  }
+});
+
+// --- MEMBER JOIN/LEAVE HANDLERS ---
+bot.on('new_chat_members', async (ctx) => {
+  try {
+    const newMembers = ctx.message.new_chat_members;
+    for (const newMember of newMembers) {
+      // Don't welcome the bot itself
+      if (newMember.id === ctx.botInfo.id) continue;
+
+      // Send welcome message
+      const welcomeData = await WelcomeFarewell.sendWelcomeMessage(ctx, newMember);
+      if (welcomeData) {
+        await ctx.reply(welcomeData.text, {
+          parse_mode: welcomeData.parse_mode
+        });
+      }
+
+      // Check for rules acceptance
+      const rulesData = await GroupRules.checkRulesOnJoin(ctx, newMember);
+      if (rulesData) {
+        await ctx.reply(rulesData.text, {
+          parse_mode: rulesData.parse_mode,
+          reply_markup: rulesData.keyboard
+        });
+      }
+    }
+  } catch (error) {
+    console.error('Error in new_chat_members handler:', error);
+  }
+});
+
+bot.on('left_chat_member', async (ctx) => {
+  try {
+    const leftMember = ctx.message.left_chat_member;
+
+    // Don't send farewell for the bot itself
+    if (leftMember.id === ctx.botInfo.id) return;
+
+    // Send farewell message
+    const farewellData = await WelcomeFarewell.sendFarewellMessage(ctx, leftMember);
+    if (farewellData) {
+      await ctx.reply(farewellData.text, {
+        parse_mode: farewellData.parse_mode
+      });
+    }
+  } catch (error) {
+    console.error('Error in left_chat_member handler:', error);
+  }
+});
+
+// --- KEYWORD ALERTS COMMANDS ---
+bot.command('تنبيه_إضافة', async (ctx) => {
+  try {
+    const keyword = ctx.message.text.replace('/تنبيه_إضافة', '').trim();
+    if (!keyword) {
+      return ctx.reply('❌ يرجى إدخال الكلمة المفتاحية\nمثال: /تنبيه_إضافة كلمة');
+    }
+    await KeywordAlerts.addKeyword(ctx, keyword, 'notify');
+  } catch (error) {
+    console.error('Error in /تنبيه_إضافة:', error);
+    ctx.reply('❌ حدث خطأ');
+  }
+});
+
+bot.command('تنبيه_حذف', async (ctx) => {
+  try {
+    const keyword = ctx.message.text.replace('/تنبيه_حذف', '').trim();
+    if (!keyword) {
+      return ctx.reply('❌ يرجى إدخال الكلمة المفتاحية\nمثال: /تنبيه_حذف كلمة');
+    }
+    await KeywordAlerts.removeKeyword(ctx, keyword);
+  } catch (error) {
+    console.error('Error in /تنبيه_حذف:', error);
+    ctx.reply('❌ حدث خطأ');
+  }
+});
+
+bot.command('التنبيهات', async (ctx) => {
+  try {
+    await KeywordAlerts.listKeywords(ctx);
+  } catch (error) {
+    console.error('Error in /التنبيهات:', error);
+    ctx.reply('❌ حدث خطأ');
+  }
+});
+
+bot.command('تنبيهات_تشغيل', async (ctx) => {
+  try {
+    await KeywordAlerts.toggleKeywordAlerts(ctx, true);
+  } catch (error) {
+    console.error('Error in /تنبيهات_تشغيل:', error);
+    ctx.reply('❌ حدث خطأ');
+  }
+});
+
+bot.command('تنبيهات_إيقاف', async (ctx) => {
+  try {
+    await KeywordAlerts.toggleKeywordAlerts(ctx, false);
+  } catch (error) {
+    console.error('Error in /تنبيهات_إيقاف:', error);
+    ctx.reply('❌ حدث خطأ');
+  }
+});
+
+// English aliases
+bot.command('addkeyword', async (ctx) => {
+  try {
+    const keyword = ctx.message.text.replace('/addkeyword', '').trim();
+    if (!keyword) {
+      return ctx.reply('❌ Please enter keyword\nExample: /addkeyword word');
+    }
+    await KeywordAlerts.addKeyword(ctx, keyword, 'notify');
+  } catch (error) {
+    console.error('Error in /addkeyword:', error);
+    ctx.reply('❌ Error');
+  }
+});
+
+bot.command('removekeyword', async (ctx) => {
+  try {
+    const keyword = ctx.message.text.replace('/removekeyword', '').trim();
+    if (!keyword) {
+      return ctx.reply('❌ Please enter keyword\nExample: /removekeyword word');
+    }
+    await KeywordAlerts.removeKeyword(ctx, keyword);
+  } catch (error) {
+    console.error('Error in /removekeyword:', error);
+    ctx.reply('❌ Error');
+  }
+});
+
+bot.command('keywords', async (ctx) => {
+  try {
+    await KeywordAlerts.listKeywords(ctx);
+  } catch (error) {
+    console.error('Error in /keywords:', error);
+    ctx.reply('❌ Error');
+  }
+});
 
 // --- AI SMART COMMANDS ---
 bot.command('dashboard', async (ctx) => {
@@ -331,6 +534,70 @@ bot.command('givecoins', async (ctx) => {
 // --- OWNER ONLY COMMANDS ---
 bot.command('owner', (ctx) => CommandHandler.handleOwnerPanel(ctx));
 bot.command('panel', (ctx) => CommandHandler.handleOwnerPanel(ctx));
+
+// --- SCHEDULED MESSAGES COMMANDS ---
+bot.command('جدولة', async (ctx) => {
+  try {
+    const match = ctx.message.text.replace('/جدولة', '').trim();
+    await ScheduledMessages.handleScheduleCommand(ctx, match, 'once');
+  } catch (error) {
+    console.error('Error in /جدولة command:', error);
+    await ctx.reply('❌ حدث خطأ');
+  }
+});
+
+bot.command('جدولة_يومي', async (ctx) => {
+  try {
+    const match = ctx.message.text.replace('/جدولة_يومي', '').trim();
+    await ScheduledMessages.handleScheduleCommand(ctx, match, 'daily');
+  } catch (error) {
+    console.error('Error in /جدولة_يومي command:', error);
+    await ctx.reply('❌ حدث خطأ');
+  }
+});
+
+bot.command('جدولة_أسبوعي', async (ctx) => {
+  try {
+    const match = ctx.message.text.replace('/جدولة_أسبوعي', '').trim();
+    await ScheduledMessages.handleScheduleCommand(ctx, match, 'weekly');
+  } catch (error) {
+    console.error('Error in /جدولة_أسبوعي command:', error);
+    await ctx.reply('❌ حدث خطأ');
+  }
+});
+
+bot.command('جدولة_شهري', async (ctx) => {
+  try {
+    const match = ctx.message.text.replace('/جدولة_شهري', '').trim();
+    await ScheduledMessages.handleScheduleCommand(ctx, match, 'monthly');
+  } catch (error) {
+    console.error('Error in /جدولة_شهري command:', error);
+    await ctx.reply('❌ حدث خطأ');
+  }
+});
+
+bot.command('الرسائل_المجدولة', async (ctx) => {
+  try {
+    await ScheduledMessages.listScheduledMessages(ctx);
+  } catch (error) {
+    console.error('Error in /الرسائل_المجدولة command:', error);
+    await ctx.reply('❌ حدث خطأ');
+  }
+});
+
+bot.command('حذف_مجدول', async (ctx) => {
+  try {
+    const messageId = ctx.message.text.replace('/حذف_مجدول', '').trim();
+    if (!messageId) {
+      await ctx.reply('Usage: /حذف_مجدول [number]')
+      return;
+    }
+    await ScheduledMessages.deleteScheduledMessage(ctx, messageId);
+  } catch (error) {
+    console.error('Error in /حذف_مجدول command:', error);
+    await ctx.reply('❌ حدث خطأ');
+  }
+});
 
 // --- OWNER ACTIONS ---
 bot.action('owner:panel', (ctx) => CommandHandler.handleOwnerPanel(ctx));
@@ -1368,6 +1635,33 @@ bot.hears('🛡️ حماية من الإساءة', (ctx) => MenuHandler.handleP
 
 // --- TEXT HANDLER FOR QURANIC GAMES (AFTER hears) ---
 bot.on('text', async (ctx, next) => {
+  // Check for commands first
+  if (ctx.message.text.startsWith('/')) {
+    if (typeof next === 'function') {
+      return next();
+    }
+    return;
+  }
+
+  // Check if in a group chat
+  if (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup') {
+    try {
+      // التحقق من الكلمات المفتاحية
+      const messageText = ctx.message.text;
+      const keywordData = await KeywordAlerts.checkKeywords(ctx, messageText);
+      
+      if (keywordData) {
+        await KeywordAlerts.handleKeywordAction(ctx, keywordData, messageText);
+        // إذا كان الإجراء حذف، لا ن continue
+        if (keywordData.action === 'delete') {
+          return;
+        }
+      }
+    } catch (error) {
+      console.error('Keyword check error:', error);
+    }
+  }
+
   // معالجة إجابات الألعاب القرآنية
   if (ctx.session?.gameState && ctx.session.gameState.game === 'quranic') {
     const userAnswer = ctx.message.text;
@@ -2822,6 +3116,17 @@ const botStart = async () => {
           logger.info('✅ تم تشغيل البوت بنجاح!');
           logger.info('✅ البوت يعمل الآن!');
           logger.info('🎯 البوت مستعد و ينتظر الرسائل...');
+
+          // Start Scheduled Messages Checker (every minute)
+          setInterval(async () => {
+            try {
+              await ScheduledMessages.processScheduledMessages(bot);
+            } catch (error) {
+              logger.error('❌ Error processing scheduled messages:', error.message);
+            }
+          }, 60000); // Check every minute
+          
+          logger.info('✅ تم تشغيل نظام الرسائل المُجدولة');
         })
         .catch((error) => {
           logger.error('❌ فشل في بدء البوت:', error.message);

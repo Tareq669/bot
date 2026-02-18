@@ -221,6 +221,127 @@ function formatSettingsMessage(settings) {
   return message;
 }
 
+// ==================== TRANSLATIONS ====================
+
+/**
+ * Translation strings for warnings system
+ */
+const translations = {
+  ar: {
+    warning_added: 'تمت إضافة التحذير',
+    user: 'المستخدم',
+    reason: 'السبب',
+    no_reason: 'لم يتم تحديد السبب',
+    warnings_count: 'عدد التحذيرات',
+    action_mute: 'كتم',
+    action_mute_failed: 'فشل الكتم',
+    action_kick: 'طرد',
+    action_kick_failed: 'فشل الطرد',
+    action_ban: 'حظر',
+    action_ban_failed: 'فشل الحظر',
+    auto_action_executed: 'تم تنفيذ الإجراء التلقائي',
+    action_taken: 'الإجراء',
+    warning_removed: 'تمت إزالة التحذير',
+    remaining_warnings: 'التحذيرات المتبقية',
+    no_warnings: 'لا توجد تحذيرات لهذا المستخدم',
+    invalid_warning_index: 'مؤشر التحذير غير صالح',
+    no_warnings_for_user: 'لا توجد تحذيرات لهذا المستخدم',
+    warnings_list: 'قائمة التحذيرات',
+    total_warnings: 'إجمالي التحذيرات',
+    warned_by: 'حذّره',
+    max_warnings: 'الحد الأقصى',
+    auto_action: 'الإجراء التلقائي',
+    warnings_cleared: 'تم مسح التحذيرات',
+    removed_warnings: 'التحذيرات المحذوفة',
+    no_warnings_to_clear: 'لا توجد تحذيرات لمسحها',
+    invalid_max_warnings: 'الحد الأقصى يجب أن يكون بين 1 و 10',
+    max_warnings_set: 'تم تعيين الحد الأقصى',
+    new_max_warnings: 'الحد الأقصى الجديد',
+    invalid_action: 'الإجراء غير صالح',
+    valid_actions: 'الإجراءات المتاحة',
+    auto_action_set: 'تم تعيين الإجراء التلقائي',
+    selected_action: 'الإجراء المحدد',
+    warn_usage: 'Usage: /تحذير @user السبب',
+    invalid_user: 'معرف المستخدم غير صالح',
+    remove_warning_usage: 'Usage: /رفع_تحذير @user',
+    warnings_usage: 'Usage: /تحذيرات @user',
+    clear_warnings_usage: 'Usage: /مسح_التحذيرات @user',
+    max_warnings_usage: 'Usage: /حد_التحذيرات 3',
+    auto_action_usage: 'Usage: /اجراء_تلقائي kick',
+    invalid_number: 'رقم غير صالح',
+    unknown_command: 'أمر غير معروف'
+  },
+  en: {
+    warning_added: 'Warning Added',
+    user: 'User',
+    reason: 'Reason',
+    no_reason: 'No reason provided',
+    warnings_count: 'Warnings Count',
+    action_mute: 'Mute',
+    action_mute_failed: 'Mute Failed',
+    action_kick: 'Kick',
+    action_kick_failed: 'Kick Failed',
+    action_ban: 'Ban',
+    action_ban_failed: 'Ban Failed',
+    auto_action_executed: 'Auto Action Executed',
+    action_taken: 'Action',
+    warning_removed: 'Warning Removed',
+    remaining_warnings: 'Remaining Warnings',
+    no_warnings: 'No warnings for this user',
+    invalid_warning_index: 'Invalid warning index',
+    no_warnings_for_user: 'No warnings for this user',
+    warnings_list: 'Warnings List',
+    total_warnings: 'Total Warnings',
+    warned_by: 'Warned by',
+    max_warnings: 'Max Warnings',
+    auto_action: 'Auto Action',
+    warnings_cleared: 'Warnings Cleared',
+    removed_warnings: 'Removed Warnings',
+    no_warnings_to_clear: 'No warnings to clear',
+    invalid_max_warnings: 'Max warnings must be between 1 and 10',
+    max_warnings_set: 'Max Warnings Set',
+    new_max_warnings: 'New Max Warnings',
+    invalid_action: 'Invalid action',
+    valid_actions: 'Valid actions',
+    auto_action_set: 'Auto Action Set',
+    selected_action: 'Selected Action',
+    warn_usage: 'Usage: /warn @user reason',
+    invalid_user: 'Invalid user ID',
+    remove_warning_usage: 'Usage: /removewarning @user',
+    warnings_usage: 'Usage: /warnings @user',
+    clear_warnings_usage: 'Usage: /clearwarnings @user',
+    max_warnings_usage: 'Usage: /maxwarnings 3',
+    auto_action_usage: 'Usage: /autoaction kick',
+    invalid_number: 'Invalid number',
+    unknown_command: 'Unknown command'
+  }
+};
+
+/**
+ * Get group language (defaults to Arabic)
+ */
+async function getGroupLanguage(groupId) {
+  // Try to get from database, default to Arabic
+  try {
+    const Group = require('../database/models/Group');
+    const group = await Group.findOne({ groupId });
+    if (group && group.language) {
+      return group.language;
+    }
+  } catch (e) {
+    // Ignore errors
+  }
+  return 'ar';
+}
+
+/**
+ * Translate a key to the group's language
+ */
+function t(key, lang = 'ar') {
+  const langTranslations = translations[lang] || translations.ar;
+  return langTranslations[key] || translations.ar[key] || key;
+}
+
 module.exports = {
   isGroup,
   sendPrivateChatError,
@@ -233,5 +354,7 @@ module.exports = {
   lockItem,
   unlockItem,
   getLockMessage,
-  formatSettingsMessage
+  formatSettingsMessage,
+  getGroupLanguage,
+  t
 };

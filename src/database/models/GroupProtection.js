@@ -54,11 +54,20 @@ const groupProtectionSchema = new mongoose.Schema({
     custom: { type: [String], default: [] }
   },
 
+  // إعدادات التحذيرات
+  warnings: [{
+    userId: Number,
+    reason: String,
+    warnedBy: Number,
+    timestamp: { type: Date, default: Date.now }
+  }],
+  maxWarnings: { type: Number, default: 3 },
+  autoAction: { type: String, enum: ['mute', 'kick', 'ban'], default: 'kick' },
+
   // إعدادات إضافية
   settings: {
     welcomeMessage: { type: String, default: '' },
     farewellMessage: { type: String, default: '' },
-    maxWarnings: { type: Number, default: 3 },
     antiFlood: { type: Boolean, default: false },
     floodLimit: { type: Number, default: 5 }
   },
@@ -72,9 +81,56 @@ const groupProtectionSchema = new mongoose.Schema({
     username: String
   }],
 
+  // نظام القواعد
+  rules: { type: String, default: '' },
+  requireAcceptRules: { type: Boolean, default: false },
+
+  // نظام الترحيب
+  welcome: {
+    enabled: { type: Boolean, default: false },
+    message: { type: String, default: '' },
+    showJoinInfo: { type: Boolean, default: true },
+    buttons: { type: Boolean, default: false }
+  },
+  farewell: {
+    enabled: { type: Boolean, default: false },
+    message: { type: String, default: '' }
+  },
+
+  // إعدادات تتبع الكلمات المفتاحية
+  keywordAlerts: [{
+    keyword: { type: String, required: true },
+    notifyAdmins: { type: Boolean, default: true },
+    action: { type: String, enum: ['notify', 'delete', 'warn'], default: 'notify' },
+    addedBy: { type: Number, default: null },
+    addedAt: { type: Date, default: Date.now }
+  }],
+  notifyOnKeywords: { type: Boolean, default: true },
+
   // وقت الإنشاء والتحديث
   createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now }
+  updatedAt: { type: Date, default: Date.now },
+
+  // نظام الأذونات والصلاحيات
+  permissions: {
+    // أذونات عامة
+    canWarn: { type: Boolean, default: true },
+    canMute: { type: Boolean, default: true },
+    canKick: { type: Boolean, default: false },
+    canBan: { type: Boolean, default: false },
+    canDelete: { type: Boolean, default: true },
+    canPin: { type: Boolean, default: false },
+    canChangeInfo: { type: Boolean, default: false },
+    // أذونات الألعاب
+    canPlayGames: { type: Boolean, default: true },
+    canUseCommands: { type: Boolean, default: true },
+    canSendMedia: { type: Boolean, default: true },
+    canSendPolls: { type: Boolean, default: true },
+    canSendInvites: { type: Boolean, default: false },
+    // أذونات التفاعل
+    canReact: { type: Boolean, default: true },
+    canUseBot: { type: Boolean, default: true }
+  }
 });
 
 module.exports = mongoose.model('GroupProtection', groupProtectionSchema);
