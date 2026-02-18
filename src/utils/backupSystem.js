@@ -99,7 +99,7 @@ class BackupSystem {
       logger.info('📸 بدء النسخة الاحتياطية الكاملة...');
 
       // جمع البيانات من جميع المجموعات
-      const [users, groups, transactions, gameStats, content, config, teams, events, auctions] = 
+      const [users, groups, transactions, gameStats, content, config, teams, events, auctions] =
         await Promise.all([
           User.find({}).lean(),
           Group.find({}).lean(),
@@ -141,7 +141,7 @@ class BackupSystem {
       };
 
       const timestamp = Date.now();
-      const filename = compress 
+      const filename = compress
         ? `full_backup_${timestamp}.json.gz`
         : `full_backup_${timestamp}.json`;
       const filepath = path.join(this.backupDir, filename);
@@ -225,7 +225,7 @@ class BackupSystem {
 
       // الاستعادة الفعلية (محفوفة بالمخاطر!)
       logger.warn('⚠️ تحذير: الاستعادة الفعلية تتطلب صلاحيات خاصة وقد تؤدي لفقدان البيانات الحالية');
-      
+
       return {
         success: true,
         message: 'تم قراءة ملف النسخة الاحتياطية بنجاح (الاستعادة الفعلية تتطلب تأكيد إضافي)',
@@ -307,7 +307,7 @@ class BackupSystem {
             filename: f,
             size: stats.size > BYTES_PER_MB ? `${sizeMB} MB` : `${sizeKB} KB`,
             sizeBytes: stats.size,
-            date: stats.mtime.toLocaleString('ar-SA', { 
+            date: stats.mtime.toLocaleString('ar-SA', {
               timeZone: 'Asia/Riyadh',
               year: 'numeric',
               month: '2-digit',
@@ -474,14 +474,14 @@ class BackupSystem {
     try {
       const backups = this.listBackups();
       const lastFullBackup = backups.find(b => b.type === 'كاملة');
-      
+
       if (!lastFullBackup) {
         logger.info('لا توجد نسخة كاملة، سيتم عمل نسخة كاملة...');
         return await this.fullBackup(true);
       }
 
       const lastBackupDate = new Date(lastFullBackup.timestamp);
-      
+
       // جمع التغييرات منذ آخر نسخة احتياطية
       const [users, groups, transactions] = await Promise.all([
         User.find({ updatedAt: { $gte: lastBackupDate } }).lean(),
@@ -528,7 +528,7 @@ class BackupSystem {
   async deleteBackup(filename) {
     try {
       const filepath = path.join(this.backupDir, filename);
-      
+
       if (!fs.existsSync(filepath)) {
         return { success: false, error: 'الملف غير موجود' };
       }

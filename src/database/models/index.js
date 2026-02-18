@@ -10,6 +10,9 @@ const Team = require('./Team');
 const Event = require('./Event');
 const Auction = require('./Auction');
 const ScheduledMessage = require('./ScheduledMessage');
+const SmartReply = require('./SmartReply');
+const GroupMember = require('./GroupMember');
+const GroupShop = require('./GroupShop');
 
 module.exports = {
   User,
@@ -21,5 +24,8 @@ module.exports = {
   Team,
   Event,
   Auction,
-  ScheduledMessage
+  ScheduledMessage,
+  SmartReply,
+  GroupMember,
+  GroupShop
 };

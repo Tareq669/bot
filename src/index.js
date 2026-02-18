@@ -23,6 +23,14 @@ const connectionMonitor = require('./utils/connectionMonitor');
 const healthMonitor = require('./utils/healthMonitor');
 const Formatter = require('./utils/formatter');
 
+// Import Groups Systems
+const LevelsSystem = require('./groups/levelsSystem');
+const GroupEconomy = require('./groups/groupEconomy');
+const GroupGames = require('./groups/groupGames');
+const GroupPanel = require('./groups/groupPanel');
+const ProtectionManager = require('./groups/protectionManager');
+const SmartReplies = require('./groups/smartReplies');
+
 // Import AI Systems
 const LearningSystem = require('./ai/learningSystem');
 const SmartNotifications = require('./ai/smartNotifications');
@@ -87,7 +95,16 @@ bot.telegram
     { command: 'ترحيب_تشغيل', description: '✅ تفعيل الترحيب' },
     { command: 'ترحيب_إيقاف', description: '❌ إيقاف الترحيب' },
     { command: 'وداع_تشغيل', description: '✅ تفعيل الوداع' },
-    { command: 'وداع_إيقاف', description: '❌ إيقاف الوداع' }
+    { command: 'وداع_إيقاف', description: '❌ إيقاف الوداع' },
+    // أوامر لوحة التحكم
+    { command: 'panel', description: '🖥️ لوحة التحكم' },
+    { command: 'لوحة', description: '🖥️ لوحة التحكم' },
+    { command: 'settings', description: '⚙️ إعدادات المجموعة' },
+    { command: 'الإعدادات', description: '⚙️ إعدادات المجموعة' },
+    { command: 'stats', description: '📊 إحصائيات المجموعة' },
+    { command: 'إحصائيات', description: '📊 إحصائيات المجموعة' },
+    { command: 'invitelink', description: '🔗 رابط الدعوة' },
+    { command: 'رابط_الدعوة', description: '🔗 رابط الدعوة' }
   ])
   .catch((err) => {
     logger.error('خطأ في تعيين قائمة الأوامر:', err);
@@ -134,6 +151,106 @@ bot.command('referral', (ctx) => CommandHandler.handleReferral(ctx));
 bot.command('events', (ctx) => CommandHandler.handleEvents(ctx));
 bot.command('library', (ctx) => CommandHandler.handleLibrary(ctx));
 bot.command('teams', (ctx) => CommandHandler.handleTeams(ctx));
+
+// --- GROUP LEVELS SYSTEM COMMANDS ---
+bot.command('profile', (ctx) => LevelsSystem.showProfile(ctx));
+bot.command('level', (ctx) => LevelsSystem.showLevel(ctx));
+bot.command('xp', (ctx) => LevelsSystem.showXp(ctx));
+bot.command('daily', (ctx) => LevelsSystem.handleDaily(ctx));
+bot.command('top', (ctx) => LevelsSystem.showTop(ctx));
+bot.command('top10', (ctx) => LevelsSystem.showTop(ctx));
+bot.command('rank', (ctx) => LevelsSystem.showRank(ctx));
+bot.command('لقبي', (ctx) => LevelsSystem.showProfile(ctx));
+bot.command('تعيين_لقب', (ctx) => {
+  const title = ctx.message.text.replace('/تعيين_لقب', '').trim();
+  LevelsSystem.setUserTitle(ctx, title);
+});
+
+// --- GROUP ECONOMY COMMANDS ---
+bot.command('balance', (ctx) => GroupEconomy.showBalance(ctx));
+bot.command('bank', (ctx) => GroupEconomy.showBank(ctx));
+bot.command('deposit', (ctx) => {
+  const amount = parseInt(ctx.message.text.replace('/deposit', '').trim());
+  GroupEconomy.deposit(ctx, amount);
+});
+bot.command('withdraw', (ctx) => {
+  const amount = parseInt(ctx.message.text.replace('/withdraw', '').trim());
+  GroupEconomy.withdraw(ctx, amount);
+});
+bot.command('pay', (ctx) => {
+  const args = ctx.message.text.replace('/pay', '').trim().split(' ');
+  const amount = parseInt(args[args.length - 1]);
+  const target = args.slice(0, -1).join(' ');
+  GroupEconomy.pay(ctx, target, amount);
+});
+bot.command('shop', (ctx) => GroupEconomy.showShop(ctx));
+bot.command('buy', (ctx) => {
+  const itemId = ctx.message.text.replace('/buy', '').trim();
+  GroupEconomy.buyItem(ctx, itemId);
+});
+bot.command('additem', (ctx) => {
+  const args = ctx.message.text.replace('/additem', '').trim().split(' ');
+  GroupEconomy.addShopItem(ctx, args);
+});
+bot.command('removeitem', (ctx) => {
+  const itemId = ctx.message.text.replace('/removeitem', '').trim();
+  GroupEconomy.removeShopItem(ctx, itemId);
+});
+bot.command('buytitle', (ctx) => {
+  const args = ctx.message.text.replace('/buytitle', '').trim().split(' ');
+  const price = !isNaN(parseInt(args[args.length - 1])) ? parseInt(args[args.length - 1]) : null;
+  const title = price ? args.slice(0, -1).join(' ') : args.join(' ');
+  GroupEconomy.buyTitle(ctx, title, price);
+});
+
+// الأوامر العربية
+bot.command('رصيد', (ctx) => GroupEconomy.showBalance(ctx));
+bot.command('بنك', (ctx) => GroupEconomy.showBank(ctx));
+bot.command('إيداع', (ctx) => {
+  const amount = parseInt(ctx.message.text.replace('/إيداع', '').trim());
+  GroupEconomy.deposit(ctx, amount);
+});
+bot.command('سحب', (ctx) => {
+  const amount = parseInt(ctx.message.text.replace('/سحب', '').trim());
+  GroupEconomy.withdraw(ctx, amount);
+});
+bot.command('تحويل', (ctx) => {
+  const args = ctx.message.text.replace('/تحويل', '').trim().split(' ');
+  const amount = parseInt(args[args.length - 1]);
+  const target = args.slice(0, -1).join(' ');
+  GroupEconomy.pay(ctx, target, amount);
+});
+bot.command('متجر', (ctx) => GroupEconomy.showShop(ctx));
+bot.command('شراء', (ctx) => {
+  const itemId = ctx.message.text.replace('/شراء', '').trim();
+  GroupEconomy.buyItem(ctx, itemId);
+});
+bot.command('إضافة_عنصر', (ctx) => {
+  const args = ctx.message.text.replace('/إضافة_عنصر', '').trim().split(' ');
+  GroupEconomy.addShopItem(ctx, args);
+});
+bot.command('حذف_عنصر', (ctx) => {
+  const itemId = ctx.message.text.replace('/حذف_عنصر', '').trim();
+  GroupEconomy.removeShopItem(ctx, itemId);
+});
+bot.command('شراء_لقب', (ctx) => {
+  const args = ctx.message.text.replace('/شراء_لقب', '').trim().split(' ');
+  const price = !isNaN(parseInt(args[args.length - 1])) ? parseInt(args[args.length - 1]) : null;
+  const title = price ? args.slice(0, -1).join(' ') : args.join(' ');
+  GroupEconomy.buyTitle(ctx, title, price);
+});
+
+// --- GROUP GAMES COMMANDS ---
+GroupGames.registerGameCommands(bot);
+
+// --- GROUP PANEL (لوحة تحكم المجموعات) ---
+new GroupPanel(bot);
+
+// --- GROUP PROTECTION MANAGER (نظام حماية المجموعات) ---
+new ProtectionManager(bot);
+
+// --- GROUP SMART REPLIES (الردود الذكية) ---
+new SmartReplies(bot);
 
 // --- GROUP PROTECTION COMMANDS ---
 GroupProtection.registerProtectionCommands(bot);
@@ -589,7 +706,7 @@ bot.command('حذف_مجدول', async (ctx) => {
   try {
     const messageId = ctx.message.text.replace('/حذف_مجدول', '').trim();
     if (!messageId) {
-      await ctx.reply('Usage: /حذف_مجدول [number]')
+      await ctx.reply('Usage: /حذف_مجدول [number]');
       return;
     }
     await ScheduledMessages.deleteScheduledMessage(ctx, messageId);
@@ -1649,7 +1766,7 @@ bot.on('text', async (ctx, next) => {
       // التحقق من الكلمات المفتاحية
       const messageText = ctx.message.text;
       const keywordData = await KeywordAlerts.checkKeywords(ctx, messageText);
-      
+
       if (keywordData) {
         await KeywordAlerts.handleKeywordAction(ctx, keywordData, messageText);
         // إذا كان الإجراء حذف، لا ن continue
@@ -1659,6 +1776,13 @@ bot.on('text', async (ctx, next) => {
       }
     } catch (error) {
       console.error('Keyword check error:', error);
+    }
+
+    // --- إضافة XP لنظام المستويات ---
+    try {
+      await LevelsSystem.processGroupMessage(ctx);
+    } catch (error) {
+      console.error('Levels system error:', error);
     }
   }
 
@@ -3125,7 +3249,7 @@ const botStart = async () => {
               logger.error('❌ Error processing scheduled messages:', error.message);
             }
           }, 60000); // Check every minute
-          
+
           logger.info('✅ تم تشغيل نظام الرسائل المُجدولة');
         })
         .catch((error) => {
