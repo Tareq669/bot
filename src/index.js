@@ -60,6 +60,21 @@ const bot = new Telegraf(process.env.BOT_TOKEN, {
 // Initialize session middleware
 bot.use(session());
 
+// --- MIDDLEWARE: Chat Type Helper ---
+bot.use((ctx, next) => {
+  // Add chat type helpers
+  if (ctx.chat) {
+    ctx.chatType = ctx.chat.type;
+    ctx.isPrivate = ctx.chat.type === 'private';
+    ctx.isGroup = ctx.chat.type === 'group' || ctx.chat.type === 'supergroup';
+  } else {
+    ctx.chatType = null;
+    ctx.isPrivate = false;
+    ctx.isGroup = false;
+  }
+  return next();
+});
+
 
 // --- SET BOT COMMANDS MENU ---
 bot.telegram
@@ -153,10 +168,16 @@ bot.command('library', (ctx) => CommandHandler.handleLibrary(ctx));
 bot.command('teams', (ctx) => CommandHandler.handleTeams(ctx));
 
 // --- GROUP LEVELS SYSTEM COMMANDS ---
-bot.command('profile', (ctx) => LevelsSystem.showProfile(ctx));
+bot.command('profile', (ctx) => {
+  if (ctx.isPrivate) return CommandHandler.handleProfile(ctx);
+  return LevelsSystem.showProfile(ctx);
+});
 bot.command('level', (ctx) => LevelsSystem.showLevel(ctx));
 bot.command('xp', (ctx) => LevelsSystem.showXp(ctx));
-bot.command('daily', (ctx) => LevelsSystem.handleDaily(ctx));
+bot.command('daily', (ctx) => {
+  if (ctx.isPrivate) return CommandHandler.handleDailyReward(ctx);
+  return LevelsSystem.handleDaily(ctx);
+});
 bot.command('top', (ctx) => LevelsSystem.showTop(ctx));
 bot.command('top10', (ctx) => LevelsSystem.showTop(ctx));
 bot.command('rank', (ctx) => LevelsSystem.showRank(ctx));
@@ -167,7 +188,10 @@ bot.command('تعيين_لقب', (ctx) => {
 });
 
 // --- GROUP ECONOMY COMMANDS ---
-bot.command('balance', (ctx) => GroupEconomy.showBalance(ctx));
+bot.command('balance', (ctx) => {
+  if (ctx.isPrivate) return CommandHandler.handleBalance(ctx);
+  return GroupEconomy.showBalance(ctx);
+});
 bot.command('bank', (ctx) => GroupEconomy.showBank(ctx));
 bot.command('deposit', (ctx) => {
   const amount = parseInt(ctx.message.text.replace('/deposit', '').trim());
@@ -183,7 +207,16 @@ bot.command('pay', (ctx) => {
   const target = args.slice(0, -1).join(' ');
   GroupEconomy.pay(ctx, target, amount);
 });
-bot.command('shop', (ctx) => GroupEconomy.showShop(ctx));
+bot.command('shop', (ctx) => {
+  if (ctx.isPrivate) {
+    // Private shop - use ShopSystem
+    const ShopSystem = require('./features/shopSystem');
+    const menu = ShopSystem.formatShopMenu();
+    return ctx.reply(menu, { parse_mode: 'HTML' });
+  }
+  // Group shop - use GroupEconomy
+  return GroupEconomy.showShop(ctx);
+});
 bot.command('buy', (ctx) => {
   const itemId = ctx.message.text.replace('/buy', '').trim();
   GroupEconomy.buyItem(ctx, itemId);
@@ -492,17 +525,6 @@ bot.command('stats', (ctx) => CommandHandler.handleStats(ctx));
 bot.command('rewards', (ctx) => CommandHandler.handleRewards(ctx));
 
 // --- NEW FEATURES COMMANDS ---
-// Shop System
-bot.command('shop', async (ctx) => {
-  try {
-    const ShopSystem = require('./features/shopSystem');
-    const menu = ShopSystem.formatShopMenu();
-    ctx.reply(menu, { parse_mode: 'HTML' });
-  } catch (error) {
-    logger.error('Shop error:', error);
-    ctx.reply('❌ خدمة المتجر غير متاحة');
-  }
-});
 
 // Payment & Transfer
 bot.command('transfer', async (ctx) => {

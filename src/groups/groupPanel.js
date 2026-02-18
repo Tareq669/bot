@@ -28,25 +28,49 @@ class GroupPanel {
       await this.handleBotAdded(ctx);
     });
 
-    // أوامر لوحة التحكم
-    this.bot.command('panel', (ctx) => this.showPanel(ctx));
-    this.bot.command('لوحة', (ctx) => this.showPanel(ctx));
+    // أوامر لوحة التحكم - للمجموعات فقط
+    this.bot.command('panel', (ctx) => {
+      if (!ctx.isGroup) return ctx.reply('❌ هذا الأمر متاح فقط في المجموعات!');
+      return this.showPanel(ctx);
+    });
+    this.bot.command('لوحة', (ctx) => {
+      if (!ctx.isGroup) return ctx.reply('❌ هذا الأمر متاح فقط في المجموعات!');
+      return this.showPanel(ctx);
+    });
 
-    // أوامر الإعدادات
-    this.bot.command('settings', (ctx) => this.showSettings(ctx));
-    this.bot.command('الإعدادات', (ctx) => this.showSettings(ctx));
+    // أوامر الإعدادات - للمجموعات فقط
+    this.bot.command('settings', (ctx) => {
+      if (!ctx.isGroup) return ctx.reply('❌ هذا الأمر متاح فقط في المجموعات!');
+      return this.showSettings(ctx);
+    });
+    this.bot.command('الإعدادات', (ctx) => {
+      if (!ctx.isGroup) return ctx.reply('❌ هذا الأمر متاح فقط في المجموعات!');
+      return this.showSettings(ctx);
+    });
 
-    // أوامر المساعدة
+    // أوامر المساعدة - يمكن استخدامها في الخاص والمجموعات
     this.bot.command('help', (ctx) => this.showHelp(ctx));
     this.bot.command('مساعدة', (ctx) => this.showHelp(ctx));
 
-    // أوامر الإحصائيات
-    this.bot.command('stats', (ctx) => this.showStats(ctx));
-    this.bot.command('إحصائيات', (ctx) => this.showStats(ctx));
+    // أوامر الإحصائيات - للمجموعات فقط
+    this.bot.command('stats', (ctx) => {
+      if (!ctx.isGroup) return ctx.reply('❌ هذا الأمر متاح فقط في المجموعات!');
+      return this.showStats(ctx);
+    });
+    this.bot.command('إحصائيات', (ctx) => {
+      if (!ctx.isGroup) return ctx.reply('❌ هذا الأمر متاح فقط في المجموعات!');
+      return this.showStats(ctx);
+    });
 
-    // أمر رابط الدعوة
-    this.bot.command('invitelink', (ctx) => this.getInviteLink(ctx));
-    this.bot.command('رابط_الدعوة', (ctx) => this.getInviteLink(ctx));
+    // أمر رابط الدعوة - للمجموعات فقط
+    this.bot.command('invitelink', (ctx) => {
+      if (!ctx.isGroup) return ctx.reply('❌ هذا الأمر متاح فقط في المجموعات!');
+      return this.getInviteLink(ctx);
+    });
+    this.bot.command('رابط_الدعوة', (ctx) => {
+      if (!ctx.isGroup) return ctx.reply('❌ هذا الأمر متاح فقط في المجموعات!');
+      return this.getInviteLink(ctx);
+    });
 
     // معالجات الأزرار
     this.setupCallbacks();
