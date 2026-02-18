@@ -778,11 +778,11 @@ class AdhkarProvider {
     const now = new Date();
     const hour = now.getHours();
     const month = now.getMonth() + 1; // الشهر الميلادي
-
+    
     // تحقق من شهر رمضان (يجب تحديثه كل عام)
     // في المستقبل يمكن استخدام حساب هجري دقيق
     const isRamadan = this.isRamadanMonth();
-
+    
     if (isRamadan) {
       // في رمضان، أعطِ أولوية لأذكار رمضان
       const ramadanAdhkar = await this.getRamadanAdhkar();
@@ -816,7 +816,7 @@ class AdhkarProvider {
   static isRamadanMonth() {
     const now = new Date();
     const year = now.getFullYear();
-
+    
     // تواريخ رمضان التقريبية للسنوات القادمة
     const ramadanDates = {
       2026: { start: new Date(2026, 1, 18), end: new Date(2026, 2, 19) }, // فبراير-مارس
@@ -824,12 +824,12 @@ class AdhkarProvider {
       2028: { start: new Date(2028, 0, 28), end: new Date(2028, 1, 26) }, // يناير-فبراير
       2029: { start: new Date(2029, 0, 16), end: new Date(2029, 1, 14) }  // يناير-فبراير
     };
-
+    
     const ramadan = ramadanDates[year];
     if (ramadan && now >= ramadan.start && now <= ramadan.end) {
       return true;
     }
-
+    
     return false;
   }
 

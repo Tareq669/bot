@@ -28,7 +28,7 @@ class EconomyManager {
       const currentCoins = user.coins || 0;
       const currentXp = user.xp || 0;
       const validAmount = Number(amount) || 0;
-
+      
       user.coins = currentCoins + validAmount;
       user.xp = currentXp + Math.floor(validAmount / 10);
       await user.save();
@@ -93,13 +93,13 @@ class EconomyManager {
       const toUser = await User.findOne({ userId: toUserId });
 
       if (!fromUser || !toUser) return false;
-
+      
       // التأكد من أن القيم صالحة وليست NaN
       const fromCoins = fromUser.coins || 0;
       const toCoins = toUser.coins || 0;
       const toXp = toUser.xp || 0;
       const validAmount = Number(amount) || 0;
-
+      
       if (fromCoins < validAmount) return false;
 
       fromUser.coins = fromCoins - validAmount;
@@ -180,7 +180,7 @@ class EconomyManager {
       // التأكد من أن القيم صالحة وليست NaN
       const currentCoins = user.coins || 0;
       const currentXp = user.xp || 0;
-
+      
       user.coins = currentCoins + reward;
       user.xp = currentXp + 50;
       user.dailyReward.lastClaimed = now;
@@ -247,7 +247,7 @@ class EconomyManager {
 
       // التأكد من أن القيم صالحة وليست NaN
       const currentCoins = user.coins || 0;
-
+      
       if (currentCoins < item.price) {
         return {
           success: false,

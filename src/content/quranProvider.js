@@ -602,9 +602,9 @@ class QuranProvider {
   // البحث عن آية بالكلمة المفتاحية
   static async searchVerses(keyword) {
     const verses = await this.getQuranVerses();
-    return verses.filter(v =>
-      v.text.includes(keyword) ||
-      v.content.includes(keyword) ||
+    return verses.filter(v => 
+      v.text.includes(keyword) || 
+      v.content.includes(keyword) || 
       v.tafsir.includes(keyword) ||
       v.surah.includes(keyword)
     );

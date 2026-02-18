@@ -211,7 +211,7 @@ class GameHandler {
     try {
       // Answer callback query immediately
       if (ctx.callbackQuery) await ctx.answerCbQuery();
-
+      
       const message = QuranicGames.formatGamesList();
 
       const buttons = Markup.inlineKeyboard([
@@ -240,7 +240,7 @@ class GameHandler {
     try {
       // Answer callback query immediately
       if (ctx.callbackQuery) await ctx.answerCbQuery();
-
+      
       ctx.session = ctx.session || {};
       const game = await QuranicGames.guessTheVerse();
 
@@ -274,7 +274,7 @@ class GameHandler {
   static async handleCompleteVerse(ctx) {
     try {      // Answer callback query immediately
       if (ctx.callbackQuery) await ctx.answerCbQuery();
-      console.log('🎮 [handleCompleteVerse] Started');
+            console.log('🎮 [handleCompleteVerse] Started');
       ctx.session = ctx.session || {};
       const game = await QuranicGames.completeTheVerse();
       console.log('🎮 [handleCompleteVerse] Game data:', game);
@@ -313,7 +313,7 @@ class GameHandler {
     try {
       // Answer callback query immediately
       if (ctx.callbackQuery) await ctx.answerCbQuery();
-
+      
       console.log('🔍 [handleSpotDifference] Started');
       ctx.session = ctx.session || {};
       const game = await QuranicGames.spotTheDifference();
@@ -359,7 +359,7 @@ class GameHandler {
     try {
       // Answer callback query immediately
       if (ctx.callbackQuery) await ctx.answerCbQuery();
-
+      
       console.log('🧠 [handleTriviaQuestion] Started');
       ctx.session = ctx.session || {};
       const game = await QuranicGames.qurranTrivia();
@@ -402,7 +402,7 @@ class GameHandler {
     try {
       // Answer callback query immediately
       if (ctx.callbackQuery) await ctx.answerCbQuery();
-
+      
       console.log('📊 [handleSurahCount] Started');
       ctx.session = ctx.session || {};
       const game = await QuranicGames.surahCount();
@@ -444,7 +444,7 @@ class GameHandler {
       if (ctx.callbackQuery) {
         await ctx.answerCbQuery();
       }
-
+      
       console.log('✅ [processQuranicAnswer] Started with answer:', userAnswer);
       ctx.session = ctx.session || {};
       const gameState = ctx.session.gameState;

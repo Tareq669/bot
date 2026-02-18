@@ -141,19 +141,19 @@ class EconomyHandler {
       const netProfit = totalEarnings - totalSpending;
       const dailyAverage = Math.floor(totalEarnings / (Math.floor((new Date() - new Date(user.createdAt)) / (1000 * 60 * 60 * 24)) || 1));
 
-      const message = '📊 <b>إحصائيات الاقتصاد</b>\n\n' +
+      const message = `📊 <b>إحصائيات الاقتصاد</b>\n\n` +
         `💰 <b>الرصيد الحالي:</b> ${user.coins.toLocaleString()} عملة\n\n` +
-        '📈 <b>الإحصائيات العامة:</b>\n' +
+        `📈 <b>الإحصائيات العامة:</b>\n` +
         `• الإجمالي المكتسب: ${totalEarnings.toLocaleString()} عملة\n` +
         `• الإجمالي المُنفق: ${totalSpending.toLocaleString()} عملة\n` +
         `• الربح الصافي: ${netProfit.toLocaleString()} عملة\n` +
         `• المتوسط اليومي: ${dailyAverage.toLocaleString()} عملة\n\n` +
-        '🏪 <b>نشاطك:</b>\n' +
+        `🏪 <b>نشاطك:</b>\n` +
         `• عمليات الشراء: ${user.purchasesCount || 0}\n` +
         `• التحويلات: ${user.transfersCount || 0}\n` +
         `• الألعاب اللعوب: ${user.gamesPlayed?.total || 0}\n\n` +
-        '💎 <b>الترتيب:</b>\n' +
-        '• الثروة: قيد التحديث\n' +
+        `💎 <b>الترتيب:</b>\n` +
+        `• الثروة: قيد التحديث\n` +
         `• الإنجازات: ${user.badges?.length || 0}`;
 
       const buttons = Markup.inlineKeyboard([
@@ -197,11 +197,11 @@ class EconomyHandler {
       const totalSent = sentTransfers.reduce((sum, t) => sum + t.amount, 0);
       const totalReceived = receivedTransfers.reduce((sum, t) => sum + t.amount, 0);
 
-      const message = '💸 <b>إحصائيات التحويلات</b>\n\n' +
-        '📤 <b>التحويلات التي أرسلتها:</b>\n' +
+      const message = `💸 <b>إحصائيات التحويلات</b>\n\n` +
+        `📤 <b>التحويلات التي أرسلتها:</b>\n` +
         `• العدد: ${sentTransfers.length}\n` +
         `• المبلغ الإجمالي: ${totalSent} عملة\n\n` +
-        '📥 <b>التحويلات التي استقبلتها:</b>\n' +
+        `📥 <b>التحويلات التي استقبلتها:</b>\n` +
         `• العدد: ${receivedTransfers.length}\n` +
         `• المبلغ الإجمالي: ${totalReceived} عملة\n\n` +
         `💰 <b>الرصيد الحالي:</b> ${user.coins || 0} عملة`;

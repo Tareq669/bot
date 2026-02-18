@@ -17,17 +17,14 @@ class CommandHandler {
       // Check if owner
       const isOwner = UIManager.isOwner(ctx.from.id);
 
-      let message = '';
-      let keyboard = null;
-
-      // Private chat menu
-      message = `👋 مرحباً ${dbUser.firstName}!\n\n🎯 اختر من لوحة المفاتيح:`;
+      // Simple welcome message with keyboard
+      let message = `👋 مرحباً ${dbUser.firstName || 'صديقي'}!\n\n🎯 اختر من لوحة المفاتيح:`;
 
       if (isOwner) {
         message = `👑 أهلاً بك يا مالك البوت ${dbUser.firstName}!\n\n⚡ لديك صلاحيات كاملة على النظام\n🎯 اختر من لوحة المفاتيح الخاصة:`;
       }
 
-      keyboard = UIManager.mainReplyKeyboard(ctx.from.id);
+      const keyboard = UIManager.mainReplyKeyboard(ctx.from.id);
 
       await ctx.reply(message, keyboard);
     } catch (error) {
@@ -65,7 +62,6 @@ class CommandHandler {
 
   static async handleLeaderboard(ctx) {
     try {
-      // Get leaderboard from User model
       const users = await User.find().sort({ xp: -1 });
       if (users.length === 0) {
         return ctx.reply('❌ لا توجد بيانات في اللوحة الصدارة');
@@ -78,8 +74,6 @@ class CommandHandler {
       ctx.reply('❌ حدث خطأ');
     }
   }
-
-  // ===== DAILY REWARD =====
 
   static async handleDailyReward(ctx) {
     try {
@@ -689,4 +683,3 @@ class CommandHandler {
 }
 
 module.exports = CommandHandler;
-
