@@ -26,23 +26,20 @@ async function isGroupAdmin(bot, groupId, userId) {
 }
 
 /**
- * التحقق من أن المستخدم مالك الجروب
- */
-async function isGroupOwner(bot, groupId, userId) {
-  try {
-    const chatMember = await bot.telegram.getChatMember(groupId, userId);
-    return chatMember.status === 'creator';
-  } catch (error) {
-    console.error('Error checking owner:', error);
-    return false;
-  }
-}
-
-/**
  * التحقق من أن الأوامر تُنفذ من الدردشة الخاصة فقط
  */
 function isPrivateChat(ctx) {
   return ctx.chat && ctx.chat.type === 'private';
+}
+
+/**
+ * تهيئة الجلسة إذا لم تكن موجودة
+ */
+function initSession(ctx) {
+  if (!ctx.session) {
+    ctx.session = {};
+  }
+  return ctx.session;
 }
 
 /**
@@ -91,7 +88,7 @@ function extractUserId(args) {
 /**
  * أمر حظر مستخدم من الجروب
  */
-async function handleBan(ctx, bot) {
+async function handleBan(ctx, _bot) {
   if (!isPrivateChat(ctx)) {
     return ctx.reply('❌ هذا الأمر يعمل فقط في الدردشة الخاصة مع البوت');
   }
@@ -111,6 +108,9 @@ async function handleBan(ctx, bot) {
   }
 
   try {
+    // تهيئة الجلسة
+    initSession(ctx);
+
     // طلب معرف الجروب
     await ctx.reply('📌 أرسل معرف الجروب الذي تريد حظر المستخدم منه:');
 
@@ -130,7 +130,7 @@ async function handleBan(ctx, bot) {
 /**
  * تنفيذ أمر الحظر
  */
-async function executeBan(bot, groupId, targetUserId, adminId) {
+async function executeBan(bot, groupId, targetUserId, _adminId) {
   try {
     await bot.telegram.banChatMember(groupId, targetUserId);
     return { success: true, message: `✅ تم حظر المستخدم ${targetUserId} من الجروب` };
@@ -143,7 +143,7 @@ async function executeBan(bot, groupId, targetUserId, adminId) {
 /**
  * أمر إلغاء حظر مستخدم
  */
-async function handleUnban(ctx, bot) {
+async function handleUnban(ctx, _bot) {
   if (!isPrivateChat(ctx)) {
     return ctx.reply('❌ هذا الأمر يعمل فقط في الدردشة الخاصة مع البوت');
   }
@@ -162,6 +162,9 @@ async function handleUnban(ctx, bot) {
   }
 
   try {
+    // تهيئة الجلسة
+    initSession(ctx);
+
     await ctx.reply('📌 أرسل معرف الجروب:');
 
     ctx.session.pendingCommand = {
@@ -192,12 +195,12 @@ async function executeUnban(bot, groupId, targetUserId) {
 /**
  * أمر طرد مستخدم
  */
-async function handleKick(ctx, bot) {
+async function handleKick(ctx, _bot) {
   if (!isPrivateChat(ctx)) {
     return ctx.reply('❌ هذا الأمر يعمل فقط في الدردشة الخاصة');
   }
 
-  const userId = ctx.from.id;
+  const _userId = ctx.from.id;
   const args = ctx.message.text.split(' ').slice(1);
   const targetUserId = extractUserId(args);
 
@@ -207,6 +210,9 @@ async function handleKick(ctx, bot) {
 
   // يمكن للمالك أو الأدمن في الجروب
   // يتطلب تخزين الجروب المراد
+
+  // تهيئة الجلسة
+  initSession(ctx);
 
   await ctx.reply('📌 أرسل معرف الجروب:');
 
@@ -243,7 +249,7 @@ async function executeKick(bot, groupId, targetUserId) {
 /**
  * أمر ترقية مستخدم كمشرف
  */
-async function handlePromote(ctx, bot) {
+async function handlePromote(ctx, _bot) {
   if (!isPrivateChat(ctx)) {
     return ctx.reply('❌ هذا الأمر يعمل فقط في الدردشة الخاصة');
   }
@@ -261,6 +267,9 @@ async function handlePromote(ctx, bot) {
   if (!targetUserId) {
     return ctx.reply('⚠️ usage: /promote [معرف_المستخدم]\nمثال: /promote 123456789');
   }
+
+  // تهيئة الجلسة
+  initSession(ctx);
 
   await ctx.reply('📌 أرسل معرف الجروب:');
 
@@ -296,7 +305,7 @@ async function executePromote(bot, groupId, targetUserId) {
 /**
  * أمر إزالة صلاحيات المشرف
  */
-async function handleDemote(ctx, bot) {
+async function handleDemote(ctx, _bot) {
   if (!isPrivateChat(ctx)) {
     return ctx.reply('❌ هذا الأمر يعمل فقط في الدردشة الخاصة');
   }
@@ -312,6 +321,9 @@ async function handleDemote(ctx, bot) {
   if (!targetUserId) {
     return ctx.reply('⚠️ usage: /demote [معرف_المستخدم]');
   }
+
+  // تهيئة الجلسة
+  initSession(ctx);
 
   await ctx.reply('📌 أرسل معرف الجروب:');
 
@@ -347,7 +359,7 @@ async function executeDemote(bot, groupId, targetUserId) {
 /**
  * أمر كتم مستخدم
  */
-async function handleMute(ctx, bot) {
+async function handleMute(ctx, _bot) {
   if (!isPrivateChat(ctx)) {
     return ctx.reply('❌ هذا الأمر يعمل فقط في الدردشة الخاصة');
   }
@@ -364,6 +376,9 @@ async function handleMute(ctx, bot) {
   if (!targetUserId) {
     return ctx.reply('⚠️ usage: /mute [معرف_المستخدم] [الدقائق]\nمثال: /mute 123456789 30');
   }
+
+  // تهيئة الجلسة
+  initSession(ctx);
 
   await ctx.reply('📌 أرسل معرف الجروب:');
 
@@ -404,7 +419,7 @@ async function executeMute(bot, groupId, targetUserId, duration = 60) {
 /**
  * أمر إلغاء كتم مستخدم
  */
-async function handleUnmute(ctx, bot) {
+async function handleUnmute(ctx, _bot) {
   if (!isPrivateChat(ctx)) {
     return ctx.reply('❌ هذا الأمر يعمل فقط في الدردشة الخاصة');
   }
@@ -415,6 +430,9 @@ async function handleUnmute(ctx, bot) {
   if (!targetUserId) {
     return ctx.reply('⚠️ usage: /unmute [معرف_المستخدم]');
   }
+
+  // تهيئة الجلسة
+  initSession(ctx);
 
   await ctx.reply('📌 أرسل معرف الجروب:');
 
@@ -448,10 +466,13 @@ async function executeUnmute(bot, groupId, targetUserId) {
 /**
  * أمر عرض إعدادات الجروب
  */
-async function handleSettings(ctx, bot) {
+async function handleSettings(ctx, _bot) {
   if (!isPrivateChat(ctx)) {
     return ctx.reply('❌ هذا الأمر يعمل فقط في الدردشة الخاصة');
   }
+
+  // تهيئة الجلسة
+  initSession(ctx);
 
   await ctx.reply('📌 أرسل معرف الجروب لعرض الإعدادات:');
 
@@ -506,10 +527,13 @@ async function executeSettings(bot, groupId) {
 /**
  * أمر عرض معلومات الجروب
  */
-async function handleInfo(ctx, bot) {
+async function handleInfo(ctx, _bot) {
   if (!isPrivateChat(ctx)) {
     return ctx.reply('❌ هذا الأمر يعمل فقط في الدردشة الخاصة');
   }
+
+  // تهيئة الجلسة
+  initSession(ctx);
 
   await ctx.reply('📌 أرسل معرف الجروب لعرض المعلومات:');
 
@@ -556,10 +580,13 @@ async function executeInfo(bot, groupId) {
 /**
  * أمر عرض إحصائيات الجروب
  */
-async function handleStats(ctx, bot) {
+async function handleStats(ctx, _bot) {
   if (!isPrivateChat(ctx)) {
     return ctx.reply('❌ هذا الأمر يعمل فقط في الدردشة الخاصة');
   }
+
+  // تهيئة الجلسة
+  initSession(ctx);
 
   await ctx.reply('📌 أرسل معرف الجروب لعرض الإحصائيات:');
 
@@ -619,6 +646,9 @@ async function executeStats(bot, groupId) {
  * معالجة الأوامر المعلقة
  */
 async function handlePendingCommand(ctx, bot) {
+  // تهيئة الجلسة
+  initSession(ctx);
+
   const pending = ctx.session.pendingCommand;
   if (!pending) return false;
 
@@ -704,6 +734,8 @@ function registerGroupController(bot) {
   // التحقق من الأوامر المعلقة
   bot.on('text', async (ctx) => {
     if (!isPrivateChat(ctx)) return;
+    // تهيئة الجلسة
+    initSession(ctx);
     if (ctx.session.pendingCommand) {
       await handlePendingCommand(ctx, bot);
     }
