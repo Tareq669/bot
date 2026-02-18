@@ -68,6 +68,91 @@ async function isAdminOrOwner(ctx, bot) {
 }
 
 /**
+ * الحصول على معلومات المالك والمشرفين من التليجرام
+ * @param {number} groupId - معرف المجموعة
+ * @param {Object} bot - نسخة البوت
+ * @returns {Promise<Object>} - معلومات المالك والمشرفين
+ */
+async function getGroupAdminsFromTelegram(groupId, bot) {
+  try {
+    const administrators = await bot.telegram.getChatAdministrators(groupId);
+
+    let owner = null;
+    const admins = [];
+
+    for (const admin of administrators) {
+      if (admin.status === 'creator') {
+        owner = {
+          userId: admin.user.id,
+          firstName: admin.user.first_name,
+          lastName: admin.user.last_name,
+          username: admin.user.username,
+          isBot: admin.user.is_bot
+        };
+      } else if (admin.status === 'administrator') {
+        admins.push({
+          userId: admin.user.id,
+          firstName: admin.user.first_name,
+          lastName: admin.user.last_name,
+          username: admin.user.username,
+          isBot: admin.user.is_bot,
+          canChangeInfo: admin.can_change_info,
+          canDeleteMessages: admin.can_delete_messages,
+          canInviteUsers: admin.can_invite_users,
+          canRestrictMembers: admin.can_restrict_members,
+          canPinMessages: admin.can_pin_messages
+        });
+      }
+    }
+
+    return { owner, admins };
+  } catch (error) {
+    console.error('خطأ في جلب الأدمنز:', error);
+    return { owner: null, admins: [] };
+  }
+}
+
+/**
+ * تحديث بيانات المالك والمشرفين في قاعدة البيانات
+ * @param {number} groupId - معرف المجموعة
+ * @param {Object} bot - نسخة البوت
+ * @returns {Promise<Object>} - النتيجة
+ */
+async function updateGroupAdmins(groupId, bot) {
+  const { GroupSettings } = require('../database/models/GroupManagement');
+
+  try {
+    const { owner, admins } = await getGroupAdminsFromTelegram(groupId, bot);
+
+    await GroupSettings.findOneAndUpdate(
+      { groupId },
+      {
+        owner: owner,
+        admins: admins.map(a => ({
+          userId: a.userId,
+          firstName: a.firstName,
+          lastName: a.lastName,
+          username: a.username,
+          canChangeInfo: a.canChangeInfo,
+          canDeleteMessages: a.canDeleteMessages,
+          canInviteUsers: a.canInviteUsers,
+          canRestrictMembers: a.canRestrictMembers,
+          canPinMessages: a.canPinMessages,
+          addedAt: new Date()
+        })),
+        lastAdminUpdate: new Date()
+      },
+      { upsert: true, new: true }
+    );
+
+    return { success: true, owner, adminsCount: admins.length };
+  } catch (error) {
+    console.error('خطأ في تحديث الأدمنز:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
  * إرسال رسالة خطأ للدردشة الخاصة
  * @param {Object} ctx - سياق التلغرام
  */
@@ -174,6 +259,8 @@ module.exports = {
   isAdmin,
   isOwner,
   isAdminOrOwner,
+  getGroupAdminsFromTelegram,
+  updateGroupAdmins,
   sendPrivateChatError,
   sendNotAdminError,
   checkGroupAndAdmin,

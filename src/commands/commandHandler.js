@@ -4,6 +4,7 @@ const Formatter = require('../ui/formatter');
 const { User } = require('../database/models');
 const EconomyManager = require('../economy/economyManager');
 const { isGroup, isAdmin } = require('../utils/groupHelper');
+const groupCommands = require('./groupCommands');
 
 class CommandHandler {
   static async handleStart(ctx) {
@@ -140,8 +141,7 @@ class CommandHandler {
       return ctx.reply('❌ هذا الأمر للمجموعات فقط');
     }
 
-    const { GroupCommands } = require('./groupCommands');
-    return GroupCommands.handleStats(ctx);
+    return groupCommands.handleStats(ctx);
   }
 
   static async handleGroupMembers(ctx) {
@@ -149,8 +149,7 @@ class CommandHandler {
       return ctx.reply('❌ هذا الأمر للمجموعات فقط');
     }
 
-    const { GroupCommands } = require('./groupCommands');
-    return GroupCommands.handleMembers(ctx);
+    return groupCommands.handleMembers(ctx);
   }
 
   static async handleGroupAdmins(ctx) {
@@ -158,8 +157,7 @@ class CommandHandler {
       return ctx.reply('❌ هذا الأمر للمجموعات فقط');
     }
 
-    const { GroupCommands } = require('./groupCommands');
-    return GroupCommands.handleAdmins(ctx);
+    return groupCommands.handleAdmins(ctx);
   }
 
   static async handleGroupProtection(ctx) {
@@ -167,8 +165,7 @@ class CommandHandler {
       return ctx.reply('❌ هذا الأمر للمجموعات فقط');
     }
 
-    const { GroupCommands } = require('./groupCommands');
-    return GroupCommands.handleProtection(ctx);
+    return groupCommands.handleProtection(ctx);
   }
 
   static async handleGroupSettings(ctx) {
@@ -176,8 +173,7 @@ class CommandHandler {
       return ctx.reply('❌ هذا الأمر للمجموعات فقط');
     }
 
-    const { GroupCommands } = require('./groupCommands');
-    return GroupCommands.handleSettings(ctx);
+    return groupCommands.handleSettings(ctx);
   }
 
   static async handleGroupRules(ctx) {
@@ -185,8 +181,7 @@ class CommandHandler {
       return ctx.reply('❌ هذا الأمر للمجموعات فقط');
     }
 
-    const { GroupCommands } = require('./groupCommands');
-    return GroupCommands.handleRules(ctx);
+    return groupCommands.handleRules(ctx);
   }
 
   static async handleMyPoints(ctx) {
@@ -194,8 +189,7 @@ class CommandHandler {
       return ctx.reply('❌ هذا الأمر للمجموعات فقط');
     }
 
-    const { GroupCommands } = require('./groupCommands');
-    return GroupCommands.handleMyPoints(ctx);
+    return groupCommands.handleMyPoints(ctx);
   }
 
   static async handleDailyReward(ctx) {
@@ -806,3 +800,4 @@ class CommandHandler {
 }
 
 module.exports = CommandHandler;
+

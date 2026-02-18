@@ -4,7 +4,7 @@
  */
 const { GroupSettings, GroupMember, GroupStats } = require('../database/models/GroupManagement');
 const groupHandlers = require('../handlers/groupHandlers');
-const { isGroup, isAdmin, sendPrivateChatError, sendNotAdminError } = require('../utils/groupHelper');
+const { isGroup, isAdmin, sendPrivateChatError, sendNotAdminError, updateGroupAdmins } = require('../utils/groupHelper');
 
 /**
  * تسجيل أوامر المجموعات
@@ -358,13 +358,76 @@ async function handleAdmins(ctx) {
     let text = '👮 <b>قائمة الأدمنز</b>\n\n';
 
     for (const admin of admins) {
-      const status = admin.status === 'creator' ? 'المالك' : 'أدمن';
-      text += `• ${admin.user.first_name} (${status})\n`;
+      const status = admin.status === 'creator' ? 'المالك 👑' : 'أدمن';
+      const name = `${admin.user.first_name}${admin.user.last_name ? ` ${admin.user.last_name}` : ''}`;
+      const username = admin.user.username ? `@${admin.user.username}` : 'لا يوجد يوزر';
+
+      text += `• ${name}\n`;
+      text += `   └ المستخدم: ${username}\n`;
+      text += `   └ الحالة: ${status}\n\n`;
     }
 
     await ctx.reply(text, { parse_mode: 'HTML' });
   } catch (error) {
     await ctx.reply('❌ فشل في جلب قائمة الأدمنز');
+  }
+}
+
+/**
+ * عرض معلومات المالك
+ */
+async function handleOwner(ctx) {
+  // التحقق من أنها مجموعة
+  if (!isGroup(ctx)) {
+    return sendPrivateChatError(ctx);
+  }
+
+  const groupId = ctx.chat.id;
+
+  try {
+    const admins = await ctx.telegram.getChatAdministrators(groupId);
+    const owner = admins.find(a => a.status === 'creator');
+
+    if (!owner) {
+      return ctx.reply('❌ لم يتم العثور على مالك المجموعة');
+    }
+
+    const text = `👑 <b>معلومات مالك المجموعة</b>\n\n• <b>الاسم:</b> ${owner.user.first_name}${owner.user.last_name ? ` ${owner.user.last_name}` : ''}\n• <b>اليوزر:</b> ${owner.user.username ? `@${owner.user.username}` : 'لا يوجد'}\n• <b>معرف:</b> \`${owner.user.id}\``;
+
+    await ctx.reply(text, { parse_mode: 'HTML' });
+  } catch (error) {
+    await ctx.reply('❌ فشل في جلب معلومات المالك');
+  }
+}
+
+/**
+ * تحديث بيانات المالك والمشرفين
+ */
+async function handleRefreshAdmins(ctx) {
+  // التحقق من أنها مجموعة
+  if (!isGroup(ctx)) {
+    return sendPrivateChatError(ctx);
+  }
+
+  // التحقق من أن المستخدم أدمن
+  const adminStatus = await isAdmin(ctx, ctx.telegram);
+  if (!adminStatus) {
+    return sendNotAdminError(ctx);
+  }
+
+  const groupId = ctx.chat.id;
+
+  try {
+    const result = await updateGroupAdmins(groupId, ctx.telegram);
+
+    if (result.success) {
+      const ownerName = result.owner?.firstName || 'غير معروف';
+      await ctx.reply(`✅ تم تحديث بيانات المالك والمشرفين\n\n• المالك: ${ownerName}\n• عدد المشرفين: ${result.adminsCount}`);
+    } else {
+      await ctx.reply('❌ فشل في تحديث البيانات');
+    }
+  } catch (error) {
+    await ctx.reply('❌ حدث خطأ أثناء التحديث');
   }
 }
 
@@ -1010,5 +1073,34 @@ function getSettingsKeyboard() {
 }
 
 module.exports = {
-  registerGroupCommands
+  registerGroupCommands,
+  handleSettings,
+  handleGroupInfo,
+  handleMembers,
+  handleAdmins,
+  handleModerators,
+  handleProtection,
+  handleWelcome,
+  handleFarewell,
+  handleRules,
+  handleStats,
+  handleLeaderboard,
+  handleMyPoints,
+  handlePromote,
+  handleDemote,
+  handleKick,
+  handleBan,
+  handleUnban,
+  handleMute,
+  handleUnmute,
+  handleLinkFilter,
+  handleSpamFilter,
+  handleAntiFlood,
+  handleAutoReply,
+  handleAutoResponse,
+  handleRank,
+  handlePenalty,
+  handleFakeBan,
+  handleOwner,
+  handleRefreshAdmins
 };

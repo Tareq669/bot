@@ -131,6 +131,8 @@ bot.command('حظر', (ctx) => GroupCommands.handleBan(ctx));
 bot.command('كتم', (ctx) => GroupCommands.handleMute(ctx));
 bot.command('الغاء_حظر', (ctx) => GroupCommands.handleUnban(ctx));
 bot.command('الغاء_الكتم', (ctx) => GroupCommands.handleUnmute(ctx));
+bot.command('مالك', (ctx) => GroupCommands.handleOwner(ctx));
+bot.command('تحديث_الادمنز', (ctx) => GroupCommands.handleRefreshAdmins(ctx));
 
 // --- AI SMART COMMANDS ---
 bot.command('dashboard', async (ctx) => {
