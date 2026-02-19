@@ -3,7 +3,7 @@
  * Handles image generation using Google Gemini API
  */
 
-const { GoogleGenAI } = require('@google/genai');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { logger } = require('../utils/helpers');
 
 class ImageHandler {
@@ -27,7 +27,7 @@ class ImageHandler {
         return;
       }
 
-      this.ai = new GoogleGenAI({ apiKey });
+      this.ai = new GoogleGenerativeAI(apiKey);
 
       this.isInitialized = true;
       logger.info('✅ Image Generator initialized successfully with Gemini');
@@ -84,15 +84,17 @@ class ImageHandler {
         };
       }
 
-      logger.info(`🎨 Generating image description for: ${  prompt.substring(0, 50)  }...`);
+      logger.info(`🎨 Generating image description for: ${prompt.substring(0, 50)}...`);
+
+      // Get the model
+      const model = this.ai.getGenerativeModel({ model: 'gemini-pro' });
 
       // Generate detailed image description using Gemini
-      const response = await this.ai.models.generateContent({
-        model: 'gemini-pro',
-        contents: `You are an AI image description generator. Create a detailed, vivid description for an image based on this prompt: "${  prompt  }". The description should be artistic and visual, suitable for an artist to create an image. Write the description in Arabic. Make it beautiful and inspiring. Keep it under 200 words.`
-      });
+      const result = await model.generateContent(
+        `You are an AI image description generator. Create a detailed, vivid description for an image based on this prompt: "${prompt}". The description should be artistic and visual, suitable for an artist to create an image. Write the description in Arabic. Make it beautiful and inspiring. Keep it under 200 words.`
+      );
 
-      const description = response.text;
+      const description = result.response.text();
 
       logger.info('✅ Image description generated successfully');
 
@@ -176,13 +178,13 @@ class ImageHandler {
         // Send the generated description
         await ctx.reply(
           '🎨 <b>وصف الصورة المولدة</b>\n\n' +
-          `📝 <b>الوصف الأصلي:</b> ${  args  }\n\n` +
-          `✨ <b>الوصف التفصيلي:</b>\n${  result.description  }\n\n` +
+          `📝 <b>الوصف الأصلي:</b> ${args}\n\n` +
+          `✨ <b>الوصف التفصيلي:</b>\n${result.description}\n\n` +
           '💡 <i>ملاحظة: هذا وصف تفصيلي للصورة. يمكنك استخدامه في أدوات توليد الصور الأخرى.</i>',
           { parse_mode: 'HTML' }
         );
       } else {
-        await ctx.reply(`❌ ${  result.error}`);
+        await ctx.reply(`❌ ${result.error}`);
       }
 
     } catch (error) {
@@ -250,13 +252,13 @@ class ImageHandler {
         // Send the generated description
         await ctx.reply(
           '🎨 <b>وصف الصورة المولدة</b>\n\n' +
-          `📝 <b>الوصف الأصلي:</b> ${  prompt  }\n\n` +
-          `✨ <b>الوصف التفصيلي:</b>\n${  result.description  }\n\n` +
+          `📝 <b>الوصف الأصلي:</b> ${prompt}\n\n` +
+          `✨ <b>الوصف التفصيلي:</b>\n${result.description}\n\n` +
           '💡 <i>ملاحظة: هذا وصف تفصيلي للصورة. يمكنك استخدامه في أدوات توليد الصور الأخرى.</i>',
           { parse_mode: 'HTML' }
         );
       } else {
-        await ctx.reply(`❌ ${  result.error}`);
+        await ctx.reply(`❌ ${result.error}`);
       }
 
       return true;
