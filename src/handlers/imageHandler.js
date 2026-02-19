@@ -38,6 +38,69 @@ class ImageHandler {
   }
 
   /**
+   * Download image from URL and save to temp file
+   * @param {string} url - Image URL
+   * @returns {Promise<{success: boolean, filePath?: string, error?: string}>}
+   */
+  async downloadImage(url) {
+    return new Promise((resolve) => {
+      const https = require('https');
+      const http = require('http');
+      const fs = require('fs');
+      const path = require('path');
+
+      const tempDir = path.join(__dirname, '../../temp');
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true });
+      }
+
+      const filename = `image_${Date.now()}.png`;
+      const filepath = path.join(tempDir, filename);
+      const file = fs.createWriteStream(filepath);
+
+      const protocol = url.startsWith('https') ? https : http;
+
+      const request = protocol.get(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      }, (response) => {
+        if (response.statusCode !== 200) {
+          file.close();
+          if (fs.existsSync(filepath)) fs.unlinkSync(filepath);
+          resolve({ success: false, error: `HTTP ${response.statusCode}` });
+          return;
+        }
+
+        response.pipe(file);
+
+        file.on('finish', () => {
+          file.close();
+          const stats = fs.statSync(filepath);
+          if (stats.size > 0) {
+            resolve({ success: true, filePath: filepath });
+          } else {
+            fs.unlinkSync(filepath);
+            resolve({ success: false, error: 'Empty file' });
+          }
+        });
+      });
+
+      request.on('error', (err) => {
+        file.close();
+        if (fs.existsSync(filepath)) fs.unlinkSync(filepath);
+        resolve({ success: false, error: err.message });
+      });
+
+      request.setTimeout(30000, () => {
+        request.destroy();
+        if (fs.existsSync(filepath)) fs.unlinkSync(filepath);
+        resolve({ success: false, error: 'Timeout' });
+      });
+    });
+  }
+
+  /**
    * Generate an image URL using Pollinations AI API
    * @param {string} prompt - Text description for image generation
    * @returns {Promise<{success: boolean, imageUrl?: string, error?: string}>}
@@ -148,10 +211,48 @@ class ImageHandler {
       const result = await this.generateImage(prompt);
 
       if (result.success) {
-        // Send the image directly
-        await ctx.replyWithPhoto(result.imageUrl, {
-          caption: `🎨 تم توليد الصورة بنجاح!\n\n📝 الوصف: ${prompt}`
-        });
+        try {
+          // Try sending the image directly from URL
+          await ctx.replyWithPhoto(result.imageUrl, {
+            caption: `🎨 تم توليد الصورة بنجاح!\n\n📝 الوصف: ${prompt}`
+          });
+        } catch (urlError) {
+          // If URL fails, try downloading and sending locally
+          logger.error('URL send failed, trying download:', urlError.message);
+
+          try {
+            const downloadResult = await this.downloadImage(result.imageUrl);
+
+            if (downloadResult.success) {
+              await ctx.replyWithPhoto({ source: downloadResult.filePath }, {
+                caption: `🎨 تم توليد الصورة بنجاح!\n\n📝 الوصف: ${prompt}`
+              });
+
+              // Clean up temp file
+              try {
+                require('fs').unlinkSync(downloadResult.filePath);
+              } catch (e) {
+                // Ignore errors during temp file cleanup
+              }
+            } else {
+              // All methods failed, send link
+              await ctx.reply(
+                '🎨 تم توليد الصورة!\n\n' +
+                `📝 الوصف: ${prompt}\n\n` +
+                `🔗 <a href="${result.imageUrl}">اضغط هنا لفتح الصورة</a>`,
+                { parse_mode: 'HTML' }
+              );
+            }
+          } catch (downloadError) {
+            logger.error('Download also failed:', downloadError.message);
+            await ctx.reply(
+              '🎨 تم توليد الصورة!\n\n' +
+              `📝 الوصف: ${prompt}\n\n` +
+              `🔗 <a href="${result.imageUrl}">اضغط هنا لفتح الصورة</a>`,
+              { parse_mode: 'HTML' }
+            );
+          }
+        }
       } else {
         await ctx.reply(`❌ ${result.error}`);
       }
@@ -203,9 +304,48 @@ class ImageHandler {
       const result = await this.generateImage(args);
 
       if (result.success) {
-        await ctx.replyWithPhoto(result.imageUrl, {
-          caption: `🎨 تم توليد الصورة بنجاح!\n\n📝 الوصف: ${args}`
-        });
+        try {
+          // Try sending the image directly from URL
+          await ctx.replyWithPhoto(result.imageUrl, {
+            caption: `🎨 تم توليد الصورة بنجاح!\n\n📝 الوصف: ${args}`
+          });
+        } catch (urlError) {
+          // If URL fails, try downloading and sending locally
+          logger.error('URL send failed, trying download:', urlError.message);
+
+          try {
+            const downloadResult = await this.downloadImage(result.imageUrl);
+
+            if (downloadResult.success) {
+              await ctx.replyWithPhoto({ source: downloadResult.filePath }, {
+                caption: `🎨 تم توليد الصورة بنجاح!\n\n📝 الوصف: ${args}`
+              });
+
+              // Clean up temp file
+              try {
+                require('fs').unlinkSync(downloadResult.filePath);
+              } catch (e) {
+                // Ignore errors during temp file cleanup
+              }
+            } else {
+              // All methods failed, send link
+              await ctx.reply(
+                '🎨 تم توليد الصورة!\n\n' +
+                `📝 الوصف: ${args}\n\n` +
+                `🔗 <a href="${result.imageUrl}">اضغط هنا لفتح الصورة</a>`,
+                { parse_mode: 'HTML' }
+              );
+            }
+          } catch (downloadError) {
+            logger.error('Download also failed:', downloadError.message);
+            await ctx.reply(
+              '🎨 تم توليد الصورة!\n\n' +
+              `📝 الوصف: ${args}\n\n` +
+              `🔗 <a href="${result.imageUrl}">اضغط هنا لفتح الصورة</a>`,
+              { parse_mode: 'HTML' }
+            );
+          }
+        }
       } else {
         await ctx.reply(`❌ ${result.error}`);
       }
