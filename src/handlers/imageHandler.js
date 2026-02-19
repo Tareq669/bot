@@ -6,7 +6,7 @@
 const { logger } = require('../utils/helpers');
 
 // Simple state system using Set
-let waitingForImagePrompt = new Set();
+const waitingForImagePrompt = new Set();
 
 class ImageHandler {
   constructor() {
@@ -102,19 +102,19 @@ class ImageHandler {
   async handleImageButton(ctx) {
     try {
       const userId = ctx.from.id;
-      
+
       // Add user to waiting set
       waitingForImagePrompt.add(userId);
-      
+
       // Reply to user asking for the prompt
       await ctx.reply(
         '🎨 اكتب وصف الصورة التي تريد توليدها\n\n' +
         'مثال: غروب الشمس على شاطئ استوائي',
         { parse_mode: 'HTML' }
       );
-      
+
       logger.info(`User ${userId} is now waiting for image prompt`);
-      
+
     } catch (error) {
       logger.error('Image button error:', error);
       await ctx.reply('❌ حدث خطأ. يرجى المحاولة مرة أخرى.');
@@ -129,24 +129,24 @@ class ImageHandler {
   async handleTextMessage(ctx) {
     try {
       const userId = ctx.from.id;
-      
+
       // Check if user is waiting for image prompt
       if (!waitingForImagePrompt.has(userId)) {
         return false;
       }
-      
+
       // Remove user from waiting set
       waitingForImagePrompt.delete(userId);
-      
+
       const prompt = ctx.message.text;
-      
+
       // Show typing indicator
       await ctx.sendChatAction('upload_photo');
       await ctx.reply('⏳ جاري توليد الصورة...');
-      
+
       // Generate image
       const result = await this.generateImage(prompt);
-      
+
       if (result.success) {
         // Send the image directly
         await ctx.replyWithPhoto(result.imageUrl, {
@@ -155,17 +155,17 @@ class ImageHandler {
       } else {
         await ctx.reply(`❌ ${result.error}`);
       }
-      
+
       return true;
-      
+
     } catch (error) {
       logger.error('Image text handling error:', error);
-      
+
       // Make sure to remove user from waiting set on error
       if (ctx.from && ctx.from.id) {
         waitingForImagePrompt.delete(ctx.from.id);
       }
-      
+
       await ctx.reply('❌ حدث خطأ. يرجى المحاولة مرة أخرى.');
       return true;
     }
@@ -218,7 +218,7 @@ class ImageHandler {
 
   /**
    * Check if user is waiting for image prompt
-   * @param {number} userId 
+   * @param {number} userId
    * @returns {boolean}
    */
   isWaitingForImagePrompt(userId) {
@@ -227,7 +227,7 @@ class ImageHandler {
 
   /**
    * Remove user from waiting set
-   * @param {number} userId 
+   * @param {number} userId
    */
   clearWaitingState(userId) {
     waitingForImagePrompt.delete(userId);
