@@ -16,13 +16,6 @@ const connectionMonitor = require('./utils/connectionMonitor');
 const healthMonitor = require('./utils/healthMonitor');
 const Formatter = require('./utils/formatter');
 
-// Import AI Systems
-const AIManager = require('./ai/aiManager');
-const LearningSystem = require('./ai/learningSystem');
-const SmartNotifications = require('./ai/smartNotifications');
-const AnalyticsEngine = require('./ai/analyticsEngine');
-const IntegratedAI = require('./ai/integratedAI');
-
 // Configure HTTPS Agent for Telegram API
 const httpsAgent = new https.Agent({
   timeout: 60000,
@@ -109,53 +102,6 @@ bot.command('referral', (ctx) => CommandHandler.handleReferral(ctx));
 bot.command('events', (ctx) => CommandHandler.handleEvents(ctx));
 bot.command('library', (ctx) => CommandHandler.handleLibrary(ctx));
 bot.command('teams', (ctx) => CommandHandler.handleTeams(ctx));
-
-// --- AI SMART COMMANDS ---
-bot.command('dashboard', async (ctx) => {
-  try {
-    const dashboard = await IntegratedAI.generateSmartDashboard(ctx.from.id);
-    const formatted = IntegratedAI.formatSmartDashboard(dashboard);
-    ctx.reply(formatted, { parse_mode: 'HTML' });
-  } catch (error) {
-    logger.error('Dashboard error:', error);
-    ctx.reply('❌ خدمة اللوحة غير متاحة حالياً');
-  }
-});
-
-bot.command('analytics', async (ctx) => {
-  try {
-    const report = await AnalyticsEngine.generateUserReport(ctx.from.id);
-    const formatted = AnalyticsEngine.formatReport(report);
-    ctx.reply(formatted, { parse_mode: 'HTML' });
-  } catch (error) {
-    logger.error('Analytics error:', error);
-    ctx.reply('❌ خدمة التحليلات غير متاحة حالياً');
-  }
-});
-
-bot.command('coaching', async (ctx) => {
-  try {
-    const message = await IntegratedAI.generateCoachingMessage(ctx.from.id);
-    ctx.reply(message, { parse_mode: 'HTML' });
-  } catch (error) {
-    logger.error('Coaching error:', error);
-    ctx.reply('❌ خدمة التدريب غير متاحة حالياً');
-  }
-});
-
-bot.command('motivation', async (ctx) => {
-  try {
-    const { User } = require('./database/models');
-    const user = await User.findOne({ userId: ctx.from.id });
-    if (user) {
-      const motivation = IntegratedAI.generateMotivation(user);
-      ctx.reply(motivation, { parse_mode: 'HTML' });
-    }
-  } catch (error) {
-    logger.error('Motivation error:', error);
-    ctx.reply('❌ خدمة التحفيز غير متاحة حالياً');
-  }
-});
 
 // --- QUICK MENU COMMANDS ---
 bot.command('khatma', (ctx) => MenuHandler.handleKhatmaMenu(ctx));
@@ -1583,76 +1529,6 @@ bot.action('stats:view', async (ctx) => {
   }
 });
 
-// --- AI ACHIEVEMENTS & NOTIFICATIONS ---
-bot.action('achievements:view', async (ctx) => {
-  try {
-    const achievements = await SmartNotifications.checkAchievements(ctx.from.id);
-    let message = '🏆 <b>إنجازاتك</b>\n\n';
-
-    if (achievements.length > 0) {
-      message += '<b>إنجازات جديدة! 🎉</b>\n';
-      const formatted = SmartNotifications.formatAchievements(achievements);
-      message += formatted;
-    } else {
-      message += '📊 لا توجد إنجازات جديدة حالياً\n';
-      message += '💪 استمر في اللعب والقراءة لفتح إنجازات جديدة!';
-    }
-
-    await ctx.editMessageText(message, {
-      parse_mode: 'HTML',
-      reply_markup: {
-        inline_keyboard: [[{ text: '⬅️ رجوع', callback_data: 'stats:view' }]]
-      }
-    });
-  } catch (error) {
-    ctx.answerCbQuery('❌ خطأ في الحصول على الإنجازات');
-  }
-});
-
-bot.action('notification:check', async (ctx) => {
-  try {
-    const notification = await SmartNotifications.getSmartNotification(ctx.from.id, ctx);
-    let message = '📢 <b>إشعاراتك الذكية</b>\n\n';
-
-    if (notification) {
-      message += SmartNotifications.formatNotification(notification);
-    } else {
-      message += '✅ لا توجد إشعارات جديدة';
-    }
-
-    await ctx.editMessageText(message, {
-      parse_mode: 'HTML',
-      reply_markup: {
-        inline_keyboard: [[{ text: '⬅️ رجوع', callback_data: 'menu:main' }]]
-      }
-    });
-  } catch (error) {
-    ctx.answerCbQuery('❌ خطأ في الحصول على الإشعارات');
-  }
-});
-
-bot.action('behavior:analyze', async (ctx) => {
-  try {
-    const behavior = await LearningSystem.analyzeUserBehavior(ctx.from.id);
-    let message = '🧠 <b>تحليل سلوكك</b>\n\n';
-
-    message += `<b>تفضيلاتك:</b>\n${behavior.preferences.join(', ')}\n\n`;
-    message += `<b>النشاط:</b> ${behavior.activityLevel}\n`;
-    message += `<b>المشاركة:</b> ${behavior.engagement}%\n\n`;
-    message += `<b>نقاط قوتك:</b>\n${behavior.strengths.join(', ')}\n\n`;
-    message += `<b>للتحسن:</b>\n${behavior.weaknesses.join(', ')}`;
-
-    await ctx.editMessageText(message, {
-      parse_mode: 'HTML',
-      reply_markup: {
-        inline_keyboard: [[{ text: '⬅️ رجوع', callback_data: 'menu:main' }]]
-      }
-    });
-  } catch (error) {
-    ctx.answerCbQuery('❌ خطأ في التحليل');
-  }
-});
-
 // --- SMART STATS & REWARDS HANDLERS ---
 bot.action('stats:view', async (ctx) => {
   try {
@@ -2745,68 +2621,8 @@ bot.on('text', async (ctx) => {
       }
     }
 
-    // Smart keyword detection
-    if (message.includes('لوحة') || message.includes('dashboard')) {
-      const dashboard = await IntegratedAI.generateSmartDashboard(ctx.from.id);
-      const formatted = IntegratedAI.formatSmartDashboard(dashboard);
-      return ctx.reply(formatted, { parse_mode: 'HTML' });
-    }
-
-    if (message.includes('إنجاز') || message.includes('achievement')) {
-      const achievements = await SmartNotifications.checkAchievements(ctx.from.id);
-      let response = '🏆 <b>إنجازاتك</b>\n\n';
-      if (achievements.length > 0) {
-        response += SmartNotifications.formatAchievements(achievements);
-      } else {
-        response += '📊 لا توجد إنجازات جديدة حالياً';
-      }
-      return ctx.reply(response, { parse_mode: 'HTML' });
-    }
-
-    if (message.includes('تحليل') || message.includes('analytics')) {
-      const report = await AnalyticsEngine.generateUserReport(ctx.from.id);
-      const formatted = AnalyticsEngine.formatReport(report);
-      return ctx.reply(formatted, { parse_mode: 'HTML' });
-    }
-
-    if (message.includes('تدريب') || message.includes('coaching')) {
-      const coaching = await IntegratedAI.generateCoachingMessage(ctx.from.id);
-      return ctx.reply(coaching, { parse_mode: 'HTML' });
-    }
-
-    if (message.includes('تحفيز') || message.includes('motivation')) {
-      const { User } = require('./database/models');
-      const user = await User.findOne({ userId: ctx.from.id });
-      if (user) {
-        const motivation = IntegratedAI.generateMotivation(user);
-        return ctx.reply(motivation, { parse_mode: 'HTML' });
-      }
-    }
-
-    // Use AI for smart responses
-    try {
-      const aiResponse = await AIManager.generateSmartResponse(ctx.from.id, message);
-      await ctx.reply(aiResponse, { parse_mode: 'HTML' });
-
-      // Record user interaction and update streak (non-blocking)
-      AIManager.recordUserInteraction(ctx.from.id, 'message:sent', 1);
-      LearningSystem.updateUserStreak(ctx.from.id).catch(err => console.error('Streak error:', err));
-
-      // Check for notifications (non-blocking)
-      SmartNotifications.getSmartNotification(ctx.from.id, ctx)
-        .then(notification => {
-          if (notification && Math.random() < 0.3) {
-            setTimeout(() => {
-              ctx.reply(SmartNotifications.formatNotification(notification), { parse_mode: 'HTML' })
-                .catch(err => console.error('Notification error:', err));
-            }, 2000);
-          }
-        })
-        .catch(err => console.error('Notification check error:', err));
-    } catch (aiError) {
-      console.error('AI response error:', aiError);
-      await ctx.reply('❌ حدث خطأ في معالجة رسالتك');
-    }
+    // Default response for unrecognized messages
+    await ctx.reply('❓ لم أفهم رسالتك. يرجى استخدام الأوامر المتاحة أو الأزرار في القائمة الرئيسية.', { parse_mode: 'HTML' });
   } catch (error) {
     console.error('Text handler error:', error);
     ctx.reply('❌ حدث خطأ، جاري المحاولة...');
