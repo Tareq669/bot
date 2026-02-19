@@ -3,34 +3,13 @@
  * Handles image generation using Google Gemini API
  */
 
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { GoogleGenAI } = require('@google/genai');
 const { logger } = require('../utils/helpers');
 
 class ImageHandler {
   constructor() {
-    this.genAI = null;
-    this.model = null;
+    this.ai = null;
     this.isInitialized = false;
-
-    // Safety settings to prevent inappropriate content
-    this.safetySettings = [
-      {
-        category: 'HARM_CATEGORY_HARASSMENT',
-        threshold: 'BLOCK_MEDIUM_AND_ABOVE'
-      },
-      {
-        category: 'HARM_CATEGORY_HATE_SPEECH',
-        threshold: 'BLOCK_MEDIUM_AND_ABOVE'
-      },
-      {
-        category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
-        threshold: 'BLOCK_MEDIUM_AND_ABOVE'
-      },
-      {
-        category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
-        threshold: 'BLOCK_MEDIUM_AND_ABOVE'
-      }
-    ];
 
     // Initialize if API key is available
     this.initialize();
@@ -48,12 +27,7 @@ class ImageHandler {
         return;
       }
 
-      this.genAI = new GoogleGenerativeAI(apiKey);
-
-      // Use Gemini 1.5 Flash model
-      this.model = this.genAI.getGenerativeModel({
-        model: 'gemini-1.5-flash'
-      });
+      this.ai = new GoogleGenAI({ apiKey });
 
       this.isInitialized = true;
       logger.info('✅ Image Generator initialized successfully with Gemini');
@@ -68,7 +42,7 @@ class ImageHandler {
    * @returns {boolean}
    */
   isAvailable() {
-    return this.isInitialized && this.model !== null;
+    return this.isInitialized && this.ai !== null;
   }
 
   /**
@@ -110,27 +84,15 @@ class ImageHandler {
         };
       }
 
-      logger.info(`🎨 Generating image description for: ${prompt.substring(0, 50)}...`);
+      logger.info('🎨 Generating image description for: ' + prompt.substring(0, 50) + '...');
 
       // Generate detailed image description using Gemini
-      const result = await this.model.generateContent({
-        contents: [{
-          parts: [{
-            text: `You are an AI image description generator. Create a detailed, vivid description for an image based on this prompt: "${prompt}". 
-                   The description should be artistic and visual, suitable for an artist to create an image.
-                   Write the description in Arabic. Make it beautiful and inspiring.
-                   Keep it under 200 words.`
-          }]
-        }],
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 500
-        },
-        safetySettings: this.safetySettings
+      const response = await this.ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: 'You are an AI image description generator. Create a detailed, vivid description for an image based on this prompt: "' + prompt + '". The description should be artistic and visual, suitable for an artist to create an image. Write the description in Arabic. Make it beautiful and inspiring. Keep it under 200 words.'
       });
 
-      const response = result.response;
-      const description = response.text();
+      const description = response.text;
 
       logger.info('✅ Image description generated successfully');
 
@@ -143,14 +105,14 @@ class ImageHandler {
       logger.error('❌ Image generation error:', error.message);
 
       // Handle specific errors
-      if (error.message?.includes('quota')) {
+      if (error.message && error.message.includes('quota')) {
         return {
           success: false,
           error: 'تم تجاوز حد الاستخدام اليومي. يرجى المحاولة لاحقاً.'
         };
       }
 
-      if (error.message?.includes('invalid') || error.message?.includes('key')) {
+      if (error.message && (error.message.includes('invalid') || error.message.includes('key'))) {
         return {
           success: false,
           error: 'خطأ في إعدادات API. يرجى التواصل مع المطور.'
@@ -186,7 +148,7 @@ class ImageHandler {
    */
   async handleImageCommand(ctx) {
     try {
-      const messageText = ctx.message?.text || '';
+      const messageText = ctx.message && ctx.message.text ? ctx.message.text : '';
       const args = messageText.split(' ').slice(1).join(' ');
 
       if (!args) {
@@ -220,7 +182,7 @@ class ImageHandler {
           { parse_mode: 'HTML' }
         );
       } else {
-        await ctx.reply(`❌ ${result.error}`);
+        await ctx.reply('❌ ' + result.error);
       }
 
     } catch (error) {
@@ -271,7 +233,7 @@ class ImageHandler {
    */
   async handleImagePrompt(ctx, prompt) {
     try {
-      if (!ctx.session?.awaitingImagePrompt) {
+      if (!ctx.session || !ctx.session.awaitingImagePrompt) {
         return false;
       }
 
@@ -294,7 +256,7 @@ class ImageHandler {
           { parse_mode: 'HTML' }
         );
       } else {
-        await ctx.reply(`❌ ${result.error}`);
+        await ctx.reply('❌ ' + result.error);
       }
 
       return true;
