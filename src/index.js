@@ -15,6 +15,7 @@ const ReconnectManager = require('./utils/reconnect');
 const connectionMonitor = require('./utils/connectionMonitor');
 const healthMonitor = require('./utils/healthMonitor');
 const Formatter = require('./utils/formatter');
+const imageHandler = require('./handlers/imageHandler');
 
 // Configure HTTPS Agent for Telegram API
 const httpsAgent = new https.Agent({
@@ -55,6 +56,7 @@ bot.telegram
     { command: 'profile', description: '👤 حسابي' },
     { command: 'leaderboard', description: '🏆 المتصدرين' },
     { command: 'notifications', description: '🔔 الإشعارات' },
+    { command: 'image', description: '🎨 توليد صورة' },
     { command: 'help', description: '❓ المساعدة' }
   ])
   .catch((err) => {
@@ -113,6 +115,9 @@ bot.command('games', (ctx) => MenuHandler.handleGamesMenu(ctx));
 bot.command('economy', (ctx) => MenuHandler.handleEconomyMenu(ctx));
 bot.command('stats', (ctx) => CommandHandler.handleStats(ctx));
 bot.command('rewards', (ctx) => CommandHandler.handleRewards(ctx));
+
+// --- IMAGE GENERATION COMMAND ---
+bot.command('image', (ctx) => imageHandler.handleImageCommand(ctx));
 
 // --- NEW FEATURES COMMANDS ---
 // Shop System
@@ -572,6 +577,10 @@ bot.action('menu:smartnotifications', (ctx) => MenuHandler.handleSmartNotificati
 bot.action('menu:backups', (ctx) => MenuHandler.handleBackupsMenu(ctx));
 bot.action('menu:cache', (ctx) => MenuHandler.handleCacheMenu(ctx));
 bot.action('menu:protection', (ctx) => MenuHandler.handleProtectionMenu(ctx));
+
+// Image generation callback
+bot.action('image:generate', (ctx) => imageHandler.handleImageCallback(ctx));
+
 bot.action('settings:notifications', (ctx) => MenuHandler.handleNotificationsSettings(ctx));
 bot.action('settings:toggleNotify', (ctx) => {
   const NotificationsHandler = require('./commands/notificationsHandler');
@@ -1308,6 +1317,7 @@ bot.hears('🔔 الإشعارات الذكية', (ctx) => MenuHandler.handleSma
 bot.hears('📁 النسخ الاحتياطية', (ctx) => MenuHandler.handleBackupsMenu(ctx));
 bot.hears('⚡ التخزين المؤقت', (ctx) => MenuHandler.handleCacheMenu(ctx));
 bot.hears('🛡️ حماية من الإساءة', (ctx) => MenuHandler.handleProtectionMenu(ctx));
+bot.hears('🎨 توليد صورة', (ctx) => imageHandler.handleImageCommand(ctx));
 
 // --- TEXT HANDLER FOR QURANIC GAMES (AFTER hears) ---
 bot.on('text', async (ctx, next) => {

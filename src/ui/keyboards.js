@@ -92,7 +92,10 @@ class UIManager {
         Markup.button.text('📊 إحصائيات')
       ],
       [
-        Markup.button.text('🎁 المكافآت'),
+        Markup.button.text('🎨 توليد صورة'),
+        Markup.button.text('🎁 المكافآت')
+      ],
+      [
         Markup.button.text('❌ إغلق')
       ]
     ]).resize();
