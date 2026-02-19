@@ -63,18 +63,24 @@ class ImageHandler {
 
       logger.info(`🎨 Generating image for: ${prompt.substring(0, 30)}...`);
 
-      // Generate image URL (without nologo to ensure it works)
+      // Generate image URL matching n8n workflow format
       const seed = Math.floor(Math.random() * 1000000);
-      const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=1024&seed=${seed}`;
+      const width = 1080;
+      const height = 1920;
+      const model = 'flux';
 
-      // Fetch image as buffer with more detailed headers
+      // Build URL with all parameters like n8n workflow
+      const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${width}&height=${height}&model=${model}&seed=${seed}&nologo=true`;
+
+      // Fetch image as buffer
       const response = await fetch(imageUrl, {
+        method: 'GET',
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/png,image/jpeg,image/gif,*/*',
-          'Accept-Language': 'en-US,en;q=0.9',
-          'Cache-Control': 'no-cache'
-        }
+          'Accept': 'image/png,image/jpeg,image/webp,*/*',
+          'Accept-Language': 'en-US,en;q=0.9'
+        },
+        redirect: 'follow'
       });
 
       if (!response.ok) {
