@@ -1,40 +1,15 @@
 /**
  * Image Generator Handler
- * Handles image generation using Google Gemini API
+ * Handles image generation using Pollinations AI API (Free, no API key required)
  */
 
-const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { logger } = require('../utils/helpers');
+const https = require('https');
 
 class ImageHandler {
   constructor() {
-    this.ai = null;
-    this.isInitialized = false;
-
-    // Initialize if API key is available
-    this.initialize();
-  }
-
-  /**
-   * Initialize the Gemini API client
-   */
-  initialize() {
-    try {
-      const apiKey = process.env.GEMINI_API_KEY;
-
-      if (!apiKey) {
-        logger.warn('⚠️ GEMINI_API_KEY not found in environment variables');
-        return;
-      }
-
-      this.ai = new GoogleGenerativeAI(apiKey);
-
-      this.isInitialized = true;
-      logger.info('✅ Image Generator initialized successfully with Gemini');
-    } catch (error) {
-      logger.error('❌ Failed to initialize Image Generator:', error.message);
-      this.isInitialized = false;
-    }
+    this.isInitialized = true;
+    logger.info('✅ Image Generator initialized successfully with Pollinations AI');
   }
 
   /**
@@ -42,20 +17,20 @@ class ImageHandler {
    * @returns {boolean}
    */
   isAvailable() {
-    return this.isInitialized && this.ai !== null;
+    return this.isInitialized;
   }
 
   /**
-   * Generate an image description using Gemini
+   * Generate an image using Pollinations AI API
    * @param {string} prompt - Text description for image generation
-   * @returns {Promise<{success: boolean, description?: string, error?: string}>}
+   * @returns {Promise<{success: boolean, imageUrl?: string, error?: string}>}
    */
-  async generateImageDescription(prompt) {
+  async generateImage(prompt) {
     try {
       if (!this.isAvailable()) {
         return {
           success: false,
-          error: 'خدمة توليد الصور غير متاحة حالياً. يرجى التحقق من إعدادات API.'
+          error: 'خدمة توليد الصور غير متاحة حالياً.'
         };
       }
 
@@ -84,42 +59,25 @@ class ImageHandler {
         };
       }
 
-      logger.info(`🎨 Generating image description for: ${prompt.substring(0, 50)}...`);
+      logger.info(`🎨 Generating image for: ${prompt.substring(0, 50)}...`);
 
-      // Get the model
-      const model = this.ai.getGenerativeModel({ model: 'gemini-pro' });
+      // Encode the prompt for URL
+      const encodedPrompt = encodeURIComponent(prompt);
 
-      // Generate detailed image description using Gemini
-      const result = await model.generateContent(
-        `You are an AI image description generator. Create a detailed, vivid description for an image based on this prompt: "${prompt}". The description should be artistic and visual, suitable for an artist to create an image. Write the description in Arabic. Make it beautiful and inspiring. Keep it under 200 words.`
-      );
+      // Generate image URL using Pollinations AI
+      // Using a random seed to get different images for the same prompt
+      const seed = Math.floor(Math.random() * 1000000);
+      const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=1024&seed=${seed}&nologo=true`;
 
-      const description = result.response.text();
-
-      logger.info('✅ Image description generated successfully');
+      logger.info('✅ Image generated successfully');
 
       return {
         success: true,
-        description: description
+        imageUrl: imageUrl
       };
 
     } catch (error) {
       logger.error('❌ Image generation error:', error.message);
-
-      // Handle specific errors
-      if (error.message && error.message.includes('quota')) {
-        return {
-          success: false,
-          error: 'تم تجاوز حد الاستخدام اليومي. يرجى المحاولة لاحقاً.'
-        };
-      }
-
-      if (error.message && (error.message.includes('invalid') || error.message.includes('key'))) {
-        return {
-          success: false,
-          error: 'خطأ في إعدادات API. يرجى التواصل مع المطور.'
-        };
-      }
 
       return {
         success: false,
@@ -169,20 +127,17 @@ class ImageHandler {
       }
 
       // Show typing indicator
-      await ctx.reply('⏳ جاري توليد وصف الصورة...');
+      await ctx.reply('⏳ جاري توليد الصورة...');
 
-      // Generate image description
-      const result = await this.generateImageDescription(args);
+      // Generate image
+      const result = await this.generateImage(args);
 
       if (result.success) {
-        // Send the generated description
-        await ctx.reply(
-          '🎨 <b>وصف الصورة المولدة</b>\n\n' +
-          `📝 <b>الوصف الأصلي:</b> ${args}\n\n` +
-          `✨ <b>الوصف التفصيلي:</b>\n${result.description}\n\n` +
-          '💡 <i>ملاحظة: هذا وصف تفصيلي للصورة. يمكنك استخدامه في أدوات توليد الصور الأخرى.</i>',
-          { parse_mode: 'HTML' }
-        );
+        // Send the generated image
+        await ctx.replyWithPhoto(result.imageUrl, {
+          caption: `🎨 <b>الصورة المولدة</b>\n\n📝 <b>الوصف:</b> ${args}\n\n💡 <i>تم التوليد بواسطة Pollinations AI</i>`,
+          parse_mode: 'HTML'
+        });
       } else {
         await ctx.reply(`❌ ${result.error}`);
       }
@@ -243,20 +198,17 @@ class ImageHandler {
       ctx.session.awaitingImagePrompt = false;
 
       // Show typing indicator
-      await ctx.reply('⏳ جاري توليد وصف الصورة...');
+      await ctx.reply('⏳ جاري توليد الصورة...');
 
-      // Generate image description
-      const result = await this.generateImageDescription(prompt);
+      // Generate image
+      const result = await this.generateImage(prompt);
 
       if (result.success) {
-        // Send the generated description
-        await ctx.reply(
-          '🎨 <b>وصف الصورة المولدة</b>\n\n' +
-          `📝 <b>الوصف الأصلي:</b> ${prompt}\n\n` +
-          `✨ <b>الوصف التفصيلي:</b>\n${result.description}\n\n` +
-          '💡 <i>ملاحظة: هذا وصف تفصيلي للصورة. يمكنك استخدامه في أدوات توليد الصور الأخرى.</i>',
-          { parse_mode: 'HTML' }
-        );
+        // Send the generated image
+        await ctx.replyWithPhoto(result.imageUrl, {
+          caption: `🎨 <b>الصورة المولدة</b>\n\n📝 <b>الوصف:</b> ${prompt}\n\n💡 <i>تم التوليد بواسطة Pollinations AI</i>`,
+          parse_mode: 'HTML'
+        });
       } else {
         await ctx.reply(`❌ ${result.error}`);
       }
