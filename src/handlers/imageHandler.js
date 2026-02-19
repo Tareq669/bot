@@ -3,11 +3,21 @@
  * Handles image generation using Pollinations AI API (Free, no API key required)
  */
 
+const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
 const { logger } = require('../utils/helpers');
 
 class ImageHandler {
   constructor() {
     this.isInitialized = true;
+    this.tempDir = path.join(__dirname, '../../temp');
+    
+    // Create temp directory if it doesn't exist
+    if (!fs.existsSync(this.tempDir)) {
+      fs.mkdirSync(this.tempDir, { recursive: true });
+    }
+    
     logger.info('✅ Image Generator initialized successfully with Pollinations AI');
   }
 
@@ -35,9 +45,89 @@ class ImageHandler {
   }
 
   /**
+   * Download image from URL and save to temp file
+   * @param {string} url - Image URL
+   * @returns {Promise<{success: boolean, filePath?: string, error?: string}>}
+   */
+  async downloadImage(url) {
+    return new Promise((resolve) => {
+      const https = require('https');
+      const http = require('http');
+      const filename = `image_${Date.now()}.png`;
+      const filepath = path.join(this.tempDir, filename);
+      const file = fs.createWriteStream(filepath);
+
+      const protocol = url.startsWith('https') ? https : http;
+
+      const request = protocol.get(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'image/png,image/jpeg,image/webp,*/*',
+          'Accept-Language': 'en-US,en;q=0.9'
+        }
+      }, (response) => {
+        // Handle redirects
+        if (response.statusCode === 301 || response.statusCode === 302) {
+          const redirectUrl = response.headers.location;
+          file.close();
+          if (fs.existsSync(filepath)) {
+            fs.unlinkSync(filepath);
+          }
+          if (redirectUrl) {
+            this.downloadImage(redirectUrl).then(resolve);
+          } else {
+            resolve({ success: false, error: 'Redirect without location' });
+          }
+          return;
+        }
+
+        if (response.statusCode !== 200) {
+          file.close();
+          if (fs.existsSync(filepath)) {
+            fs.unlinkSync(filepath);
+          }
+          resolve({ success: false, error: `HTTP ${response.statusCode}` });
+          return;
+        }
+
+        response.pipe(file);
+
+        file.on('finish', () => {
+          file.close();
+          // Verify file exists and has content
+          const stats = fs.statSync(filepath);
+          if (stats.size > 0) {
+            resolve({ success: true, filePath: filepath });
+          } else {
+            fs.unlinkSync(filepath);
+            resolve({ success: false, error: 'Empty file downloaded' });
+          }
+        });
+      });
+
+      request.on('error', (err) => {
+        file.close();
+        if (fs.existsSync(filepath)) {
+          fs.unlinkSync(filepath);
+        }
+        resolve({ success: false, error: err.message });
+      });
+
+      request.setTimeout(60000, () => {
+        request.destroy();
+        file.close();
+        if (fs.existsSync(filepath)) {
+          fs.unlinkSync(filepath);
+        }
+        resolve({ success: false, error: 'Request timeout' });
+      });
+    });
+  }
+
+  /**
    * Generate an image using Pollinations AI API
    * @param {string} prompt - Text description for image generation
-   * @returns {Promise<{success: boolean, imageUrl?: string, error?: string, enhancedPrompt?: string}>}
+   * @returns {Promise<{success: boolean, filePath?: string, error?: string, enhancedPrompt?: string}>}
    */
   async generateImage(prompt) {
     try {
@@ -98,6 +188,8 @@ class ImageHandler {
    * @param {TelegrafContext} ctx
    */
   async handleImageCommand(ctx) {
+    let tempFile = null;
+    
     try {
       const messageText = ctx.message && ctx.message.text ? ctx.message.text : '';
       const args = messageText.split(' ').slice(1).join(' ');
@@ -121,26 +213,27 @@ class ImageHandler {
       await ctx.sendChatAction('upload_photo');
       await ctx.reply('⏳ جاري توليد الصورة...');
 
-      // Generate image
+      // Generate image URL
       const result = await this.generateImage(args);
 
       if (result.success) {
-        const { Markup } = require('telegraf');
-
-        // Send the image URL with a clickable button
-        await ctx.reply(
-          `✨ <b>تم التوليد بواسطة الذكاء الاصطناعي</b>\n\n` +
-          `📝 <b>الوصف:</b> ${result.enhancedPrompt}\n\n` +
-          `🔗 <a href="${result.imageUrl}">اضغط هنا لفتح الصورة</a>\n\n` +
-          `💡 <i>الصورة بحجم 1024x1024</i>`,
-          {
-            parse_mode: 'HTML',
-            ...Markup.inlineKeyboard([
-              [Markup.button.url('🖼️ عرض الصورة', result.imageUrl)],
-              [Markup.button.callback('🔄 توليد صورة أخرى', 'image:generate')]
-            ])
-          }
-        );
+        // Try sending photo from URL
+        try {
+          await ctx.replyWithPhoto(result.imageUrl, {
+            caption: `✨ <b>تم التوليد بواسطة الذكاء الاصطناعي</b>\n\n📝 <b>الوصف:</b> ${result.enhancedPrompt}`,
+            parse_mode: 'HTML'
+          });
+        } catch (photoError) {
+          // If URL fails, send link
+          logger.error('Photo send error:', photoError.message);
+          const { Markup } = require('telegraf');
+          await ctx.reply(
+            `✨ <b>تم التوليد بواسطة الذكاء الاصطناعي</b>\n\n` +
+            `📝 <b>الوصف:</b> ${result.enhancedPrompt}\n\n` +
+            `🔗 <a href="${result.imageUrl}">اضغط هنا لفتح الصورة</a>`,
+            { parse_mode: 'HTML' }
+          );
+        }
       } else {
         await ctx.reply(`❌ ${result.error}`);
       }
@@ -170,8 +263,7 @@ class ImageHandler {
         '• مسجد جميل في الليل\n\n' +
         '⚠️ <i>ملاحظة: لا يمكن توليد صور ذات محتوى غير لائق</i>',
         {
-          parse_mode: 'HTML',
-          reply_markup: Markup.forceReply().reply_markup
+          parse_mode: 'HTML'
         }
       );
 
@@ -192,6 +284,8 @@ class ImageHandler {
    * @returns {Promise<boolean>} - Whether the message was handled
    */
   async handleImagePrompt(ctx, prompt) {
+    let tempFile = null;
+    
     try {
       if (!ctx.session || !ctx.session.awaitingImagePrompt) {
         return false;
@@ -204,26 +298,27 @@ class ImageHandler {
       await ctx.sendChatAction('upload_photo');
       await ctx.reply('⏳ جاري توليد الصورة...');
 
-      // Generate image
+      // Generate image URL
       const result = await this.generateImage(prompt);
 
       if (result.success) {
-        const { Markup } = require('telegraf');
-
-        // Send the image URL with a clickable button
-        await ctx.reply(
-          `✨ <b>تم التوليد بواسطة الذكاء الاصطناعي</b>\n\n` +
-          `📝 <b>الوصف:</b> ${result.enhancedPrompt}\n\n` +
-          `🔗 <a href="${result.imageUrl}">اضغط هنا لفتح الصورة</a>\n\n` +
-          `💡 <i>الصورة بحجم 1024x1024</i>`,
-          {
-            parse_mode: 'HTML',
-            ...Markup.inlineKeyboard([
-              [Markup.button.url('🖼️ عرض الصورة', result.imageUrl)],
-              [Markup.button.callback('🔄 توليد صورة أخرى', 'image:generate')]
-            ])
-          }
-        );
+        // Try sending photo from URL
+        try {
+          await ctx.replyWithPhoto(result.imageUrl, {
+            caption: `✨ <b>تم التوليد بواسطة الذكاء الاصطناعي</b>\n\n📝 <b>الوصف:</b> ${result.enhancedPrompt}`,
+            parse_mode: 'HTML'
+          });
+        } catch (photoError) {
+          // If URL fails, send link
+          logger.error('Photo send error:', photoError.message);
+          const { Markup } = require('telegraf');
+          await ctx.reply(
+            `✨ <b>تم التوليد بواسطة الذكاء الاصطناعي</b>\n\n` +
+            `📝 <b>الوصف:</b> ${result.enhancedPrompt}\n\n` +
+            `🔗 <a href="${result.imageUrl}">اضغط هنا لفتح الصورة</a>`,
+            { parse_mode: 'HTML' }
+          );
+        }
       } else {
         await ctx.reply(`❌ ${result.error}`);
       }
