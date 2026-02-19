@@ -39,6 +39,29 @@ class ImageHandler {
   }
 
   /**
+   * Retry helper function
+   * @param {Function} fn - Function to retry
+   * @param {number} maxRetries - Maximum number of retries
+   * @param {number} delay - Delay between retries in ms
+   * @returns {Promise}
+   */
+  async retryWithBackoff(fn, maxRetries = 3, delay = 1000) {
+    let lastError;
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        return await fn();
+      } catch (error) {
+        lastError = error;
+        logger.warn(`Retry ${i + 1}/${maxRetries} failed:`, error.message);
+        if (i < maxRetries - 1) {
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    }
+    throw lastError;
+  }
+
+  /**
    * Generate an image and return as Buffer
    * @param {string} prompt - Text description for image generation
    * @returns {Promise<{success: boolean, buffer?: Buffer, error?: string}>}
@@ -69,30 +92,35 @@ class ImageHandler {
       const height = 1920;
       const model = 'flux';
 
-      // Build URL with all parameters like n8n workflow
+      // Build URL with all parameters
       const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${width}&height=${height}&model=${model}&seed=${seed}&nologo=true`;
 
-      // Fetch image as buffer
-      const response = await fetch(imageUrl, {
-        method: 'GET',
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept': 'image/png,image/jpeg,image/webp,*/*',
-          'Accept-Language': 'en-US,en;q=0.9'
-        },
-        redirect: 'follow'
-      });
+      // Fetch image with retry logic
+      const fetchImage = async () => {
+        const response = await fetch(imageUrl, {
+          method: 'GET',
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept': 'image/png,image/jpeg,image/webp,*/*'
+          },
+          redirect: 'follow'
+        });
 
-      if (!response.ok) {
-        logger.error(`❌ Fetch failed: ${response.status}`);
-        return { success: false, error: 'فشل في تحميل الصورة.' };
-      }
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
 
-      const buffer = await response.buffer();
+        const buffer = await response.buffer();
 
-      if (!buffer || buffer.length === 0) {
-        return { success: false, error: 'الصورة فارغة.' };
-      }
+        if (!buffer || buffer.length === 0) {
+          throw new Error('Empty buffer');
+        }
+
+        return buffer;
+      };
+
+      // Retry up to 3 times with 1 second delay
+      const buffer = await this.retryWithBackoff(fetchImage, 3, 1000);
 
       logger.info('✅ Image generated successfully');
       return { success: true, buffer: buffer };
