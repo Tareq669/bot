@@ -1317,13 +1317,13 @@ bot.hears('🔔 الإشعارات الذكية', (ctx) => MenuHandler.handleSma
 bot.hears('📁 النسخ الاحتياطية', (ctx) => MenuHandler.handleBackupsMenu(ctx));
 bot.hears('⚡ التخزين المؤقت', (ctx) => MenuHandler.handleCacheMenu(ctx));
 bot.hears('🛡️ حماية من الإساءة', (ctx) => MenuHandler.handleProtectionMenu(ctx));
-bot.hears('🎨 توليد صورة', (ctx) => imageHandler.handleImageCommand(ctx));
+bot.hears('🎨 توليد صورة', (ctx) => imageHandler.handleImageButton(ctx));
 
-// --- TEXT HANDLER FOR QURANIC GAMES (AFTER hears) ---
+// --- TEXT HANDLER FOR IMAGE GENERATION AND QURANIC GAMES ---
 bot.on('text', async (ctx, next) => {
-  // معالجة طلبات توليد الصور
-  if (ctx.session?.awaitingImagePrompt) {
-    const handled = await imageHandler.handleImagePrompt(ctx, ctx.message.text);
+  // Check if user is waiting for image prompt using the new Set system
+  if (ctx.from && imageHandler.isWaitingForImagePrompt(ctx.from.id)) {
+    const handled = await imageHandler.handleTextMessage(ctx);
     if (handled) return;
   }
 
