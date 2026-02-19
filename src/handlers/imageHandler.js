@@ -1,40 +1,14 @@
 /**
  * Image Generator Handler
- * Handles image generation using Google Gemini API and Pollinations AI
+ * Handles image generation using Pollinations AI API (Free, no API key required)
  */
 
-const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { logger } = require('../utils/helpers');
 
 class ImageHandler {
   constructor() {
-    this.genAI = null;
-    this.isInitialized = false;
-
-    // Initialize if API key is available
-    this.initialize();
-  }
-
-  /**
-   * Initialize the Gemini API client
-   */
-  initialize() {
-    try {
-      const apiKey = process.env.GEMINI_API_KEY;
-
-      if (!apiKey) {
-        logger.warn('⚠️ GEMINI_API_KEY not found in environment variables');
-        return;
-      }
-
-      this.genAI = new GoogleGenerativeAI(apiKey);
-
-      this.isInitialized = true;
-      logger.info('✅ Image Generator initialized successfully with Gemini');
-    } catch (error) {
-      logger.error('❌ Failed to initialize Image Generator:', error.message);
-      this.isInitialized = false;
-    }
+    this.isInitialized = true;
+    logger.info('✅ Image Generator initialized successfully with Pollinations AI');
   }
 
   /**
@@ -42,29 +16,7 @@ class ImageHandler {
    * @returns {boolean}
    */
   isAvailable() {
-    return this.isInitialized && this.genAI !== null;
-  }
-
-  /**
-   * Generate an enhanced image prompt using Gemini
-   * @param {string} prompt - Text description for image generation
-   * @returns {Promise<string>}
-   */
-  async enhancePrompt(prompt) {
-    try {
-      if (!this.isAvailable()) {
-        return prompt; // Fallback to original prompt if API not available
-      }
-
-      const model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-      const promptInstruction = `Create a detailed English artistic prompt for: "${prompt}". Output ONLY the prompt.`;
-
-      const result = await model.generateContent(promptInstruction);
-      return result.response.text().trim();
-    } catch (error) {
-      logger.error('❌ Failed to enhance prompt:', error.message);
-      return prompt; // Fallback to original prompt on error
-    }
+    return this.isInitialized;
   }
 
   /**
@@ -85,10 +37,17 @@ class ImageHandler {
   /**
    * Generate an image using Pollinations AI API
    * @param {string} prompt - Text description for image generation
-   * @returns {Promise<{success: boolean, imageUrl?: string, error?: string}>}
+   * @returns {Promise<{success: boolean, imageUrl?: string, error?: string, enhancedPrompt?: string}>}
    */
   async generateImage(prompt) {
     try {
+      if (!this.isAvailable()) {
+        return {
+          success: false,
+          error: 'خدمة توليد الصور غير متاحة حالياً.'
+        };
+      }
+
       if (!prompt || prompt.trim().length === 0) {
         return {
           success: false,
@@ -112,21 +71,16 @@ class ImageHandler {
 
       logger.info(`🎨 Generating image for: ${prompt.substring(0, 50)}...`);
 
-      // Enhance prompt using Gemini
-      const enhancedPrompt = await this.enhancePrompt(prompt);
-
-      logger.info(`📝 Enhanced prompt: ${enhancedPrompt.substring(0, 50)}...`);
-
       // Generate image URL using Pollinations AI with random seed
       const seed = Math.floor(Math.random() * 1000000);
-      const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(enhancedPrompt)}?width=1024&height=1024&seed=${seed}&nologo=true`;
+      const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=1024&seed=${seed}&nologo=true`;
 
       logger.info('✅ Image generated successfully');
 
       return {
         success: true,
         imageUrl: imageUrl,
-        enhancedPrompt: enhancedPrompt
+        enhancedPrompt: prompt
       };
 
     } catch (error) {
