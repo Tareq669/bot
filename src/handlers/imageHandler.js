@@ -133,11 +133,11 @@ class ImageHandler {
       const result = await this.generateImage(args);
 
       if (result.success) {
-        // Send the generated image URL as a message (Telegram cannot fetch the image directly)
-        await ctx.reply(
-          `🎨 <b>الصورة المولدة</b>\n\n📝 <b>الوصف:</b> ${args}\n\n🌐 <b>رابط الصورة:</b> ${result.imageUrl}\n\n💡 <i>تم التوليد بواسطة Pollinations AI</i>`,
-          { parse_mode: 'HTML' }
-        );
+        // Send the generated image directly using replyWithPhoto
+        await ctx.replyWithPhoto(result.imageUrl, {
+          caption: `🎨 <b>الصورة المولدة</b>\n\n📝 <b>الوصف:</b> ${args}\n\n💡 <i>تم التوليد بواسطة Pollinations AI</i>`,
+          parse_mode: 'HTML'
+        });
       } else {
         await ctx.reply(`❌ ${result.error}`);
       }
