@@ -120,8 +120,7 @@ class ImageHandler {
           }]
         }],
         generationConfig: {
-          responseModalities: ['IMAGE'],
-          imageSizes: ['1024x1024']
+          responseModalities: ['IMAGE']
         },
         safetySettings: this.safetySettings
       });
