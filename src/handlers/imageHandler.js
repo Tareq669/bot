@@ -52,7 +52,7 @@ class ImageHandler {
 
       // Use Imagen model for image generation
       this.model = this.genAI.getGenerativeModel({
-        model: 'imagen-3.0-generate-001' // Latest Imagen model
+        model: 'imagen-3.0-generate-002' // Latest Imagen model
       });
 
       this.isInitialized = true;
