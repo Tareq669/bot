@@ -88,7 +88,7 @@ class ImageHandler {
 
       // Generate detailed image description using Gemini
       const response = await this.ai.models.generateContent({
-        model: 'gemini-2.0-flash',
+        model: 'gemini-1.5-flash',
         contents: 'You are an AI image description generator. Create a detailed, vivid description for an image based on this prompt: "' + prompt + '". The description should be artistic and visual, suitable for an artist to create an image. Write the description in Arabic. Make it beautiful and inspiring. Keep it under 200 words.'
       });
 
