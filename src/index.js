@@ -1321,6 +1321,12 @@ bot.hears('🎨 توليد صورة', (ctx) => imageHandler.handleImageCommand(c
 
 // --- TEXT HANDLER FOR QURANIC GAMES (AFTER hears) ---
 bot.on('text', async (ctx, next) => {
+  // معالجة طلبات توليد الصور
+  if (ctx.session?.awaitingImagePrompt) {
+    const handled = await imageHandler.handleImagePrompt(ctx, ctx.message.text);
+    if (handled) return;
+  }
+
   // معالجة إجابات الألعاب القرآنية
   if (ctx.session?.gameState && ctx.session.gameState.game === 'quranic') {
     const userAnswer = ctx.message.text;

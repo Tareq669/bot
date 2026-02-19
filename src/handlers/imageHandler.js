@@ -50,9 +50,9 @@ class ImageHandler {
 
       this.genAI = new GoogleGenerativeAI(apiKey);
 
-      // Use Imagen model for image generation
+      // Use Gemini 2.0 Flash for image generation (supports image output)
       this.model = this.genAI.getGenerativeModel({
-        model: 'imagen-3.0-generate-002' // Latest Imagen model
+        model: 'gemini-2.0-flash-exp'
       });
 
       this.isInitialized = true;
@@ -269,6 +269,8 @@ class ImageHandler {
     try {
       await ctx.answerCbQuery();
 
+      const { Markup } = require('telegraf');
+
       await ctx.editMessageText(
         '🎨 <b>مولد الصور بالذكاء الاصطناعي</b>\n\n' +
         'أرسل وصفاً للصورة التي تريد توليدها:\n\n' +
@@ -277,7 +279,10 @@ class ImageHandler {
         '• قطة لطيفة ترتدي نظارة شمسية\n' +
         '• مسجد جميل في الليل\n\n' +
         '⚠️ <i>ملاحظة: لا يمكن توليد صور ذات محتوى غير لائق</i>',
-        { parse_mode: 'HTML' }
+        {
+          parse_mode: 'HTML',
+          reply_markup: Markup.forceReply().reply_markup
+        }
       );
 
       // Set session to await image prompt
