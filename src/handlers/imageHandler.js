@@ -3,6 +3,7 @@
  * Handles image generation using Pollinations AI API (Free, no API key required)
  */
 
+const fetch = require('node-fetch');
 const { logger } = require('../utils/helpers');
 
 // Simple state system using Set
@@ -38,66 +39,62 @@ class ImageHandler {
   }
 
   /**
-   * Download image from URL and save to temp file
-   * @param {string} url - Image URL
-   * @returns {Promise<{success: boolean, filePath?: string, error?: string}>}
+   * Generate an image and return as Buffer
+   * @param {string} prompt - Text description for image generation
+   * @returns {Promise<{success: boolean, buffer?: Buffer, error?: string}>}
    */
-  async downloadImage(url) {
-    return new Promise((resolve) => {
-      const https = require('https');
-      const http = require('http');
-      const fs = require('fs');
-      const path = require('path');
-
-      const tempDir = path.join(__dirname, '../../temp');
-      if (!fs.existsSync(tempDir)) {
-        fs.mkdirSync(tempDir, { recursive: true });
+  async generateImageBuffer(prompt) {
+    try {
+      if (!this.isAvailable()) {
+        return { success: false, error: 'خدمة توليد الصور غير متاحة حالياً.' };
       }
 
-      const filename = `image_${Date.now()}.png`;
-      const filepath = path.join(tempDir, filename);
-      const file = fs.createWriteStream(filepath);
+      if (!prompt || prompt.trim().length === 0) {
+        return { success: false, error: 'يرجى إدخال وصف للصورة.' };
+      }
 
-      const protocol = url.startsWith('https') ? https : http;
+      if (prompt.length > 500) {
+        return { success: false, error: 'الوصف طويل جداً.' };
+      }
 
-      const request = protocol.get(url, {
+      if (this.checkInappropriateContent(prompt)) {
+        return { success: false, error: 'عذراً، لا يمكن توليد هذا المحتوى.' };
+      }
+
+      logger.info(`🎨 Generating image for: ${prompt.substring(0, 30)}...`);
+
+      // Generate image URL (without nologo to ensure it works)
+      const seed = Math.floor(Math.random() * 1000000);
+      const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=1024&seed=${seed}`;
+
+      // Fetch image as buffer with more detailed headers
+      const response = await fetch(imageUrl, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/png,image/jpeg,image/gif,*/*',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Cache-Control': 'no-cache'
         }
-      }, (response) => {
-        if (response.statusCode !== 200) {
-          file.close();
-          if (fs.existsSync(filepath)) fs.unlinkSync(filepath);
-          resolve({ success: false, error: `HTTP ${response.statusCode}` });
-          return;
-        }
-
-        response.pipe(file);
-
-        file.on('finish', () => {
-          file.close();
-          const stats = fs.statSync(filepath);
-          if (stats.size > 0) {
-            resolve({ success: true, filePath: filepath });
-          } else {
-            fs.unlinkSync(filepath);
-            resolve({ success: false, error: 'Empty file' });
-          }
-        });
       });
 
-      request.on('error', (err) => {
-        file.close();
-        if (fs.existsSync(filepath)) fs.unlinkSync(filepath);
-        resolve({ success: false, error: err.message });
-      });
+      if (!response.ok) {
+        logger.error(`❌ Fetch failed: ${response.status}`);
+        return { success: false, error: 'فشل في تحميل الصورة.' };
+      }
 
-      request.setTimeout(30000, () => {
-        request.destroy();
-        if (fs.existsSync(filepath)) fs.unlinkSync(filepath);
-        resolve({ success: false, error: 'Timeout' });
-      });
-    });
+      const buffer = await response.buffer();
+
+      if (!buffer || buffer.length === 0) {
+        return { success: false, error: 'الصورة فارغة.' };
+      }
+
+      logger.info('✅ Image generated successfully');
+      return { success: true, buffer: buffer };
+
+    } catch (error) {
+      logger.error('❌ Image generation error:', error.message);
+      return { success: false, error: 'حدث خطأ. يرجى المحاولة مرة أخرى.' };
+    }
   }
 
   /**
@@ -108,53 +105,32 @@ class ImageHandler {
   async generateImage(prompt) {
     try {
       if (!this.isAvailable()) {
-        return {
-          success: false,
-          error: 'خدمة توليد الصور غير متاحة حالياً.'
-        };
+        return { success: false, error: 'خدمة توليد الصور غير متاحة حالياً.' };
       }
 
       if (!prompt || prompt.trim().length === 0) {
-        return {
-          success: false,
-          error: 'يرجى إدخال وصف للصورة التي تريد توليدها.'
-        };
+        return { success: false, error: 'يرجى إدخال وصف للصورة.' };
       }
 
       if (prompt.length > 500) {
-        return {
-          success: false,
-          error: 'الوصف طويل جداً. يرجى اختصاره إلى أقل من 500 حرف.'
-        };
+        return { success: false, error: 'الوصف طويل جداً.' };
       }
 
       if (this.checkInappropriateContent(prompt)) {
-        return {
-          success: false,
-          error: 'عذراً، لا يمكن توليد صور تحتوي على محتوى غير لائق.'
-        };
+        return { success: false, error: 'عذراً، لا يمكن توليد هذا المحتوى.' };
       }
 
-      logger.info(`🎨 Generating image for: ${prompt.substring(0, 50)}...`);
+      logger.info(`🎨 Generating image for: ${prompt.substring(0, 30)}...`);
 
-      // Generate image URL using Pollinations AI with random seed
       const seed = Math.floor(Math.random() * 1000000);
       const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=1024&seed=${seed}&nologo=true`;
 
-      logger.info('✅ Image URL generated successfully');
-
-      return {
-        success: true,
-        imageUrl: imageUrl
-      };
+      logger.info('✅ Image URL generated');
+      return { success: true, imageUrl: imageUrl };
 
     } catch (error) {
       logger.error('❌ Image generation error:', error.message);
-
-      return {
-        success: false,
-        error: 'حدث خطأ أثناء توليد الصورة. يرجى المحاولة مرة أخرى.'
-      };
+      return { success: false, error: 'حدث خطأ. يرجى المحاولة مرة أخرى.' };
     }
   }
 
@@ -165,15 +141,10 @@ class ImageHandler {
   async handleImageButton(ctx) {
     try {
       const userId = ctx.from.id;
-
-      // Add user to waiting set
       waitingForImagePrompt.add(userId);
 
-      // Reply to user asking for the prompt
       await ctx.reply(
-        '🎨 اكتب وصف الصورة التي تريد توليدها\n\n' +
-        'مثال: غروب الشمس على شاطئ استوائي',
-        { parse_mode: 'HTML' }
+        '🎨 اكتب وصف الصورة التي تريد توليدها\n\nمثال: غروب الشمس على شاطئ استوائي'
       );
 
       logger.info(`User ${userId} is now waiting for image prompt`);
@@ -187,72 +158,31 @@ class ImageHandler {
   /**
    * Handle text message and check if user is waiting for image prompt
    * @param {TelegrafContext} ctx
-   * @returns {Promise<boolean>} - True if handled, false otherwise
+   * @returns {Promise<boolean>}
    */
   async handleTextMessage(ctx) {
     try {
       const userId = ctx.from.id;
 
-      // Check if user is waiting for image prompt
       if (!waitingForImagePrompt.has(userId)) {
         return false;
       }
 
-      // Remove user from waiting set
       waitingForImagePrompt.delete(userId);
 
       const prompt = ctx.message.text;
 
-      // Show typing indicator
       await ctx.sendChatAction('upload_photo');
       await ctx.reply('⏳ جاري توليد الصورة...');
 
-      // Generate image
-      const result = await this.generateImage(prompt);
+      // Generate image as buffer
+      const result = await this.generateImageBuffer(prompt);
 
       if (result.success) {
-        try {
-          // Try sending the image directly from URL
-          await ctx.replyWithPhoto(result.imageUrl, {
-            caption: `🎨 تم توليد الصورة بنجاح!\n\n📝 الوصف: ${prompt}`
-          });
-        } catch (urlError) {
-          // If URL fails, try downloading and sending locally
-          logger.error('URL send failed, trying download:', urlError.message);
-
-          try {
-            const downloadResult = await this.downloadImage(result.imageUrl);
-
-            if (downloadResult.success) {
-              await ctx.replyWithPhoto({ source: downloadResult.filePath }, {
-                caption: `🎨 تم توليد الصورة بنجاح!\n\n📝 الوصف: ${prompt}`
-              });
-
-              // Clean up temp file
-              try {
-                require('fs').unlinkSync(downloadResult.filePath);
-              } catch (e) {
-                // Ignore errors during temp file cleanup
-              }
-            } else {
-              // All methods failed, send link
-              await ctx.reply(
-                '🎨 تم توليد الصورة!\n\n' +
-                `📝 الوصف: ${prompt}\n\n` +
-                `🔗 <a href="${result.imageUrl}">اضغط هنا لفتح الصورة</a>`,
-                { parse_mode: 'HTML' }
-              );
-            }
-          } catch (downloadError) {
-            logger.error('Download also failed:', downloadError.message);
-            await ctx.reply(
-              '🎨 تم توليد الصورة!\n\n' +
-              `📝 الوصف: ${prompt}\n\n` +
-              `🔗 <a href="${result.imageUrl}">اضغط هنا لفتح الصورة</a>`,
-              { parse_mode: 'HTML' }
-            );
-          }
-        }
+        // Send the image directly with buffer
+        await ctx.replyWithPhoto({ source: result.buffer, filename: 'image.png' }, {
+          caption: `🎨 تم توليد الصورة بنجاح!\n\n📝 الوصف: ${prompt}`
+        });
       } else {
         await ctx.reply(`❌ ${result.error}`);
       }
@@ -262,7 +192,6 @@ class ImageHandler {
     } catch (error) {
       logger.error('Image text handling error:', error);
 
-      // Make sure to remove user from waiting set on error
       if (ctx.from && ctx.from.id) {
         waitingForImagePrompt.delete(ctx.from.id);
       }
@@ -288,64 +217,23 @@ class ImageHandler {
           '<code>/image وصف الصورة</code>\n\n' +
           '📝 <b>أمثلة:</b>\n' +
           '• /image غروب الشمس على شاطئ استوائي\n' +
-          '• /image قطة لطيفة ترتدي نظارة شمسية\n' +
-          '• /image مسجد جميل في الليل\n\n' +
-          '⚠️ <i>ملاحظة: لا يمكن توليد صور ذات محتوى غير لائق</i>',
+          '• /image قطة لطيفة ترتدي نظارة شمسية\n\n' +
+          '⚠️ <i>ملاحظة: لا يمكن توليد صور غير لائقة</i>',
           { parse_mode: 'HTML' }
         );
         return;
       }
 
-      // Show typing indicator
       await ctx.sendChatAction('upload_photo');
       await ctx.reply('⏳ جاري توليد الصورة...');
 
-      // Generate image
-      const result = await this.generateImage(args);
+      // Generate image as buffer
+      const result = await this.generateImageBuffer(args);
 
       if (result.success) {
-        try {
-          // Try sending the image directly from URL
-          await ctx.replyWithPhoto(result.imageUrl, {
-            caption: `🎨 تم توليد الصورة بنجاح!\n\n📝 الوصف: ${args}`
-          });
-        } catch (urlError) {
-          // If URL fails, try downloading and sending locally
-          logger.error('URL send failed, trying download:', urlError.message);
-
-          try {
-            const downloadResult = await this.downloadImage(result.imageUrl);
-
-            if (downloadResult.success) {
-              await ctx.replyWithPhoto({ source: downloadResult.filePath }, {
-                caption: `🎨 تم توليد الصورة بنجاح!\n\n📝 الوصف: ${args}`
-              });
-
-              // Clean up temp file
-              try {
-                require('fs').unlinkSync(downloadResult.filePath);
-              } catch (e) {
-                // Ignore errors during temp file cleanup
-              }
-            } else {
-              // All methods failed, send link
-              await ctx.reply(
-                '🎨 تم توليد الصورة!\n\n' +
-                `📝 الوصف: ${args}\n\n` +
-                `🔗 <a href="${result.imageUrl}">اضغط هنا لفتح الصورة</a>`,
-                { parse_mode: 'HTML' }
-              );
-            }
-          } catch (downloadError) {
-            logger.error('Download also failed:', downloadError.message);
-            await ctx.reply(
-              '🎨 تم توليد الصورة!\n\n' +
-              `📝 الوصف: ${args}\n\n` +
-              `🔗 <a href="${result.imageUrl}">اضغط هنا لفتح الصورة</a>`,
-              { parse_mode: 'HTML' }
-            );
-          }
-        }
+        await ctx.replyWithPhoto({ source: result.buffer, filename: 'image.png' }, {
+          caption: `🎨 تم توليد الصورة بنجاح!\n\n📝 الوصف: ${args}`
+        });
       } else {
         await ctx.reply(`❌ ${result.error}`);
       }
