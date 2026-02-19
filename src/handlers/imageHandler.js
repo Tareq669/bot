@@ -127,13 +127,20 @@ class ImageHandler {
       if (result.success) {
         const { Markup } = require('telegraf');
 
-        await ctx.replyWithPhoto(result.imageUrl, {
-          caption: `✨ <b>تم التوليد بواسطة الذكاء الاصطناعي</b>\n\n📝 <b>الوصف المستخدم:</b>\n<i>${result.enhancedPrompt}</i>`,
-          parse_mode: 'HTML',
-          ...Markup.inlineKeyboard([
-            [Markup.button.callback('🔄 توليد صورة أخرى', 'image:generate')]
-          ])
-        });
+        // Send the image URL with a clickable button
+        await ctx.reply(
+          `✨ <b>تم التوليد بواسطة الذكاء الاصطناعي</b>\n\n` +
+          `📝 <b>الوصف:</b> ${result.enhancedPrompt}\n\n` +
+          `🔗 <a href="${result.imageUrl}">اضغط هنا لفتح الصورة</a>\n\n` +
+          `💡 <i>الصورة بحجم 1024x1024</i>`,
+          {
+            parse_mode: 'HTML',
+            ...Markup.inlineKeyboard([
+              [Markup.button.url('🖼️ عرض الصورة', result.imageUrl)],
+              [Markup.button.callback('🔄 توليد صورة أخرى', 'image:generate')]
+            ])
+          }
+        );
       } else {
         await ctx.reply(`❌ ${result.error}`);
       }
@@ -203,13 +210,20 @@ class ImageHandler {
       if (result.success) {
         const { Markup } = require('telegraf');
 
-        await ctx.replyWithPhoto(result.imageUrl, {
-          caption: `✨ <b>تم التوليد بواسطة الذكاء الاصطناعي</b>\n\n📝 <b>الوصف المستخدم:</b>\n<i>${result.enhancedPrompt}</i>`,
-          parse_mode: 'HTML',
-          ...Markup.inlineKeyboard([
-            [Markup.button.callback('🔄 توليد صورة أخرى', 'image:generate')]
-          ])
-        });
+        // Send the image URL with a clickable button
+        await ctx.reply(
+          `✨ <b>تم التوليد بواسطة الذكاء الاصطناعي</b>\n\n` +
+          `📝 <b>الوصف:</b> ${result.enhancedPrompt}\n\n` +
+          `🔗 <a href="${result.imageUrl}">اضغط هنا لفتح الصورة</a>\n\n` +
+          `💡 <i>الصورة بحجم 1024x1024</i>`,
+          {
+            parse_mode: 'HTML',
+            ...Markup.inlineKeyboard([
+              [Markup.button.url('🖼️ عرض الصورة', result.imageUrl)],
+              [Markup.button.callback('🔄 توليد صورة أخرى', 'image:generate')]
+            ])
+          }
+        );
       } else {
         await ctx.reply(`❌ ${result.error}`);
       }
