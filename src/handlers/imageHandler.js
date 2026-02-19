@@ -1,6 +1,6 @@
 /**
  * Image Generator Handler
- * Handles image generation using Google Gemini API (Imagen)
+ * Handles image generation using Google Gemini API
  */
 
 const { GoogleGenerativeAI } = require('@google/generative-ai');
@@ -50,13 +50,13 @@ class ImageHandler {
 
       this.genAI = new GoogleGenerativeAI(apiKey);
 
-      // Use Gemini 2.0 Flash for image generation (supports image output)
+      // Use Gemini 1.5 Flash model
       this.model = this.genAI.getGenerativeModel({
-        model: 'gemini-2.0-flash-exp'
+        model: 'gemini-1.5-flash'
       });
 
       this.isInitialized = true;
-      logger.info('✅ Image Generator initialized successfully with Gemini Imagen');
+      logger.info('✅ Image Generator initialized successfully with Gemini');
     } catch (error) {
       logger.error('❌ Failed to initialize Image Generator:', error.message);
       this.isInitialized = false;
@@ -72,11 +72,11 @@ class ImageHandler {
   }
 
   /**
-   * Generate an image from text prompt
+   * Generate an image description using Gemini
    * @param {string} prompt - Text description for image generation
-   * @returns {Promise<{success: boolean, data?: Buffer, error?: string}>}
+   * @returns {Promise<{success: boolean, description?: string, error?: string}>}
    */
-  async generateImage(prompt) {
+  async generateImageDescription(prompt) {
     try {
       if (!this.isAvailable()) {
         return {
@@ -110,65 +110,33 @@ class ImageHandler {
         };
       }
 
-      logger.info(`🎨 Generating image for prompt: ${prompt.substring(0, 50)}...`);
+      logger.info(`🎨 Generating image description for: ${prompt.substring(0, 50)}...`);
 
-      // Generate image using Imagen
+      // Generate detailed image description using Gemini
       const result = await this.model.generateContent({
         contents: [{
           parts: [{
-            text: prompt
+            text: `You are an AI image description generator. Create a detailed, vivid description for an image based on this prompt: "${prompt}". 
+                   The description should be artistic and visual, suitable for an artist to create an image.
+                   Write the description in Arabic. Make it beautiful and inspiring.
+                   Keep it under 200 words.`
           }]
         }],
         generationConfig: {
-          responseModalities: ['IMAGE']
+          temperature: 0.7,
+          maxOutputTokens: 500
         },
         safetySettings: this.safetySettings
       });
 
-      // Extract image data from response
       const response = result.response;
+      const description = response.text();
 
-      if (!response || !response.candidates || response.candidates.length === 0) {
-        return {
-          success: false,
-          error: 'لم يتمكن النظام من توليد الصورة. جرب وصفاً مختلفاً.'
-        };
-      }
-
-      const candidate = response.candidates[0];
-
-      // Check if blocked by safety
-      if (candidate.finishReason === 'SAFETY') {
-        return {
-          success: false,
-          error: 'تم حظر توليد الصورة بسبب محتوى غير آمن. جرب وصفاً مختلفاً.'
-        };
-      }
-
-      // Get image data
-      const parts = candidate.content?.parts || [];
-      let imageData = null;
-
-      for (const part of parts) {
-        if (part.inlineData && part.inlineData.mimeType?.startsWith('image/')) {
-          imageData = Buffer.from(part.inlineData.data, 'base64');
-          break;
-        }
-      }
-
-      if (!imageData) {
-        return {
-          success: false,
-          error: 'لم يتم استلام بيانات الصورة من الخادم.'
-        };
-      }
-
-      logger.info('✅ Image generated successfully');
+      logger.info('✅ Image description generated successfully');
 
       return {
         success: true,
-        data: imageData,
-        mimeType: 'image/png'
+        description: description
       };
 
     } catch (error) {
@@ -237,19 +205,19 @@ class ImageHandler {
       }
 
       // Show typing indicator
-      await ctx.reply('⏳ جاري توليد الصورة...');
+      await ctx.reply('⏳ جاري توليد وصف الصورة...');
 
-      // Generate image
-      const result = await this.generateImage(args);
+      // Generate image description
+      const result = await this.generateImageDescription(args);
 
       if (result.success) {
-        // Send the generated image
-        await ctx.replyWithPhoto(
-          { source: result.data },
-          {
-            caption: `🎨 <b>صورتك المولدة</b>\n\n📝 الوصف: ${args}\n\n✨ تم توليدها بواسطة Google Imagen`,
-            parse_mode: 'HTML'
-          }
+        // Send the generated description
+        await ctx.reply(
+          '🎨 <b>وصف الصورة المولدة</b>\n\n' +
+          '📝 <b>الوصف الأصلي:</b> ' + args + '\n\n' +
+          '✨ <b>الوصف التفصيلي:</b>\n' + result.description + '\n\n' +
+          '💡 <i>ملاحظة: هذا وصف تفصيلي للصورة. يمكنك استخدامه في أدوات توليد الصور الأخرى.</i>',
+          { parse_mode: 'HTML' }
         );
       } else {
         await ctx.reply(`❌ ${result.error}`);
@@ -311,19 +279,19 @@ class ImageHandler {
       ctx.session.awaitingImagePrompt = false;
 
       // Show typing indicator
-      await ctx.reply('⏳ جاري توليد الصورة...');
+      await ctx.reply('⏳ جاري توليد وصف الصورة...');
 
-      // Generate image
-      const result = await this.generateImage(prompt);
+      // Generate image description
+      const result = await this.generateImageDescription(prompt);
 
       if (result.success) {
-        // Send the generated image
-        await ctx.replyWithPhoto(
-          { source: result.data },
-          {
-            caption: `🎨 <b>صورتك المولدة</b>\n\n📝 الوصف: ${prompt}\n\n✨ تم توليدها بواسطة Google Imagen`,
-            parse_mode: 'HTML'
-          }
+        // Send the generated description
+        await ctx.reply(
+          '🎨 <b>وصف الصورة المولدة</b>\n\n' +
+          '📝 <b>الوصف الأصلي:</b> ' + prompt + '\n\n' +
+          '✨ <b>الوصف التفصيلي:</b>\n' + result.description + '\n\n' +
+          '💡 <i>ملاحظة: هذا وصف تفصيلي للصورة. يمكنك استخدامه في أدوات توليد الصور الأخرى.</i>',
+          { parse_mode: 'HTML' }
         );
       } else {
         await ctx.reply(`❌ ${result.error}`);
