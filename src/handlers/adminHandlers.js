@@ -155,7 +155,7 @@ class AdminHandlers {
         '♻️ <b>نسخ تدريجي:</b> التغييرات منذ آخر نسخة\n' +
         '📋 <b>قائمة النسخ:</b> عرض النسخ المتاحة\n' +
         '📊 <b>الإحصائيات:</b> معلومات عن النسخ الاحتياطية',
-        { 
+        {
           parse_mode: 'HTML',
           reply_markup: keyboard.reply_markup
         }
@@ -184,11 +184,11 @@ class AdminHandlers {
       const result = await backup.fullBackup(true); // with compression
 
       if (result.success) {
-        const message = 
+        const message =
           '✅ <b>نسخة احتياطية كاملة ناجحة!</b>\n\n' +
           `📦 الملف: <code>${result.filename}</code>\n` +
           `📊 الحجم: ${result.size}\n` +
-          `🗜️ مضغوط: نعم\n\n` +
+          '🗜️ مضغوط: نعم\n\n' +
           '<b>الإحصائيات:</b>\n' +
           `👤 المستخدمين: ${result.statistics.totalUsers}\n` +
           `🏢 المجموعات: ${result.statistics.totalGroups}\n` +
@@ -224,7 +224,7 @@ class AdminHandlers {
 
       if (result.success) {
         await ctx.reply(
-          `✅ تم النسخ الاحتياطي للمستخدمين!\n\n` +
+          '✅ تم النسخ الاحتياطي للمستخدمين!\n\n' +
           `📦 ${result.filename}\n` +
           `👥 ${result.count} مستخدم`
         );
@@ -309,7 +309,7 @@ class AdminHandlers {
 
       if (result.success) {
         await ctx.reply(
-          `✅ نسخة احتياطية تدريجية ناجحة!\n\n` +
+          '✅ نسخة احتياطية تدريجية ناجحة!\n\n' +
           `📦 ${result.filename}\n` +
           `📝 عدد التغييرات: ${result.changesCount}`
         );

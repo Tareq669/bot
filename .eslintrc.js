@@ -1,7 +1,7 @@
 module.exports = {
   env: {
     node: true,
-    es2021: true,
+    es6: true,
     jest: true
   },
   extends: [
@@ -14,7 +14,7 @@ module.exports = {
   rules: {
     // Possible Errors
     'no-console': 'off', // Allow console for logging
-    'no-unused-vars': ['warn', { 
+    'no-unused-vars': ['warn', {
       argsIgnorePattern: '^_',
       varsIgnorePattern: '^_'
     }],
@@ -49,11 +49,6 @@ module.exports = {
     'callback-return': 'warn',
     'handle-callback-err': 'warn',
     'no-path-concat': 'error'
-  },
-  ignorePatterns: [
-    'node_modules/',
-    'coverage/',
-    'logs/',
-    '*.log'
-  ]
+  }
+
 };

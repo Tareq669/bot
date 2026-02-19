@@ -1,15 +1,40 @@
 /**
  * Image Generator Handler
- * Handles image generation using Pollinations AI API (Free, no API key required)
+ * Handles image generation using Google Gemini API and Pollinations AI
  */
 
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { logger } = require('../utils/helpers');
-const https = require('https');
 
 class ImageHandler {
   constructor() {
-    this.isInitialized = true;
-    logger.info('✅ Image Generator initialized successfully with Pollinations AI');
+    this.genAI = null;
+    this.isInitialized = false;
+
+    // Initialize if API key is available
+    this.initialize();
+  }
+
+  /**
+   * Initialize the Gemini API client
+   */
+  initialize() {
+    try {
+      const apiKey = process.env.GEMINI_API_KEY;
+
+      if (!apiKey) {
+        logger.warn('⚠️ GEMINI_API_KEY not found in environment variables');
+        return;
+      }
+
+      this.genAI = new GoogleGenerativeAI(apiKey);
+
+      this.isInitialized = true;
+      logger.info('✅ Image Generator initialized successfully with Gemini');
+    } catch (error) {
+      logger.error('❌ Failed to initialize Image Generator:', error.message);
+      this.isInitialized = false;
+    }
   }
 
   /**
@@ -17,72 +42,28 @@ class ImageHandler {
    * @returns {boolean}
    */
   isAvailable() {
-    return this.isInitialized;
+    return this.isInitialized && this.genAI !== null;
   }
 
   /**
-   * Generate an image using Pollinations AI API
+   * Generate an enhanced image prompt using Gemini
    * @param {string} prompt - Text description for image generation
-   * @returns {Promise<{success: boolean, imageUrl?: string, error?: string}>}
+   * @returns {Promise<string>}
    */
-  async generateImage(prompt) {
+  async enhancePrompt(prompt) {
     try {
       if (!this.isAvailable()) {
-        return {
-          success: false,
-          error: 'خدمة توليد الصور غير متاحة حالياً.'
-        };
+        return prompt; // Fallback to original prompt if API not available
       }
 
-      // Validate prompt
-      if (!prompt || prompt.trim().length === 0) {
-        return {
-          success: false,
-          error: 'يرجى إدخال وصف للصورة التي تريد توليدها.'
-        };
-      }
+      const model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const promptInstruction = `Create a detailed English artistic prompt for: "${prompt}". Output ONLY the prompt.`;
 
-      // Limit prompt length
-      if (prompt.length > 500) {
-        return {
-          success: false,
-          error: 'الوصف طويل جداً. يرجى اختصاره إلى أقل من 500 حرف.'
-        };
-      }
-
-      // Check for inappropriate content in prompt
-      const inappropriateWords = this.checkInappropriateContent(prompt);
-      if (inappropriateWords) {
-        return {
-          success: false,
-          error: 'عذراً، لا يمكن توليد صور تحتوي على محتوى غير لائق.'
-        };
-      }
-
-      logger.info(`🎨 Generating image for: ${prompt.substring(0, 50)}...`);
-
-      // Encode the prompt for URL
-      const encodedPrompt = encodeURIComponent(prompt);
-
-      // Generate image URL using Pollinations AI
-      // Using a random seed to get different images for the same prompt
-      const seed = Math.floor(Math.random() * 1000000);
-      const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=1024&seed=${seed}&nologo=true`;
-
-      logger.info('✅ Image generated successfully');
-
-      return {
-        success: true,
-        imageUrl: imageUrl
-      };
-
+      const result = await model.generateContent(promptInstruction);
+      return result.response.text().trim();
     } catch (error) {
-      logger.error('❌ Image generation error:', error.message);
-
-      return {
-        success: false,
-        error: 'حدث خطأ أثناء توليد الصورة. يرجى المحاولة مرة أخرى.'
-      };
+      logger.error('❌ Failed to enhance prompt:', error.message);
+      return prompt; // Fallback to original prompt on error
     }
   }
 
@@ -93,13 +74,69 @@ class ImageHandler {
    */
   checkInappropriateContent(prompt) {
     const inappropriatePatterns = [
-      // Add patterns to filter inappropriate content
       /عاري/i, /جنس/i, /إباحي/i, /porn/i, /nude/i, /sex/i,
       /عنف/i, /دموي/i, /violent/i, /gore/i, /kill/i,
       /كراهية/i, /hate/i, /racist/i
     ];
 
     return inappropriatePatterns.some(pattern => pattern.test(prompt));
+  }
+
+  /**
+   * Generate an image using Pollinations AI API
+   * @param {string} prompt - Text description for image generation
+   * @returns {Promise<{success: boolean, imageUrl?: string, error?: string}>}
+   */
+  async generateImage(prompt) {
+    try {
+      if (!prompt || prompt.trim().length === 0) {
+        return {
+          success: false,
+          error: 'يرجى إدخال وصف للصورة التي تريد توليدها.'
+        };
+      }
+
+      if (prompt.length > 500) {
+        return {
+          success: false,
+          error: 'الوصف طويل جداً. يرجى اختصاره إلى أقل من 500 حرف.'
+        };
+      }
+
+      if (this.checkInappropriateContent(prompt)) {
+        return {
+          success: false,
+          error: 'عذراً، لا يمكن توليد صور تحتوي على محتوى غير لائق.'
+        };
+      }
+
+      logger.info(`🎨 Generating image for: ${prompt.substring(0, 50)}...`);
+
+      // Enhance prompt using Gemini
+      const enhancedPrompt = await this.enhancePrompt(prompt);
+
+      logger.info(`📝 Enhanced prompt: ${enhancedPrompt.substring(0, 50)}...`);
+
+      // Generate image URL using Pollinations AI with random seed
+      const seed = Math.floor(Math.random() * 1000000);
+      const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(enhancedPrompt)}?width=1024&height=1024&seed=${seed}&nologo=true`;
+
+      logger.info('✅ Image generated successfully');
+
+      return {
+        success: true,
+        imageUrl: imageUrl,
+        enhancedPrompt: enhancedPrompt
+      };
+
+    } catch (error) {
+      logger.error('❌ Image generation error:', error.message);
+
+      return {
+        success: false,
+        error: 'حدث خطأ أثناء توليد الصورة. يرجى المحاولة مرة أخرى.'
+      };
+    }
   }
 
   /**
@@ -127,16 +164,21 @@ class ImageHandler {
       }
 
       // Show typing indicator
+      await ctx.sendChatAction('upload_photo');
       await ctx.reply('⏳ جاري توليد الصورة...');
 
       // Generate image
       const result = await this.generateImage(args);
 
       if (result.success) {
-        // Send the generated image directly using replyWithPhoto
+        const { Markup } = require('telegraf');
+
         await ctx.replyWithPhoto(result.imageUrl, {
-          caption: `🎨 <b>الصورة المولدة</b>\n\n📝 <b>الوصف:</b> ${args}\n\n💡 <i>تم التوليد بواسطة Pollinations AI</i>`,
-          parse_mode: 'HTML'
+          caption: `✨ <b>تم التوليد بواسطة الذكاء الاصطناعي</b>\n\n📝 <b>الوصف المستخدم:</b>\n<i>${result.enhancedPrompt}</i>`,
+          parse_mode: 'HTML',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('🔄 توليد صورة أخرى', 'image:generate')]
+          ])
         });
       } else {
         await ctx.reply(`❌ ${result.error}`);
@@ -198,16 +240,21 @@ class ImageHandler {
       ctx.session.awaitingImagePrompt = false;
 
       // Show typing indicator
+      await ctx.sendChatAction('upload_photo');
       await ctx.reply('⏳ جاري توليد الصورة...');
 
       // Generate image
       const result = await this.generateImage(prompt);
 
       if (result.success) {
-        // Send the generated image
+        const { Markup } = require('telegraf');
+
         await ctx.replyWithPhoto(result.imageUrl, {
-          caption: `🎨 <b>الصورة المولدة</b>\n\n📝 <b>الوصف:</b> ${prompt}\n\n💡 <i>تم التوليد بواسطة Pollinations AI</i>`,
-          parse_mode: 'HTML'
+          caption: `✨ <b>تم التوليد بواسطة الذكاء الاصطناعي</b>\n\n📝 <b>الوصف المستخدم:</b>\n<i>${result.enhancedPrompt}</i>`,
+          parse_mode: 'HTML',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('🔄 توليد صورة أخرى', 'image:generate')]
+          ])
         });
       } else {
         await ctx.reply(`❌ ${result.error}`);
@@ -231,8 +278,8 @@ class ImageHandler {
     const { Markup } = require('telegraf');
 
     return Markup.inlineKeyboard([
-      [{ text: '🎨 توليد صورة جديدة', callback_data: 'image:generate' }],
-      [{ text: '⬅️ رجوع', callback_data: 'menu:main' }]
+      [Markup.button.callback('🎨 توليد صورة جديدة', 'image:generate')],
+      [Markup.button.callback('⬅️ رجوع', 'menu:main')]
     ]);
   }
 }

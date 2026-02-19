@@ -40,7 +40,7 @@ class KhatmaProvider {
   // Advance pages for a user object (mutates user.khatmaProgress)
   static async advancePages(user, delta = 1) {
     if (!user) throw new Error('User required');
-    
+
     // Ensure khatmaProgress exists and has all required properties
     if (!user.khatmaProgress) {
       user.khatmaProgress = {
@@ -52,13 +52,13 @@ class KhatmaProvider {
         daysActive: 0
       };
     }
-    
+
     // Ensure all properties exist
     if (user.khatmaProgress.currentPage === undefined) user.khatmaProgress.currentPage = 1;
     if (user.khatmaProgress.percentComplete === undefined) user.khatmaProgress.percentComplete = 0;
     if (user.khatmaProgress.startDate === undefined) user.khatmaProgress.startDate = new Date();
     if (user.khatmaProgress.completionCount === undefined) user.khatmaProgress.completionCount = 0;
-    
+
     const total = this.totalPages();
     const current = user.khatmaProgress.currentPage || 1;
     const next = Math.min(total, current + Number(delta));
@@ -74,15 +74,15 @@ class KhatmaProvider {
 
   static async resetKhatma(user) {
     if (!user) throw new Error('User required');
-    
+
     // Ensure khatmaProgress exists
     if (!user.khatmaProgress) {
       user.khatmaProgress = {};
     }
-    
+
     // Preserve completionCount if it exists
     const completionCount = user.khatmaProgress.completionCount || 0;
-    
+
     user.khatmaProgress.currentPage = 1;
     user.khatmaProgress.percentComplete = 0;
     user.khatmaProgress.startDate = new Date();
