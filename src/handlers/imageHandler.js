@@ -84,12 +84,12 @@ class ImageHandler {
         };
       }
 
-      logger.info('🎨 Generating image description for: ' + prompt.substring(0, 50) + '...');
+      logger.info(`🎨 Generating image description for: ${  prompt.substring(0, 50)  }...`);
 
       // Generate detailed image description using Gemini
       const response = await this.ai.models.generateContent({
         model: 'gemini-pro',
-        contents: 'You are an AI image description generator. Create a detailed, vivid description for an image based on this prompt: "' + prompt + '". The description should be artistic and visual, suitable for an artist to create an image. Write the description in Arabic. Make it beautiful and inspiring. Keep it under 200 words.'
+        contents: `You are an AI image description generator. Create a detailed, vivid description for an image based on this prompt: "${  prompt  }". The description should be artistic and visual, suitable for an artist to create an image. Write the description in Arabic. Make it beautiful and inspiring. Keep it under 200 words.`
       });
 
       const description = response.text;
@@ -176,13 +176,13 @@ class ImageHandler {
         // Send the generated description
         await ctx.reply(
           '🎨 <b>وصف الصورة المولدة</b>\n\n' +
-          '📝 <b>الوصف الأصلي:</b> ' + args + '\n\n' +
-          '✨ <b>الوصف التفصيلي:</b>\n' + result.description + '\n\n' +
+          `📝 <b>الوصف الأصلي:</b> ${  args  }\n\n` +
+          `✨ <b>الوصف التفصيلي:</b>\n${  result.description  }\n\n` +
           '💡 <i>ملاحظة: هذا وصف تفصيلي للصورة. يمكنك استخدامه في أدوات توليد الصور الأخرى.</i>',
           { parse_mode: 'HTML' }
         );
       } else {
-        await ctx.reply('❌ ' + result.error);
+        await ctx.reply(`❌ ${  result.error}`);
       }
 
     } catch (error) {
@@ -250,13 +250,13 @@ class ImageHandler {
         // Send the generated description
         await ctx.reply(
           '🎨 <b>وصف الصورة المولدة</b>\n\n' +
-          '📝 <b>الوصف الأصلي:</b> ' + prompt + '\n\n' +
-          '✨ <b>الوصف التفصيلي:</b>\n' + result.description + '\n\n' +
+          `📝 <b>الوصف الأصلي:</b> ${  prompt  }\n\n` +
+          `✨ <b>الوصف التفصيلي:</b>\n${  result.description  }\n\n` +
           '💡 <i>ملاحظة: هذا وصف تفصيلي للصورة. يمكنك استخدامه في أدوات توليد الصور الأخرى.</i>',
           { parse_mode: 'HTML' }
         );
       } else {
-        await ctx.reply('❌ ' + result.error);
+        await ctx.reply(`❌ ${  result.error}`);
       }
 
       return true;
