@@ -1,6 +1,6 @@
 /**
  * Image Generator Handler
- * Handles image generation using Pollinations AI API (Free, no API key required)
+ * Uses Hugging Face Inference API for image generation
  */
 
 const fetch = require('node-fetch');
@@ -12,7 +12,13 @@ const waitingForImagePrompt = new Set();
 class ImageHandler {
   constructor() {
     this.isInitialized = true;
-    logger.info('✅ Image Generator initialized successfully with Pollinations AI');
+    this.hfToken = process.env.HF_TOKEN;
+
+    if (!this.hfToken) {
+      logger.warn('⚠️ HF_TOKEN not found in environment variables');
+    } else {
+      logger.info('✅ Image Generator initialized with Hugging Face');
+    }
   }
 
   /**
@@ -20,7 +26,7 @@ class ImageHandler {
    * @returns {boolean}
    */
   isAvailable() {
-    return this.isInitialized;
+    return this.isInitialized && !!this.hfToken;
   }
 
   /**
@@ -62,14 +68,14 @@ class ImageHandler {
   }
 
   /**
-   * Generate an image and return as Buffer
+   * Generate an image using Hugging Face API
    * @param {string} prompt - Text description for image generation
    * @returns {Promise<{success: boolean, buffer?: Buffer, error?: string}>}
    */
   async generateImageBuffer(prompt) {
     try {
       if (!this.isAvailable()) {
-        return { success: false, error: 'خدمة توليد الصور غير متاحة حالياً.' };
+        return { success: false, error: 'خدمة توليد الصور غير متاحة. يرجى إضافة HF_TOKEN.' };
       }
 
       if (!prompt || prompt.trim().length === 0) {
@@ -86,81 +92,41 @@ class ImageHandler {
 
       logger.info(`🎨 Generating image for: ${prompt.substring(0, 30)}...`);
 
-      // Generate image URL matching n8n workflow format
-      const seed = Math.floor(Math.random() * 1000000);
-      const width = 1080;
-      const height = 1920;
-      const model = 'flux';
-
-      // Build URL with all parameters
-      const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${width}&height=${height}&model=${model}&seed=${seed}&nologo=true`;
-
-      // Fetch image with retry logic
-      const fetchImage = async () => {
-        const response = await fetch(imageUrl, {
-          method: 'GET',
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Accept': 'image/png,image/jpeg,image/webp,*/*'
-          },
-          redirect: 'follow'
-        });
+      // Hugging Face Inference API call
+      const hfGenerateImage = async () => {
+        const response = await fetch(
+          'https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2',
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${this.hfToken}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ inputs: prompt })
+          }
+        );
 
         if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
+          const errorText = await response.text();
+          throw new Error(`HF API error: ${response.status} - ${errorText}`);
         }
 
-        const buffer = await response.buffer();
+        // Get array buffer
+        const arrayBuffer = await response.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
 
         if (!buffer || buffer.length === 0) {
-          throw new Error('Empty buffer');
+          throw new Error('Empty response from Hugging Face');
         }
 
         return buffer;
       };
 
       // Retry up to 3 times with 1 second delay
-      const buffer = await this.retryWithBackoff(fetchImage, 3, 1000);
+      const buffer = await this.retryWithBackoff(hfGenerateImage, 3, 1000);
 
       logger.info('✅ Image generated successfully');
       return { success: true, buffer: buffer };
-
-    } catch (error) {
-      logger.error('❌ Image generation error:', error.message);
-      return { success: false, error: 'حدث خطأ. يرجى المحاولة مرة أخرى.' };
-    }
-  }
-
-  /**
-   * Generate an image URL using Pollinations AI API
-   * @param {string} prompt - Text description for image generation
-   * @returns {Promise<{success: boolean, imageUrl?: string, error?: string}>}
-   */
-  async generateImage(prompt) {
-    try {
-      if (!this.isAvailable()) {
-        return { success: false, error: 'خدمة توليد الصور غير متاحة حالياً.' };
-      }
-
-      if (!prompt || prompt.trim().length === 0) {
-        return { success: false, error: 'يرجى إدخال وصف للصورة.' };
-      }
-
-      if (prompt.length > 500) {
-        return { success: false, error: 'الوصف طويل جداً.' };
-      }
-
-      if (this.checkInappropriateContent(prompt)) {
-        return { success: false, error: 'عذراً، لا يمكن توليد هذا المحتوى.' };
-      }
-
-      logger.info(`🎨 Generating image for: ${prompt.substring(0, 30)}...`);
-
-      const seed = Math.floor(Math.random() * 1000000);
-      const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=1024&seed=${seed}&nologo=true`;
-
-      logger.info('✅ Image URL generated');
-      return { success: true, imageUrl: imageUrl };
 
     } catch (error) {
       logger.error('❌ Image generation error:', error.message);
@@ -174,6 +140,11 @@ class ImageHandler {
    */
   async handleImageButton(ctx) {
     try {
+      if (!this.isAvailable()) {
+        await ctx.reply('❌ خدمة توليد الصور غير متاحة. يرجى إضافة HF_TOKEN في إعدادات البوت.');
+        return;
+      }
+
       const userId = ctx.from.id;
       waitingForImagePrompt.add(userId);
 
@@ -209,7 +180,7 @@ class ImageHandler {
       await ctx.sendChatAction('upload_photo');
       await ctx.reply('⏳ جاري توليد الصورة...');
 
-      // Generate image as buffer
+      // Generate image
       const result = await this.generateImageBuffer(prompt);
 
       if (result.success) {
@@ -241,6 +212,11 @@ class ImageHandler {
    */
   async handleImageCommand(ctx) {
     try {
+      if (!this.isAvailable()) {
+        await ctx.reply('❌ خدمة توليد الصور غير متاحة. يرجى إضافة HF_TOKEN في إعدادات البوت.');
+        return;
+      }
+
       const messageText = ctx.message && ctx.message.text ? ctx.message.text : '';
       const args = messageText.split(' ').slice(1).join(' ');
 
@@ -261,7 +237,7 @@ class ImageHandler {
       await ctx.sendChatAction('upload_photo');
       await ctx.reply('⏳ جاري توليد الصورة...');
 
-      // Generate image as buffer
+      // Generate image
       const result = await this.generateImageBuffer(args);
 
       if (result.success) {
