@@ -27,10 +27,32 @@ const connectionMonitor = require('./utils/connectionMonitor');
 const healthMonitor = require('./utils/healthMonitor');
 const Formatter = require('./utils/formatter');
 
+const normalizeEnvValue = (value) => {
+  if (typeof value !== 'string') {
+    return value;
+  }
+  return value.trim().replace(/^["']|["']$/g, '');
+};
+
+const isMissingRequiredEnv = (value) => {
+  if (typeof value !== 'string') {
+    return true;
+  }
+  const normalized = normalizeEnvValue(value);
+  const invalidLiterals = new Set([
+    '',
+    'undefined',
+    'null',
+    'your_huggingface_token_here',
+    'your_telegram_bot_token_here'
+  ]);
+  return invalidLiterals.has(normalized.toLowerCase());
+};
+
 const requiredEnvVars = ['BOT_TOKEN', 'HF_TOKEN'];
 const missingEnvVars = requiredEnvVars.filter((envName) => {
   const value = process.env[envName];
-  return !value || !value.trim();
+  return isMissingRequiredEnv(value);
 });
 
 if (missingEnvVars.length > 0) {
@@ -38,6 +60,9 @@ if (missingEnvVars.length > 0) {
   logger.error('💡 Set them in Railway Variables (production) or .env (local development).');
   process.exit(1);
 }
+
+process.env.BOT_TOKEN = normalizeEnvValue(process.env.BOT_TOKEN);
+process.env.HF_TOKEN = normalizeEnvValue(process.env.HF_TOKEN);
 
 const imageHandler = require('./handlers/imageHandler');
 

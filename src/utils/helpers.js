@@ -3,6 +3,10 @@ const logger = {
     console.log(`[INFO] ${new Date().toISOString()} - ${message}`);
   },
   error: (message, error) => {
+    if (typeof error === 'undefined') {
+      console.error(`[ERROR] ${new Date().toISOString()} - ${message}`);
+      return;
+    }
     console.error(`[ERROR] ${new Date().toISOString()} - ${message}`, error);
   },
   warn: (message) => {

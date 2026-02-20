@@ -12,7 +12,9 @@ const waitingForImagePrompt = new Set();
 class ImageHandler {
   constructor() {
     this.isInitialized = true;
-    this.hfToken = process.env.HF_TOKEN;
+    const rawToken = process.env.HF_TOKEN;
+    this.hfToken =
+      typeof rawToken === 'string' ? rawToken.trim().replace(/^["']|["']$/g, '') : rawToken;
     this.hfModel = process.env.HF_IMAGE_MODEL || 'stabilityai/stable-diffusion-xl-base-1.0';
 
     if (!this.hfToken) {
