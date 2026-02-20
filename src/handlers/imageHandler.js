@@ -16,6 +16,8 @@ class ImageHandler {
     this.hfToken =
       typeof rawToken === 'string' ? rawToken.trim().replace(/^["']|["']$/g, '') : rawToken;
     this.hfModel = process.env.HF_IMAGE_MODEL || 'stabilityai/stable-diffusion-xl-base-1.0';
+    this.hfTranslationModel =
+      process.env.HF_TRANSLATION_MODEL || 'Helsinki-NLP/opus-mt-ar-en';
 
     if (!this.hfToken) {
       logger.warn('⚠️ HF_TOKEN not found in environment variables');
@@ -30,6 +32,86 @@ class ImageHandler {
    */
   isAvailable() {
     return this.isInitialized && !!this.hfToken;
+  }
+
+  /**
+   * Detect Arabic letters in text
+   * @param {string} text
+   * @returns {boolean}
+   */
+  hasArabicText(text) {
+    return /[\u0600-\u06FF]/.test(text);
+  }
+
+  /**
+   * Extract translated text from common HF translation response formats
+   * @param {unknown} payload
+   * @returns {string}
+   */
+  extractTranslatedText(payload) {
+    if (Array.isArray(payload) && payload.length > 0) {
+      const first = payload[0];
+      if (typeof first === 'string') return first;
+      if (first && typeof first === 'object') {
+        if (typeof first.translation_text === 'string') return first.translation_text;
+        if (typeof first.generated_text === 'string') return first.generated_text;
+      }
+    }
+
+    if (payload && typeof payload === 'object') {
+      if (typeof payload.translation_text === 'string') return payload.translation_text;
+      if (typeof payload.generated_text === 'string') return payload.generated_text;
+    }
+
+    return '';
+  }
+
+  /**
+   * Translate Arabic prompts to English for better text-to-image quality
+   * @param {string} prompt
+   * @returns {Promise<string>}
+   */
+  async translatePromptIfNeeded(prompt) {
+    if (!this.hasArabicText(prompt)) {
+      return prompt;
+    }
+
+    try {
+      const response = await fetch(
+        `https://router.huggingface.co/hf-inference/models/${this.hfTranslationModel}`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${this.hfToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            inputs: prompt,
+            options: { wait_for_model: true }
+          })
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        logger.warn(`Arabic prompt translation failed (${response.status}): ${errorText}`);
+        return prompt;
+      }
+
+      const payload = await response.json();
+      const translated = this.extractTranslatedText(payload).trim();
+
+      if (!translated) {
+        logger.warn('Arabic prompt translation returned empty text; using original prompt');
+        return prompt;
+      }
+
+      logger.info(`Arabic prompt translated: ${translated.substring(0, 80)}`);
+      return translated;
+    } catch (error) {
+      logger.warn(`Arabic prompt translation error: ${error.message}`);
+      return prompt;
+    }
   }
 
   /**
@@ -97,7 +179,10 @@ class ImageHandler {
         return { success: false, error: 'عذراً، لا يمكن توليد هذا المحتوى.' };
       }
 
-      logger.info(`🎨 Generating image for: ${prompt.substring(0, 30)}...`);
+      const cleanPrompt = prompt.trim();
+      const promptForGeneration = await this.translatePromptIfNeeded(cleanPrompt);
+
+      logger.info(`🎨 Generating image for: ${promptForGeneration.substring(0, 30)}...`);
 
       // Hugging Face Router API call (api-inference.huggingface.co is deprecated)
       const hfGenerateImage = async () => {
@@ -111,7 +196,7 @@ class ImageHandler {
               'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-              inputs: prompt,
+              inputs: promptForGeneration,
               options: {
                 wait_for_model: true
               }
