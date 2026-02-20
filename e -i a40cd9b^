@@ -1,0 +1,95 @@
+[33m5f61ba4[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m Remove Hugging Face token before push
+[33ma40cd9b[m feat: update image generation to use Hugging Face API and enhance error handling; add HF_TOKEN to environment configuration
+[33mfc1efd3[m[33m ([m[1;31morigin/my-bot-tele[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m feat: implement retry logic for image fetching with backoff strategy and enhance error handling
+[33m52faf20[m feat: enhance image URL generation with n8n workflow parameters and improve fetch headers
+[33m8c4c05e[m feat: implement image generation as buffer and enhance error handling for image fetching
+[33mfa84f30[m feat: implement image download functionality and enhance error handling for image sending
+[33me36dfd8[m refactor: change waitingForImagePrompt to const; clean up whitespace in image handling methods
+[33mc95413c[m refactor: streamline image generation handling; replace command with button interaction and implement waiting state management
+[33m704d2e1[m Merge branch 'main' of https://github.com/Tareq669/bot
+[33m61fce9a[m refactor: update axios dependency to version 1.13.5; enhance imageHandler with temporary directory creation and image download functionality
+[33m9475fbe[m متوقف
+[33m1eb5e3e[m Add workflow_dispatch trigger to test workflow
+[33m9f7828b[m refactor: update image response to send clickable URL and enhanced message formatting in Telegram
+[33me119fe5[m refactor: remove Google Gemini API integration; streamline image generation to use Pollinations AI exclusively
+[33mfd90d2d[m fix: add peer dependency flag to eslint package in package-lock.json
+[33m6577d1b[m Refactor adminHandlers for improved message formatting and consistency; update imageHandler to integrate Google Gemini API for enhanced image prompt generation; streamline backupSystem code for better readability and maintainability.
+[33mb7c7ff5[m refactor: update image response to use replyWithPhoto for direct image sending in Telegram
+[33mc4ad21a[m refactor: update image response to send URL instead of direct image in Telegram
+[33mb04a5f5[m refactor: remove Google Gemini API integration and switch to Pollinations AI for image generation
+[33m8352965[m refactor: update image generation handler to use new Google Generative AI package
+[33m9ab908a[m refactor: improve string concatenation for better readability in image description generation
+[33maccb874[m feat: update image generation model to use Gemini Pro for enhanced description quality
+[33m368c07e[m fix: revert image generation model to Gemini 1.5 Flash for improved description quality
+[33m65314a1[m feat: update image generation model to use Gemini 2.0 Flash for improved descriptions
+[33m317c1cc[m feat: update image generation handler to use @google/genai and improve error handling
+[33m42dbf5c[m feat: update image generation to provide detailed descriptions using Gemini 1.5 Flash
+[33md2443c1[m feat: update image generation to use Gemini 2.0 Flash and handle image prompt requests
+[33m79224d9[m fix: update to the latest Imagen model version for improved image generation
+[33md0861a0[m refactor: remove redundant image size configuration in generation settings
+[33m069782f[m feat: add image generation feature using Google Gemini API
+[33m4ba8674[m Refactor AI system: remove integratedAI, learningSystem, smartNotifications, and related handlers
+[33m0e3a192[m Refactor: Remove groupKeyboards and groupHelper modules; introduce UIManager for keyboard management
+[33m15f238b[m refactor: remove duplicate smart stats and rewards handlers from index.js
+[33m9471424[m refactor: clean up unused variables and improve response generation in AIManager
+[33m92ef405[m feat: add group command restrictions and chat type helpers
+[33m26dced7[m feat: add Smart Replies Manager for group chats
+[33mc11ebca[m feat: add scheduled messages feature with CRUD operations
+[33m2134c7d[m refactor: remove group controller and related imports from index.js
+[33me716edc[m refactor: replace group owner check with private chat validation and session initialization
+[33m943206d[m feat: add group controller for managing group commands and permissions
+[33m338f05d[m refactor: remove AIManager and related smart response handling
+[33m8c94201[m feat: implement group protection commands and related functionalities
+[33m7074234[m Refactor: Remove group management commands and related handlers
+[33mb5b3c51[m feat: add daily statistics commands and update handling for group activity
+[33m46df586[m feat: enhance group management with owner info and admin updates
+[33m06b562a[m feat: add group-specific command handlers and keyboard interactions
+[33m7d5b8c1[m feat: add group and admin validation functions to groupHelper
+[33mba8821d[m feat: add group management commands and initialize group handlers
+[33mecea7d4[m feat: add group management handlers and keyboard layouts
+[33me1f3aab[m المجموعة
+[33m63d6a0b[m تنظيف الكود: إزالة الاستيرادات غير المستخدمة من menuHandler.js
+[33m556d549[m Refactor notification system: remove automated notifications and related settings from User model; clean up notification handling in index.js
+[33m34490c3[m إضافة وظيفة لإغلاق لوحة المفاتيح عند تلقي الأمر "❌ إغلق"
+[33m5f52741[m الاشعارات اكتمل
+[33mb7dba80[m الاشعارات 7
+[33m671a49c[m االاشعارات 6
+[33m2a35307[m الاشعارات 5
+[33mdc1655d[m الاشعارات 4
+[33med47bbe[m الاشعارات 3
+[33m369031f[m الاشعارات 2
+[33mb2a710e[m الاشعارات 1
+[33m3ab6b97[m الاشعارات
+[33m3364ed4[m اضافة اشعارات
+[33m7dd8d3c[m feat(notifications): implement advanced notification system and handler
+[33mecd64f2[m البوت كما كان
+[33mec37783[m feat(handler): initialize session for quiz and game handlers
+[33m13e174c[m تعديل المتحوى الجديد
+[33m2b0b726[m feat(ui): add extra features button and menu for additional Quranic functionalities
+[33m5580e5e[m feat(ui): add extra features menu and actions for Quranic functionalities
+[33mbf9a574[m refactor(ui): remove extra features menu and related actions
+[33me213c59[m feat(ui): add extra button to rewards keyboard
+[33m704f7df[m feat: add new button for extra features in rewards menu
+[33m433c1d5[m feat: add extra new features menu and actions for Quranic functionalities
+[33m3aca0ca[m chore: remove subproject reference from bot
+[33mf212215[m Merge branch 'main' of https://github.com/Tareq669/bot
+[33m1a528d9[m Update subproject commit reference in bot
+[33m5b8cbde[m feat: add new features handler for Quran, Adhkar, Admin, and Games functionalities
+[33m20bb79d[m botpkup2
+[33m37ab384[m Merge pull request #6 from Tareq669/copilot/create-backup-for-bot2
+[33mff908f2[m[33m ([m[1;31morigin/copilot/create-backup-for-bot[m[33m)[m Add comprehensive unit tests for helpers.js
+[33mfceff1b[m Add quick start guide for backup system
+[33m1f0d665[m Complete backup system implementation with comprehensive documentation
+[33mcf63cc5[m Address code review feedback - optimize performance and maintainability
+[33md0a6fca[m Add comprehensive backup system tests and validation
+[33mefac905[m Enhance backup system with comprehensive features
+[33m40c72f0[m Initial plan
+[33m187b210[m feat: simplify user query in broadcastMessage method for auction updates
+[33m04d6081[m feat: enhance notifications management with new user-friendly options and backup system
+[33m463bb5b[m feat: update keyboards with new features and improved layouts for user interactions
+[33mf7fb1e2[m feat: add notifications menu keyboard with callback buttons
+[33mc264980[m feat: enhance UIManager with new keyboards and owner controls
+[33m9a78872[m feat: add new keyboard for notifications settings
+[33m7216cb4[m feat: add UIManager class with comprehensive keyboard layouts for bot interactions
+[33m34ea9fb[m feat: enhance keyboard layouts with new features and improved notifications
+[33mc42974e[m refacto
