@@ -1,5 +1,3 @@
-const { Content } = require('../database/models');
-
 class AdhkarProvider {
   // أذكار الصباح والمساء الكاملة
   static async getAdhkarVerses() {
@@ -777,7 +775,6 @@ class AdhkarProvider {
   static async getTimedAdhkar() {
     const now = new Date();
     const hour = now.getHours();
-    const month = now.getMonth() + 1; // الشهر الميلادي
 
     // تحقق من شهر رمضان (يجب تحديثه كل عام)
     // في المستقبل يمكن استخدام حساب هجري دقيق

@@ -181,7 +181,7 @@ class NotificationSystem {
 
     let text = '📬 <b>الإشعارات</b>\n\n';
 
-    notifications.forEach((notif, index) => {
+    notifications.forEach((notif, _index) => {
       const time = new Date(notif.timestamp).toLocaleDateString('ar');
       const status = notif.read ? '✅' : '🆕';
       text += `${status} ${notif.message}\n<i>${time}</i>\n\n`;

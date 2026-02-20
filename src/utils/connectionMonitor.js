@@ -16,13 +16,10 @@ class ConnectionMonitor {
   async checkConnection() {
     try {
       // محاولة الاتصال بخادم Telegram (سريع وموثوق)
-      const start = Date.now();
       const response = await this.fetch('https://api.telegram.org/botTest/getMe', {
         timeout: 5000,
         method: 'GET'
       });
-
-      const duration = Date.now() - start;
 
       if (!response || response.status !== 404) {
         // نتوقع 404 لأن البوت تجريبي

@@ -30,7 +30,6 @@ const gunzip = promisify(zlib.gunzip);
 // Constants for file size calculations
 const BYTES_PER_KB = 1024;
 const BYTES_PER_MB = 1024 * 1024;
-const BYTES_PER_GB = 1024 * 1024 * 1024;
 
 class BackupSystem {
   constructor() {
@@ -205,7 +204,7 @@ class BackupSystem {
       // خيارات الاستعادة
       const {
         dryRun = false,  // فقط معاينة بدون تطبيق
-        collections = null  // مجموعات محددة للاستعادة
+        collections: _collections = null  // مجموعات محددة للاستعادة
       } = options;
 
       if (dryRun) {

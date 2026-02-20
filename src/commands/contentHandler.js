@@ -1,7 +1,5 @@
 const Markup = require('telegraf/markup');
 const ContentProvider = require('../content/contentProvider');
-const UIManager = require('../ui/keyboards');
-const Formatter = require('../ui/formatter');
 
 class ContentHandler {
   // Handle Baqfat (bio suggestions)

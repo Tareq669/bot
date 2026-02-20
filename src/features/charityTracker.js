@@ -201,10 +201,10 @@ class CharityTracker {
     // By type
     if (Object.keys(data.stats.byType).length > 0) {
       message += '📋 <b>حسب النوع:</b>\n';
-      Object.entries(data.stats.byType).forEach(([type, data]) => {
+      Object.entries(data.stats.byType).forEach(([type, typeStats]) => {
         const emoji = this.getCharityEmoji(type);
-        message += `${emoji} ${type}: ${data.count}`;
-        if (data.amount > 0) message += ` (${data.amount.toLocaleString()} ريال)`;
+        message += `${emoji} ${type}: ${typeStats.count}`;
+        if (typeStats.amount > 0) message += ` (${typeStats.amount.toLocaleString()} ريال)`;
         message += '\n';
       });
       message += '\n';

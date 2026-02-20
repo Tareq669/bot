@@ -1,4 +1,4 @@
-const { safeSend, logger } = require('./helpers');
+const { safeSend } = require('./helpers');
 
 class SendQueue {
   constructor({ concurrency = 3, delayMs = 300 } = {}) {

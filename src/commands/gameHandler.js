@@ -3,7 +3,6 @@ const EconomyManager = require('../economy/economyManager');
 const QuranicGames = require('../games/quranicGames');
 const Formatter = require('../ui/formatter');
 const Markup = require('telegraf/markup');
-const { User } = require('../database/models');
 
 class GameHandler {
   static async handleRPS(ctx) {

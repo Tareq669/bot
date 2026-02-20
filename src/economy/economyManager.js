@@ -1,5 +1,4 @@
 const { User, Transaction } = require('../database/models');
-const Formatter = require('../ui/formatter');
 
 class EconomyManager {
   // Get user balance

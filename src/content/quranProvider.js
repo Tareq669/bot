@@ -1,5 +1,3 @@
-const { Content } = require('../database/models');
-
 class QuranProvider {
   // قرآن كريم - آيات كاملة مع قراءات صوتية
   static async getQuranVerses() {

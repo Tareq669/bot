@@ -1,5 +1,3 @@
-const { Content } = require('../database/models');
-
 class ContentProvider {
   // Get daily Adhkar (Islamic reminders) - Now using AdhkarProvider with enhanced data
   static async getAdhkar() {
