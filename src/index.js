@@ -1,4 +1,15 @@
-﻿require('dotenv').config();
+﻿const isRailwayEnvironment = Boolean(
+  process.env.RAILWAY_ENVIRONMENT ||
+  process.env.RAILWAY_PROJECT_ID ||
+  process.env.RAILWAY_SERVICE_ID ||
+  process.env.RAILWAY_GIT_REPO_NAME
+);
+
+// Load .env only for local development (Railway provides env vars natively).
+if (!isRailwayEnvironment) {
+  require('dotenv').config();
+}
+
 const { Telegraf, session, Markup } = require('telegraf');
 const express = require('express');
 const https = require('https');
@@ -15,6 +26,19 @@ const ReconnectManager = require('./utils/reconnect');
 const connectionMonitor = require('./utils/connectionMonitor');
 const healthMonitor = require('./utils/healthMonitor');
 const Formatter = require('./utils/formatter');
+
+const requiredEnvVars = ['BOT_TOKEN', 'HF_TOKEN'];
+const missingEnvVars = requiredEnvVars.filter((envName) => {
+  const value = process.env[envName];
+  return !value || !value.trim();
+});
+
+if (missingEnvVars.length > 0) {
+  logger.error(`❌ Missing required environment variables: ${missingEnvVars.join(', ')}`);
+  logger.error('💡 Set them in Railway Variables (production) or .env (local development).');
+  process.exit(1);
+}
+
 const imageHandler = require('./handlers/imageHandler');
 
 // Configure HTTPS Agent for Telegram API
