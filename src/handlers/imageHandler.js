@@ -161,6 +161,23 @@ class ImageHandler {
   }
 
   /**
+   * Handle inline callback for image generation entry point
+   * @param {TelegrafContext} ctx
+   */
+  async handleImageCallback(ctx) {
+    try {
+      if (ctx.callbackQuery) {
+        await ctx.answerCbQuery();
+      }
+
+      await this.handleImageButton(ctx);
+    } catch (error) {
+      logger.error('Image callback error:', error);
+      await ctx.reply('❌ حدث خطأ. يرجى المحاولة مرة أخرى.');
+    }
+  }
+
+  /**
    * Handle text message and check if user is waiting for image prompt
    * @param {TelegrafContext} ctx
    * @returns {Promise<boolean>}
