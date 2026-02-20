@@ -1,5 +1,3 @@
-const { Content } = require('../database/models');
-
 class IslamicLibrary {
   /**
    * Tafsir (Quranic Exegesis) Database

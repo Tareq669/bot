@@ -69,7 +69,7 @@ class ShopSystem {
     text += 'اختر واشتري ما يعجبك:\n\n';
 
     let index = 1;
-    for (const [key, item] of Object.entries(this.SHOP_ITEMS)) {
+    for (const [_key, item] of Object.entries(this.SHOP_ITEMS)) {
       text += `${index}️⃣ <b>${item.name}</b>\n`;
       text += `💰 السعر: <code>${item.price}</code> نقطة\n`;
       text += `📝 ${item.description}\n\n`;
@@ -216,7 +216,7 @@ class ShopSystem {
 
     const items = Object.entries(this.SHOP_ITEMS)
       .slice(0, 5)
-      .map(([key, item]) => `⭐ ${item.name} - ${item.price} نقطة`);
+      .map(([_key, item]) => `⭐ ${item.name} - ${item.price} نقطة`);
 
     text += `${items.join('\n')  }\n\n`;
     text += 'استخدم: <code>/shop</code> لعرض جميع العناصر';

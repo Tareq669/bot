@@ -166,7 +166,7 @@ class DuaSystem {
     const collections = this.getDuaCollections();
     const results = [];
 
-    Object.entries(collections).forEach(([category, collection]) => {
+    Object.entries(collections).forEach(([_category, collection]) => {
       collection.duas.forEach(dua => {
         if (dua.arabic.includes(keyword) ||
             collection.name.includes(keyword) ||

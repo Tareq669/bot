@@ -5,11 +5,9 @@ class GameManager {
   // Rock Paper Scissors Game
   static async playRockPaperScissors(userId, userChoice) {
     const choices = ['🪨', '📄', '✂️'];
-    const choiceTexts = ['حجر', 'ورق', 'مقص'];
     const idx = Math.floor(Math.random() * 3);
 
     const botChoice = choices[idx];
-    const botText = choiceTexts[idx];
 
     let userIdx = -1;
     if (userChoice.includes('rock')) userIdx = 0;

@@ -1,5 +1,4 @@
 const { User } = require('../database/models');
-const moment = require('moment-timezone');
 
 class AdvancedStatsSystem {
   /**
@@ -13,7 +12,6 @@ class AdvancedStatsSystem {
       const now = new Date();
       const currentMonth = now.getMonth();
       const currentYear = now.getFullYear();
-      const currentDay = now.getDate();
 
       // Calculate periods
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());

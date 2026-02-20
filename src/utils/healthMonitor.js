@@ -86,7 +86,7 @@ class BotHealthMonitor {
     }
 
     this.checkInterval = setInterval(async () => {
-      const report = await this.healthCheck();
+      await this.healthCheck();
       // Removed excessive logging - only log on issues
     }, interval);
 

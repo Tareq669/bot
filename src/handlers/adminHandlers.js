@@ -129,9 +129,6 @@ class AdminHandlers {
         return ctx.reply(ERROR_MESSAGES.NO_PERMISSION);
       }
 
-      const BackupSystem = require('../utils/backupSystem');
-      const backup = new BackupSystem();
-
       // عرض قائمة خيارات النسخ الاحتياطي
       const keyboard = Markup.inlineKeyboard([
         [

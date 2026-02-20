@@ -303,7 +303,7 @@ class TeamManager {
   /**
    * Create team challenge
    */
-  static async createChallenge(teamId, challengeData) {
+  static async createChallenge(teamId, _challengeData) {
     try {
       const team = await Team.findById(teamId);
       if (!team) return { success: false, message: 'الفريق غير موجود' };

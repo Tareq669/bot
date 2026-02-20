@@ -1,7 +1,5 @@
 const Markup = require('telegraf/markup');
 const { User } = require('../database/models');
-const Formatter = require('../ui/formatter');
-const GameManager = require('../games/gameManager');
 
 class ProfileHandler {
   // Handle profile info

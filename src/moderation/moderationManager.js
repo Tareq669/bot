@@ -57,7 +57,7 @@ class ModerationManager {
   }
 
   // Warn user
-  static async warnUser(userId, groupId, reason = '') {
+  static async warnUser(userId, groupId, _reason = '') {
     try {
       const group = await Group.findOne({ groupId });
       if (!group) return { success: false };
@@ -216,11 +216,11 @@ class ModerationManager {
   }
 
   // Mock functions for demonstration
-  static async getMessageCount(key) {
+  static async getMessageCount(_key) {
     return Math.floor(Math.random() * 5);
   }
 
-  static async incrementMessageCount(key) {
+  static async incrementMessageCount(_key) {
     return true;
   }
 }
