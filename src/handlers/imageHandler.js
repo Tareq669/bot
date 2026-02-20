@@ -13,11 +13,12 @@ class ImageHandler {
   constructor() {
     this.isInitialized = true;
     this.hfToken = process.env.HF_TOKEN;
+    this.hfModel = process.env.HF_IMAGE_MODEL || 'stabilityai/stable-diffusion-xl-base-1.0';
 
     if (!this.hfToken) {
       logger.warn('⚠️ HF_TOKEN not found in environment variables');
     } else {
-      logger.info('✅ Image Generator initialized with Hugging Face');
+      logger.info(`✅ Image Generator initialized with Hugging Face model: ${this.hfModel}`);
     }
   }
 
@@ -58,7 +59,11 @@ class ImageHandler {
         return await fn();
       } catch (error) {
         lastError = error;
-        logger.warn(`Retry ${i + 1}/${maxRetries} failed:`, error.message);
+        const nonRetryable = /HF API error:\s*(401|403|410)/i.test(error.message) || /expired token|expired/i.test(error.message);
+        if (nonRetryable) {
+          throw error;
+        }
+        logger.warn(`Retry ${i + 1}/${maxRetries} failed: ${error.message}`);
         if (i < maxRetries - 1) {
           await new Promise(resolve => setTimeout(resolve, delay));
         }
@@ -92,23 +97,36 @@ class ImageHandler {
 
       logger.info(`🎨 Generating image for: ${prompt.substring(0, 30)}...`);
 
-      // Hugging Face Inference API call
+      // Hugging Face Router API call (api-inference.huggingface.co is deprecated)
       const hfGenerateImage = async () => {
+        const url = `https://router.huggingface.co/hf-inference/models/${this.hfModel}`;
         const response = await fetch(
-          'https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2',
+          url,
           {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${this.hfToken}`,
               'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ inputs: prompt })
+            body: JSON.stringify({
+              inputs: prompt,
+              options: {
+                wait_for_model: true
+              }
+            })
           }
         );
 
         if (!response.ok) {
           const errorText = await response.text();
-          throw new Error(`HF API error: ${response.status} - ${errorText}`);
+          let errorMessage = errorText;
+          try {
+            const parsed = JSON.parse(errorText);
+            errorMessage = parsed.error || parsed.message || errorText;
+          } catch {
+            // Keep raw error text when not JSON
+          }
+          throw new Error(`HF API error: ${response.status} - ${errorMessage}`);
         }
 
         // Get array buffer
@@ -129,8 +147,52 @@ class ImageHandler {
       return { success: true, buffer: buffer };
 
     } catch (error) {
-      logger.error('❌ Image generation error:', error.message);
-      return { success: false, error: 'حدث خطأ. يرجى المحاولة مرة أخرى.' };
+      const message = error?.message || 'Unknown error';
+      logger.error('❌ Image generation error:', message);
+
+      if (message.includes('410')) {
+        return {
+          success: false,
+          error: 'خدمة Hugging Face القديمة توقفت. تم تحديث المسار، أعد المحاولة.'
+        };
+      }
+
+      if (message.includes('401') && /expired|token/i.test(message)) {
+        return {
+          success: false,
+          error: 'رمز HF_TOKEN منتهي الصلاحية. أنشئ Token جديد من Hugging Face وضعه في ملف .env.'
+        };
+      }
+
+      if (message.includes('401')) {
+        return {
+          success: false,
+          error: 'HF_TOKEN غير صالح أو بدون صلاحية Inference. تحقق من التوكن في .env.'
+        };
+      }
+
+      if (message.includes('403')) {
+        return {
+          success: false,
+          error: 'HF_TOKEN لا يملك صلاحية Inference Providers. أنشئ Token بصلاحيات مناسبة (Read + Inference) أو فعّل صلاحية المزود من إعدادات Hugging Face.'
+        };
+      }
+
+      if (message.includes('402') || /billing|payment/i.test(message)) {
+        return {
+          success: false,
+          error: 'لا توجد صلاحية دفع/رصيد كافٍ لخدمة التوليد على Hugging Face.'
+        };
+      }
+
+      if (message.includes('429')) {
+        return {
+          success: false,
+          error: 'تم تجاوز الحد المسموح للطلبات. انتظر قليلًا ثم أعد المحاولة.'
+        };
+      }
+
+      return { success: false, error: 'حدث خطأ في توليد الصورة. يرجى المحاولة مرة أخرى.' };
     }
   }
 
