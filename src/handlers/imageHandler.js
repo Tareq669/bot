@@ -3,6 +3,10 @@
  * Uses Hugging Face Inference API for image generation
  */
 
+if (process.env.NODE_ENV !== 'production') {
+  require('dotenv').config();
+}
+
 const fetch = require('node-fetch');
 const { logger } = require('../utils/helpers');
 
