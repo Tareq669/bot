@@ -453,7 +453,11 @@ class CommandHandler {
       }
 
       const message = AdvancedProfileSystem.formatProfile(profileData);
-      await ctx.reply(message, { parse_mode: 'HTML' });
+      const buttons = UIManager.profileMenuKeyboard();
+      await ctx.reply(message, {
+        parse_mode: 'HTML',
+        reply_markup: buttons.reply_markup
+      });
     } catch (error) {
       console.error('Error in handleProfile:', error);
       await ctx.reply('❌ حدث خطأ');
