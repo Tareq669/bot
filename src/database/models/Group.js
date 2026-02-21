@@ -91,6 +91,108 @@ const groupSchema = new mongoose.Schema({
       }
     }
   ],
+  gameSystem: {
+    settings: {
+      enabled: {
+        type: Boolean,
+        default: true
+      },
+      autoQuestions: {
+        type: Boolean,
+        default: false
+      },
+      intervalMinutes: {
+        type: Number,
+        default: 15
+      },
+      questionTimeoutSec: {
+        type: Number,
+        default: 25
+      }
+    },
+    state: {
+      lastAutoAt: Date,
+      lastDailyKey: {
+        type: String,
+        default: ''
+      },
+      weekKey: {
+        type: String,
+        default: ''
+      }
+    },
+    scores: [
+      {
+        userId: Number,
+        username: String,
+        points: {
+          type: Number,
+          default: 0
+        },
+        weeklyPoints: {
+          type: Number,
+          default: 0
+        },
+        wins: {
+          type: Number,
+          default: 0
+        },
+        streak: {
+          type: Number,
+          default: 0
+        },
+        bestStreak: {
+          type: Number,
+          default: 0
+        },
+        lastWinDate: Date,
+        updatedAt: Date
+      }
+    ],
+    teams: [
+      {
+        name: String,
+        captainId: Number,
+        members: [Number],
+        points: {
+          type: Number,
+          default: 0
+        },
+        wins: {
+          type: Number,
+          default: 0
+        },
+        createdAt: Date,
+        updatedAt: Date
+      }
+    ],
+    tournament: {
+      active: {
+        type: Boolean,
+        default: false
+      },
+      season: {
+        type: Number,
+        default: 1
+      },
+      startedAt: Date,
+      endedAt: Date,
+      rewards: {
+        first: {
+          type: Number,
+          default: 100
+        },
+        second: {
+          type: Number,
+          default: 60
+        },
+        third: {
+          type: Number,
+          default: 40
+        }
+      }
+    }
+  },
   statistics: {
     messagesCount: {
       type: Number,

@@ -19,6 +19,7 @@ const MenuHandler = require('./commands/menuHandler');
 const GameHandler = require('./commands/gameHandler');
 const NewGamesHandler = require('./commands/newGamesHandler');
 const GroupAdminHandler = require('./commands/groupAdminHandler');
+const GroupGamesHandler = require('./commands/groupGamesHandler');
 const QuranicGamesHandler = require('./commands/quranicGamesHandler');
 const EconomyHandler = require('./commands/economyHandler');
 const ContentHandler = require('./commands/contentHandler');
@@ -90,6 +91,7 @@ const bot = new Telegraf(process.env.BOT_TOKEN, {
 
 // Initialize session middleware
 bot.use(session());
+GroupGamesHandler.setup(bot);
 
 const PRIVATE_ONLY_COMMANDS = new Set([
   'khatma', 'adhkar', 'quran', 'quotes', 'poetry', 'games', 'economy', 'stats', 'rewards',
@@ -100,7 +102,9 @@ const PRIVATE_ONLY_COMMANDS = new Set([
 
 const GROUP_ONLY_COMMANDS = new Set([
   'gpanel', 'ghelp', 'gsettings', 'gwarn', 'gwarns', 'gunwarn', 'gresetwarn',
-  'gmute', 'gunmute', 'gban', 'gunban', 'gclear', 'glogs', 'gpolicy'
+  'gmute', 'gunmute', 'gban', 'gunban', 'gclear', 'glogs', 'gpolicy',
+  'gquiz', 'gmath', 'gword', 'gdaily', 'gleader', 'gweekly', 'ggame', 'ggames',
+  'gteam', 'gteams', 'gtour'
 ]);
 
 const PRIVATE_REPLY_BUTTONS = new Set([
@@ -185,7 +189,17 @@ Promise.all([
       { command: 'gban', description: 'حظر عضو (بالرد)' },
       { command: 'gunban', description: 'رفع حظر عضو (ID)' },
       { command: 'gclear', description: 'حذف رسالة (بالرد)' },
-      { command: 'glogs', description: 'عرض سجل الإدارة' }
+      { command: 'glogs', description: 'عرض سجل الإدارة' },
+      { command: 'gquiz', description: 'سؤال سريع للجروب' },
+      { command: 'gmath', description: 'تحدي حساب ذهني' },
+      { command: 'gword', description: 'ترتيب كلمة' },
+      { command: 'gdaily', description: 'التحدي اليومي' },
+      { command: 'gleader', description: 'متصدرين الجروب' },
+      { command: 'gweekly', description: 'متصدرين الأسبوع' },
+      { command: 'ggame', description: 'إعدادات ألعاب الجروب' },
+      { command: 'gteam', description: 'إدارة فريقك' },
+      { command: 'gteams', description: 'ترتيب الفرق' },
+      { command: 'gtour', description: 'إدارة البطولة الأسبوعية' }
     ],
     { scope: { type: 'all_group_chats' } }
   )
@@ -246,6 +260,17 @@ bot.command('gban', (ctx) => GroupAdminHandler.handleBanCommand(ctx));
 bot.command('gunban', (ctx) => GroupAdminHandler.handleUnbanCommand(ctx));
 bot.command('gclear', (ctx) => GroupAdminHandler.handleClearCommand(ctx));
 bot.command('glogs', (ctx) => GroupAdminHandler.handleLogsCommand(ctx));
+bot.command('gquiz', (ctx) => GroupGamesHandler.handleQuizCommand(ctx));
+bot.command('gmath', (ctx) => GroupGamesHandler.handleMathCommand(ctx));
+bot.command('gword', (ctx) => GroupGamesHandler.handleWordCommand(ctx));
+bot.command('gdaily', (ctx) => GroupGamesHandler.handleDailyCommand(ctx));
+bot.command('gleader', (ctx) => GroupGamesHandler.handleLeaderCommand(ctx));
+bot.command('gweekly', (ctx) => GroupGamesHandler.handleWeeklyCommand(ctx));
+bot.command('ggame', (ctx) => GroupGamesHandler.handleGameToggleCommand(ctx));
+bot.command('ggames', (ctx) => GroupGamesHandler.handleGamesHelp(ctx));
+bot.command('gteam', (ctx) => GroupGamesHandler.handleTeamCommand(ctx));
+bot.command('gteams', (ctx) => GroupGamesHandler.handleTeamsCommand(ctx));
+bot.command('gtour', (ctx) => GroupGamesHandler.handleTournamentCommand(ctx));
 
 // --- COMMAND HANDLERS ---
 bot.command('profile', (ctx) => CommandHandler.handleProfile(ctx));
@@ -3033,6 +3058,8 @@ bot.on('text', async (ctx) => {
     const message = ctx.message.text;
 
     if (GroupAdminHandler.isGroupChat(ctx)) {
+      const handledGame = await GroupGamesHandler.handleIncomingGroupText(ctx, message);
+      if (handledGame) return;
       const wasModerated = await GroupAdminHandler.processGroupMessage(ctx);
       if (wasModerated) return;
       // Keep group chats isolated from private feature flows.

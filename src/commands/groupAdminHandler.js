@@ -160,7 +160,18 @@ class GroupAdminHandler {
       '• /gpolicy\n' +
       '• /gpolicy 2 3 10\n' +
       '• /glogs\n' +
-      '• /gclear (بالرد)'
+      '• /gclear (بالرد)\n\n' +
+      '<b>ألعاب الجروب:</b>\n' +
+      '• /gquiz سؤال سريع\n' +
+      '• /gmath حساب ذهني\n' +
+      '• /gword ترتيب كلمة\n' +
+      '• /gdaily تحدي يومي\n' +
+      '• /gleader المتصدرين\n' +
+      '• /gweekly سباق الأسبوع\n' +
+      '• /ggame إعدادات الألعاب\n' +
+      '• /gteam إدارة فريقك\n' +
+      '• /gteams ترتيب الفرق\n' +
+      '• /gtour إدارة البطولة'
     );
   }
 
@@ -210,7 +221,18 @@ class GroupAdminHandler {
       '• /gresetwarn تصفير التحذيرات (بالرد)\n' +
       '• /gpolicy عرض/تعديل سياسة العقوبات\n' +
       '• /glogs عرض سجل الإدارة\n' +
-      '• /gclear حذف رسالة بالرد',
+      '• /gclear حذف رسالة بالرد\n\n' +
+      '<b>ألعاب الجروب:</b>\n' +
+      '• /gquiz سؤال سريع\n' +
+      '• /gmath تحدي حساب\n' +
+      '• /gword ترتيب كلمة\n' +
+      '• /gdaily تحدي يومي\n' +
+      '• /gleader لوحة المتصدرين\n' +
+      '• /gweekly سباق الأسبوع\n' +
+      '• /ggame إعدادات الألعاب\n' +
+      '• /gteam إدارة فريقك\n' +
+      '• /gteams ترتيب الفرق\n' +
+      '• /gtour إدارة البطولة',
       { parse_mode: 'HTML' }
     );
   }
