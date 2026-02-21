@@ -2080,6 +2080,21 @@ bot.action(/game:quiz:(.+)/, (ctx) => {
 bot.action('game:dice', (ctx) => GameHandler.handleDice(ctx));
 bot.action('game:luck', (ctx) => GameHandler.handleLuck(ctx));
 bot.action('game:challenges', (ctx) => GameHandler.handleChallenges(ctx));
+bot.action('game:bomb', (ctx) => GameHandler.handleBombDefuse(ctx));
+bot.action(/game:bomb:ans:(\d+)/, (ctx) => {
+  const answerIndex = parseInt(ctx.match[1], 10);
+  GameHandler.handleBombAnswer(ctx, answerIndex);
+});
+bot.action('game:cardbattle', (ctx) => GameHandler.handleCardBattle(ctx));
+bot.action(/game:card:pick:(\d+)/, (ctx) => {
+  const cardIndex = parseInt(ctx.match[1], 10);
+  GameHandler.handleCardPick(ctx, cardIndex);
+});
+bot.action('game:mind', (ctx) => GameHandler.handleMindPuzzle(ctx));
+bot.action(/game:mind:ans:(\d+)/, (ctx) => {
+  const answerIndex = parseInt(ctx.match[1], 10);
+  GameHandler.handleMindAnswer(ctx, answerIndex);
+});
 
 // --- QURANIC GAMES HANDLERS (نظام جديد متكامل) ---
 bot.action('game:quranic', async (ctx) => await QuranicGamesHandler.showMenu(ctx));

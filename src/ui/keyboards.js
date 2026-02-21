@@ -182,8 +182,15 @@ class UIManager {
         Markup.button.callback('🎲 رول النرد', 'game:dice')
       ],
       [
-        Markup.button.callback('🎯 تحديات عشوائية', 'game:challenges'),
-        Markup.button.callback('⬅️ رجوع', 'menu:main')
+        Markup.button.callback('\ud83d\udca3 \u062a\u0641\u0643\u064a\u0643 \u0627\u0644\u0642\u0646\u0628\u0644\u0629', 'game:bomb'),
+        Markup.button.callback('\ud83c\udccf \u0645\u0639\u0631\u0643\u0629 \u0627\u0644\u0628\u0637\u0627\u0642\u0627\u062a', 'game:cardbattle')
+      ],
+      [
+        Markup.button.callback('\ud83e\udde0 \u0623\u0644\u063a\u0627\u0632 \u0627\u0644\u0630\u0643\u0627\u0621', 'game:mind'),
+        Markup.button.callback('\ud83c\udfaf \u062a\u062d\u062f\u064a\u0627\u062a \u0639\u0634\u0648\u0627\u0626\u064a\u0629', 'game:challenges')
+      ],
+      [
+        Markup.button.callback('\u2b05\ufe0f \u0631\u062c\u0648\u0639', 'menu:main')
       ]
     ]);
   }
