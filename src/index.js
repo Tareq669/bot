@@ -722,15 +722,132 @@ bot.action('new:shop', async (ctx) => {
   );
 });
 
+const renderShopCategory = async (ctx, category) => {
+  const ShopSystem = require('./features/shopSystem');
+  const { User } = require('./database/models');
+
+  try {
+    await ctx.answerCbQuery();
+  } catch (_error) {
+    // Ignore callback answer failures for old/expired queries.
+  }
+
+  const user = await User.findOne({ userId: ctx.from.id });
+  const balance = user?.coins || 0;
+  const items =
+    category === 'all'
+      ? ShopSystem.getAllShopItems()
+      : ShopSystem.getShopItemsByCategory(category);
+  const categoryLabel = ShopSystem.getShopCategoryLabel(category);
+
+  let message = `🛍️ <b>${categoryLabel}</b>\n\n💰 <b>رصيدك:</b> ${balance} عملة\n\n`;
+
+  if (items.length === 0) {
+    message += 'لا توجد عناصر متاحة حالياً في هذه الفئة.';
+  } else {
+    items.forEach((item, index) => {
+      message += `${index + 1}. ${item.emoji} <b>${item.name}</b>\n`;
+      message += `💰 السعر: ${item.price} عملة\n`;
+      message += `📝 ${item.description}\n\n`;
+    });
+  }
+
+  const rows = items.map((item) => [
+    Markup.button.callback(`🛒 شراء ${item.emoji} ${item.name}`, `shop:buykey:${item.key}`)
+  ]);
+  rows.push([
+    Markup.button.callback('🎒 حقيبتي', 'shop:inventory'),
+    Markup.button.callback('⬅️ رجوع', 'new:shop')
+  ]);
+
+  const keyboard = Markup.inlineKeyboard(rows);
+  try {
+    await ctx.editMessageText(message.trim(), {
+      parse_mode: 'HTML',
+      reply_markup: keyboard.reply_markup
+    });
+  } catch (_error) {
+    await ctx.reply(message.trim(), {
+      parse_mode: 'HTML',
+      reply_markup: keyboard.reply_markup
+    });
+  }
+};
+
 bot.action('shop:all', async (ctx) => {
-  const shopSystem = require('./features/shopSystem');
-  const items = shopSystem.getAllShopItems();
-  let message = '🛍️ <b>كل العناصر المتاحة</b>\n\n';
-  items.forEach((item) => {
-    message += `${item.emoji} <b>${item.name}</b>\n💰 ${item.price} عملة\n${item.description}\n\n`;
+  await renderShopCategory(ctx, 'all');
+});
+
+bot.action('shop:badges', async (ctx) => {
+  await renderShopCategory(ctx, 'badges');
+});
+
+bot.action('shop:boosts', async (ctx) => {
+  await renderShopCategory(ctx, 'boosts');
+});
+
+bot.action('shop:rewards', async (ctx) => {
+  await renderShopCategory(ctx, 'rewards');
+});
+
+bot.action('shop:weapons', async (ctx) => {
+  await renderShopCategory(ctx, 'weapons');
+});
+
+bot.action('shop:inventory', async (ctx) => {
+  const ShopSystem = require('./features/shopSystem');
+  const summary = await ShopSystem.getUserInventorySummary(ctx.from.id);
+
+  try {
+    await ctx.answerCbQuery();
+  } catch (_error) {
+    // Ignore callback answer failures for old/expired queries.
+  }
+
+  const keyboard = Markup.inlineKeyboard([
+    [
+      Markup.button.callback('🛍️ المتجر', 'new:shop'),
+      Markup.button.callback('⬅️ رجوع', 'new:shop')
+    ]
+  ]);
+
+  try {
+    await ctx.editMessageText(summary, {
+      parse_mode: 'HTML',
+      reply_markup: keyboard.reply_markup
+    });
+  } catch (_error) {
+    await ctx.reply(summary, {
+      parse_mode: 'HTML',
+      reply_markup: keyboard.reply_markup
+    });
+  }
+});
+
+bot.action(/shop:buykey:([a-zA-Z0-9_]+)/, async (ctx) => {
+  const ShopSystem = require('./features/shopSystem');
+  const itemKey = ctx.match[1];
+  const result = await ShopSystem.buyItem(ctx.from.id, itemKey);
+
+  try {
+    await ctx.answerCbQuery(result.success ? '✅ تم الشراء' : '❌ تعذر الشراء', {
+      show_alert: !result.success
+    });
+  } catch (_error) {
+    // Ignore callback answer failures for old/expired queries.
+  }
+
+  const keyboard = Markup.inlineKeyboard([
+    [
+      Markup.button.callback('🛍️ متابعة التسوق', 'new:shop'),
+      Markup.button.callback('🎒 حقيبتي', 'shop:inventory')
+    ]
+  ]);
+
+  await ctx.reply(result.message, {
+    parse_mode: 'HTML',
+    reply_markup: keyboard.reply_markup
   });
-  const keyboard = Markup.inlineKeyboard([[Markup.button.callback('⬅️ رجوع', 'new:shop')]]);
-  await ctx.reply(message, { parse_mode: 'HTML', reply_markup: keyboard });
 });
 
 // --- NEW TRANSFER ACTIONS ---

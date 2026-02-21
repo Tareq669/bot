@@ -69,6 +69,13 @@ const userSchema = new mongoose.Schema({
     boughtAt: Date
   }],
 
+  activeBoosts: [{
+    boostKey: String,
+    multiplier: Number,
+    endDate: Date,
+    boughtAt: Date
+  }],
+
   khatmaProgress: {
     currentPage: {
       type: Number,
