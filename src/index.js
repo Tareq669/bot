@@ -1094,16 +1094,63 @@ bot.action('mem:review', async (ctx) => {
 });
 
 // --- DUA ACTIONS ---
+const showSingleDuaFromCategory = async (ctx, category) => {
+  const DuaSystem = require('./features/duaSystem');
+  const collection = DuaSystem.getDuaCollection(category);
+
+  if (!collection) {
+    await ctx.answerCbQuery('❌ الفئة غير موجودة');
+    return;
+  }
+
+  const dua = DuaSystem.getRandomDuaByCategory(category);
+  if (!dua) {
+    await ctx.answerCbQuery('❌ لا توجد أدعية في هذه الفئة');
+    return;
+  }
+
+  const message =
+    `🤲 <b>${collection.name}</b>\n` +
+    `📚 <b>عدد الأدعية في الفئة:</b> ${collection.duas.length}\n\n` +
+    DuaSystem.formatDua(dua);
+
+  const buttons = Markup.inlineKeyboard([
+    [Markup.button.callback('🆕 دعاء آخر', `dua:next:${category}`)],
+    [Markup.button.callback('📂 جميع الفئات', 'dua:menu'), Markup.button.callback('⬅️ الرئيسية', 'menu:main')]
+  ]);
+
+  try {
+    await ctx.editMessageText(message, {
+      parse_mode: 'HTML',
+      reply_markup: buttons.reply_markup
+    });
+  } catch (_e) {
+    await ctx.reply(message, {
+      parse_mode: 'HTML',
+      reply_markup: buttons.reply_markup
+    });
+  }
+};
+
 bot.action(
   /dua:(morning|evening|protection|forgiveness|sustenance|sleep|food|travel)/,
   async (ctx) => {
-    const DuaSystem = require('./features/duaSystem');
     const category = ctx.match[1];
-    const collection = DuaSystem.getDuaCollection(category);
-    if (!collection) return ctx.answerCbQuery('❌ غير موجود');
-    await ctx.reply(DuaSystem.formatDuaCollection(collection), { parse_mode: 'HTML' });
+    await showSingleDuaFromCategory(ctx, category);
+    await ctx.answerCbQuery('🤲 تم عرض دعاء كامل');
   }
 );
+
+bot.action(
+  /dua:next:(morning|evening|protection|forgiveness|sustenance|sleep|food|travel)/,
+  async (ctx) => {
+    const category = ctx.match[1];
+    await showSingleDuaFromCategory(ctx, category);
+    await ctx.answerCbQuery('🆕 دعاء جديد');
+  }
+);
+
+bot.action('dua:menu', (ctx) => CommandHandler.handleDua(ctx));
 
 // --- LIBRARY ACTIONS ---
 bot.action('library:tafsir', async (ctx) => {

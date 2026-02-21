@@ -1,4 +1,4 @@
-const Markup = require('telegraf/markup');
+﻿const Markup = require('telegraf/markup');
 const UIManager = require('../ui/keyboards');
 const Formatter = require('../ui/formatter');
 const { User } = require('../database/models');
@@ -528,13 +528,27 @@ class CommandHandler {
   static async handleDua(ctx) {
     try {
       const DuaSystem = require('../features/duaSystem');
-      const randomDua = DuaSystem.getRandomDua();
+      const collections = DuaSystem.getDuaCollections();
+      const totalDuas = Object.values(collections).reduce(
+        (sum, collection) => sum + collection.duas.length,
+        0
+      );
 
-      const message = DuaSystem.formatDua(randomDua);
+      const message =
+        '🤲 <b>مكتبة الأدعية</b>\n\n' +
+        'اختر الفئة التي تريدها، وسيتم عرض دعاء كامل مع إمكانية جلب دعاء جديد من نفس الفئة.\n\n' +
+        `📚 إجمالي الأدعية المتاحة: <b>${totalDuas}</b>`;
 
       const keyboard = UIManager.duaCollectionsKeyboard();
 
-      await ctx.reply(message, { parse_mode: 'HTML', reply_markup: keyboard.reply_markup });
+      try {
+        await ctx.editMessageText(message, {
+          parse_mode: 'HTML',
+          reply_markup: keyboard.reply_markup
+        });
+      } catch (_e) {
+        await ctx.reply(message, { parse_mode: 'HTML', reply_markup: keyboard.reply_markup });
+      }
     } catch (error) {
       console.error('Error in handleDua:', error);
       await ctx.reply('❌ حدث خطأ');
