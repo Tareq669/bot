@@ -78,6 +78,8 @@ class GroupGamesHandler {
   static roundTimers = new Map();
   static autoLoop = null;
   static activeMcq = new Map();
+  static activeQuizPolls = new Map();
+  static activeQuizSeries = new Map();
   static activeVotes = new Map();
   static activeVoteByChat = new Map();
   static lastQuestionByGroup = new Map();
@@ -177,6 +179,16 @@ class GroupGamesHandler {
     const groupType = ctx.chat.type || 'group';
     const group = await Group.findOneAndUpdate(
       { groupId },
+      { $set: { groupTitle, groupType, updatedAt: new Date() }, $setOnInsert: { createdAt: new Date() } },
+      { upsert: true, new: true }
+    );
+    this.normalizeGroupState(group);
+    return group;
+  }
+
+  static async ensureGroupRecordByChatId(chatId, groupTitle = 'Unknown Group', groupType = 'group') {
+    const group = await Group.findOneAndUpdate(
+      { groupId: String(chatId) },
       { $set: { groupTitle, groupType, updatedAt: new Date() }, $setOnInsert: { createdAt: new Date() } },
       { upsert: true, new: true }
     );
@@ -316,6 +328,69 @@ class GroupGamesHandler {
     return { type: 'word', prompt: `🔤 <b>ترتيب كلمة</b>\n\nرتّب هذه الأحرف: <b>${shuffled}</b>`, answers: [word], reward: 10, timeoutSec: 35 };
   }
 
+  static async sendQuizPoll(chatId, question, reward, timeoutSec = 25) {
+    if (!this.bot) return null;
+    const shuffled = this.shuffleArray(question.options.map((opt, idx) => ({ opt, original: idx })));
+    const correctOptionId = shuffled.findIndex((x) => x.original === question.answerIndex);
+    const options = shuffled.map((x) => x.opt);
+    const openPeriod = Math.min(600, Math.max(10, Number(timeoutSec || 25)));
+
+    const sent = await this.bot.telegram.sendPoll(Number(chatId), question.question, options, {
+      type: 'quiz',
+      is_anonymous: false,
+      allows_multiple_answers: false,
+      correct_option_id: correctOptionId,
+      open_period: openPeriod,
+      explanation: 'اختر الإجابة الصحيحة'
+    });
+
+    const pollId = sent?.poll?.id;
+    if (!pollId) return sent;
+
+    const cleanup = setTimeout(() => {
+      this.activeQuizPolls.delete(pollId);
+    }, (openPeriod + 5) * 1000);
+
+    this.activeQuizPolls.set(pollId, {
+      chatId: String(chatId),
+      reward: Number(reward || 8),
+      correctOptionId,
+      awardedUsers: new Set(),
+      cleanup
+    });
+    return sent;
+  }
+
+  static async handlePollAnswer(ctx) {
+    const answer = ctx.update?.poll_answer;
+    if (!answer) return;
+
+    const state = this.activeQuizPolls.get(answer.poll_id);
+    if (!state) return;
+
+    const userId = Number(answer.user?.id);
+    if (!userId) return;
+    if (state.awardedUsers.has(userId)) return;
+
+    const selected = Array.isArray(answer.option_ids) ? answer.option_ids : [];
+    const isCorrect = selected.includes(state.correctOptionId);
+    if (!isCorrect) return;
+
+    state.awardedUsers.add(userId);
+
+    const group = await this.ensureGroupRecordByChatId(state.chatId);
+    const scoreMeta = await this.updateScore(group, answer.user, state.reward);
+    group.updatedAt = new Date();
+    await group.save();
+
+    const rank = this.getUserRank(group, userId);
+    await this.bot.telegram.sendMessage(
+      Number(state.chatId),
+      `✅ ${answer.user?.first_name || 'لاعب'} أجاب صحيحًا!\n💰 +${scoreMeta.finalReward} نقطة\n🏅 الترتيب: #${rank || '-'}`,
+      { parse_mode: 'HTML' }
+    ).catch(() => {});
+  }
+
   static getUserRank(group, userId) {
     const list = [...(group.gameSystem.scores || [])].sort((a, b) => (b.points || 0) - (a.points || 0));
     const idx = list.findIndex((x) => Number(x.userId) === Number(userId));
@@ -438,6 +513,16 @@ class GroupGamesHandler {
       await ctx.reply('⛔ ألعاب الجروب معطلة. فعّلها عبر /ggame on');
       return { ok: false, group };
     }
+    const chatKey = String(ctx.chat.id);
+    const hasActiveQuizPoll = Array.from(this.activeQuizPolls.values()).some((p) => p.chatId === chatKey);
+    if (hasActiveQuizPoll) {
+      await ctx.reply('⏳ يوجد سؤال Quiz نشط الآن. انتظر حتى ينتهي.');
+      return { ok: false, group };
+    }
+    if (this.activeQuizSeries.has(chatKey)) {
+      await ctx.reply('⏳ يوجد سلسلة QuizBot نشطة حاليًا.');
+      return { ok: false, group };
+    }
     if (this.activeRounds.has(String(ctx.chat.id))) {
       await ctx.reply('⏳ يوجد تحدي نشط الآن. جاوبوا أولاً قبل بدء لعبة جديدة.');
       return { ok: false, group };
@@ -503,9 +588,11 @@ class GroupGamesHandler {
     if (!status.ok) return;
     const args = this.parseCommandArgs(ctx);
     const difficulty = this.parseDifficulty(args[0]);
-    const round = this.buildQuizRound(difficulty, ctx.chat.id);
-    round.timeoutSec = Math.max(10, status.group.gameSystem.settings.questionTimeoutSec || 25);
-    await this.startRoundInternal(ctx.chat.id, round, false);
+    const pool = MCQ_QUESTIONS.filter((q) => this.questionMatchesDifficulty(q, difficulty));
+    const source = pool.length > 0 ? pool : MCQ_QUESTIONS;
+    const question = this.pickNonRepeating(source, `quizpoll:${String(ctx.chat.id)}`);
+    const timeoutSec = Math.max(10, status.group.gameSystem.settings.questionTimeoutSec || 25);
+    await this.sendQuizPoll(ctx.chat.id, question, question.reward, timeoutSec);
   }
 
   static async handleMathCommand(ctx) {
@@ -546,32 +633,85 @@ class GroupGamesHandler {
     const pool = MCQ_QUESTIONS.filter((q) => this.questionMatchesDifficulty(q, difficulty));
     const source = pool.length > 0 ? pool : MCQ_QUESTIONS;
     const question = this.pickNonRepeating(source, `mcq:${String(ctx.chat.id)}`);
-    const shuffled = this.shuffleArray(question.options.map((opt, idx) => ({ opt, original: idx })));
-    const newAnswerIndex = shuffled.findIndex((x) => x.original === question.answerIndex);
-    const shuffledOptions = shuffled.map((x) => x.opt);
-    const token = this.token('m');
-    const chatId = String(ctx.chat.id);
-    const timeoutSec = 35;
+    const timeoutSec = Math.max(10, status.group.gameSystem.settings.questionTimeoutSec || 25);
+    await this.sendQuizPoll(ctx.chat.id, question, question.reward, timeoutSec);
+  }
 
-    const keyboard = Markup.inlineKeyboard(shuffledOptions.map((opt, idx) => [Markup.button.callback(opt, `group:mcq:${token}:${idx}`)]));
+  static async dispatchQuizSeries(chatId) {
+    const session = this.activeQuizSeries.get(String(chatId));
+    if (!session) return;
+    if (session.remaining <= 0) {
+      this.activeQuizSeries.delete(String(chatId));
+      await this.bot.telegram.sendMessage(Number(chatId), '🏁 انتهت سلسلة الكويز. استخدم /gleader لعرض النتائج.').catch(() => {});
+      return;
+    }
 
-    const sent = await ctx.reply(
-      `🗳️ <b>سؤال اختيارات</b>\n\n${question.question}\n\n⏱️ ${timeoutSec} ثانية | 💰 ${question.reward} نقطة`,
-      { parse_mode: 'HTML', reply_markup: keyboard.reply_markup }
-    );
+    const pool = MCQ_QUESTIONS.filter((q) => this.questionMatchesDifficulty(q, session.difficulty));
+    const source = pool.length > 0 ? pool : MCQ_QUESTIONS;
+    const question = this.pickNonRepeating(source, `series:${String(chatId)}`);
+    await this.sendQuizPoll(chatId, question, question.reward, session.timeoutSec);
+    session.remaining -= 1;
 
-    const timer = setTimeout(async () => {
-      const state = this.activeMcq.get(token);
-      if (!state) return;
-      this.activeMcq.delete(token);
-      await ctx.telegram.sendMessage(
-        Number(chatId),
-        `⌛ انتهى الوقت.\n✅ الإجابة الصحيحة: <b>${shuffledOptions[newAnswerIndex]}</b>`,
-        { parse_mode: 'HTML', reply_to_message_id: sent.message_id }
-      ).catch(() => {});
-    }, timeoutSec * 1000);
+    if (session.remaining > 0) {
+      session.timer = setTimeout(() => {
+        this.dispatchQuizSeries(chatId).catch(() => {});
+      }, (session.timeoutSec + 3) * 1000);
+    } else {
+      session.timer = setTimeout(async () => {
+        this.activeQuizSeries.delete(String(chatId));
+        await this.bot.telegram.sendMessage(Number(chatId), '🏁 انتهت سلسلة الكويز. استخدم /gleader لعرض النتائج.').catch(() => {});
+      }, (session.timeoutSec + 3) * 1000);
+    }
+  }
 
-    this.activeMcq.set(token, { chatId, answerIndex: newAnswerIndex, reward: question.reward, timer });
+  static async handleQuizSetCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const isAdmin = await this.isGroupAdmin(ctx);
+    if (!isAdmin) return ctx.reply('❌ هذا الأمر للمشرفين فقط.');
+
+    const args = this.parseCommandArgs(ctx);
+    const chatKey = String(ctx.chat.id);
+
+    if (args.length === 0) {
+      const active = this.activeQuizSeries.get(chatKey);
+      if (!active) {
+        return ctx.reply(
+          '🧩 <b>نظام QuizBot للجروب</b>\n\n' +
+          'لبدء سلسلة: <code>/gquizset 5</code>\n' +
+          'مع صعوبة: <code>/gquizset 7 hard</code>\n' +
+          'للإيقاف: <code>/gquizset stop</code>',
+          { parse_mode: 'HTML' }
+        );
+      }
+      return ctx.reply(`⏳ سلسلة نشطة: متبقي ${active.remaining} سؤال.`);
+    }
+
+    const mode = String(args[0]).toLowerCase();
+    if (['stop', 'off', 'cancel'].includes(mode)) {
+      const current = this.activeQuizSeries.get(chatKey);
+      if (current?.timer) clearTimeout(current.timer);
+      this.activeQuizSeries.delete(chatKey);
+      return ctx.reply('✅ تم إيقاف سلسلة الكويز.');
+    }
+
+    if (this.activeQuizSeries.has(chatKey)) {
+      return ctx.reply('⏳ يوجد سلسلة كويز نشطة بالفعل. استخدم /gquizset stop لإيقافها أولاً.');
+    }
+
+    const count = Math.max(2, Math.min(20, parseInt(args[0] || '5', 10) || 5));
+    const difficulty = this.parseDifficulty(args[1]) || null;
+    const group = await this.ensureGroupRecord(ctx);
+    const timeoutSec = Math.max(10, group.gameSystem.settings.questionTimeoutSec || 25);
+
+    this.activeQuizSeries.set(chatKey, {
+      remaining: count,
+      difficulty,
+      timeoutSec,
+      timer: null
+    });
+
+    await ctx.reply(`🚀 بدأت سلسلة QuizBot: ${count} أسئلة${difficulty ? ` (${difficulty})` : ''}.`);
+    await this.dispatchQuizSeries(ctx.chat.id);
   }
 
   static async handleMcqCallback(ctx, token, index) {
@@ -930,6 +1070,9 @@ class GroupGamesHandler {
       '• /gmcq سؤال اختيارات بأزرار\n' +
       '• /gvote تصويت تفاعلي (مؤقت)\n' +
       'صيغة مخصصة: <code>/gvote 120 | السؤال | خيار1 | خيار2 | خيار3</code>\n' +
+      '• /gquizset 5 سلسلة QuizBot\n' +
+      '• /gquizset 7 hard سلسلة مع صعوبة\n' +
+      '• /gquizset stop إيقاف السلسلة\n' +
       '• /gleader لوحة المتصدرين\n' +
       '• /gweekly سباق الأسبوع\n' +
       '• /ggame إعدادات نظام الألعاب (للمشرفين)\n' +
@@ -938,7 +1081,8 @@ class GroupGamesHandler {
       '• /gtour إدارة البطولة الأسبوعية (للمشرفين)\n\n' +
       'مستويات الصعوبة: <code>/gquiz easy</code> | <code>/gquiz medium</code> | <code>/gquiz hard</code>\n' +
       '<code>/gmcq easy</code> | <code>/gmcq medium</code> | <code>/gmcq hard</code>\n\n' +
-      'نظام الستريك: كل 3 فوز متتالي = بونص نقاط 🔥',
+      'نظام الستريك: كل 3 فوز متتالي = بونص نقاط 🔥\n' +
+      'نمط الكويز الآن يعمل بأسلوب Quiz Poll مثل QuizBot.',
       { parse_mode: 'HTML', reply_markup: keyboard.reply_markup }
     );
   }

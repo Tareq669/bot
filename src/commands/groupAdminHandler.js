@@ -168,6 +168,7 @@ class GroupAdminHandler {
       '• /gdaily تحدي يومي\n' +
       '• /gmcq سؤال اختيارات\n' +
       '• /gvote تصويت تفاعلي\n' +
+      '• /gquizset سلسلة QuizBot\n' +
       '• /gleader المتصدرين\n' +
       '• /gweekly سباق الأسبوع\n' +
       '• /ggame إعدادات الألعاب\n' +
@@ -231,6 +232,7 @@ class GroupAdminHandler {
       '• /gdaily تحدي يومي\n' +
       '• /gmcq سؤال اختيارات\n' +
       '• /gvote تصويت تفاعلي\n' +
+      '• /gquizset سلسلة QuizBot\n' +
       '• /gleader لوحة المتصدرين\n' +
       '• /gweekly سباق الأسبوع\n' +
       '• /ggame إعدادات الألعاب\n' +

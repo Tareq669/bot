@@ -85,7 +85,7 @@ const bot = new Telegraf(process.env.BOT_TOKEN, {
   polling: {
     timeout: 30,
     limit: 100,
-    allowedUpdates: ['message', 'callback_query', 'inline_query']
+    allowedUpdates: ['message', 'callback_query', 'inline_query', 'poll_answer']
   }
 });
 
@@ -103,7 +103,7 @@ const PRIVATE_ONLY_COMMANDS = new Set([
 const GROUP_ONLY_COMMANDS = new Set([
   'gpanel', 'ghelp', 'gsettings', 'gwarn', 'gwarns', 'gunwarn', 'gresetwarn',
   'gmute', 'gunmute', 'gban', 'gunban', 'gclear', 'glogs', 'gpolicy',
-  'gquiz', 'gmath', 'gword', 'gdaily', 'gmcq', 'gvote', 'gleader', 'gweekly', 'ggame', 'ggames',
+  'gquiz', 'gmath', 'gword', 'gdaily', 'gmcq', 'gvote', 'gquizset', 'gleader', 'gweekly', 'ggame', 'ggames',
   'gteam', 'gteams', 'gtour'
 ]);
 
@@ -196,6 +196,7 @@ Promise.all([
       { command: 'gdaily', description: 'التحدي اليومي' },
       { command: 'gmcq', description: 'سؤال اختيارات' },
       { command: 'gvote', description: 'تصويت تفاعلي' },
+      { command: 'gquizset', description: 'سلسلة QuizBot' },
       { command: 'gleader', description: 'متصدرين الجروب' },
       { command: 'gweekly', description: 'متصدرين الأسبوع' },
       { command: 'ggame', description: 'إعدادات ألعاب الجروب' },
@@ -268,6 +269,7 @@ bot.command('gword', (ctx) => GroupGamesHandler.handleWordCommand(ctx));
 bot.command('gdaily', (ctx) => GroupGamesHandler.handleDailyCommand(ctx));
 bot.command('gmcq', (ctx) => GroupGamesHandler.handleMcqCommand(ctx));
 bot.command('gvote', (ctx) => GroupGamesHandler.handleVoteCommand(ctx));
+bot.command('gquizset', (ctx) => GroupGamesHandler.handleQuizSetCommand(ctx));
 bot.command('gleader', (ctx) => GroupGamesHandler.handleLeaderCommand(ctx));
 bot.command('gweekly', (ctx) => GroupGamesHandler.handleWeeklyCommand(ctx));
 bot.command('ggame', (ctx) => GroupGamesHandler.handleGameToggleCommand(ctx));
@@ -1318,6 +1320,7 @@ bot.action(/^group:mcq:([a-z0-9]+):(\d+)$/i, (ctx) => GroupGamesHandler.handleMc
 bot.action(/^group:vote:([a-z0-9]+):(\d+)$/i, (ctx) => GroupGamesHandler.handleVoteCallback(ctx, ctx.match[1], ctx.match[2]));
 bot.action(/^group:games:(gquiz|gmath|gword|gdaily|gmcq|gvote|gleader|gweekly)$/i, (ctx) => GroupGamesHandler.handleGamesMenuAction(ctx, ctx.match[1].toLowerCase()));
 bot.action(/^group:.+$/, (ctx) => GroupAdminHandler.handleGroupCallback(ctx));
+bot.on('poll_answer', (ctx) => GroupGamesHandler.handlePollAnswer(ctx));
 bot.action('menu:main', (ctx) => MenuHandler.handleMainMenu(ctx));
 bot.action('menu:khatma', (ctx) => MenuHandler.handleKhatmaMenu(ctx));
 bot.action('menu:adhkar', (ctx) => MenuHandler.handleAdhkarMenu(ctx));
