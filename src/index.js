@@ -3883,8 +3883,10 @@ bot.on('text', async (ctx) => {
       }
     }
 
-    // Default response for unrecognized messages
-    await ctx.reply('❓ لم أفهم رسالتك. يرجى استخدام الأوامر المتاحة أو الأزرار في القائمة الرئيسية.', { parse_mode: 'HTML' });
+    // Default response for unrecognized messages (private chats only)
+    if (ctx.chat?.type === 'private') {
+      await ctx.reply('❓ لم أفهم رسالتك. يرجى استخدام الأوامر المتاحة أو الأزرار في القائمة الرئيسية.', { parse_mode: 'HTML' });
+    }
   } catch (error) {
     console.error('Text handler error:', error);
     ctx.reply('❌ حدث خطأ، جاري المحاولة...');

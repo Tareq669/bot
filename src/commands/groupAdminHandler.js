@@ -15,7 +15,7 @@ class GroupAdminHandler {
     const groupTitle = ctx.chat.title || 'Unknown Group';
     const groupType = ctx.chat.type || 'group';
 
-    const group = await Group.findOneAndUpdate(
+    return Group.findOneAndUpdate(
       { groupId },
       {
         $set: {
@@ -29,8 +29,6 @@ class GroupAdminHandler {
       },
       { upsert: true, new: true }
     );
-
-    return group;
   }
 
   static async isGroupAdmin(ctx, userId = null) {
@@ -45,6 +43,25 @@ class GroupAdminHandler {
     } catch (_error) {
       return false;
     }
+  }
+
+  static async getBotMember(ctx) {
+    try {
+      return await ctx.telegram.getChatMember(ctx.chat.id, ctx.botInfo.id);
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  static async ensureBotModerationRights(ctx) {
+    const botMember = await this.getBotMember(ctx);
+    if (!botMember || !['administrator', 'creator'].includes(botMember.status)) {
+      return {
+        ok: false,
+        message: '❌ يجب ترقية البوت إلى مشرف وتفعيل صلاحيات الحذف/الحظر/التقييد.'
+      };
+    }
+    return { ok: true, botMember };
   }
 
   static getRepliedUserId(ctx) {
@@ -110,8 +127,8 @@ class GroupAdminHandler {
 
     return ctx.reply(
       '✅ تم تفعيل وضع الجروبات.\n' +
-        'استخدم /gpanel لعرض لوحة الإدارة.\n' +
-        'ملاحظة: ميزات الخاص لا تعمل هنا.'
+      'استخدم /gpanel لعرض لوحة الإدارة.\n' +
+      'ملاحظة: ميزات الخاص لا تعمل هنا.'
     );
   }
 
@@ -119,14 +136,14 @@ class GroupAdminHandler {
     if (!this.isGroupChat(ctx)) return;
     return ctx.reply(
       '<b>مساعدة إدارة الجروب</b>\n\n' +
-        '• /gpanel لوحة الإدارة\n' +
-        '• /gwarn تحذير بالرد\n' +
-        '• /gwarns عرض التحذيرات بالرد\n' +
-        '• /gmute 10 كتم بالدقائق بالرد\n' +
-        '• /gunmute فك كتم بالرد\n' +
-        '• /gban حظر بالرد\n' +
-        '• /gunban 123456 رفع حظر\n' +
-        '• /gclear حذف رسالة بالرد',
+      '• /gpanel لوحة الإدارة\n' +
+      '• /gwarn تحذير بالرد\n' +
+      '• /gwarns عرض التحذيرات بالرد\n' +
+      '• /gmute 10 كتم بالدقائق بالرد\n' +
+      '• /gunmute فك كتم بالرد\n' +
+      '• /gban حظر بالرد\n' +
+      '• /gunban 123456 رفع حظر\n' +
+      '• /gclear حذف رسالة بالرد',
       { parse_mode: 'HTML' }
     );
   }
@@ -135,12 +152,15 @@ class GroupAdminHandler {
     if (!this.isGroupChat(ctx)) return;
 
     const isAdmin = await this.isGroupAdmin(ctx);
-    if (!isAdmin) {
-      return ctx.reply('❌ هذا الأمر للمشرفين فقط.');
-    }
+    if (!isAdmin) return ctx.reply('❌ هذا الأمر للمشرفين فقط.');
 
     const group = await this.ensureGroupRecord(ctx);
-    return ctx.reply(this.formatGroupPanel(group), {
+    const botRights = await this.ensureBotModerationRights(ctx);
+    const botStatus = botRights.ok
+      ? '\n\n✅ وضع الإدارة: البوت يملك صلاحيات الإدارة.'
+      : `\n\n⚠️ ${botRights.message}`;
+
+    return ctx.reply(this.formatGroupPanel(group) + botStatus, {
       parse_mode: 'HTML',
       reply_markup: this.groupPanelKeyboard(group).reply_markup
     });
@@ -201,11 +221,7 @@ class GroupAdminHandler {
 
     if (ctx.callbackQuery) {
       await ctx.answerCbQuery('✅', { show_alert: false });
-      try {
-        return await ctx.reply(message, { parse_mode: 'HTML' });
-      } catch (_error) {
-        return;
-      }
+      return ctx.reply(message, { parse_mode: 'HTML' });
     }
 
     return ctx.reply(message, { parse_mode: 'HTML' });
@@ -217,9 +233,11 @@ class GroupAdminHandler {
     const isAdmin = await this.isGroupAdmin(ctx);
     if (!isAdmin) return ctx.reply('❌ هذا الأمر للمشرفين فقط.');
 
+    const botRights = await this.ensureBotModerationRights(ctx);
+    if (!botRights.ok) return ctx.reply(botRights.message);
+
     const targetUserId = this.getRepliedUserId(ctx);
     if (!targetUserId) return ctx.reply('❌ يجب الرد على رسالة المستخدم للتحذير.');
-
     if (targetUserId === ctx.from.id) return ctx.reply('❌ لا يمكنك تحذير نفسك.');
 
     const targetIsAdmin = await this.isGroupAdmin(ctx, targetUserId);
@@ -241,15 +259,12 @@ class GroupAdminHandler {
     await group.save();
 
     const label = this.getRepliedUserLabel(ctx);
-    await ctx.reply(
-      `⚠️ تم تحذير ${label}\nالسبب: ${reason}\nالتحذيرات: ${warning.count}/3`
-    );
+    await ctx.reply(`⚠️ تم تحذير ${label}\nالسبب: ${reason}\nالتحذيرات: ${warning.count}/3`);
 
     if (warning.count >= 3) {
       try {
         await ctx.telegram.banChatMember(ctx.chat.id, targetUserId);
         await ctx.reply(`🚫 تم حظر ${label} تلقائيًا بعد 3 تحذيرات.`);
-
         group.bannedUsers.push({
           userId: targetUserId,
           reason: 'تجاوز 3 تحذيرات',
@@ -282,6 +297,9 @@ class GroupAdminHandler {
 
     const isAdmin = await this.isGroupAdmin(ctx);
     if (!isAdmin) return ctx.reply('❌ هذا الأمر للمشرفين فقط.');
+
+    const botRights = await this.ensureBotModerationRights(ctx);
+    if (!botRights.ok) return ctx.reply(botRights.message);
 
     const targetUserId = this.getRepliedUserId(ctx);
     if (!targetUserId) return ctx.reply('❌ يجب الرد على رسالة المستخدم للكتم.');
@@ -323,6 +341,9 @@ class GroupAdminHandler {
     const isAdmin = await this.isGroupAdmin(ctx);
     if (!isAdmin) return ctx.reply('❌ هذا الأمر للمشرفين فقط.');
 
+    const botRights = await this.ensureBotModerationRights(ctx);
+    if (!botRights.ok) return ctx.reply(botRights.message);
+
     const targetUserId = this.getRepliedUserId(ctx);
     if (!targetUserId) return ctx.reply('❌ يجب الرد على رسالة المستخدم لفك الكتم.');
 
@@ -355,6 +376,9 @@ class GroupAdminHandler {
     const isAdmin = await this.isGroupAdmin(ctx);
     if (!isAdmin) return ctx.reply('❌ هذا الأمر للمشرفين فقط.');
 
+    const botRights = await this.ensureBotModerationRights(ctx);
+    if (!botRights.ok) return ctx.reply(botRights.message);
+
     const targetUserId = this.getRepliedUserId(ctx);
     if (!targetUserId) return ctx.reply('❌ يجب الرد على رسالة المستخدم للحظر.');
 
@@ -386,17 +410,18 @@ class GroupAdminHandler {
     const isAdmin = await this.isGroupAdmin(ctx);
     if (!isAdmin) return ctx.reply('❌ هذا الأمر للمشرفين فقط.');
 
+    const botRights = await this.ensureBotModerationRights(ctx);
+    if (!botRights.ok) return ctx.reply(botRights.message);
+
     const args = this.parseCommandArgs(ctx);
     const targetUserId = parseInt(args[0] || '', 10);
     if (!targetUserId) return ctx.reply('❌ استخدم: /gunban USER_ID');
 
     try {
       await ctx.telegram.unbanChatMember(ctx.chat.id, targetUserId, { only_if_banned: true });
-
       const group = await this.ensureGroupRecord(ctx);
       group.bannedUsers = group.bannedUsers.filter((u) => Number(u.userId) !== Number(targetUserId));
       await group.save();
-
       return ctx.reply('✅ تم إلغاء حظر المستخدم.');
     } catch (_error) {
       return ctx.reply('❌ فشل إلغاء الحظر. تأكد من صلاحيات البوت.');
@@ -408,6 +433,9 @@ class GroupAdminHandler {
 
     const isAdmin = await this.isGroupAdmin(ctx);
     if (!isAdmin) return ctx.reply('❌ هذا الأمر للمشرفين فقط.');
+
+    const botRights = await this.ensureBotModerationRights(ctx);
+    if (!botRights.ok) return ctx.reply(botRights.message);
 
     const repliedMessageId = ctx.message?.reply_to_message?.message_id;
     if (!repliedMessageId) {
@@ -459,16 +487,19 @@ class GroupAdminHandler {
     const isAdmin = await this.isGroupAdmin(ctx);
     if (isAdmin) return false;
 
+    const botRights = await this.ensureBotModerationRights(ctx);
+    if (!botRights.ok) return false;
+
     const text = ctx.message.text;
 
     if (group.settings?.lockLinks) {
       const hasLink = /(https?:\/\/|t\.me\/|www\.)/i.test(text);
       if (hasLink) {
         try {
-          await ctx.deleteMessage();
+          await ctx.telegram.deleteMessage(ctx.chat.id, ctx.message.message_id);
           await ctx.reply('🔒 الروابط ممنوعة في هذا الجروب.');
         } catch (_error) {
-          // ignore if cannot delete
+          await ctx.reply('⚠️ تم اكتشاف رابط لكن لا يمكن حذفه. فعّل صلاحية حذف الرسائل للبوت.');
         }
         return true;
       }
@@ -479,10 +510,10 @@ class GroupAdminHandler {
       const found = blockedWords.some((w) => text.includes(w));
       if (found) {
         try {
-          await ctx.deleteMessage();
+          await ctx.telegram.deleteMessage(ctx.chat.id, ctx.message.message_id);
           await ctx.reply('⚠️ تم حذف رسالة تحتوي على ألفاظ غير مسموحة.');
         } catch (_error) {
-          // ignore if cannot delete
+          await ctx.reply('⚠️ تم اكتشاف لفظ غير مسموح لكن لا يمكن الحذف. فعّل صلاحية حذف الرسائل للبوت.');
         }
         return true;
       }
