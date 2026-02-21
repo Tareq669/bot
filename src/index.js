@@ -100,7 +100,7 @@ const PRIVATE_ONLY_COMMANDS = new Set([
 
 const GROUP_ONLY_COMMANDS = new Set([
   'gpanel', 'ghelp', 'gsettings', 'gwarn', 'gwarns', 'gunwarn', 'gresetwarn',
-  'gmute', 'gunmute', 'gban', 'gunban', 'gclear', 'glogs'
+  'gmute', 'gunmute', 'gban', 'gunban', 'gclear', 'glogs', 'gpolicy'
 ]);
 
 const PRIVATE_REPLY_BUTTONS = new Set([
@@ -179,6 +179,7 @@ Promise.all([
       { command: 'gwarns', description: 'عرض تحذيرات عضو (بالرد)' },
       { command: 'gunwarn', description: 'إزالة تحذير (بالرد)' },
       { command: 'gresetwarn', description: 'تصفير التحذيرات (بالرد)' },
+      { command: 'gpolicy', description: 'سياسة العقوبات التلقائية' },
       { command: 'gmute', description: 'كتم عضو بالدقائق (بالرد)' },
       { command: 'gunmute', description: 'فك كتم عضو (بالرد)' },
       { command: 'gban', description: 'حظر عضو (بالرد)' },
@@ -238,6 +239,7 @@ bot.command('gwarn', (ctx) => GroupAdminHandler.handleWarnCommand(ctx));
 bot.command('gwarns', (ctx) => GroupAdminHandler.handleWarnsCommand(ctx));
 bot.command('gunwarn', (ctx) => GroupAdminHandler.handleUnwarnCommand(ctx));
 bot.command('gresetwarn', (ctx) => GroupAdminHandler.handleResetWarnCommand(ctx));
+bot.command('gpolicy', (ctx) => GroupAdminHandler.handlePolicyCommand(ctx));
 bot.command('gmute', (ctx) => GroupAdminHandler.handleMuteCommand(ctx));
 bot.command('gunmute', (ctx) => GroupAdminHandler.handleUnmuteCommand(ctx));
 bot.command('gban', (ctx) => GroupAdminHandler.handleBanCommand(ctx));
@@ -3043,7 +3045,7 @@ bot.on('text', async (ctx) => {
       return;
     }
 
-    console.log('📝 نص عادي:', message.substring(0, 30));
+    logger.info(`TEXT_RECEIVED: ${String(message).substring(0, 30)}`);
 
     // Handle feature awaiting input
     if (ctx.session && ctx.session.featureAwait) {

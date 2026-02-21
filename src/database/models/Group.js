@@ -35,6 +35,24 @@ const groupSchema = new mongoose.Schema({
     lockMedia: {
       type: Boolean,
       default: false
+    },
+    warningPolicy: {
+      enabled: {
+        type: Boolean,
+        default: true
+      },
+      muteAt: {
+        type: Number,
+        default: 2
+      },
+      banAt: {
+        type: Number,
+        default: 3
+      },
+      muteMinutes: {
+        type: Number,
+        default: 10
+      }
     }
   },
   admins: [

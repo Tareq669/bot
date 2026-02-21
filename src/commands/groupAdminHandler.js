@@ -15,7 +15,7 @@ class GroupAdminHandler {
     const groupTitle = ctx.chat.title || 'Unknown Group';
     const groupType = ctx.chat.type || 'group';
 
-    return Group.findOneAndUpdate(
+    const group = await Group.findOneAndUpdate(
       { groupId },
       {
         $set: {
@@ -29,6 +29,8 @@ class GroupAdminHandler {
       },
       { upsert: true, new: true }
     );
+    this.normalizeGroupState(group);
+    return group;
   }
 
   static async isGroupAdmin(ctx, userId = null) {
@@ -80,6 +82,44 @@ class GroupAdminHandler {
     return parts.slice(1);
   }
 
+  static normalizeGroupState(group) {
+    if (!group.settings) group.settings = {};
+    if (typeof group.settings.lockLinks !== 'boolean') group.settings.lockLinks = false;
+    if (typeof group.settings.filterBadWords !== 'boolean') group.settings.filterBadWords = true;
+    if (typeof group.settings.floodProtection !== 'boolean') group.settings.floodProtection = true;
+
+    if (!group.settings.warningPolicy) {
+      group.settings.warningPolicy = { enabled: true, muteAt: 2, banAt: 3, muteMinutes: 10 };
+    }
+    if (typeof group.settings.warningPolicy.enabled !== 'boolean') group.settings.warningPolicy.enabled = true;
+    if (!Number.isInteger(group.settings.warningPolicy.muteAt)) group.settings.warningPolicy.muteAt = 2;
+    if (!Number.isInteger(group.settings.warningPolicy.banAt)) group.settings.warningPolicy.banAt = 3;
+    if (!Number.isInteger(group.settings.warningPolicy.muteMinutes)) group.settings.warningPolicy.muteMinutes = 10;
+
+    if (!Array.isArray(group.warnings)) group.warnings = [];
+    if (!Array.isArray(group.bannedUsers)) group.bannedUsers = [];
+    if (!Array.isArray(group.moderationLogs)) group.moderationLogs = [];
+    if (!group.statistics) group.statistics = {};
+    if (!Number.isInteger(group.statistics.messagesCount)) group.statistics.messagesCount = 0;
+
+    return group;
+  }
+
+  static getWarningPolicy(group) {
+    const policy = group?.settings?.warningPolicy || {};
+    return {
+      enabled: policy.enabled !== false,
+      muteAt: Number.isInteger(policy.muteAt) ? policy.muteAt : 2,
+      banAt: Number.isInteger(policy.banAt) ? policy.banAt : 3,
+      muteMinutes: Number.isInteger(policy.muteMinutes) ? policy.muteMinutes : 10
+    };
+  }
+
+  static formatPolicy(policy) {
+    if (!policy.enabled) return '❌ معطلة';
+    return `✅ مفعلة | كتم عند: ${policy.muteAt} | حظر عند: ${policy.banAt} | مدة الكتم: ${policy.muteMinutes}د`;
+  }
+
   static async addModerationLog(group, action, actorId, targetId = null, reason = '', metadata = null) {
     group.moderationLogs = Array.isArray(group.moderationLogs) ? group.moderationLogs : [];
     group.moderationLogs.unshift({
@@ -98,6 +138,7 @@ class GroupAdminHandler {
 
   static formatGroupPanel(group) {
     const settings = group?.settings || {};
+    const policy = this.getWarningPolicy(group);
     return (
       '🛡️ <b>لوحة إدارة الجروب</b>\n\n' +
       `👥 المجموعة: <b>${group?.groupTitle || 'Unknown'}</b>\n` +
@@ -105,7 +146,8 @@ class GroupAdminHandler {
       '<b>الإعدادات الحالية:</b>\n' +
       `• منع الروابط: ${settings.lockLinks ? '✅' : '❌'}\n` +
       `• فلتر الكلمات: ${settings.filterBadWords ? '✅' : '❌'}\n` +
-      `• حماية التكرار: ${settings.floodProtection ? '✅' : '❌'}\n\n` +
+      `• حماية التكرار: ${settings.floodProtection ? '✅' : '❌'}\n` +
+      `• سياسة العقوبات: ${this.formatPolicy(policy)}\n\n` +
       '<b>أوامر الإدارة:</b>\n' +
       '• /gwarn (بالرد)\n' +
       '• /gwarns (بالرد)\n' +
@@ -115,6 +157,8 @@ class GroupAdminHandler {
       '• /gunban 123456\n' +
       '• /gunwarn (بالرد)\n' +
       '• /gresetwarn (بالرد)\n' +
+      '• /gpolicy\n' +
+      '• /gpolicy 2 3 10\n' +
       '• /glogs\n' +
       '• /gclear (بالرد)'
     );
@@ -164,6 +208,7 @@ class GroupAdminHandler {
       '• /gunban 123456 رفع حظر\n' +
       '• /gunwarn إزالة تحذير واحد (بالرد)\n' +
       '• /gresetwarn تصفير التحذيرات (بالرد)\n' +
+      '• /gpolicy عرض/تعديل سياسة العقوبات\n' +
       '• /glogs عرض سجل الإدارة\n' +
       '• /gclear حذف رسالة بالرد',
       { parse_mode: 'HTML' }
@@ -276,6 +321,7 @@ class GroupAdminHandler {
     const reason = args.length > 0 ? args.join(' ') : 'مخالفة قواعد الجروب';
 
     const group = await this.ensureGroupRecord(ctx);
+    this.normalizeGroupState(group);
     let warning = group.warnings.find((w) => w.userId === targetUserId);
     if (!warning) {
       warning = { userId: targetUserId, count: 0, lastWarning: new Date() };
@@ -291,15 +337,17 @@ class GroupAdminHandler {
     await group.save();
 
     const label = this.getRepliedUserLabel(ctx);
-    await ctx.reply(`⚠️ تم تحذير ${label}\nالسبب: ${reason}\nالتحذيرات: ${warning.count}/3`);
+    const policy = this.getWarningPolicy(group);
+    await ctx.reply(`⚠️ تم تحذير ${label}\nالسبب: ${reason}\nالتحذيرات: ${warning.count}/${policy.banAt}`);
+    if (!policy.enabled) return;
 
-    if (warning.count >= 3) {
+    if (warning.count >= policy.banAt) {
       try {
         await ctx.telegram.banChatMember(ctx.chat.id, targetUserId);
-        await ctx.reply(`🚫 تم حظر ${label} تلقائيًا بعد 3 تحذيرات.`);
+        await ctx.reply(`🚫 تم حظر ${label} تلقائيًا عند ${policy.banAt} تحذيرات.`);
         group.bannedUsers.push({
           userId: targetUserId,
-          reason: 'تجاوز 3 تحذيرات',
+          reason: `تجاوز ${policy.banAt} تحذيرات`,
           bannedAt: new Date(),
           bannedBy: ctx.from.id
         });
@@ -308,11 +356,46 @@ class GroupAdminHandler {
           'auto_ban_after_warnings',
           ctx.from.id,
           targetUserId,
-          'تجاوز 3 تحذيرات'
+          `تجاوز ${policy.banAt} تحذيرات`
         );
         await group.save();
       } catch (_error) {
         await ctx.reply('❌ فشل الحظر التلقائي. تأكد من صلاحيات البوت.');
+      }
+      return;
+    }
+
+    if (warning.count >= policy.muteAt) {
+      const untilDate = Math.floor(Date.now() / 1000) + policy.muteMinutes * 60;
+      try {
+        await ctx.telegram.restrictChatMember(ctx.chat.id, targetUserId, {
+          can_send_messages: false,
+          can_send_audios: false,
+          can_send_documents: false,
+          can_send_photos: false,
+          can_send_videos: false,
+          can_send_video_notes: false,
+          can_send_voice_notes: false,
+          can_send_polls: false,
+          can_send_other_messages: false,
+          can_add_web_page_previews: false,
+          can_change_info: false,
+          can_invite_users: false,
+          can_pin_messages: false,
+          can_manage_topics: false,
+          until_date: untilDate
+        });
+        await this.addModerationLog(
+          group,
+          'auto_mute_after_warnings',
+          ctx.from.id,
+          targetUserId,
+          `${policy.muteMinutes}m after ${warning.count} warnings`
+        );
+        await group.save();
+        await ctx.reply(`🔇 تم كتم ${label} تلقائيًا لمدة ${policy.muteMinutes} دقيقة.`);
+      } catch (_error) {
+        await ctx.reply('❌ فشل الكتم التلقائي. تأكد من صلاحيات البوت.');
       }
     }
   }
@@ -324,11 +407,13 @@ class GroupAdminHandler {
     if (!targetUserId) return ctx.reply('❌ يجب الرد على رسالة المستخدم لعرض تحذيراته.');
 
     const group = await this.ensureGroupRecord(ctx);
+    this.normalizeGroupState(group);
     const warning = group.warnings.find((w) => w.userId === targetUserId);
     const count = warning?.count || 0;
     const label = this.getRepliedUserLabel(ctx);
+    const policy = this.getWarningPolicy(group);
 
-    return ctx.reply(`📌 تحذيرات ${label}: ${count}/3`);
+    return ctx.reply(`📌 تحذيرات ${label}: ${count}/${policy.banAt}`);
   }
 
   static async handleUnwarnCommand(ctx) {
@@ -341,6 +426,7 @@ class GroupAdminHandler {
     if (!targetUserId) return ctx.reply('❌ يجب الرد على رسالة المستخدم لإزالة تحذير.');
 
     const group = await this.ensureGroupRecord(ctx);
+    this.normalizeGroupState(group);
     const warning = group.warnings.find((w) => Number(w.userId) === Number(targetUserId));
     const label = this.getRepliedUserLabel(ctx);
 
@@ -354,8 +440,9 @@ class GroupAdminHandler {
       warningCount: warning.count
     });
     await group.save();
+    const policy = this.getWarningPolicy(group);
 
-    return ctx.reply(`✅ تم إزالة تحذير من ${label}. التحذيرات الحالية: ${warning.count}/3`);
+    return ctx.reply(`✅ تم إزالة تحذير من ${label}. التحذيرات الحالية: ${warning.count}/${policy.banAt}`);
   }
 
   static async handleResetWarnCommand(ctx) {
@@ -368,6 +455,7 @@ class GroupAdminHandler {
     if (!targetUserId) return ctx.reply('❌ يجب الرد على رسالة المستخدم لتصفير التحذيرات.');
 
     const group = await this.ensureGroupRecord(ctx);
+    this.normalizeGroupState(group);
     const warning = group.warnings.find((w) => Number(w.userId) === Number(targetUserId));
     const label = this.getRepliedUserLabel(ctx);
 
@@ -406,6 +494,88 @@ class GroupAdminHandler {
     });
 
     return ctx.reply(message.trim(), { parse_mode: 'HTML' });
+  }
+
+  static async handlePolicyCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+
+    const isAdmin = await this.isGroupAdmin(ctx);
+    if (!isAdmin) return ctx.reply('❌ هذا الأمر للمشرفين فقط.');
+
+    const group = await this.ensureGroupRecord(ctx);
+    const args = this.parseCommandArgs(ctx);
+
+    if (args.length === 0) {
+      const policy = this.getWarningPolicy(group);
+      return ctx.reply(
+        '⚙️ <b>سياسة العقوبات التلقائية</b>\n\n' +
+          `الحالة: ${policy.enabled ? '✅ مفعلة' : '❌ معطلة'}\n` +
+          `الكتم عند: ${policy.muteAt} تحذيرات\n` +
+          `الحظر عند: ${policy.banAt} تحذيرات\n` +
+          `مدة الكتم: ${policy.muteMinutes} دقيقة\n\n` +
+          'لتعديل السياسة:\n' +
+          '<code>/gpolicy muteAt banAt muteMinutes</code>\n' +
+          'مثال: <code>/gpolicy 2 3 15</code>\n\n' +
+          'لإيقافها: <code>/gpolicy off</code>\n' +
+          'لتفعيلها: <code>/gpolicy on</code>',
+        { parse_mode: 'HTML' }
+      );
+    }
+
+    const mode = String(args[0] || '').toLowerCase();
+    if (mode === 'off' || mode === 'disable') {
+      group.settings.warningPolicy.enabled = false;
+      await this.addModerationLog(group, 'policy_update', ctx.from.id, null, 'warning policy disabled');
+      await group.save();
+      return ctx.reply('✅ تم تعطيل العقوبات التلقائية.');
+    }
+
+    if (mode === 'on' || mode === 'enable') {
+      group.settings.warningPolicy.enabled = true;
+      await this.addModerationLog(group, 'policy_update', ctx.from.id, null, 'warning policy enabled');
+      await group.save();
+      return ctx.reply('✅ تم تفعيل العقوبات التلقائية.');
+    }
+
+    if (args.length < 3) {
+      return ctx.reply('❌ الصيغة غير صحيحة. استخدم: /gpolicy muteAt banAt muteMinutes');
+    }
+
+    const muteAt = parseInt(args[0], 10);
+    const banAt = parseInt(args[1], 10);
+    const muteMinutes = parseInt(args[2], 10);
+
+    if (!Number.isInteger(muteAt) || !Number.isInteger(banAt) || !Number.isInteger(muteMinutes)) {
+      return ctx.reply('❌ القيم يجب أن تكون أرقام صحيحة.');
+    }
+    if (muteAt < 1 || banAt < 2 || muteMinutes < 1) {
+      return ctx.reply('❌ القيم غير منطقية. مثال مناسب: /gpolicy 2 3 10');
+    }
+    if (muteAt >= banAt) {
+      return ctx.reply('❌ يجب أن يكون banAt أكبر من muteAt.');
+    }
+
+    group.settings.warningPolicy = {
+      enabled: true,
+      muteAt,
+      banAt,
+      muteMinutes
+    };
+    await this.addModerationLog(
+      group,
+      'policy_update',
+      ctx.from.id,
+      null,
+      `muteAt=${muteAt}, banAt=${banAt}, muteMinutes=${muteMinutes}`
+    );
+    await group.save();
+
+    return ctx.reply(
+      `✅ تم تحديث السياسة:\n` +
+        `• الكتم عند ${muteAt}\n` +
+        `• الحظر عند ${banAt}\n` +
+        `• مدة الكتم ${muteMinutes} دقيقة`
+    );
   }
 
   static async handleMuteCommand(ctx) {
