@@ -18,6 +18,7 @@ const CommandHandler = require('./commands/commandHandler');
 const MenuHandler = require('./commands/menuHandler');
 const GameHandler = require('./commands/gameHandler');
 const NewGamesHandler = require('./commands/newGamesHandler');
+const GroupAdminHandler = require('./commands/groupAdminHandler');
 const QuranicGamesHandler = require('./commands/quranicGamesHandler');
 const EconomyHandler = require('./commands/economyHandler');
 const ContentHandler = require('./commands/contentHandler');
@@ -90,25 +91,100 @@ const bot = new Telegraf(process.env.BOT_TOKEN, {
 // Initialize session middleware
 bot.use(session());
 
+const PRIVATE_ONLY_COMMANDS = new Set([
+  'khatma', 'adhkar', 'quran', 'quotes', 'poetry', 'games', 'economy', 'stats', 'rewards',
+  'image', 'shop', 'transfer', 'notifications', 'notif', 'backup', 'qgames', 'profile',
+  'balance', 'leaderboard', 'daily', 'features', 'goals', 'charity', 'memorization', 'dua',
+  'referral', 'events', 'teams', 'owner', 'panel', 'owners', 'myid', 'health', 'givecoins'
+]);
+
+const GROUP_ONLY_COMMANDS = new Set([
+  'gpanel', 'ghelp', 'gsettings', 'gwarn', 'gwarns', 'gmute', 'gunmute', 'gban', 'gunban', 'gclear'
+]);
+
+const PRIVATE_REPLY_BUTTONS = new Set([
+  '🕌 الختمة', '📿 الأذكار', '📖 القرآن', '💭 الاقتباسات', '✍️ الشعر', '🎮 الألعاب',
+  '💰 الاقتصاد', '👤 حسابي', '🏆 المتصدرين', '⚙️ الإعدادات', '✨ الميزات', '📚 المكتبة',
+  '📊 إحصائيات', '🎁 المكافآت', '🛍️ المتجر', '💸 التحويلات والتبرعات', '🔔 الإشعارات الذكية',
+  '📁 النسخ الاحتياطية', '⚡ التخزين المؤقت', '🛡️ حماية من الإساءة', '🎨 توليد صورة', '👑 لوحة المالك'
+]);
+
+bot.use(async (ctx, next) => {
+  const chatType = ctx.chat?.type;
+  const isPrivate = chatType === 'private';
+  const isGroup = chatType === 'group' || chatType === 'supergroup';
+
+  if (isGroup && ctx.callbackQuery?.data && !ctx.callbackQuery.data.startsWith('group:')) {
+    await ctx.answerCbQuery('هذا الزر مخصص للمحادثة الخاصة.', { show_alert: false }).catch(() => {});
+    return;
+  }
+
+  if (isPrivate && ctx.callbackQuery?.data?.startsWith('group:')) {
+    await ctx.answerCbQuery('هذا الزر مخصص للجروبات.', { show_alert: false }).catch(() => {});
+    return;
+  }
+
+  const text = ctx.message?.text?.trim();
+  if (isGroup && text && PRIVATE_REPLY_BUTTONS.has(text)) {
+    await ctx.reply('ℹ️ هذه القائمة مخصصة للمحادثة الخاصة مع البوت.');
+    return;
+  }
+
+  if (text && text.startsWith('/')) {
+    const commandName = text.slice(1).split(/\s+/)[0].split('@')[0].toLowerCase();
+
+    if (isGroup && PRIVATE_ONLY_COMMANDS.has(commandName)) {
+      await ctx.reply('ℹ️ هذا الأمر مخصص للمحادثة الخاصة مع البوت.');
+      return;
+    }
+
+    if (isPrivate && GROUP_ONLY_COMMANDS.has(commandName)) {
+      await ctx.reply('ℹ️ هذا الأمر مخصص للجروبات.');
+      return;
+    }
+  }
+
+  return next();
+});
+
 
 // --- SET BOT COMMANDS MENU ---
-bot.telegram
-  .setMyCommands([
-    { command: 'start', description: '🏠 الرئيسية' },
-    { command: 'khatma', description: '🕌 الختمة' },
-    { command: 'adhkar', description: '📿 الأذكار' },
-    { command: 'quran', description: '📖 القرآن' },
-    { command: 'games', description: '🎮 الألعاب' },
-    { command: 'qgames', description: '🎯 الألعاب القرآنية' },
-    { command: 'economy', description: '💰 الاقتصاد' },
-    { command: 'shop', description: '🛍️ المتجر' },
-    { command: 'transfer', description: '📤 تحويل أموال' },
-    { command: 'profile', description: '👤 حسابي' },
-    { command: 'leaderboard', description: '🏆 المتصدرين' },
-    { command: 'notifications', description: '🔔 الإشعارات' },
-    { command: 'image', description: '🎨 توليد صورة' },
-    { command: 'help', description: '❓ المساعدة' }
-  ])
+Promise.all([
+  bot.telegram.setMyCommands(
+    [
+      { command: 'start', description: '🏠 الرئيسية' },
+      { command: 'khatma', description: '🕌 الختمة' },
+      { command: 'adhkar', description: '📿 الأذكار' },
+      { command: 'quran', description: '📖 القرآن' },
+      { command: 'games', description: '🎮 الألعاب' },
+      { command: 'qgames', description: '🎯 الألعاب القرآنية' },
+      { command: 'economy', description: '💰 الاقتصاد' },
+      { command: 'shop', description: '🛍️ المتجر' },
+      { command: 'transfer', description: '📤 تحويل أموال' },
+      { command: 'profile', description: '👤 حسابي' },
+      { command: 'leaderboard', description: '🏆 المتصدرين' },
+      { command: 'notifications', description: '🔔 الإشعارات' },
+      { command: 'image', description: '🎨 توليد صورة' },
+      { command: 'help', description: '❓ المساعدة' }
+    ],
+    { scope: { type: 'all_private_chats' } }
+  ),
+  bot.telegram.setMyCommands(
+    [
+      { command: 'start', description: 'بدء نظام الجروب' },
+      { command: 'gpanel', description: 'لوحة إدارة الجروب' },
+      { command: 'ghelp', description: 'مساعدة أوامر الجروب' },
+      { command: 'gwarn', description: 'تحذير عضو (بالرد)' },
+      { command: 'gwarns', description: 'عرض تحذيرات عضو (بالرد)' },
+      { command: 'gmute', description: 'كتم عضو بالدقائق (بالرد)' },
+      { command: 'gunmute', description: 'فك كتم عضو (بالرد)' },
+      { command: 'gban', description: 'حظر عضو (بالرد)' },
+      { command: 'gunban', description: 'رفع حظر عضو (ID)' },
+      { command: 'gclear', description: 'حذف رسالة (بالرد)' }
+    ],
+    { scope: { type: 'all_group_chats' } }
+  )
+])
   .catch((err) => {
     logger.error('خطأ في تعيين قائمة الأوامر:', err);
   });
@@ -137,8 +213,30 @@ bot.catch((err, ctx) => {
 });
 
 // --- STARTUP COMMANDS ---
-bot.start((ctx) => CommandHandler.handleStart(ctx));
-bot.help((ctx) => CommandHandler.handleHelp(ctx));
+bot.start((ctx) => {
+  if (GroupAdminHandler.isGroupChat(ctx)) {
+    return GroupAdminHandler.handleGroupStart(ctx);
+  }
+  return CommandHandler.handleStart(ctx);
+});
+bot.help((ctx) => {
+  if (GroupAdminHandler.isGroupChat(ctx)) {
+    return GroupAdminHandler.handleGroupHelp(ctx);
+  }
+  return CommandHandler.handleHelp(ctx);
+});
+
+// --- GROUP ADMIN COMMANDS ---
+bot.command('ghelp', (ctx) => GroupAdminHandler.handleGroupHelp(ctx));
+bot.command('gpanel', (ctx) => GroupAdminHandler.handleGroupPanel(ctx));
+bot.command('gsettings', (ctx) => GroupAdminHandler.handleGroupPanel(ctx));
+bot.command('gwarn', (ctx) => GroupAdminHandler.handleWarnCommand(ctx));
+bot.command('gwarns', (ctx) => GroupAdminHandler.handleWarnsCommand(ctx));
+bot.command('gmute', (ctx) => GroupAdminHandler.handleMuteCommand(ctx));
+bot.command('gunmute', (ctx) => GroupAdminHandler.handleUnmuteCommand(ctx));
+bot.command('gban', (ctx) => GroupAdminHandler.handleBanCommand(ctx));
+bot.command('gunban', (ctx) => GroupAdminHandler.handleUnbanCommand(ctx));
+bot.command('gclear', (ctx) => GroupAdminHandler.handleClearCommand(ctx));
 
 // --- COMMAND HANDLERS ---
 bot.command('profile', (ctx) => CommandHandler.handleProfile(ctx));
@@ -1178,6 +1276,7 @@ bot.action('owner:cleanup:confirm', async (ctx) => {
 });
 
 // --- MENU CALLBACKS ---
+bot.action(/^group:.+$/, (ctx) => GroupAdminHandler.handleGroupCallback(ctx));
 bot.action('menu:main', (ctx) => MenuHandler.handleMainMenu(ctx));
 bot.action('menu:khatma', (ctx) => MenuHandler.handleKhatmaMenu(ctx));
 bot.action('menu:adhkar', (ctx) => MenuHandler.handleAdhkarMenu(ctx));
@@ -2923,6 +3022,11 @@ bot.hears('👑 لوحة المالك', async (ctx) => {
 bot.on('text', async (ctx) => {
   try {
     const message = ctx.message.text;
+
+    if (GroupAdminHandler.isGroupChat(ctx)) {
+      const wasModerated = await GroupAdminHandler.processGroupMessage(ctx);
+      if (wasModerated) return;
+    }
 
     // ⭐ CHECK GUESS GAME INPUT FIRST (before all other handlers)
     const GuessNumberGame = require('./games/guessNumberGame');
