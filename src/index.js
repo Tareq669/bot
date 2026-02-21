@@ -99,7 +99,8 @@ const PRIVATE_ONLY_COMMANDS = new Set([
 ]);
 
 const GROUP_ONLY_COMMANDS = new Set([
-  'gpanel', 'ghelp', 'gsettings', 'gwarn', 'gwarns', 'gmute', 'gunmute', 'gban', 'gunban', 'gclear'
+  'gpanel', 'ghelp', 'gsettings', 'gwarn', 'gwarns', 'gunwarn', 'gresetwarn',
+  'gmute', 'gunmute', 'gban', 'gunban', 'gclear', 'glogs'
 ]);
 
 const PRIVATE_REPLY_BUTTONS = new Set([
@@ -176,11 +177,14 @@ Promise.all([
       { command: 'ghelp', description: 'مساعدة أوامر الجروب' },
       { command: 'gwarn', description: 'تحذير عضو (بالرد)' },
       { command: 'gwarns', description: 'عرض تحذيرات عضو (بالرد)' },
+      { command: 'gunwarn', description: 'إزالة تحذير (بالرد)' },
+      { command: 'gresetwarn', description: 'تصفير التحذيرات (بالرد)' },
       { command: 'gmute', description: 'كتم عضو بالدقائق (بالرد)' },
       { command: 'gunmute', description: 'فك كتم عضو (بالرد)' },
       { command: 'gban', description: 'حظر عضو (بالرد)' },
       { command: 'gunban', description: 'رفع حظر عضو (ID)' },
-      { command: 'gclear', description: 'حذف رسالة (بالرد)' }
+      { command: 'gclear', description: 'حذف رسالة (بالرد)' },
+      { command: 'glogs', description: 'عرض سجل الإدارة' }
     ],
     { scope: { type: 'all_group_chats' } }
   )
@@ -232,11 +236,14 @@ bot.command('gpanel', (ctx) => GroupAdminHandler.handleGroupPanel(ctx));
 bot.command('gsettings', (ctx) => GroupAdminHandler.handleGroupPanel(ctx));
 bot.command('gwarn', (ctx) => GroupAdminHandler.handleWarnCommand(ctx));
 bot.command('gwarns', (ctx) => GroupAdminHandler.handleWarnsCommand(ctx));
+bot.command('gunwarn', (ctx) => GroupAdminHandler.handleUnwarnCommand(ctx));
+bot.command('gresetwarn', (ctx) => GroupAdminHandler.handleResetWarnCommand(ctx));
 bot.command('gmute', (ctx) => GroupAdminHandler.handleMuteCommand(ctx));
 bot.command('gunmute', (ctx) => GroupAdminHandler.handleUnmuteCommand(ctx));
 bot.command('gban', (ctx) => GroupAdminHandler.handleBanCommand(ctx));
 bot.command('gunban', (ctx) => GroupAdminHandler.handleUnbanCommand(ctx));
 bot.command('gclear', (ctx) => GroupAdminHandler.handleClearCommand(ctx));
+bot.command('glogs', (ctx) => GroupAdminHandler.handleLogsCommand(ctx));
 
 // --- COMMAND HANDLERS ---
 bot.command('profile', (ctx) => CommandHandler.handleProfile(ctx));

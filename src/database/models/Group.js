@@ -60,6 +60,19 @@ const groupSchema = new mongoose.Schema({
       lastWarning: Date
     }
   ],
+  moderationLogs: [
+    {
+      action: String,
+      actorId: Number,
+      targetId: Number,
+      reason: String,
+      metadata: mongoose.Schema.Types.Mixed,
+      createdAt: {
+        type: Date,
+        default: Date.now
+      }
+    }
+  ],
   statistics: {
     messagesCount: {
       type: Number,

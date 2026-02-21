@@ -80,6 +80,22 @@ class GroupAdminHandler {
     return parts.slice(1);
   }
 
+  static async addModerationLog(group, action, actorId, targetId = null, reason = '', metadata = null) {
+    group.moderationLogs = Array.isArray(group.moderationLogs) ? group.moderationLogs : [];
+    group.moderationLogs.unshift({
+      action,
+      actorId,
+      targetId,
+      reason: reason || '',
+      metadata: metadata || null,
+      createdAt: new Date()
+    });
+
+    if (group.moderationLogs.length > 100) {
+      group.moderationLogs = group.moderationLogs.slice(0, 100);
+    }
+  }
+
   static formatGroupPanel(group) {
     const settings = group?.settings || {};
     return (
@@ -97,6 +113,9 @@ class GroupAdminHandler {
       '• /gunmute (بالرد)\n' +
       '• /gban (بالرد)\n' +
       '• /gunban 123456\n' +
+      '• /gunwarn (بالرد)\n' +
+      '• /gresetwarn (بالرد)\n' +
+      '• /glogs\n' +
       '• /gclear (بالرد)'
     );
   }
@@ -143,6 +162,9 @@ class GroupAdminHandler {
       '• /gunmute فك كتم بالرد\n' +
       '• /gban حظر بالرد\n' +
       '• /gunban 123456 رفع حظر\n' +
+      '• /gunwarn إزالة تحذير واحد (بالرد)\n' +
+      '• /gresetwarn تصفير التحذيرات (بالرد)\n' +
+      '• /glogs عرض سجل الإدارة\n' +
       '• /gclear حذف رسالة بالرد',
       { parse_mode: 'HTML' }
     );
@@ -184,6 +206,13 @@ class GroupAdminHandler {
     const group = await this.ensureGroupRecord(ctx);
     const current = Boolean(group.settings?.[key]);
     group.settings[key] = !current;
+    await this.addModerationLog(
+      group,
+      'toggle_setting',
+      ctx.from.id,
+      null,
+      `${key} => ${group.settings[key] ? 'on' : 'off'}`
+    );
     group.updatedAt = new Date();
     await group.save();
 
@@ -255,6 +284,9 @@ class GroupAdminHandler {
 
     warning.count += 1;
     warning.lastWarning = new Date();
+    await this.addModerationLog(group, 'warn', ctx.from.id, targetUserId, reason, {
+      warningCount: warning.count
+    });
     group.updatedAt = new Date();
     await group.save();
 
@@ -271,6 +303,13 @@ class GroupAdminHandler {
           bannedAt: new Date(),
           bannedBy: ctx.from.id
         });
+        await this.addModerationLog(
+          group,
+          'auto_ban_after_warnings',
+          ctx.from.id,
+          targetUserId,
+          'تجاوز 3 تحذيرات'
+        );
         await group.save();
       } catch (_error) {
         await ctx.reply('❌ فشل الحظر التلقائي. تأكد من صلاحيات البوت.');
@@ -290,6 +329,83 @@ class GroupAdminHandler {
     const label = this.getRepliedUserLabel(ctx);
 
     return ctx.reply(`📌 تحذيرات ${label}: ${count}/3`);
+  }
+
+  static async handleUnwarnCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+
+    const isAdmin = await this.isGroupAdmin(ctx);
+    if (!isAdmin) return ctx.reply('❌ هذا الأمر للمشرفين فقط.');
+
+    const targetUserId = this.getRepliedUserId(ctx);
+    if (!targetUserId) return ctx.reply('❌ يجب الرد على رسالة المستخدم لإزالة تحذير.');
+
+    const group = await this.ensureGroupRecord(ctx);
+    const warning = group.warnings.find((w) => Number(w.userId) === Number(targetUserId));
+    const label = this.getRepliedUserLabel(ctx);
+
+    if (!warning || warning.count <= 0) {
+      return ctx.reply(`ℹ️ لا توجد تحذيرات على ${label}.`);
+    }
+
+    warning.count = Math.max(0, warning.count - 1);
+    warning.lastWarning = new Date();
+    await this.addModerationLog(group, 'unwarn', ctx.from.id, targetUserId, 'remove one warning', {
+      warningCount: warning.count
+    });
+    await group.save();
+
+    return ctx.reply(`✅ تم إزالة تحذير من ${label}. التحذيرات الحالية: ${warning.count}/3`);
+  }
+
+  static async handleResetWarnCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+
+    const isAdmin = await this.isGroupAdmin(ctx);
+    if (!isAdmin) return ctx.reply('❌ هذا الأمر للمشرفين فقط.');
+
+    const targetUserId = this.getRepliedUserId(ctx);
+    if (!targetUserId) return ctx.reply('❌ يجب الرد على رسالة المستخدم لتصفير التحذيرات.');
+
+    const group = await this.ensureGroupRecord(ctx);
+    const warning = group.warnings.find((w) => Number(w.userId) === Number(targetUserId));
+    const label = this.getRepliedUserLabel(ctx);
+
+    if (!warning) {
+      return ctx.reply(`ℹ️ لا توجد تحذيرات على ${label}.`);
+    }
+
+    warning.count = 0;
+    warning.lastWarning = new Date();
+    await this.addModerationLog(group, 'reset_warn', ctx.from.id, targetUserId, 'reset warnings');
+    await group.save();
+
+    return ctx.reply(`✅ تم تصفير تحذيرات ${label}.`);
+  }
+
+  static async handleLogsCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+
+    const isAdmin = await this.isGroupAdmin(ctx);
+    if (!isAdmin) return ctx.reply('❌ هذا الأمر للمشرفين فقط.');
+
+    const group = await this.ensureGroupRecord(ctx);
+    const logs = Array.isArray(group.moderationLogs) ? group.moderationLogs.slice(0, 15) : [];
+
+    if (logs.length === 0) {
+      return ctx.reply('ℹ️ لا يوجد سجل إداري بعد.');
+    }
+
+    let message = '📜 <b>سجل الإدارة (آخر 15 إجراء)</b>\n\n';
+    logs.forEach((log, index) => {
+      const time = new Date(log.createdAt || Date.now()).toLocaleString('ar');
+      const actor = log.actorId ? `<code>${log.actorId}</code>` : '-';
+      const target = log.targetId ? `<code>${log.targetId}</code>` : '-';
+      const reason = log.reason ? ` | ${log.reason}` : '';
+      message += `${index + 1}. ${log.action}\n👤 ${actor} -> ${target}\n🕒 ${time}${reason}\n\n`;
+    });
+
+    return ctx.reply(message.trim(), { parse_mode: 'HTML' });
   }
 
   static async handleMuteCommand(ctx) {
@@ -329,6 +445,9 @@ class GroupAdminHandler {
         can_manage_topics: false,
         until_date: untilDate
       });
+      const group = await this.ensureGroupRecord(ctx);
+      await this.addModerationLog(group, 'mute', ctx.from.id, targetUserId, `duration=${minutes}m`);
+      await group.save();
       return ctx.reply(`🔇 تم كتم المستخدم لمدة ${minutes} دقيقة.`);
     } catch (_error) {
       return ctx.reply('❌ فشل الكتم. تأكد من صلاحيات البوت.');
@@ -364,6 +483,9 @@ class GroupAdminHandler {
         can_pin_messages: false,
         can_manage_topics: false
       });
+      const group = await this.ensureGroupRecord(ctx);
+      await this.addModerationLog(group, 'unmute', ctx.from.id, targetUserId);
+      await group.save();
       return ctx.reply('🔊 تم فك كتم المستخدم.');
     } catch (_error) {
       return ctx.reply('❌ فشل فك الكتم. تأكد من صلاحيات البوت.');
@@ -397,6 +519,7 @@ class GroupAdminHandler {
         bannedAt: new Date(),
         bannedBy: ctx.from.id
       });
+      await this.addModerationLog(group, 'ban', ctx.from.id, targetUserId, reason);
       await group.save();
       return ctx.reply('🚫 تم حظر المستخدم.');
     } catch (_error) {
@@ -421,6 +544,7 @@ class GroupAdminHandler {
       await ctx.telegram.unbanChatMember(ctx.chat.id, targetUserId, { only_if_banned: true });
       const group = await this.ensureGroupRecord(ctx);
       group.bannedUsers = group.bannedUsers.filter((u) => Number(u.userId) !== Number(targetUserId));
+      await this.addModerationLog(group, 'unban', ctx.from.id, targetUserId);
       await group.save();
       return ctx.reply('✅ تم إلغاء حظر المستخدم.');
     } catch (_error) {
@@ -445,6 +569,9 @@ class GroupAdminHandler {
     try {
       await ctx.telegram.deleteMessage(ctx.chat.id, repliedMessageId);
       await ctx.telegram.deleteMessage(ctx.chat.id, ctx.message.message_id);
+      const group = await this.ensureGroupRecord(ctx);
+      await this.addModerationLog(group, 'clear_message', ctx.from.id, this.getRepliedUserId(ctx));
+      await group.save();
       return;
     } catch (_error) {
       return ctx.reply('❌ فشل حذف الرسالة.');
@@ -497,6 +624,8 @@ class GroupAdminHandler {
       if (hasLink) {
         try {
           await ctx.telegram.deleteMessage(ctx.chat.id, ctx.message.message_id);
+          await this.addModerationLog(group, 'delete_link_message', ctx.botInfo.id, ctx.from.id, 'link blocked');
+          await group.save();
           await ctx.reply('🔒 الروابط ممنوعة في هذا الجروب.');
         } catch (_error) {
           await ctx.reply('⚠️ تم اكتشاف رابط لكن لا يمكن حذفه. فعّل صلاحية حذف الرسائل للبوت.');
@@ -511,6 +640,8 @@ class GroupAdminHandler {
       if (found) {
         try {
           await ctx.telegram.deleteMessage(ctx.chat.id, ctx.message.message_id);
+          await this.addModerationLog(group, 'delete_badword_message', ctx.botInfo.id, ctx.from.id, 'blocked word');
+          await group.save();
           await ctx.reply('⚠️ تم حذف رسالة تحتوي على ألفاظ غير مسموحة.');
         } catch (_error) {
           await ctx.reply('⚠️ تم اكتشاف لفظ غير مسموح لكن لا يمكن الحذف. فعّل صلاحية حذف الرسائل للبوت.');
