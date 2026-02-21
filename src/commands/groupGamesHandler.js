@@ -878,11 +878,7 @@ class GroupGamesHandler {
 
   static async handleGamesMenuAction(ctx, action) {
     if (!this.isGroupChat(ctx)) return;
-    if (ctx.callbackQuery) {
-      await ctx.answerCbQuery().catch(() => {});
-      const fakeText = `/${action}`;
-      ctx.message = { ...(ctx.callbackQuery.message || {}), text: fakeText };
-    }
+    if (ctx.callbackQuery) await ctx.answerCbQuery().catch(() => {});
 
     if (action === 'gquiz') return this.handleQuizCommand(ctx);
     if (action === 'gmath') return this.handleMathCommand(ctx);
