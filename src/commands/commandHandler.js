@@ -136,10 +136,17 @@ class CommandHandler {
       }
 
       const totalUsers = await User.countDocuments();
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
       const activeUsers = await User.countDocuments({
-        lastActiveDay: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
+        $or: [
+          { lastActive: { $gte: sevenDaysAgo } },
+          { updatedAt: { $gte: sevenDaysAgo } },
+          { createdAt: { $gte: sevenDaysAgo } }
+        ]
       });
-      const bannedUsers = await User.countDocuments({ banned: true });
+      const bannedUsers = await User.countDocuments({
+        $or: [{ isBanned: true }, { banned: true }]
+      });
 
       const totalCoins = await User.aggregate([
         { $group: { _id: null, total: { $sum: '$coins' } } }
@@ -379,8 +386,8 @@ class CommandHandler {
 
       let message = '👥 <b>آخر 20 مستخدماً</b>\n\n';
       users.forEach((u, i) => {
-        const status = u.banned ? '🚫' : '✅';
-        message += `${i + 1}. ${status} ${u.firstName} (@${u.username || 'لا يوجد'})\n`;
+        const status = u.isBanned || u.banned ? '🚫' : '✅';
+        message += `${i + 1}. ${status} ${u.firstName || 'مستخدم'} (@${u.username || 'لا يوجد'})\n`;
         message += `   ID: <code>${u.userId}</code>\n`;
         message += `   💰${u.coins} - ⭐${u.xp} - 🎖️${u.level}\n\n`;
       });

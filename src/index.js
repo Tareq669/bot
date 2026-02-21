@@ -340,6 +340,567 @@ bot.action('owner:logs', (ctx) => CommandHandler.handleOwnerLogs(ctx));
 bot.action('owner:viewall', (ctx) => CommandHandler.handleOwnerViewAllUsers(ctx));
 bot.action('owner:givecoins', (ctx) => CommandHandler.handleOwnerGiveCoins(ctx));
 
+const getActiveUsersQuery = () => ({
+  $and: [
+    { $or: [{ isBanned: { $exists: false } }, { isBanned: false }] },
+    { $or: [{ banned: { $exists: false } }, { banned: false }] }
+  ]
+});
+
+const getBannedUsersQuery = () => ({
+  $or: [{ isBanned: true }, { banned: true }]
+});
+
+const ensureOwner = async (ctx) => {
+  const UIManager = require('./ui/keyboards');
+  if (!UIManager.isOwner(ctx.from.id)) {
+    await ctx.answerCbQuery('❌ غير مصرح');
+    return false;
+  }
+  return true;
+};
+
+const editOrReplyHtml = async (ctx, message, keyboard = null) => {
+  const options = {
+    parse_mode: 'HTML'
+  };
+  if (keyboard?.reply_markup) {
+    options.reply_markup = keyboard.reply_markup;
+  }
+  try {
+    await ctx.editMessageText(message, options);
+  } catch (_error) {
+    await ctx.reply(message, options);
+  }
+};
+
+const escapeHtml = (text) =>
+  String(text ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+const parsePositiveInt = (value) => {
+  const parsed = parseInt(value, 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+};
+
+const isCancelInput = (value) => String(value || '').trim().toLowerCase() === '/cancel';
+
+const escapeRegex = (text) => String(text || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+// Owner - Maintenance
+bot.action('owner:maintenance', async (ctx) => {
+  try {
+    if (!(await ensureOwner(ctx))) return;
+
+    const message =
+      '🔧 <b>وضع الصيانة</b>\n\n' +
+      'اختر العملية المطلوبة:\n' +
+      '• تنظيف سريع للبيانات\n' +
+      '• فحص الأداء\n' +
+      '• نسخ احتياطي يدوي\n' +
+      '• مسح الكاش\n' +
+      '• إعادة تشغيل الخدمة';
+
+    const keyboard = Markup.inlineKeyboard([
+      [
+        Markup.button.callback('🧹 تنظيف سريع', 'owner:dbclean'),
+        Markup.button.callback('📊 الأداء', 'owner:performance')
+      ],
+      [
+        Markup.button.callback('💾 نسخ احتياطي', 'owner:backup'),
+        Markup.button.callback('⚡ مسح الكاش', 'owner:cacheclear')
+      ],
+      [
+        Markup.button.callback('🔄 إعادة تشغيل', 'owner:restart'),
+        Markup.button.callback('⬅️ رجوع', 'owner:panel')
+      ]
+    ]);
+
+    await editOrReplyHtml(ctx, message, keyboard);
+  } catch (error) {
+    console.error('Owner maintenance error:', error);
+    ctx.answerCbQuery('❌ حدث خطأ');
+  }
+});
+
+bot.action('owner:cacheclear', async (ctx) => {
+  try {
+    if (!(await ensureOwner(ctx))) return;
+    if (global.cache && typeof global.cache.flush === 'function') {
+      global.cache.flush();
+    }
+    await ctx.answerCbQuery('✅ تم');
+    await ctx.reply('✅ تم مسح الكاش بنجاح');
+  } catch (error) {
+    console.error('Owner cache clear error:', error);
+    ctx.answerCbQuery('❌ حدث خطأ');
+  }
+});
+
+// Owner - Games Management
+bot.action('owner:games', async (ctx) => {
+  try {
+    if (!(await ensureOwner(ctx))) return;
+    const { GameStats } = require('./database/models');
+
+    const totalRecords = await GameStats.countDocuments();
+    const totals = await GameStats.aggregate([
+      {
+        $group: {
+          _id: null,
+          played: { $sum: '$played' },
+          won: { $sum: '$won' },
+          lost: { $sum: '$lost' },
+          coinsEarned: { $sum: '$coinsEarned' }
+        }
+      }
+    ]);
+
+    const byGame = await GameStats.aggregate([
+      {
+        $group: {
+          _id: '$gameName',
+          played: { $sum: '$played' },
+          won: { $sum: '$won' }
+        }
+      },
+      { $sort: { played: -1 } },
+      { $limit: 8 }
+    ]);
+
+    const stats = totals[0] || { played: 0, won: 0, lost: 0, coinsEarned: 0 };
+    let message =
+      '🎮 <b>إدارة الألعاب</b>\n\n' +
+      `📊 سجلات الألعاب: ${totalRecords}\n` +
+      `🕹️ إجمالي اللعب: ${stats.played}\n` +
+      `🏆 إجمالي الفوز: ${stats.won}\n` +
+      `💸 إجمالي الخسارة: ${stats.lost}\n` +
+      `💰 العملات المكتسبة: ${stats.coinsEarned}\n\n` +
+      '<b>الألعاب الأكثر لعبًا:</b>\n';
+
+    if (byGame.length === 0) {
+      message += 'لا توجد بيانات ألعاب بعد.';
+    } else {
+      byGame.forEach((game, index) => {
+        message += `${index + 1}. ${game._id} — لعب: ${game.played} | فوز: ${game.won}\n`;
+      });
+    }
+
+    const keyboard = Markup.inlineKeyboard([[Markup.button.callback('⬅️ رجوع', 'owner:panel')]]);
+    await editOrReplyHtml(ctx, message, keyboard);
+  } catch (error) {
+    console.error('Owner games error:', error);
+    ctx.answerCbQuery('❌ حدث خطأ');
+  }
+});
+
+// Owner - Content Management
+bot.action('owner:content', async (ctx) => {
+  try {
+    if (!(await ensureOwner(ctx))) return;
+    const { Content } = require('./database/models');
+
+    const total = await Content.countDocuments();
+    const active = await Content.countDocuments({ isActive: true });
+    const byType = await Content.aggregate([
+      {
+        $group: {
+          _id: '$contentType',
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { count: -1 } },
+      { $limit: 10 }
+    ]);
+
+    let message =
+      '📚 <b>إدارة المحتوى</b>\n\n' +
+      `📦 إجمالي العناصر: ${total}\n` +
+      `✅ العناصر النشطة: ${active}\n` +
+      `⛔ العناصر غير النشطة: ${Math.max(total - active, 0)}\n\n` +
+      '<b>التصنيفات:</b>\n';
+
+    if (byType.length === 0) {
+      message += 'لا يوجد محتوى مسجل حالياً.';
+    } else {
+      byType.forEach((item, index) => {
+        message += `${index + 1}. ${item._id || 'غير مصنف'}: ${item.count}\n`;
+      });
+    }
+
+    const keyboard = Markup.inlineKeyboard([
+      [Markup.button.callback('✏️ إدارة من الإعدادات', 'settings:content')],
+      [Markup.button.callback('⬅️ رجوع', 'owner:panel')]
+    ]);
+    await editOrReplyHtml(ctx, message, keyboard);
+  } catch (error) {
+    console.error('Owner content error:', error);
+    ctx.answerCbQuery('❌ حدث خطأ');
+  }
+});
+
+// Owner - Restart
+bot.action('owner:restart', async (ctx) => {
+  try {
+    if (!(await ensureOwner(ctx))) return;
+    const keyboard = Markup.inlineKeyboard([
+      [
+        Markup.button.callback('✅ نعم، أعد التشغيل', 'owner:restart:confirm'),
+        Markup.button.callback('❌ إلغاء', 'owner:panel')
+      ]
+    ]);
+    await editOrReplyHtml(
+      ctx,
+      '🔄 <b>تأكيد إعادة التشغيل</b>\n\nسيتم إيقاف العملية الحالية ليقوم السيرفر بإعادة تشغيلها تلقائياً.',
+      keyboard
+    );
+  } catch (error) {
+    console.error('Owner restart prompt error:', error);
+    ctx.answerCbQuery('❌ حدث خطأ');
+  }
+});
+
+bot.action('owner:restart:confirm', async (ctx) => {
+  try {
+    if (!(await ensureOwner(ctx))) return;
+    await ctx.answerCbQuery('✅ جاري التنفيذ');
+    await ctx.reply('🛑 جاري إعادة التشغيل... سيتم تشغيل البوت تلقائياً خلال ثوانٍ.');
+    setTimeout(() => process.exit(0), 1200);
+  } catch (error) {
+    console.error('Owner restart confirm error:', error);
+    ctx.answerCbQuery('❌ حدث خطأ');
+  }
+});
+
+// Owner - Users quick actions
+bot.action('owner:search', async (ctx) => {
+  try {
+    if (!(await ensureOwner(ctx))) return;
+    ctx.session = ctx.session || {};
+    ctx.session.ownerAwait = { type: 'searchUser' };
+    await ctx.answerCbQuery('✅');
+    await ctx.reply('🔍 أرسل ID المستخدم أو الاسم للبحث.');
+  } catch (error) {
+    console.error('Owner search error:', error);
+    ctx.answerCbQuery('❌ حدث خطأ');
+  }
+});
+
+bot.action('owner:ban', async (ctx) => {
+  try {
+    if (!(await ensureOwner(ctx))) return;
+    ctx.session = ctx.session || {};
+    ctx.session.ownerAwait = { type: 'banUser' };
+    await ctx.answerCbQuery('✅');
+    await ctx.reply('🚫 أرسل: ID سبب_اختياري\nمثال: 123456789 إساءة متكررة');
+  } catch (error) {
+    console.error('Owner ban prompt error:', error);
+    ctx.answerCbQuery('❌ حدث خطأ');
+  }
+});
+
+bot.action('owner:unban', async (ctx) => {
+  try {
+    if (!(await ensureOwner(ctx))) return;
+    ctx.session = ctx.session || {};
+    ctx.session.ownerAwait = { type: 'unbanUser' };
+    await ctx.answerCbQuery('✅');
+    await ctx.reply('✅ أرسل ID المستخدم لفك الحظر.');
+  } catch (error) {
+    console.error('Owner unban prompt error:', error);
+    ctx.answerCbQuery('❌ حدث خطأ');
+  }
+});
+
+bot.action('owner:givexp', async (ctx) => {
+  try {
+    if (!(await ensureOwner(ctx))) return;
+    ctx.session = ctx.session || {};
+    ctx.session.ownerAwait = { type: 'giveXp' };
+    await ctx.answerCbQuery('✅');
+    await ctx.reply('⭐ أرسل: ID المبلغ\nمثال: 123456789 500');
+  } catch (error) {
+    console.error('Owner givexp prompt error:', error);
+    ctx.answerCbQuery('❌ حدث خطأ');
+  }
+});
+
+bot.action('owner:reset', async (ctx) => {
+  try {
+    if (!(await ensureOwner(ctx))) return;
+    ctx.session = ctx.session || {};
+    ctx.session.ownerAwait = { type: 'resetUser' };
+    await ctx.answerCbQuery('✅');
+    await ctx.reply('🔄 أرسل ID المستخدم لإعادة تعيين بياناته الأساسية.');
+  } catch (error) {
+    console.error('Owner reset prompt error:', error);
+    ctx.answerCbQuery('❌ حدث خطأ');
+  }
+});
+
+bot.action('owner:delete', async (ctx) => {
+  try {
+    if (!(await ensureOwner(ctx))) return;
+    ctx.session = ctx.session || {};
+    ctx.session.ownerAwait = { type: 'deleteUser' };
+    await ctx.answerCbQuery('✅');
+    await ctx.reply('🗑️ أرسل: ID CONFIRM\nمثال: 123456789 CONFIRM');
+  } catch (error) {
+    console.error('Owner delete prompt error:', error);
+    ctx.answerCbQuery('❌ حدث خطأ');
+  }
+});
+
+// Owner - Economy details
+bot.action('owner:ecostats', async (ctx) => {
+  try {
+    if (!(await ensureOwner(ctx))) return;
+    const { User, Transaction } = require('./database/models');
+
+    const userCount = await User.countDocuments();
+    const totals = await User.aggregate([
+      {
+        $group: {
+          _id: null,
+          coins: { $sum: '$coins' },
+          xp: { $sum: '$xp' },
+          totalEarnings: { $sum: '$totalEarnings' },
+          totalSpending: { $sum: '$totalSpending' }
+        }
+      }
+    ]);
+
+    const txCount = await Transaction.countDocuments();
+    const transferCount = await Transaction.countDocuments({ type: 'transfer' });
+
+    const values = totals[0] || { coins: 0, xp: 0, totalEarnings: 0, totalSpending: 0 };
+    const avgCoins = userCount > 0 ? Math.round(values.coins / userCount) : 0;
+
+    const message =
+      '📊 <b>إحصائيات الاقتصاد</b>\n\n' +
+      `👥 المستخدمون: ${userCount}\n` +
+      `💰 إجمالي العملات: ${values.coins}\n` +
+      `⭐ إجمالي XP: ${values.xp}\n` +
+      `📥 إجمالي الأرباح: ${values.totalEarnings}\n` +
+      `📤 إجمالي المصروف: ${values.totalSpending}\n` +
+      `💵 متوسط العملات/مستخدم: ${avgCoins}\n` +
+      `🧾 إجمالي المعاملات: ${txCount}\n` +
+      `🔁 التحويلات: ${transferCount}`;
+
+    const keyboard = Markup.inlineKeyboard([[Markup.button.callback('⬅️ رجوع', 'owner:economy')]]);
+    await editOrReplyHtml(ctx, message, keyboard);
+  } catch (error) {
+    console.error('Owner ecostats error:', error);
+    ctx.answerCbQuery('❌ حدث خطأ');
+  }
+});
+
+bot.action('owner:taxall', async (ctx) => {
+  try {
+    if (!(await ensureOwner(ctx))) return;
+    ctx.session = ctx.session || {};
+    ctx.session.ownerAwait = { type: 'taxall' };
+    await ctx.answerCbQuery('✅');
+    await ctx.reply('💸 أرسل قيمة الخصم من كل مستخدم.\nمثال: 25');
+  } catch (error) {
+    console.error('Owner taxall prompt error:', error);
+    ctx.answerCbQuery('❌ حدث خطأ');
+  }
+});
+
+bot.action('owner:shop', async (ctx) => {
+  try {
+    if (!(await ensureOwner(ctx))) return;
+    const ShopSystem = require('./features/shopSystem');
+    const items = ShopSystem.getAllShopItems();
+    const totalValue = items.reduce((sum, item) => sum + (item.price || 0), 0);
+    const avgPrice = items.length ? Math.round(totalValue / items.length) : 0;
+
+    const message =
+      '🛒 <b>إدارة متجر الميزات</b>\n\n' +
+      `📦 عدد العناصر: ${items.length}\n` +
+      `💰 مجموع أسعار العناصر: ${totalValue}\n` +
+      `📊 متوسط السعر: ${avgPrice}\n\n` +
+      'استخدم "العناصر" لعرض التفاصيل.';
+
+    const keyboard = Markup.inlineKeyboard([
+      [Markup.button.callback('📦 العناصر', 'owner:items')],
+      [Markup.button.callback('⬅️ رجوع', 'owner:economy')]
+    ]);
+    await editOrReplyHtml(ctx, message, keyboard);
+  } catch (error) {
+    console.error('Owner shop error:', error);
+    ctx.answerCbQuery('❌ حدث خطأ');
+  }
+});
+
+bot.action('owner:items', async (ctx) => {
+  try {
+    if (!(await ensureOwner(ctx))) return;
+    const ShopSystem = require('./features/shopSystem');
+    const items = ShopSystem.getAllShopItems();
+
+    let message = '📦 <b>عناصر المتجر</b>\n\n';
+    if (items.length === 0) {
+      message += 'لا توجد عناصر متجر حالياً.';
+    } else {
+      items.forEach((item, index) => {
+        message += `${index + 1}. ${item.emoji} <b>${item.name}</b>\n`;
+        message += `🔑 <code>${item.key}</code>\n`;
+        message += `💰 ${item.price} | 🏷️ ${item.type}\n\n`;
+      });
+    }
+
+    const keyboard = Markup.inlineKeyboard([[Markup.button.callback('⬅️ رجوع', 'owner:shop')]]);
+    await editOrReplyHtml(ctx, message, keyboard);
+  } catch (error) {
+    console.error('Owner items error:', error);
+    ctx.answerCbQuery('❌ حدث خطأ');
+  }
+});
+
+// Owner - DB tools
+bot.action('owner:backup', async (ctx) => {
+  try {
+    if (!(await ensureOwner(ctx))) return;
+    const BackupSystem = require('./utils/backupSystem');
+    const backup = new BackupSystem();
+    const result = await backup.fullBackup(true);
+
+    if (!result.success) {
+      return ctx.reply(`❌ فشل النسخ الاحتياطي: ${result.error || 'خطأ غير معروف'}`);
+    }
+
+    return ctx.reply(
+      '✅ <b>تم إنشاء نسخة احتياطية</b>\n\n' +
+        `📄 الملف: <code>${result.filename}</code>\n` +
+        `📊 الحجم: ${result.size}\n` +
+        `👥 المستخدمون: ${result.statistics?.totalUsers || 0}`,
+      { parse_mode: 'HTML' }
+    );
+  } catch (error) {
+    console.error('Owner backup error:', error);
+    ctx.answerCbQuery('❌ حدث خطأ');
+  }
+});
+
+bot.action('owner:restore', async (ctx) => {
+  try {
+    if (!(await ensureOwner(ctx))) return;
+    const BackupSystem = require('./utils/backupSystem');
+    const backup = new BackupSystem();
+    const backups = backup.listBackups().slice(0, 5);
+
+    let message =
+      '🔄 <b>استرجاع نسخة احتياطية</b>\n\n' +
+      'أرسل اسم الملف لعمل معاينة آمنة (بدون استرجاع فعلي).\n\n';
+
+    if (backups.length > 0) {
+      message += '<b>آخر النسخ:</b>\n';
+      backups.forEach((item, index) => {
+        message += `${index + 1}. <code>${item.filename}</code>\n`;
+      });
+    } else {
+      message += 'لا توجد نسخ احتياطية متاحة.';
+    }
+
+    ctx.session = ctx.session || {};
+    ctx.session.ownerAwait = { type: 'restorePreview' };
+
+    await ctx.answerCbQuery('✅');
+    await ctx.reply(message, { parse_mode: 'HTML' });
+  } catch (error) {
+    console.error('Owner restore prompt error:', error);
+    ctx.answerCbQuery('❌ حدث خطأ');
+  }
+});
+
+bot.action('owner:dbclean', async (ctx) => {
+  try {
+    if (!(await ensureOwner(ctx))) return;
+    const { User } = require('./database/models');
+    const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const now = new Date();
+
+    const notificationsCleanup = await User.updateMany(
+      {},
+      { $pull: { notificationsLog: { timestamp: { $lt: cutoff } } } }
+    );
+
+    const boostsCleanup = await User.updateMany(
+      {},
+      { $pull: { activeBoosts: { endDate: { $lt: now } } } }
+    );
+
+    const BackupSystem = require('./utils/backupSystem');
+    const backup = new BackupSystem();
+    const oldBackups = backup.deleteOldBackups(30);
+
+    const message =
+      '🧹 <b>نتيجة التنظيف</b>\n\n' +
+      `🔔 تنظيف سجل الإشعارات: ${notificationsCleanup.modifiedCount || 0} مستخدم\n` +
+      `⚡ تنظيف المعززات المنتهية: ${boostsCleanup.modifiedCount || 0} مستخدم\n` +
+      `💾 حذف النسخ القديمة: ${oldBackups.deleted || 0}`;
+
+    await ctx.answerCbQuery('✅ تم');
+    await ctx.reply(message, { parse_mode: 'HTML' });
+  } catch (error) {
+    console.error('Owner dbclean error:', error);
+    ctx.answerCbQuery('❌ حدث خطأ');
+  }
+});
+
+bot.action('owner:performance', async (ctx) => {
+  try {
+    if (!(await ensureOwner(ctx))) return;
+    const mongoose = require('mongoose');
+    const dbStats = await mongoose.connection.db.stats();
+    const mem = process.memoryUsage();
+    const cacheStats = global.cache?.getStats?.() || null;
+    const limiterStats = global.rateLimiter?.getStats?.() || null;
+
+    const message =
+      '⚡ <b>تقرير الأداء</b>\n\n' +
+      `🕒 Uptime: ${Math.floor(process.uptime() / 60)} دقيقة\n` +
+      `💾 Heap Used: ${(mem.heapUsed / 1024 / 1024).toFixed(2)} MB\n` +
+      `💾 Heap Total: ${(mem.heapTotal / 1024 / 1024).toFixed(2)} MB\n` +
+      `📦 RSS: ${(mem.rss / 1024 / 1024).toFixed(2)} MB\n` +
+      `🗄️ DB Size: ${(dbStats.dataSize / 1024 / 1024).toFixed(2)} MB\n` +
+      `📄 DB Objects: ${dbStats.objects}\n` +
+      `⚙️ Cache Keys: ${cacheStats?.keyCount || 0}\n` +
+      `🛡️ Blocked Users: ${limiterStats?.blockedUsers || 0}`;
+
+    const keyboard = Markup.inlineKeyboard([[Markup.button.callback('⬅️ رجوع', 'owner:database')]]);
+    await editOrReplyHtml(ctx, message, keyboard);
+  } catch (error) {
+    console.error('Owner performance error:', error);
+    ctx.answerCbQuery('❌ حدث خطأ');
+  }
+});
+
+bot.action('owner:query', async (ctx) => {
+  try {
+    if (!(await ensureOwner(ctx))) return;
+    ctx.session = ctx.session || {};
+    ctx.session.ownerAwait = { type: 'dbQuery' };
+    await ctx.answerCbQuery('✅');
+    await ctx.reply(
+      '🔍 أرسل صيغة الاستعلام:\n' +
+        '<code>collection limit</code>\n\n' +
+        'المتاح: users, transactions, games, content\n' +
+        'مثال: <code>users 5</code>',
+      { parse_mode: 'HTML' }
+    );
+  } catch (error) {
+    console.error('Owner query prompt error:', error);
+    ctx.answerCbQuery('❌ حدث خطأ');
+  }
+});
+
 // Owner - Banned Users List
 bot.action('owner:banned', async (ctx) => {
   try {
@@ -349,7 +910,7 @@ bot.action('owner:banned', async (ctx) => {
     }
 
     const { User } = require('./database/models');
-    const banned = await User.find({ banned: true }).limit(20);
+    const banned = await User.find(getBannedUsersQuery()).limit(20);
 
     let message = `🚫 <b>المستخدمون المحظورون (${banned.length})</b>\n\n`;
 
@@ -357,7 +918,7 @@ bot.action('owner:banned', async (ctx) => {
       message += 'لا يوجد مستخدمون محظورون حالياً';
     } else {
       banned.forEach((u, i) => {
-        message += `${i + 1}. ${u.firstName}\n`;
+        message += `${i + 1}. ${u.firstName || 'مستخدم'}\n`;
         message += `   ID: <code>${u.userId}</code>\n`;
         message += `   السبب: ${u.banReason || 'غير محدد'}\n\n`;
       });
@@ -548,9 +1109,14 @@ bot.action('owner:cleanup', async (ctx) => {
     const { User } = require('./database/models');
     // Users inactive for more than 90 days
     const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
-    const inactiveCount = await User.countDocuments({
-      lastActiveDay: { $lt: ninetyDaysAgo }
-    });
+    const inactivityQuery = {
+      $or: [
+        { lastActive: { $lt: ninetyDaysAgo } },
+        { updatedAt: { $lt: ninetyDaysAgo } },
+        { createdAt: { $lt: ninetyDaysAgo } }
+      ]
+    };
+    const inactiveCount = await User.countDocuments(inactivityQuery);
 
     const message =
       '🗑️ <b>تنظيف البيانات</b>\n\n' +
@@ -592,7 +1158,11 @@ bot.action('owner:cleanup:confirm', async (ctx) => {
     const { User } = require('./database/models');
     const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
     const result = await User.deleteMany({
-      lastActiveDay: { $lt: ninetyDaysAgo }
+      $or: [
+        { lastActive: { $lt: ninetyDaysAgo } },
+        { updatedAt: { $lt: ninetyDaysAgo } },
+        { createdAt: { $lt: ninetyDaysAgo } }
+      ]
     });
 
     await ctx.answerCbQuery(`✅ تم حذف ${result.deletedCount} مستخدم`);
@@ -1389,6 +1959,7 @@ bot.action('stats:games', (ctx) => MenuHandler.handleStatsGames(ctx));
 // --- BAN/UNBAN HANDLERS ---
 bot.action(/admin:ban:(\d+)/, async (ctx) => {
   try {
+    if (!(await ensureOwner(ctx))) return;
     const userId = parseInt(ctx.match[1]);
     const { User } = require('./database/models');
     const userToBan = await User.findOne({ userId });
@@ -1398,6 +1969,7 @@ bot.action(/admin:ban:(\d+)/, async (ctx) => {
     }
 
     userToBan.isBanned = true;
+    userToBan.banned = true;
     userToBan.bannedAt = new Date();
     userToBan.banReason = 'تم الحظر من قبل الإدارة';
     await userToBan.save();
@@ -1419,6 +1991,7 @@ bot.action(/admin:ban:(\d+)/, async (ctx) => {
 
 bot.action(/admin:unban:(\d+)/, async (ctx) => {
   try {
+    if (!(await ensureOwner(ctx))) return;
     const userId = parseInt(ctx.match[1]);
     const { User } = require('./database/models');
     const userToUnban = await User.findOne({ userId });
@@ -1428,6 +2001,7 @@ bot.action(/admin:unban:(\d+)/, async (ctx) => {
     }
 
     userToUnban.isBanned = false;
+    userToUnban.banned = false;
     userToUnban.bannedAt = null;
     userToUnban.banReason = null;
     await userToUnban.save();
@@ -2618,7 +3192,10 @@ bot.on('text', async (ctx) => {
             foundUser = await User.findOne({ userId: parseInt(message.trim()) });
           } else {
             // Search by name
-            foundUser = await User.findOne({ firstName: new RegExp(message.trim(), 'i') });
+            const searchRegex = new RegExp(escapeRegex(message.trim()), 'i');
+            foundUser = await User.findOne({
+              $or: [{ firstName: searchRegex }, { username: searchRegex }]
+            });
           }
 
           ctx.session.adminAwait = null;
@@ -2629,18 +3206,19 @@ bot.on('text', async (ctx) => {
 
           const userInfo =
             '👤 <b>معلومات المستخدم</b>\n\n' +
-            `👤 الاسم: ${foundUser.firstName}\n` +
+            `👤 الاسم: ${escapeHtml(foundUser.firstName || 'مستخدم')}\n` +
             `🆔 ID: ${foundUser.userId}\n` +
             `⭐ النقاط: ${foundUser.xp || 0}\n` +
             `🎖️ المستوى: ${foundUser.level || 1}\n` +
             `💰 العملات: ${foundUser.coins || 0}\n` +
+            `🚫 الحالة: ${foundUser.isBanned || foundUser.banned ? 'محظور' : 'نشط'}\n` +
             `📅 تاريخ الانضمام: ${new Date(foundUser.joinDate).toLocaleDateString('ar')}`;
 
-          const buttons = Markup.inlineKeyboard(
-            [Markup.button.callback('🚫 حظر', `admin:ban:${  foundUser.userId}`)],
-            [Markup.button.callback('✅ السماح', `admin:unban:${  foundUser.userId}`)],
+          const buttons = Markup.inlineKeyboard([
+            [Markup.button.callback('🚫 حظر', `admin:ban:${foundUser.userId}`)],
+            [Markup.button.callback('✅ السماح', `admin:unban:${foundUser.userId}`)],
             [Markup.button.callback('⬅️ رجوع', 'settings:users')]
-          );
+          ]);
 
           return ctx.reply(userInfo, { parse_mode: 'HTML', reply_markup: buttons.reply_markup });
         }
@@ -2652,7 +3230,7 @@ bot.on('text', async (ctx) => {
             return ctx.reply('❌ تم الإلغاء');
           }
 
-          const allUsers = await User.find({ banned: false });
+          const allUsers = await User.find(getActiveUsersQuery());
           let sent = 0;
           let failed = 0;
 
@@ -2684,7 +3262,7 @@ bot.on('text', async (ctx) => {
     // Handle owner awaiting input
     if (ctx.session && ctx.session.ownerAwait) {
       const awaiting = ctx.session.ownerAwait;
-      const { User } = require('./database/models');
+      const { User, Transaction, GameStats, Content } = require('./database/models');
       const UIManager = require('./ui/keyboards');
 
       if (!UIManager.isOwner(ctx.from.id)) {
@@ -2693,13 +3271,15 @@ bot.on('text', async (ctx) => {
       }
 
       try {
-        if (awaiting.type === 'broadcast') {
-          if (message.toLowerCase() === '/cancel') {
-            ctx.session.ownerAwait = null;
-            return ctx.reply('❌ تم الإلغاء');
-          }
+        const input = message.trim();
 
-          const allUsers = await User.find({ banned: false });
+        if (isCancelInput(input)) {
+          ctx.session.ownerAwait = null;
+          return ctx.reply('❌ تم الإلغاء');
+        }
+
+        if (awaiting.type === 'broadcast') {
+          const allUsers = await User.find(getActiveUsersQuery());
           let sent = 0;
           let failed = 0;
 
@@ -2716,7 +3296,6 @@ bot.on('text', async (ctx) => {
             } catch (e) {
               failed++;
             }
-            // Small delay to avoid rate limiting
             await new Promise((resolve) => setTimeout(resolve, 100));
           }
 
@@ -2727,20 +3306,15 @@ bot.on('text', async (ctx) => {
         }
 
         if (awaiting.type === 'givecoins') {
-          if (message.toLowerCase() === '/cancel') {
-            ctx.session.ownerAwait = null;
-            return ctx.reply('❌ تم الإلغاء');
-          }
-
-          const parts = message.trim().split(/\s+/);
+          const parts = input.split(/\s+/);
           if (parts.length !== 2) {
             return ctx.reply('❌ الصيغة غير صحيحة\nأرسل: ID المبلغ\nمثال: 123456789 1000');
           }
 
-          const userId = parseInt(parts[0]);
-          const amount = parseInt(parts[1]);
+          const userId = parsePositiveInt(parts[0]);
+          const amount = parsePositiveInt(parts[1]);
 
-          if (isNaN(userId) || isNaN(amount) || amount <= 0) {
+          if (!userId || !amount) {
             return ctx.reply('❌ القيم غير صحيحة');
           }
 
@@ -2749,13 +3323,12 @@ bot.on('text', async (ctx) => {
             return ctx.reply('❌ لم يتم العثور على المستخدم');
           }
 
-          targetUser.coins += amount;
-          targetUser.totalEarnings += amount;
+          targetUser.coins = (targetUser.coins || 0) + amount;
+          targetUser.totalEarnings = (targetUser.totalEarnings || 0) + amount;
           await targetUser.save();
 
           ctx.session.ownerAwait = null;
 
-          // Notify the user
           try {
             await ctx.telegram.sendMessage(
               userId,
@@ -2770,7 +3343,7 @@ bot.on('text', async (ctx) => {
 
           return ctx.reply(
             '✅ تم بنجاح\n' +
-              `المستخدم: ${targetUser.firstName}\n` +
+              `المستخدم: ${escapeHtml(targetUser.firstName || 'مستخدم')}\n` +
               `المبلغ: ${amount} عملة\n` +
               `الرصيد الجديد: ${targetUser.coins} عملة`,
             { parse_mode: 'HTML' }
@@ -2778,28 +3351,22 @@ bot.on('text', async (ctx) => {
         }
 
         if (awaiting.type === 'rewardall') {
-          if (message.toLowerCase() === '/cancel') {
-            ctx.session.ownerAwait = null;
-            return ctx.reply('❌ تم الإلغاء');
-          }
-
-          const amount = parseInt(message.trim());
-          if (isNaN(amount) || amount <= 0) {
+          const amount = parsePositiveInt(input);
+          if (!amount) {
             return ctx.reply('❌ المبلغ غير صحيح');
           }
 
-          const allUsers = await User.find({ banned: false });
+          const allUsers = await User.find(getActiveUsersQuery());
           let updated = 0;
 
           await ctx.reply(`⏳ جاري توزيع ${amount} عملة لـ ${allUsers.length} مستخدم...`);
 
           for (const user of allUsers) {
-            user.coins += amount;
-            user.totalEarnings += amount;
+            user.coins = (user.coins || 0) + amount;
+            user.totalEarnings = (user.totalEarnings || 0) + amount;
             await user.save();
             updated++;
 
-            // Notify user
             try {
               await ctx.telegram.sendMessage(
                 user.userId,
@@ -2812,7 +3379,6 @@ bot.on('text', async (ctx) => {
               // User blocked bot
             }
 
-            // Small delay
             await new Promise((resolve) => setTimeout(resolve, 100));
           }
 
@@ -2825,6 +3391,328 @@ bot.on('text', async (ctx) => {
             { parse_mode: 'HTML' }
           );
         }
+
+        if (awaiting.type === 'searchUser') {
+          let foundUser = null;
+          const numericId = parsePositiveInt(input);
+          if (numericId) {
+            foundUser = await User.findOne({ userId: numericId });
+          } else {
+            const searchRegex = new RegExp(escapeRegex(input), 'i');
+            foundUser = await User.findOne({
+              $or: [{ firstName: searchRegex }, { username: searchRegex }]
+            });
+          }
+
+          ctx.session.ownerAwait = null;
+
+          if (!foundUser) {
+            return ctx.reply('❌ لم يتم العثور على المستخدم');
+          }
+
+          const isBanned = Boolean(foundUser.isBanned || foundUser.banned);
+          const joinDate = foundUser.joinDate || foundUser.createdAt || new Date();
+
+          const messageText =
+            '👤 <b>نتيجة البحث</b>\n\n' +
+            `👤 الاسم: ${escapeHtml(foundUser.firstName || 'مستخدم')}\n` +
+            `📛 اليوزر: ${escapeHtml(foundUser.username || 'بدون')}\n` +
+            `🆔 ID: <code>${foundUser.userId}</code>\n` +
+            `💰 العملات: ${foundUser.coins || 0}\n` +
+            `⭐ XP: ${foundUser.xp || 0}\n` +
+            `🎖️ المستوى: ${foundUser.level || 1}\n` +
+            `🚫 الحالة: ${isBanned ? 'محظور' : 'نشط'}\n` +
+            `📅 الانضمام: ${new Date(joinDate).toLocaleDateString('ar')}`;
+
+          const keyboard = Markup.inlineKeyboard([
+            [
+              isBanned
+                ? Markup.button.callback('✅ إلغاء الحظر', `admin:unban:${foundUser.userId}`)
+                : Markup.button.callback('🚫 حظر المستخدم', `admin:ban:${foundUser.userId}`)
+            ],
+            [Markup.button.callback('⬅️ رجوع', 'owner:users')]
+          ]);
+
+          return ctx.reply(messageText, {
+            parse_mode: 'HTML',
+            reply_markup: keyboard.reply_markup
+          });
+        }
+
+        if (awaiting.type === 'banUser') {
+          const parts = input.split(/\s+/);
+          const userId = parsePositiveInt(parts[0]);
+          const reason = parts.slice(1).join(' ').trim() || 'تم الحظر من قبل المالك';
+
+          if (!userId) {
+            return ctx.reply('❌ الصيغة غير صحيحة. أرسل: ID سبب_اختياري');
+          }
+
+          const targetUser = await User.findOne({ userId });
+          if (!targetUser) {
+            return ctx.reply('❌ لم يتم العثور على المستخدم');
+          }
+
+          targetUser.isBanned = true;
+          targetUser.banned = true;
+          targetUser.bannedAt = new Date();
+          targetUser.banReason = reason;
+          await targetUser.save();
+
+          ctx.session.ownerAwait = null;
+
+          try {
+            await ctx.telegram.sendMessage(
+              targetUser.userId,
+              `🚫 <b>تم حظرك من البوت</b>\n\nالسبب: ${escapeHtml(reason)}`,
+              { parse_mode: 'HTML' }
+            );
+          } catch (e) {
+            // User blocked bot
+          }
+
+          return ctx.reply(
+            `✅ تم حظر المستخدم <b>${escapeHtml(targetUser.firstName || 'مستخدم')}</b> بنجاح.`,
+            { parse_mode: 'HTML' }
+          );
+        }
+
+        if (awaiting.type === 'unbanUser') {
+          const userId = parsePositiveInt(input);
+          if (!userId) {
+            return ctx.reply('❌ الصيغة غير صحيحة. أرسل ID المستخدم.');
+          }
+
+          const targetUser = await User.findOne({ userId });
+          if (!targetUser) {
+            return ctx.reply('❌ لم يتم العثور على المستخدم');
+          }
+
+          targetUser.isBanned = false;
+          targetUser.banned = false;
+          targetUser.bannedAt = null;
+          targetUser.banReason = null;
+          await targetUser.save();
+
+          ctx.session.ownerAwait = null;
+          return ctx.reply(
+            `✅ تم إلغاء حظر المستخدم <b>${escapeHtml(targetUser.firstName || 'مستخدم')}</b>.`,
+            { parse_mode: 'HTML' }
+          );
+        }
+
+        if (awaiting.type === 'giveXp') {
+          const parts = input.split(/\s+/);
+          if (parts.length !== 2) {
+            return ctx.reply('❌ الصيغة غير صحيحة. أرسل: ID المبلغ');
+          }
+
+          const userId = parsePositiveInt(parts[0]);
+          const amount = parsePositiveInt(parts[1]);
+          if (!userId || !amount) {
+            return ctx.reply('❌ القيم غير صحيحة');
+          }
+
+          const targetUser = await User.findOne({ userId });
+          if (!targetUser) {
+            return ctx.reply('❌ لم يتم العثور على المستخدم');
+          }
+
+          targetUser.xp = (targetUser.xp || 0) + amount;
+          targetUser.level = Math.max(targetUser.level || 1, Math.floor((targetUser.xp || 0) / 100) + 1);
+          await targetUser.save();
+
+          ctx.session.ownerAwait = null;
+          return ctx.reply(
+            '✅ تم إضافة XP بنجاح\n' +
+              `👤 المستخدم: ${escapeHtml(targetUser.firstName || 'مستخدم')}\n` +
+              `⭐ المضاف: ${amount}\n` +
+              `📈 XP الحالي: ${targetUser.xp}`,
+            { parse_mode: 'HTML' }
+          );
+        }
+
+        if (awaiting.type === 'resetUser') {
+          const userId = parsePositiveInt(input);
+          if (!userId) {
+            return ctx.reply('❌ الصيغة غير صحيحة. أرسل ID المستخدم.');
+          }
+
+          const targetUser = await User.findOne({ userId });
+          if (!targetUser) {
+            return ctx.reply('❌ لم يتم العثور على المستخدم');
+          }
+
+          targetUser.level = 1;
+          targetUser.xp = 0;
+          targetUser.coins = 100;
+          targetUser.totalEarnings = 100;
+          targetUser.totalSpending = 0;
+          targetUser.dailyReward = { streak: 0 };
+          targetUser.gamesPlayed = { total: 0, wins: 0 };
+          targetUser.inventory = [];
+          targetUser.activeBoosts = [];
+          targetUser.badges = [];
+          targetUser.badgeDetails = [];
+          targetUser.achievements = [];
+          targetUser.savedKhatmas = [];
+          targetUser.notificationsLog = [];
+          targetUser.transfersCount = 0;
+          targetUser.receivedTransfers = 0;
+          targetUser.totalTransferred = 0;
+          targetUser.totalReceived = 0;
+          targetUser.banned = false;
+          targetUser.isBanned = false;
+          targetUser.banReason = null;
+          targetUser.bannedAt = null;
+          await targetUser.save();
+
+          ctx.session.ownerAwait = null;
+          return ctx.reply(
+            `✅ تم إعادة تعيين بيانات المستخدم <b>${escapeHtml(targetUser.firstName || 'مستخدم')}</b>.`,
+            { parse_mode: 'HTML' }
+          );
+        }
+
+        if (awaiting.type === 'deleteUser') {
+          const parts = input.split(/\s+/);
+          const userId = parsePositiveInt(parts[0]);
+          const confirm = (parts[1] || '').toUpperCase();
+
+          if (!userId || confirm !== 'CONFIRM') {
+            return ctx.reply('❌ الصيغة غير صحيحة. أرسل: ID CONFIRM');
+          }
+
+          const deleted = await User.findOneAndDelete({ userId });
+          if (!deleted) {
+            return ctx.reply('❌ لم يتم العثور على المستخدم');
+          }
+
+          ctx.session.ownerAwait = null;
+          return ctx.reply(`✅ تم حذف المستخدم <code>${userId}</code> نهائياً.`, {
+            parse_mode: 'HTML'
+          });
+        }
+
+        if (awaiting.type === 'taxall') {
+          const amount = parsePositiveInt(input);
+          if (!amount) {
+            return ctx.reply('❌ قيمة الخصم غير صحيحة');
+          }
+
+          const allUsers = await User.find(getActiveUsersQuery());
+          let affected = 0;
+          let totalDeducted = 0;
+
+          for (const user of allUsers) {
+            const currentCoins = Math.max(user.coins || 0, 0);
+            const deduction = Math.min(currentCoins, amount);
+            if (deduction <= 0) continue;
+
+            user.coins = currentCoins - deduction;
+            user.totalSpending = (user.totalSpending || 0) + deduction;
+            await user.save();
+            affected++;
+            totalDeducted += deduction;
+          }
+
+          ctx.session.ownerAwait = null;
+          return ctx.reply(
+            '✅ تم تنفيذ الخصم الجماعي\n' +
+              `👥 المستخدمون المتأثرون: ${affected}\n` +
+              `💸 مجموع المخصوم: ${totalDeducted}`,
+            { parse_mode: 'HTML' }
+          );
+        }
+
+        if (awaiting.type === 'restorePreview') {
+          const BackupSystem = require('./utils/backupSystem');
+          const backup = new BackupSystem();
+          const result = await backup.restoreFromBackup(input, { dryRun: true });
+
+          if (!result.success) {
+            return ctx.reply(`❌ فشل قراءة النسخة الاحتياطية: ${escapeHtml(result.error || 'خطأ غير معروف')}`, {
+              parse_mode: 'HTML'
+            });
+          }
+
+          ctx.session.ownerAwait = null;
+
+          const stats = result.statistics || {};
+          return ctx.reply(
+            '🔎 <b>معاينة النسخة الاحتياطية</b>\n\n' +
+              `✅ الحالة: ${escapeHtml(result.message || 'جاهزة')}\n` +
+              `👥 المستخدمون: ${stats.totalUsers || stats.users || 0}\n` +
+              `💬 المجموعات: ${stats.totalGroups || stats.groups || 0}\n` +
+              `🧾 المعاملات: ${stats.totalTransactions || stats.transactions || 0}\n` +
+              `🎮 الألعاب: ${stats.totalGameStats || stats.gameStats || 0}`,
+            { parse_mode: 'HTML' }
+          );
+        }
+
+        if (awaiting.type === 'dbQuery') {
+          const [collectionInput, limitInput] = input.split(/\s+/);
+          const collection = (collectionInput || '').toLowerCase();
+          const limit = Math.max(1, Math.min(parsePositiveInt(limitInput) || 5, 20));
+
+          const queryMap = {
+            users: {
+              model: User,
+              title: 'المستخدمون',
+              formatter: (doc) =>
+                `👤 ${escapeHtml(doc.firstName || 'مستخدم')} | ID: <code>${doc.userId}</code>\n` +
+                `💰 ${doc.coins || 0} | ⭐ ${doc.xp || 0} | 🚫 ${doc.isBanned || doc.banned ? 'محظور' : 'نشط'}`
+            },
+            transactions: {
+              model: Transaction,
+              title: 'المعاملات',
+              formatter: (doc) =>
+                `🧾 <code>${doc._id}</code>\n` +
+                `👤 ${doc.userId} | النوع: ${escapeHtml(doc.type)} | المبلغ: ${doc.amount}\n` +
+                `📅 ${new Date(doc.createdAt || Date.now()).toLocaleString('ar')}`
+            },
+            games: {
+              model: GameStats,
+              title: 'إحصائيات الألعاب',
+              formatter: (doc) =>
+                `🎮 ${escapeHtml(doc.gameName || 'غير معروف')} | ID: <code>${doc.userId}</code>\n` +
+                `▶️ ${doc.played || 0} | 🏆 ${doc.won || 0} | 💥 ${doc.lost || 0}`
+            },
+            content: {
+              model: Content,
+              title: 'المحتوى',
+              formatter: (doc) =>
+                `📚 ${escapeHtml(doc.contentType || 'غير معروف')}\n` +
+                `🏷️ ${escapeHtml(doc.category || 'بدون')} | ✅ ${doc.isActive ? 'نشط' : 'متوقف'}\n` +
+                `<code>${doc._id}</code>`
+            }
+          };
+
+          const queryConfig = queryMap[collection];
+          if (!queryConfig) {
+            return ctx.reply(
+              '❌ مجموعة غير مدعومة.\nاستخدم: users أو transactions أو games أو content'
+            );
+          }
+
+          const docs = await queryConfig.model.find({}).sort({ createdAt: -1 }).limit(limit).lean();
+          ctx.session.ownerAwait = null;
+
+          if (docs.length === 0) {
+            return ctx.reply(`ℹ️ لا توجد بيانات في مجموعة ${queryConfig.title}.`);
+          }
+
+          let response = `🔍 <b>نتيجة الاستعلام: ${queryConfig.title}</b>\n`;
+          response += `📦 العدد: ${docs.length}\n\n`;
+          docs.forEach((doc, index) => {
+            response += `<b>${index + 1})</b>\n${queryConfig.formatter(doc)}\n\n`;
+          });
+
+          return ctx.reply(response.trim(), { parse_mode: 'HTML' });
+        }
+
+        ctx.session.ownerAwait = null;
+        return ctx.reply('❌ نوع العملية غير معروف. أعد المحاولة من لوحة المالك.');
       } catch (err) {
         console.error('Error handling ownerAwait input:', err);
         ctx.session.ownerAwait = null;
