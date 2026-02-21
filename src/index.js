@@ -1316,6 +1316,7 @@ bot.action('owner:cleanup:confirm', async (ctx) => {
 // --- MENU CALLBACKS ---
 bot.action(/^group:mcq:([a-z0-9]+):(\d+)$/i, (ctx) => GroupGamesHandler.handleMcqCallback(ctx, ctx.match[1], ctx.match[2]));
 bot.action(/^group:vote:([a-z0-9]+):(\d+)$/i, (ctx) => GroupGamesHandler.handleVoteCallback(ctx, ctx.match[1], ctx.match[2]));
+bot.action(/^group:games:(gquiz|gmath|gword|gdaily|gmcq|gvote|gleader|gweekly)$/i, (ctx) => GroupGamesHandler.handleGamesMenuAction(ctx, ctx.match[1].toLowerCase()));
 bot.action(/^group:.+$/, (ctx) => GroupAdminHandler.handleGroupCallback(ctx));
 bot.action('menu:main', (ctx) => MenuHandler.handleMainMenu(ctx));
 bot.action('menu:khatma', (ctx) => MenuHandler.handleKhatmaMenu(ctx));

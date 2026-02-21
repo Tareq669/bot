@@ -134,6 +134,23 @@ class GroupGamesHandler {
     return parts.slice(1);
   }
 
+  static parseDifficulty(arg) {
+    const x = String(arg || '').toLowerCase();
+    if (['easy', 'سهل'].includes(x)) return 'easy';
+    if (['medium', 'متوسط'].includes(x)) return 'medium';
+    if (['hard', 'صعب'].includes(x)) return 'hard';
+    return null;
+  }
+
+  static questionMatchesDifficulty(question, difficulty) {
+    if (!difficulty) return true;
+    const reward = Number(question?.reward || 0);
+    if (difficulty === 'easy') return reward <= 7;
+    if (difficulty === 'medium') return reward >= 8 && reward <= 9;
+    if (difficulty === 'hard') return reward >= 10;
+    return true;
+  }
+
   static async ensureGroupRecord(ctx) {
     const groupId = String(ctx.chat.id);
     const groupTitle = ctx.chat.title || 'Unknown Group';
@@ -256,8 +273,9 @@ class GroupGamesHandler {
     return { type: 'daily', prompt: `🧠 <b>التحدي اليومي</b>\n\n${daily.question}`, answers: daily.answers, reward: daily.reward, timeoutSec: 120 };
   }
 
-  static buildQuizRound() {
-    const quiz = this.pickRandom(QUICK_QUESTIONS);
+  static buildQuizRound(difficulty = null) {
+    const pool = QUICK_QUESTIONS.filter((q) => this.questionMatchesDifficulty(q, difficulty));
+    const quiz = this.pickRandom(pool.length > 0 ? pool : QUICK_QUESTIONS);
     return { type: 'quiz', prompt: `❓ <b>سؤال سريع</b>\n\n${quiz.question}`, answers: quiz.answers, reward: quiz.reward, timeoutSec: 30 };
   }
 
@@ -461,7 +479,9 @@ class GroupGamesHandler {
     if (!this.isGroupChat(ctx)) return;
     const status = await this.canStartRound(ctx);
     if (!status.ok) return;
-    const round = this.buildQuizRound();
+    const args = this.parseCommandArgs(ctx);
+    const difficulty = this.parseDifficulty(args[0]);
+    const round = this.buildQuizRound(difficulty);
     round.timeoutSec = Math.max(10, status.group.gameSystem.settings.questionTimeoutSec || 25);
     await this.startRoundInternal(ctx.chat.id, round, false);
   }
@@ -499,8 +519,10 @@ class GroupGamesHandler {
     if (!this.isGroupChat(ctx)) return;
     const status = await this.canStartRound(ctx);
     if (!status.ok) return;
-
-    const question = this.pickRandom(MCQ_QUESTIONS);
+    const args = this.parseCommandArgs(ctx);
+    const difficulty = this.parseDifficulty(args[0]);
+    const pool = MCQ_QUESTIONS.filter((q) => this.questionMatchesDifficulty(q, difficulty));
+    const question = this.pickRandom(pool.length > 0 ? pool : MCQ_QUESTIONS);
     const token = this.token('m');
     const chatId = String(ctx.chat.id);
     const timeoutSec = 35;
@@ -554,10 +576,15 @@ class GroupGamesHandler {
     if (!text.includes('|')) return null;
     const parts = text.split('|').map((x) => x.trim()).filter(Boolean);
     if (parts.length < 3) return null;
-    const question = parts[0].replace(/^\/gvote\s*/i, '').trim();
-    const options = parts.slice(1, 6);
+    const head = parts[0].replace(/^\/gvote\s*/i, '').trim();
+    const sec = parseInt(head, 10);
+    const hasDuration = Number.isInteger(sec) && sec >= 20 && sec <= 600;
+    const durationSec = hasDuration ? sec : 90;
+    const question = hasDuration ? parts[1] : head;
+    const optionStart = hasDuration ? 2 : 1;
+    const options = parts.slice(optionStart, optionStart + 5);
     if (!question || options.length < 2) return null;
-    return { question, options };
+    return { question, options, durationSec };
   }
 
   static buildVoteKeyboard(session) {
@@ -569,10 +596,17 @@ class GroupGamesHandler {
     if (!this.isGroupChat(ctx)) return;
     const argsRaw = (ctx.message?.text || '').trim();
     let payload = this.parseVoteCommand(argsRaw);
-    if (!payload) payload = this.pickRandom(DEFAULT_VOTE_TOPICS);
+    if (!payload) {
+      const base = this.pickRandom(DEFAULT_VOTE_TOPICS);
+      payload = { ...base, durationSec: 90 };
+    }
 
     const oldToken = this.activeVoteByChat.get(String(ctx.chat.id));
-    if (oldToken) this.activeVotes.delete(oldToken);
+    if (oldToken) {
+      const oldSession = this.activeVotes.get(oldToken);
+      if (oldSession?.timer) clearTimeout(oldSession.timer);
+      this.activeVotes.delete(oldToken);
+    }
 
     const token = this.token('v');
     const session = {
@@ -581,17 +615,52 @@ class GroupGamesHandler {
       question: payload.question,
       options: payload.options,
       votes: {},
-      counts: Array(payload.options.length).fill(0)
+      counts: Array(payload.options.length).fill(0),
+      durationSec: payload.durationSec || 90,
+      messageId: null,
+      timer: null
     };
 
     this.activeVotes.set(token, session);
     this.activeVoteByChat.set(String(ctx.chat.id), token);
 
     const keyboard = this.buildVoteKeyboard(session);
-    await ctx.reply(`🗳️ <b>${session.question}</b>\n\nصيغة مخصصة: /gvote السؤال | خيار1 | خيار2 | خيار3`, {
+    const sent = await ctx.reply(`🗳️ <b>${session.question}</b>\n\n⏱️ مدة التصويت: ${session.durationSec} ثانية\nصيغة مخصصة: /gvote 120 | السؤال | خيار1 | خيار2 | خيار3`, {
       parse_mode: 'HTML',
       reply_markup: keyboard.reply_markup
     });
+    session.messageId = sent.message_id;
+    session.timer = setTimeout(async () => {
+      await this.finalizeVote(session.token);
+    }, session.durationSec * 1000);
+  }
+
+  static async finalizeVote(token) {
+    const session = this.activeVotes.get(token);
+    if (!session) return;
+    this.activeVotes.delete(token);
+    if (this.activeVoteByChat.get(String(session.chatId)) === token) {
+      this.activeVoteByChat.delete(String(session.chatId));
+    }
+    if (session.timer) clearTimeout(session.timer);
+
+    const result = session.options.map((opt, idx) => ({ opt, count: session.counts[idx] || 0 }))
+      .sort((a, b) => b.count - a.count);
+    const winner = result[0];
+    let message = `🧾 <b>انتهى التصويت</b>\n\nالسؤال: ${session.question}\n`;
+    if (!winner || winner.count === 0) {
+      message += '\nلا توجد أصوات مسجلة.';
+    } else {
+      message += `\n🏆 الخيار الفائز: <b>${winner.opt}</b> (${winner.count} صوت)\n\n`;
+      result.forEach((r, i) => {
+        message += `${i + 1}. ${r.opt} — ${r.count}\n`;
+      });
+    }
+
+    await this.bot.telegram.sendMessage(Number(session.chatId), message, {
+      parse_mode: 'HTML',
+      reply_to_message_id: session.messageId || undefined
+    }).catch(() => {});
   }
 
   static async handleVoteCallback(ctx, token, index) {
@@ -775,8 +844,33 @@ class GroupGamesHandler {
     return ctx.reply('❌ صيغة غير صحيحة. استخدم /gtour status|start|end|rewards');
   }
 
+  static async handleGamesMenuAction(ctx, action) {
+    if (!this.isGroupChat(ctx)) return;
+    if (ctx.callbackQuery) {
+      await ctx.answerCbQuery().catch(() => {});
+      const fakeText = `/${action}`;
+      ctx.message = { ...(ctx.callbackQuery.message || {}), text: fakeText };
+    }
+
+    if (action === 'gquiz') return this.handleQuizCommand(ctx);
+    if (action === 'gmath') return this.handleMathCommand(ctx);
+    if (action === 'gword') return this.handleWordCommand(ctx);
+    if (action === 'gdaily') return this.handleDailyCommand(ctx);
+    if (action === 'gmcq') return this.handleMcqCommand(ctx);
+    if (action === 'gvote') return this.handleVoteCommand(ctx);
+    if (action === 'gleader') return this.handleLeaderCommand(ctx);
+    if (action === 'gweekly') return this.handleWeeklyCommand(ctx);
+    return null;
+  }
+
   static async handleGamesHelp(ctx) {
     if (!this.isGroupChat(ctx)) return;
+    const keyboard = Markup.inlineKeyboard([
+      [Markup.button.callback('❓ سؤال سريع', 'group:games:gquiz'), Markup.button.callback('🗳️ اختيارات', 'group:games:gmcq')],
+      [Markup.button.callback('➗ حساب ذهني', 'group:games:gmath'), Markup.button.callback('🔤 ترتيب كلمة', 'group:games:gword')],
+      [Markup.button.callback('🧠 تحدي يومي', 'group:games:gdaily'), Markup.button.callback('📊 تصويت', 'group:games:gvote')],
+      [Markup.button.callback('🏁 المتصدرين', 'group:games:gleader'), Markup.button.callback('📅 سباق الأسبوع', 'group:games:gweekly')]
+    ]);
     return ctx.reply(
       '🎮 <b>ألعاب الجروب التفاعلية</b>\n\n' +
       '• /gquiz سؤال سريع\n' +
@@ -784,15 +878,18 @@ class GroupGamesHandler {
       '• /gword ترتيب كلمة\n' +
       '• /gdaily تحدي يومي\n' +
       '• /gmcq سؤال اختيارات بأزرار\n' +
-      '• /gvote تصويت تفاعلي\n' +
+      '• /gvote تصويت تفاعلي (مؤقت)\n' +
+      'صيغة مخصصة: <code>/gvote 120 | السؤال | خيار1 | خيار2 | خيار3</code>\n' +
       '• /gleader لوحة المتصدرين\n' +
       '• /gweekly سباق الأسبوع\n' +
       '• /ggame إعدادات نظام الألعاب (للمشرفين)\n' +
       '• /gteam إدارة فريقك\n' +
       '• /gteams ترتيب الفرق\n' +
       '• /gtour إدارة البطولة الأسبوعية (للمشرفين)\n\n' +
+      'مستويات الصعوبة: <code>/gquiz easy</code> | <code>/gquiz medium</code> | <code>/gquiz hard</code>\n' +
+      '<code>/gmcq easy</code> | <code>/gmcq medium</code> | <code>/gmcq hard</code>\n\n' +
       'نظام الستريك: كل 3 فوز متتالي = بونص نقاط 🔥',
-      { parse_mode: 'HTML' }
+      { parse_mode: 'HTML', reply_markup: keyboard.reply_markup }
     );
   }
 }
