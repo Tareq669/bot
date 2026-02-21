@@ -80,6 +80,7 @@ class GroupGamesHandler {
   static activeMcq = new Map();
   static activeVotes = new Map();
   static activeVoteByChat = new Map();
+  static lastQuestionByGroup = new Map();
 
   static isGroupChat(ctx) {
     return GROUP_TYPES.has(ctx?.chat?.type);
@@ -126,6 +127,25 @@ class GroupGamesHandler {
 
   static pickRandom(items) {
     return items[Math.floor(Math.random() * items.length)];
+  }
+
+  static shuffleArray(items) {
+    const copy = [...items];
+    for (let i = copy.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+    return copy;
+  }
+
+  static pickNonRepeating(items, key) {
+    if (!Array.isArray(items) || items.length === 0) return null;
+    if (items.length === 1) return items[0];
+    const last = this.lastQuestionByGroup.get(key);
+    const pool = items.filter((q) => (q.question || q.prompt || JSON.stringify(q)) !== last);
+    const picked = this.pickRandom(pool.length > 0 ? pool : items);
+    this.lastQuestionByGroup.set(key, picked.question || picked.prompt || JSON.stringify(picked));
+    return picked;
   }
 
   static parseCommandArgs(ctx) {
@@ -224,7 +244,7 @@ class GroupGamesHandler {
       const lastAutoAt = group.gameSystem.state.lastAutoAt ? new Date(group.gameSystem.state.lastAutoAt).getTime() : 0;
       if (Date.now() - lastAutoAt < intervalMinutes * 60 * 1000) continue;
 
-      const base = this.pickRandom(QUICK_QUESTIONS);
+      const base = this.pickNonRepeating(QUICK_QUESTIONS, `auto:${groupId}`);
       await this.startRoundInternal(Number(group.groupId), {
         type: 'quiz',
         prompt: `⚡ <b>سؤال تلقائي</b>\n\n${base.question}`,
@@ -273,9 +293,11 @@ class GroupGamesHandler {
     return { type: 'daily', prompt: `🧠 <b>التحدي اليومي</b>\n\n${daily.question}`, answers: daily.answers, reward: daily.reward, timeoutSec: 120 };
   }
 
-  static buildQuizRound(difficulty = null) {
+  static buildQuizRound(difficulty = null, groupId = null) {
     const pool = QUICK_QUESTIONS.filter((q) => this.questionMatchesDifficulty(q, difficulty));
-    const quiz = this.pickRandom(pool.length > 0 ? pool : QUICK_QUESTIONS);
+    const effectivePool = pool.length > 0 ? pool : QUICK_QUESTIONS;
+    const key = `quiz:${String(groupId || 'global')}`;
+    const quiz = this.pickNonRepeating(effectivePool, key);
     return { type: 'quiz', prompt: `❓ <b>سؤال سريع</b>\n\n${quiz.question}`, answers: quiz.answers, reward: quiz.reward, timeoutSec: 30 };
   }
 
@@ -481,7 +503,7 @@ class GroupGamesHandler {
     if (!status.ok) return;
     const args = this.parseCommandArgs(ctx);
     const difficulty = this.parseDifficulty(args[0]);
-    const round = this.buildQuizRound(difficulty);
+    const round = this.buildQuizRound(difficulty, ctx.chat.id);
     round.timeoutSec = Math.max(10, status.group.gameSystem.settings.questionTimeoutSec || 25);
     await this.startRoundInternal(ctx.chat.id, round, false);
   }
@@ -522,14 +544,16 @@ class GroupGamesHandler {
     const args = this.parseCommandArgs(ctx);
     const difficulty = this.parseDifficulty(args[0]);
     const pool = MCQ_QUESTIONS.filter((q) => this.questionMatchesDifficulty(q, difficulty));
-    const question = this.pickRandom(pool.length > 0 ? pool : MCQ_QUESTIONS);
+    const source = pool.length > 0 ? pool : MCQ_QUESTIONS;
+    const question = this.pickNonRepeating(source, `mcq:${String(ctx.chat.id)}`);
+    const shuffled = this.shuffleArray(question.options.map((opt, idx) => ({ opt, original: idx })));
+    const newAnswerIndex = shuffled.findIndex((x) => x.original === question.answerIndex);
+    const shuffledOptions = shuffled.map((x) => x.opt);
     const token = this.token('m');
     const chatId = String(ctx.chat.id);
     const timeoutSec = 35;
 
-    const keyboard = Markup.inlineKeyboard(
-      question.options.map((opt, idx) => [Markup.button.callback(opt, `group:mcq:${token}:${idx}`)])
-    );
+    const keyboard = Markup.inlineKeyboard(shuffledOptions.map((opt, idx) => [Markup.button.callback(opt, `group:mcq:${token}:${idx}`)]));
 
     const sent = await ctx.reply(
       `🗳️ <b>سؤال اختيارات</b>\n\n${question.question}\n\n⏱️ ${timeoutSec} ثانية | 💰 ${question.reward} نقطة`,
@@ -542,12 +566,12 @@ class GroupGamesHandler {
       this.activeMcq.delete(token);
       await ctx.telegram.sendMessage(
         Number(chatId),
-        `⌛ انتهى الوقت.\n✅ الإجابة الصحيحة: <b>${question.options[question.answerIndex]}</b>`,
+        `⌛ انتهى الوقت.\n✅ الإجابة الصحيحة: <b>${shuffledOptions[newAnswerIndex]}</b>`,
         { parse_mode: 'HTML', reply_to_message_id: sent.message_id }
       ).catch(() => {});
     }, timeoutSec * 1000);
 
-    this.activeMcq.set(token, { chatId, answerIndex: question.answerIndex, reward: question.reward, timer });
+    this.activeMcq.set(token, { chatId, answerIndex: newAnswerIndex, reward: question.reward, timer });
   }
 
   static async handleMcqCallback(ctx, token, index) {
@@ -600,6 +624,7 @@ class GroupGamesHandler {
       const base = this.pickRandom(DEFAULT_VOTE_TOPICS);
       payload = { ...base, durationSec: 90 };
     }
+    payload.options = this.shuffleArray(payload.options);
 
     const oldToken = this.activeVoteByChat.get(String(ctx.chat.id));
     if (oldToken) {
@@ -625,10 +650,17 @@ class GroupGamesHandler {
     this.activeVoteByChat.set(String(ctx.chat.id), token);
 
     const keyboard = this.buildVoteKeyboard(session);
-    const sent = await ctx.reply(`🗳️ <b>${session.question}</b>\n\n⏱️ مدة التصويت: ${session.durationSec} ثانية\nصيغة مخصصة: /gvote 120 | السؤال | خيار1 | خيار2 | خيار3`, {
-      parse_mode: 'HTML',
-      reply_markup: keyboard.reply_markup
-    });
+    let sent = null;
+    try {
+      sent = await ctx.reply(`🗳️ <b>${session.question}</b>\n\n⏱️ مدة التصويت: ${session.durationSec} ثانية\nصيغة مخصصة: /gvote 120 | السؤال | خيار1 | خيار2 | خيار3`, {
+        parse_mode: 'HTML',
+        reply_markup: keyboard.reply_markup
+      });
+    } catch (_e) {
+      // Fallback in case Telegram rejects markup for any reason.
+      const choices = session.options.map((opt, i) => `${i + 1}. ${opt}`).join('\n');
+      sent = await ctx.reply(`🗳️ ${session.question}\n\n${choices}\n\n⚠️ لم يتم عرض الأزرار، جرّب إصدار Telegram مختلف.`);
+    }
     session.messageId = sent.message_id;
     session.timer = setTimeout(async () => {
       await this.finalizeVote(session.token);
