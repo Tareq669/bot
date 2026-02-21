@@ -3035,6 +3035,8 @@ bot.on('text', async (ctx) => {
     if (GroupAdminHandler.isGroupChat(ctx)) {
       const wasModerated = await GroupAdminHandler.processGroupMessage(ctx);
       if (wasModerated) return;
+      // Keep group chats isolated from private feature flows.
+      return;
     }
 
     // ⭐ CHECK GUESS GAME INPUT FIRST (before all other handlers)

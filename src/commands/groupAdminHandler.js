@@ -790,7 +790,7 @@ class GroupAdminHandler {
     const text = ctx.message.text;
 
     if (group.settings?.lockLinks) {
-      const hasLink = /(https?:\/\/|t\.me\/|www\.)/i.test(text);
+      const hasLink = /(https?:\/\/|t\.me\/|telegram\.me\/|www\.|(?:[a-z0-9-]+\.)+(?:com|net|org|io|me|co|ai|dev|app|xyz|info|ly|ru|uk|de|fr|sa|ae|qa|eg|tr)\b)/i.test(text);
       if (hasLink) {
         try {
           await ctx.telegram.deleteMessage(ctx.chat.id, ctx.message.message_id);
