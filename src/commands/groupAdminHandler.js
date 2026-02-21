@@ -166,6 +166,8 @@ class GroupAdminHandler {
       '• /gmath حساب ذهني\n' +
       '• /gword ترتيب كلمة\n' +
       '• /gdaily تحدي يومي\n' +
+      '• /gmcq سؤال اختيارات\n' +
+      '• /gvote تصويت تفاعلي\n' +
       '• /gleader المتصدرين\n' +
       '• /gweekly سباق الأسبوع\n' +
       '• /ggame إعدادات الألعاب\n' +
@@ -227,6 +229,8 @@ class GroupAdminHandler {
       '• /gmath تحدي حساب\n' +
       '• /gword ترتيب كلمة\n' +
       '• /gdaily تحدي يومي\n' +
+      '• /gmcq سؤال اختيارات\n' +
+      '• /gvote تصويت تفاعلي\n' +
       '• /gleader لوحة المتصدرين\n' +
       '• /gweekly سباق الأسبوع\n' +
       '• /ggame إعدادات الألعاب\n' +

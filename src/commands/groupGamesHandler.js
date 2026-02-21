@@ -1,38 +1,85 @@
+﻿const Markup = require('telegraf/markup');
 const { Group } = require('../database/models');
 
 const GROUP_TYPES = new Set(['group', 'supergroup']);
 
 const QUICK_QUESTIONS = [
   { question: 'ما عاصمة السعودية؟', answers: ['الرياض'], reward: 8 },
-  { question: 'كم عدد أيام الأسبوع؟', answers: ['7', 'سبعة'], reward: 7 },
-  { question: 'كم ناتج 9 + 6 ؟', answers: ['15', 'خمسة عشر'], reward: 6 },
-  { question: 'ما الكوكب المعروف بالكوكب الأحمر؟', answers: ['المريخ'], reward: 8 },
-  { question: 'كم دقيقة في الساعة؟', answers: ['60', 'ستون'], reward: 6 },
-  { question: 'ما اللغة الرسمية في البرازيل؟', answers: ['البرتغالية', 'برتغالية'], reward: 10 },
+  { question: 'ما عاصمة مصر؟', answers: ['القاهرة', 'القاهره'], reward: 8 },
+  { question: 'ما عاصمة المغرب؟', answers: ['الرباط'], reward: 8 },
+  { question: 'ما عاصمة الإمارات؟', answers: ['أبوظبي', 'ابوظبي'], reward: 8 },
+  { question: 'كم يوم في الأسبوع؟', answers: ['7', 'سبعة', 'سبعه'], reward: 7 },
+  { question: 'كم دقيقة في الساعة؟', answers: ['60', 'ستون'], reward: 7 },
+  { question: 'كم ساعة في اليوم؟', answers: ['24'], reward: 7 },
+  { question: 'كم ناتج 9 + 6 ؟', answers: ['15'], reward: 6 },
+  { question: 'كم ناتج 12 × 3 ؟', answers: ['36'], reward: 7 },
+  { question: 'كم ناتج 100 ÷ 4 ؟', answers: ['25'], reward: 7 },
+  { question: 'ما الكوكب الأحمر؟', answers: ['المريخ'], reward: 8 },
   { question: 'ما أكبر محيط في العالم؟', answers: ['المحيط الهادي', 'الهادي'], reward: 10 },
-  { question: 'كم عدد القارات؟', answers: ['7', 'سبع', 'سبعة'], reward: 8 },
-  { question: 'من مخترع المصباح الكهربائي (المشهور)؟', answers: ['توماس اديسون', 'اديسون'], reward: 9 },
-  { question: 'ما ناتج 12 × 3 ؟', answers: ['36', 'ستة وثلاثون'], reward: 7 }
+  { question: 'كم عدد القارات؟', answers: ['7'], reward: 8 },
+  { question: 'من مخترع المصباح الكهربائي؟', answers: ['توماس اديسون', 'اديسون'], reward: 9 },
+  { question: 'ما الغاز الذي نتنفسه؟', answers: ['الأكسجين', 'الاكسجين', 'اكسجين'], reward: 8 },
+  { question: 'ما اللغة الرسمية في البرازيل؟', answers: ['البرتغالية', 'برتغالية'], reward: 10 },
+  { question: 'ما أكبر قارة؟', answers: ['آسيا', 'اسيا'], reward: 9 },
+  { question: 'كم ضلعًا للمثلث؟', answers: ['3'], reward: 6 },
+  { question: 'ما أصغر عدد أولي؟', answers: ['2'], reward: 7 },
+  { question: 'ما عاصمة اليابان؟', answers: ['طوكيو'], reward: 9 },
+  { question: 'ما عاصمة ألمانيا؟', answers: ['برلين'], reward: 9 },
+  { question: 'ما عاصمة فرنسا؟', answers: ['باريس'], reward: 9 },
+  { question: 'ما عاصمة إيطاليا؟', answers: ['روما'], reward: 9 },
+  { question: 'ما عاصمة كندا؟', answers: ['أوتاوا', 'اوتاوا'], reward: 9 },
+  { question: 'كم عدد حروف اللغة العربية؟', answers: ['28'], reward: 9 },
+  { question: 'ما الفصل الذي يلي الصيف؟', answers: ['الخريف'], reward: 7 },
+  { question: 'ما الحيوان الملقب بسفينة الصحراء؟', answers: ['الجمل'], reward: 7 },
+  { question: 'ما أكبر كوكب في المجموعة الشمسية؟', answers: ['المشتري'], reward: 9 },
+  { question: 'ما أقرب كوكب للشمس؟', answers: ['عطارد'], reward: 9 },
+  { question: 'في أي قارة تقع مصر؟', answers: ['أفريقيا', 'افريقيا'], reward: 8 }
+];
+
+const MCQ_QUESTIONS = [
+  { question: 'ما أكبر كوكب؟', options: ['المريخ', 'المشتري', 'زحل', 'الزهرة'], answerIndex: 1, reward: 10 },
+  { question: 'عاصمة اليابان؟', options: ['سيؤول', 'طوكيو', 'بكين', 'بانكوك'], answerIndex: 1, reward: 9 },
+  { question: 'ناتج 9 × 7 ؟', options: ['63', '56', '72', '49'], answerIndex: 0, reward: 8 },
+  { question: 'العنصر O ؟', options: ['الأكسجين', 'الهيدروجين', 'الحديد', 'الذهب'], answerIndex: 0, reward: 8 },
+  { question: 'عدد القارات؟', options: ['5', '6', '7', '8'], answerIndex: 2, reward: 8 },
+  { question: 'عاصمة فرنسا؟', options: ['باريس', 'روما', 'برلين', 'مدريد'], answerIndex: 0, reward: 8 },
+  { question: 'كم ساعة في اليوم؟', options: ['12', '18', '24', '30'], answerIndex: 2, reward: 7 },
+  { question: 'ناتج 100 ÷ 5 ؟', options: ['10', '15', '20', '25'], answerIndex: 2, reward: 7 },
+  { question: 'أكبر محيط؟', options: ['الأطلسي', 'الهندي', 'الهادي', 'المتجمد'], answerIndex: 2, reward: 9 },
+  { question: 'عاصمة ألمانيا؟', options: ['برلين', 'ميونخ', 'فرانكفورت', 'هامبورغ'], answerIndex: 0, reward: 8 }
 ];
 
 const DAILY_CHALLENGES = [
-  { question: 'تحدي يومي: ما ناتج 14 × 7 ؟', answers: ['98', 'ثمانية وتسعون'], reward: 25 },
-  { question: 'تحدي يومي: اكتب اسم أطول نهر في العالم (الجواب الشائع عربيًا).', answers: ['النيل', 'نهر النيل'], reward: 25 },
-  { question: 'تحدي يومي: كم عدد حروف اللغة العربية؟', answers: ['28', 'ثمانية وعشرون'], reward: 25 },
+  { question: 'تحدي يومي: كم ناتج 14 × 7 ؟', answers: ['98'], reward: 25 },
+  { question: 'تحدي يومي: اكتب اسم أطول نهر شائع عربيًا.', answers: ['النيل', 'نهر النيل'], reward: 25 },
   { question: 'تحدي يومي: ما عاصمة اليابان؟', answers: ['طوكيو'], reward: 25 },
-  { question: 'تحدي يومي: ما هو العنصر الكيميائي رمزه O؟', answers: ['الاكسجين', 'الأكسجين', 'اكسجين'], reward: 25 }
+  { question: 'تحدي يومي: ما العنصر الكيميائي O ؟', answers: ['الأكسجين', 'الاكسجين'], reward: 25 },
+  { question: 'تحدي يومي: ما عاصمة تركيا؟', answers: ['أنقرة', 'انقرة'], reward: 25 },
+  { question: 'تحدي يومي: ما أكبر كوكب؟', answers: ['المشتري'], reward: 25 }
 ];
 
 const WORDS = [
   'مكتبة', 'مدرسة', 'هندسة', 'برمجة', 'رياضيات', 'ذكاء', 'تعاون', 'صداقة',
-  'منافسة', 'تحدي', 'إنجاز', 'تطوير', 'حكمة', 'إبداع', 'نجاح'
+  'منافسة', 'تحدي', 'إنجاز', 'تطوير', 'حكمة', 'إبداع', 'نجاح', 'مغامرة',
+  'تخطيط', 'إدارة', 'قيادة', 'تعلم', 'تركيز', 'حلول', 'فريق', 'سرعة'
 ];
+
+const DEFAULT_VOTE_TOPICS = [
+  { question: 'تصويت: أفضل وقت للعبة اليومية؟', options: ['بعد العصر', 'بعد المغرب', 'بعد العشاء'] },
+  { question: 'تصويت: نزيد مستوى الصعوبة؟', options: ['نعم', 'متوسط', 'لا'] },
+  { question: 'تصويت: أي لعبة تفضل؟', options: ['سؤال سريع', 'ترتيب كلمات', 'حساب ذهني', 'اختيارات'] }
+];
+
+const CELEBRATION_LINES = ['إجابة ممتازة!', 'مستوى قوي!', 'رد سريع جدًا!', 'أداء احترافي!'];
 
 class GroupGamesHandler {
   static bot = null;
   static activeRounds = new Map();
   static roundTimers = new Map();
   static autoLoop = null;
+  static activeMcq = new Map();
+  static activeVotes = new Map();
+  static activeVoteByChat = new Map();
 
   static isGroupChat(ctx) {
     return GROUP_TYPES.has(ctx?.chat?.type);
@@ -52,11 +99,13 @@ class GroupGamesHandler {
     return `${date.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
   }
 
+  static token(prefix = 'x') {
+    return `${prefix}${Math.random().toString(36).slice(2, 8)}`;
+  }
+
   static normalizeText(value) {
     if (typeof value !== 'string') return '';
-    return value
-      .toLowerCase()
-      .trim()
+    return value.toLowerCase().trim()
       .replace(/[ًٌٍَُِّْـ]/g, '')
       .replace(/[إأآ]/g, 'ا')
       .replace(/ة/g, 'ه')
@@ -71,14 +120,18 @@ class GroupGamesHandler {
       [chars[i], chars[j]] = [chars[j], chars[i]];
     }
     const shuffled = chars.join('');
-    if (shuffled === word && word.length > 1) {
-      return word.slice(1) + word[0];
-    }
+    if (shuffled === word && word.length > 1) return word.slice(1) + word[0];
     return shuffled;
   }
 
   static pickRandom(items) {
     return items[Math.floor(Math.random() * items.length)];
+  }
+
+  static parseCommandArgs(ctx) {
+    const text = ctx.message?.text || '';
+    const parts = text.trim().split(/\s+/);
+    return parts.slice(1);
   }
 
   static async ensureGroupRecord(ctx) {
@@ -87,10 +140,7 @@ class GroupGamesHandler {
     const groupType = ctx.chat.type || 'group';
     const group = await Group.findOneAndUpdate(
       { groupId },
-      {
-        $set: { groupTitle, groupType, updatedAt: new Date() },
-        $setOnInsert: { createdAt: new Date() }
-      },
+      { $set: { groupTitle, groupType, updatedAt: new Date() }, $setOnInsert: { createdAt: new Date() } },
       { upsert: true, new: true }
     );
     this.normalizeGroupState(group);
@@ -99,14 +149,7 @@ class GroupGamesHandler {
 
   static normalizeGroupState(group) {
     if (!group.gameSystem) group.gameSystem = {};
-    if (!group.gameSystem.settings) {
-      group.gameSystem.settings = {
-        enabled: true,
-        autoQuestions: false,
-        intervalMinutes: 15,
-        questionTimeoutSec: 25
-      };
-    }
+    if (!group.gameSystem.settings) group.gameSystem.settings = { enabled: true, autoQuestions: false, intervalMinutes: 15, questionTimeoutSec: 25 };
     if (typeof group.gameSystem.settings.enabled !== 'boolean') group.gameSystem.settings.enabled = true;
     if (typeof group.gameSystem.settings.autoQuestions !== 'boolean') group.gameSystem.settings.autoQuestions = false;
     if (!Number.isInteger(group.gameSystem.settings.intervalMinutes)) group.gameSystem.settings.intervalMinutes = 15;
@@ -119,21 +162,8 @@ class GroupGamesHandler {
 
     if (!Array.isArray(group.gameSystem.scores)) group.gameSystem.scores = [];
     if (!Array.isArray(group.gameSystem.teams)) group.gameSystem.teams = [];
-    if (!group.gameSystem.tournament) {
-      group.gameSystem.tournament = {
-        active: false,
-        season: 1,
-        startedAt: null,
-        endedAt: null,
-        rewards: { first: 100, second: 60, third: 40 }
-      };
-    }
-    if (typeof group.gameSystem.tournament.active !== 'boolean') group.gameSystem.tournament.active = false;
-    if (!Number.isInteger(group.gameSystem.tournament.season)) group.gameSystem.tournament.season = 1;
+    if (!group.gameSystem.tournament) group.gameSystem.tournament = { active: false, season: 1, startedAt: null, endedAt: null, rewards: { first: 100, second: 60, third: 40 } };
     if (!group.gameSystem.tournament.rewards) group.gameSystem.tournament.rewards = { first: 100, second: 60, third: 40 };
-    if (!Number.isInteger(group.gameSystem.tournament.rewards.first)) group.gameSystem.tournament.rewards.first = 100;
-    if (!Number.isInteger(group.gameSystem.tournament.rewards.second)) group.gameSystem.tournament.rewards.second = 60;
-    if (!Number.isInteger(group.gameSystem.tournament.rewards.third)) group.gameSystem.tournament.rewards.third = 40;
 
     return group;
   }
@@ -166,39 +196,26 @@ class GroupGamesHandler {
     this.roundTimers.delete(key);
   }
 
-  static parseCommandArgs(ctx) {
-    const text = ctx.message?.text || '';
-    const parts = text.trim().split(/\s+/);
-    return parts.slice(1);
-  }
-
   static async runAutoQuestionLoop() {
     const groups = await Group.find({ 'gameSystem.settings.autoQuestions': true });
     for (const group of groups) {
       this.normalizeGroupState(group);
       if (!group.gameSystem.settings.enabled) continue;
-
       const groupId = String(group.groupId);
       if (this.activeRounds.has(groupId)) continue;
-
       const intervalMinutes = Math.max(5, group.gameSystem.settings.intervalMinutes || 15);
       const lastAutoAt = group.gameSystem.state.lastAutoAt ? new Date(group.gameSystem.state.lastAutoAt).getTime() : 0;
       if (Date.now() - lastAutoAt < intervalMinutes * 60 * 1000) continue;
-      if (!this.bot) continue;
 
       const base = this.pickRandom(QUICK_QUESTIONS);
-      const timeoutSec = Math.max(10, group.gameSystem.settings.questionTimeoutSec || 25);
-      await this.startRoundInternal(
-        Number(group.groupId),
-        {
-          type: 'quiz',
-          prompt: `⚡ <b>سؤال تلقائي</b>\n\n${base.question}`,
-          answers: base.answers,
-          reward: base.reward,
-          timeoutSec
-        },
-        true
-      );
+      await this.startRoundInternal(Number(group.groupId), {
+        type: 'quiz',
+        prompt: `⚡ <b>سؤال تلقائي</b>\n\n${base.question}`,
+        answers: base.answers,
+        reward: base.reward,
+        timeoutSec: Math.max(10, group.gameSystem.settings.questionTimeoutSec || 25)
+      }, true);
+
       group.gameSystem.state.lastAutoAt = new Date();
       await group.save();
     }
@@ -234,27 +251,14 @@ class GroupGamesHandler {
 
     this.roundTimers.set(groupId, timeout);
   }
-
   static buildDailyRound() {
     const daily = this.pickRandom(DAILY_CHALLENGES);
-    return {
-      type: 'daily',
-      prompt: `🧠 <b>التحدي اليومي</b>\n\n${daily.question}`,
-      answers: daily.answers,
-      reward: daily.reward,
-      timeoutSec: 120
-    };
+    return { type: 'daily', prompt: `🧠 <b>التحدي اليومي</b>\n\n${daily.question}`, answers: daily.answers, reward: daily.reward, timeoutSec: 120 };
   }
 
   static buildQuizRound() {
     const quiz = this.pickRandom(QUICK_QUESTIONS);
-    return {
-      type: 'quiz',
-      prompt: `❓ <b>سؤال سريع</b>\n\n${quiz.question}`,
-      answers: quiz.answers,
-      reward: quiz.reward,
-      timeoutSec: 30
-    };
+    return { type: 'quiz', prompt: `❓ <b>سؤال سريع</b>\n\n${quiz.question}`, answers: quiz.answers, reward: quiz.reward, timeoutSec: 30 };
   }
 
   static buildMathRound() {
@@ -262,92 +266,20 @@ class GroupGamesHandler {
     const b = Math.floor(Math.random() * 20) + 2;
     const ops = ['+', '-', '*'];
     const op = this.pickRandom(ops);
-    let answer = 0;
-    if (op === '+') answer = a + b;
-    if (op === '-') answer = a - b;
-    if (op === '*') answer = a * b;
-    return {
-      type: 'math',
-      prompt: `➗ <b>تحدي حساب ذهني</b>\n\nما ناتج: <b>${a} ${op} ${b}</b> ؟`,
-      answers: [String(answer)],
-      reward: 9,
-      timeoutSec: 25
-    };
+    const answer = op === '+' ? (a + b) : op === '-' ? (a - b) : (a * b);
+    return { type: 'math', prompt: `➗ <b>تحدي حساب ذهني</b>\n\nما ناتج: <b>${a} ${op} ${b}</b> ؟`, answers: [String(answer)], reward: 9, timeoutSec: 25 };
   }
 
   static buildWordRound() {
     const word = this.pickRandom(WORDS);
     const shuffled = this.shuffleWord(word);
-    return {
-      type: 'word',
-      prompt: `🔤 <b>ترتيب كلمة</b>\n\nرتّب هذه الأحرف: <b>${shuffled}</b>`,
-      answers: [word],
-      reward: 10,
-      timeoutSec: 35
-    };
+    return { type: 'word', prompt: `🔤 <b>ترتيب كلمة</b>\n\nرتّب هذه الأحرف: <b>${shuffled}</b>`, answers: [word], reward: 10, timeoutSec: 35 };
   }
 
-  static async updateScore(group, user, reward) {
-    this.normalizeGroupState(group);
-
-    const weekKey = this.getWeekKey();
-    if (group.gameSystem.state.weekKey !== weekKey) {
-      group.gameSystem.state.weekKey = weekKey;
-      group.gameSystem.scores.forEach((s) => {
-        s.weeklyPoints = 0;
-      });
-    }
-
-    const userId = Number(user.id);
-    let row = group.gameSystem.scores.find((s) => Number(s.userId) === userId);
-    if (!row) {
-      row = {
-        userId,
-        username: user.username || user.first_name || String(user.id),
-        points: 0,
-        weeklyPoints: 0,
-        wins: 0,
-        streak: 0,
-        bestStreak: 0,
-        lastWinDate: null,
-        updatedAt: new Date()
-      };
-      group.gameSystem.scores.push(row);
-    }
-
-    row.username = user.username || user.first_name || String(user.id);
-    row.points = (row.points || 0) + reward;
-    row.weeklyPoints = (row.weeklyPoints || 0) + reward;
-    row.wins = (row.wins || 0) + 1;
-    row.updatedAt = new Date();
-
-    const todayKey = this.getDateKey();
-    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const yesterdayKey = this.getDateKey(yesterday);
-    const lastWinKey = row.lastWinDate ? this.getDateKey(new Date(row.lastWinDate)) : '';
-
-    if (lastWinKey === todayKey) {
-      row.streak = Math.max(1, row.streak || 1);
-    } else if (lastWinKey === yesterdayKey) {
-      row.streak = (row.streak || 0) + 1;
-    } else {
-      row.streak = 1;
-    }
-    row.bestStreak = Math.max(row.bestStreak || 0, row.streak || 1);
-    row.lastWinDate = new Date();
-
-    if (group.gameSystem.tournament?.active) {
-      const team = this.getUserTeam(group, userId);
-      if (team) {
-        team.points = (team.points || 0) + reward;
-        team.updatedAt = new Date();
-      }
-    }
-  }
-
-  static normalizeTeamName(raw) {
-    if (typeof raw !== 'string') return '';
-    return raw.trim().replace(/\s+/g, ' ').slice(0, 24);
+  static getUserRank(group, userId) {
+    const list = [...(group.gameSystem.scores || [])].sort((a, b) => (b.points || 0) - (a.points || 0));
+    const idx = list.findIndex((x) => Number(x.userId) === Number(userId));
+    return idx >= 0 ? idx + 1 : null;
   }
 
   static getUserTeam(group, userId) {
@@ -363,22 +295,62 @@ class GroupGamesHandler {
     if (!amount || amount <= 0) return;
     let row = group.gameSystem.scores.find((s) => Number(s.userId) === Number(userId));
     if (!row) {
-      row = {
-        userId: Number(userId),
-        username: String(userId),
-        points: 0,
-        weeklyPoints: 0,
-        wins: 0,
-        streak: 0,
-        bestStreak: 0,
-        lastWinDate: null,
-        updatedAt: new Date()
-      };
+      row = { userId: Number(userId), username: String(userId), points: 0, weeklyPoints: 0, wins: 0, streak: 0, bestStreak: 0, lastWinDate: null, updatedAt: new Date() };
       group.gameSystem.scores.push(row);
     }
     row.points = (row.points || 0) + amount;
     row.weeklyPoints = (row.weeklyPoints || 0) + amount;
     row.updatedAt = new Date();
+  }
+
+  static async updateScore(group, user, reward) {
+    this.normalizeGroupState(group);
+    const weekKey = this.getWeekKey();
+    if (group.gameSystem.state.weekKey !== weekKey) {
+      group.gameSystem.state.weekKey = weekKey;
+      group.gameSystem.scores.forEach((s) => { s.weeklyPoints = 0; });
+    }
+
+    const userId = Number(user.id);
+    let row = group.gameSystem.scores.find((s) => Number(s.userId) === userId);
+    if (!row) {
+      row = { userId, username: user.username || user.first_name || String(user.id), points: 0, weeklyPoints: 0, wins: 0, streak: 0, bestStreak: 0, lastWinDate: null, updatedAt: new Date() };
+      group.gameSystem.scores.push(row);
+    }
+
+    row.username = user.username || user.first_name || String(user.id);
+    row.points = (row.points || 0) + reward;
+    row.weeklyPoints = (row.weeklyPoints || 0) + reward;
+    row.wins = (row.wins || 0) + 1;
+    row.updatedAt = new Date();
+
+    const todayKey = this.getDateKey();
+    const yesterdayKey = this.getDateKey(new Date(Date.now() - 24 * 60 * 60 * 1000));
+    const lastWinKey = row.lastWinDate ? this.getDateKey(new Date(row.lastWinDate)) : '';
+    if (lastWinKey === todayKey) row.streak = Math.max(1, row.streak || 1);
+    else if (lastWinKey === yesterdayKey) row.streak = (row.streak || 0) + 1;
+    else row.streak = 1;
+
+    row.bestStreak = Math.max(row.bestStreak || 0, row.streak || 1);
+    row.lastWinDate = new Date();
+
+    let streakBonus = 0;
+    if ((row.streak || 0) > 0 && row.streak % 3 === 0) {
+      streakBonus = 3;
+      row.points += streakBonus;
+      row.weeklyPoints += streakBonus;
+    }
+
+    const finalReward = reward + streakBonus;
+    if (group.gameSystem.tournament?.active) {
+      const team = this.getUserTeam(group, userId);
+      if (team) {
+        team.points = (team.points || 0) + finalReward;
+        team.updatedAt = new Date();
+      }
+    }
+
+    return { finalReward, streakBonus, streak: row.streak || 0 };
   }
 
   static async handleIncomingGroupText(ctx, text) {
@@ -400,19 +372,37 @@ class GroupGamesHandler {
 
     this.clearRound(groupId);
     const group = await this.ensureGroupRecord(ctx);
-    await this.updateScore(group, ctx.from, round.reward);
-
-    if (round.type === 'daily') {
-      group.gameSystem.state.lastDailyKey = this.getDateKey();
-    }
+    const scoreMeta = await this.updateScore(group, ctx.from, round.reward);
+    if (round.type === 'daily') group.gameSystem.state.lastDailyKey = this.getDateKey();
     group.updatedAt = new Date();
     await group.save();
 
     const winner = ctx.from.first_name || ctx.from.username || String(ctx.from.id);
-    return ctx.reply(
-      `🏆 ${winner} فاز بالجولة!\n✅ الإجابة صحيحة: <b>${round.answers[0]}</b>\n💰 +${round.reward} نقطة`,
+    const rank = this.getUserRank(group, ctx.from.id);
+    const team = this.getUserTeam(group, ctx.from.id);
+    const hype = this.pickRandom(CELEBRATION_LINES);
+    const bonusLine = scoreMeta.streakBonus > 0 ? `\n🔥 بونص ستريك +${scoreMeta.streakBonus}` : '';
+    const teamLine = team ? `\n👥 فريقك: ${team.name} | نقاط الفريق: ${team.points || 0}` : '';
+    const rankLine = rank ? `\n🏅 ترتيبك الحالي: #${rank}` : '';
+
+    await ctx.reply(
+      `🏆 ${winner} فاز بالجولة!\n✅ الإجابة صحيحة: <b>${round.answers[0]}</b>\n💰 +${scoreMeta.finalReward} نقطة${bonusLine}\n🔥 الستريك: ${scoreMeta.streak}${rankLine}${teamLine}\n✨ ${hype}`,
       { parse_mode: 'HTML' }
-    ).then(() => true);
+    );
+    return true;
+  }
+
+  static async canStartRound(ctx) {
+    const group = await this.ensureGroupRecord(ctx);
+    if (!group.gameSystem.settings.enabled) {
+      await ctx.reply('⛔ ألعاب الجروب معطلة. فعّلها عبر /ggame on');
+      return { ok: false, group };
+    }
+    if (this.activeRounds.has(String(ctx.chat.id))) {
+      await ctx.reply('⏳ يوجد تحدي نشط الآن. جاوبوا أولاً قبل بدء لعبة جديدة.');
+      return { ok: false, group };
+    }
+    return { ok: true, group };
   }
 
   static async handleGameToggleCommand(ctx) {
@@ -431,11 +421,7 @@ class GroupGamesHandler {
         `الأسئلة التلقائية: ${s.autoQuestions ? '✅' : '❌'}\n` +
         `كل: ${s.intervalMinutes} دقيقة\n` +
         `مهلة السؤال: ${s.questionTimeoutSec} ثانية\n\n` +
-        'الاستخدام:\n' +
-        '<code>/ggame on</code>\n' +
-        '<code>/ggame off</code>\n' +
-        '<code>/ggame auto on 15</code>\n' +
-        '<code>/ggame auto off</code>',
+        'الاستخدام:\n<code>/ggame on</code>\n<code>/ggame off</code>\n<code>/ggame auto on 15</code>\n<code>/ggame auto off</code>',
         { parse_mode: 'HTML' }
       );
     }
@@ -471,26 +457,12 @@ class GroupGamesHandler {
     return ctx.reply('❌ صيغة غير صحيحة. استخدم /ggame أو /ggame auto on 15');
   }
 
-  static async canStartRound(ctx) {
-    const group = await this.ensureGroupRecord(ctx);
-    if (!group.gameSystem.settings.enabled) {
-      await ctx.reply('⛔ ألعاب الجروب معطلة. فعّلها عبر /ggame on');
-      return { ok: false, group };
-    }
-    if (this.activeRounds.has(String(ctx.chat.id))) {
-      await ctx.reply('⏳ يوجد تحدي نشط الآن. جاوبوا أولاً قبل بدء لعبة جديدة.');
-      return { ok: false, group };
-    }
-    return { ok: true, group };
-  }
-
   static async handleQuizCommand(ctx) {
     if (!this.isGroupChat(ctx)) return;
     const status = await this.canStartRound(ctx);
     if (!status.ok) return;
-    const group = status.group;
     const round = this.buildQuizRound();
-    round.timeoutSec = Math.max(10, group.gameSystem.settings.questionTimeoutSec || 25);
+    round.timeoutSec = Math.max(10, status.group.gameSystem.settings.questionTimeoutSec || 25);
     await this.startRoundInternal(ctx.chat.id, round, false);
   }
 
@@ -498,9 +470,8 @@ class GroupGamesHandler {
     if (!this.isGroupChat(ctx)) return;
     const status = await this.canStartRound(ctx);
     if (!status.ok) return;
-    const group = status.group;
     const round = this.buildMathRound();
-    round.timeoutSec = Math.max(10, group.gameSystem.settings.questionTimeoutSec || 25);
+    round.timeoutSec = Math.max(10, status.group.gameSystem.settings.questionTimeoutSec || 25);
     await this.startRoundInternal(ctx.chat.id, round, false);
   }
 
@@ -508,9 +479,8 @@ class GroupGamesHandler {
     if (!this.isGroupChat(ctx)) return;
     const status = await this.canStartRound(ctx);
     if (!status.ok) return;
-    const group = status.group;
     const round = this.buildWordRound();
-    round.timeoutSec = Math.max(10, group.gameSystem.settings.questionTimeoutSec || 25);
+    round.timeoutSec = Math.max(10, status.group.gameSystem.settings.questionTimeoutSec || 25);
     await this.startRoundInternal(ctx.chat.id, round, false);
   }
 
@@ -520,21 +490,135 @@ class GroupGamesHandler {
     if (!status.ok) return;
     const group = status.group;
     const todayKey = this.getDateKey();
-    if (group.gameSystem.state.lastDailyKey === todayKey) {
-      return ctx.reply('✅ تم لعب التحدي اليومي اليوم بالفعل. جرّب غدًا.');
-    }
+    if (group.gameSystem.state.lastDailyKey === todayKey) return ctx.reply('✅ تم لعب التحدي اليومي اليوم بالفعل. جرّب غدًا.');
     group.gameSystem.state.lastDailyKey = todayKey;
     await group.save();
     await this.startRoundInternal(ctx.chat.id, this.buildDailyRound(), false);
+  }
+  static async handleMcqCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const status = await this.canStartRound(ctx);
+    if (!status.ok) return;
+
+    const question = this.pickRandom(MCQ_QUESTIONS);
+    const token = this.token('m');
+    const chatId = String(ctx.chat.id);
+    const timeoutSec = 35;
+
+    const keyboard = Markup.inlineKeyboard(
+      question.options.map((opt, idx) => [Markup.button.callback(opt, `group:mcq:${token}:${idx}`)])
+    );
+
+    const sent = await ctx.reply(
+      `🗳️ <b>سؤال اختيارات</b>\n\n${question.question}\n\n⏱️ ${timeoutSec} ثانية | 💰 ${question.reward} نقطة`,
+      { parse_mode: 'HTML', reply_markup: keyboard.reply_markup }
+    );
+
+    const timer = setTimeout(async () => {
+      const state = this.activeMcq.get(token);
+      if (!state) return;
+      this.activeMcq.delete(token);
+      await ctx.telegram.sendMessage(
+        Number(chatId),
+        `⌛ انتهى الوقت.\n✅ الإجابة الصحيحة: <b>${question.options[question.answerIndex]}</b>`,
+        { parse_mode: 'HTML', reply_to_message_id: sent.message_id }
+      ).catch(() => {});
+    }, timeoutSec * 1000);
+
+    this.activeMcq.set(token, { chatId, answerIndex: question.answerIndex, reward: question.reward, timer });
+  }
+
+  static async handleMcqCallback(ctx, token, index) {
+    if (!this.isGroupChat(ctx)) return;
+    const state = this.activeMcq.get(token);
+    if (!state) return ctx.answerCbQuery('انتهت هذه الجولة.', { show_alert: false }).catch(() => {});
+    if (String(ctx.chat.id) !== String(state.chatId)) return ctx.answerCbQuery('هذه الجولة ليست لهذا الجروب.', { show_alert: false }).catch(() => {});
+
+    const selected = Number(index);
+    if (selected !== Number(state.answerIndex)) return ctx.answerCbQuery('إجابة غير صحيحة، جرّب مرة أخرى.', { show_alert: false }).catch(() => {});
+
+    clearTimeout(state.timer);
+    this.activeMcq.delete(token);
+    await ctx.answerCbQuery('إجابة صحيحة!', { show_alert: false }).catch(() => {});
+
+    const group = await this.ensureGroupRecord(ctx);
+    const scoreMeta = await this.updateScore(group, ctx.from, state.reward);
+    group.updatedAt = new Date();
+    await group.save();
+
+    const rank = this.getUserRank(group, ctx.from.id);
+    await ctx.reply(`✅ <b>${ctx.from.first_name || 'عضو'}</b> أجاب صحيحًا!\n💰 +${scoreMeta.finalReward} نقطة\n🏅 ترتيبك: #${rank || '-'}`, { parse_mode: 'HTML' });
+  }
+
+  static parseVoteCommand(text) {
+    if (!text.includes('|')) return null;
+    const parts = text.split('|').map((x) => x.trim()).filter(Boolean);
+    if (parts.length < 3) return null;
+    const question = parts[0].replace(/^\/gvote\s*/i, '').trim();
+    const options = parts.slice(1, 6);
+    if (!question || options.length < 2) return null;
+    return { question, options };
+  }
+
+  static buildVoteKeyboard(session) {
+    const rows = session.options.map((opt, idx) => [Markup.button.callback(`${opt} (${session.counts[idx] || 0})`, `group:vote:${session.token}:${idx}`)]);
+    return Markup.inlineKeyboard(rows);
+  }
+
+  static async handleVoteCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const argsRaw = (ctx.message?.text || '').trim();
+    let payload = this.parseVoteCommand(argsRaw);
+    if (!payload) payload = this.pickRandom(DEFAULT_VOTE_TOPICS);
+
+    const oldToken = this.activeVoteByChat.get(String(ctx.chat.id));
+    if (oldToken) this.activeVotes.delete(oldToken);
+
+    const token = this.token('v');
+    const session = {
+      token,
+      chatId: String(ctx.chat.id),
+      question: payload.question,
+      options: payload.options,
+      votes: {},
+      counts: Array(payload.options.length).fill(0)
+    };
+
+    this.activeVotes.set(token, session);
+    this.activeVoteByChat.set(String(ctx.chat.id), token);
+
+    const keyboard = this.buildVoteKeyboard(session);
+    await ctx.reply(`🗳️ <b>${session.question}</b>\n\nصيغة مخصصة: /gvote السؤال | خيار1 | خيار2 | خيار3`, {
+      parse_mode: 'HTML',
+      reply_markup: keyboard.reply_markup
+    });
+  }
+
+  static async handleVoteCallback(ctx, token, index) {
+    if (!this.isGroupChat(ctx)) return;
+    const session = this.activeVotes.get(token);
+    if (!session) return ctx.answerCbQuery('هذا التصويت انتهى.', { show_alert: false }).catch(() => {});
+    if (String(ctx.chat.id) !== String(session.chatId)) return ctx.answerCbQuery('تصويت لجروب آخر.', { show_alert: false }).catch(() => {});
+
+    const idx = Number(index);
+    if (!Number.isInteger(idx) || idx < 0 || idx >= session.options.length) {
+      return ctx.answerCbQuery('خيار غير صالح.', { show_alert: false }).catch(() => {});
+    }
+
+    const userId = String(ctx.from.id);
+    const prev = session.votes[userId];
+    if (Number.isInteger(prev)) session.counts[prev] = Math.max(0, (session.counts[prev] || 0) - 1);
+    session.votes[userId] = idx;
+    session.counts[idx] = (session.counts[idx] || 0) + 1;
+
+    await ctx.answerCbQuery('تم تسجيل صوتك ✅', { show_alert: false }).catch(() => {});
+    await ctx.editMessageReplyMarkup(this.buildVoteKeyboard(session).reply_markup).catch(() => {});
   }
 
   static async handleLeaderCommand(ctx) {
     if (!this.isGroupChat(ctx)) return;
     const group = await this.ensureGroupRecord(ctx);
-    const rows = [...group.gameSystem.scores]
-      .sort((a, b) => (b.points || 0) - (a.points || 0))
-      .slice(0, 10);
-
+    const rows = [...group.gameSystem.scores].sort((a, b) => (b.points || 0) - (a.points || 0)).slice(0, 10);
     if (rows.length === 0) return ctx.reply('📊 لا يوجد نقاط بعد. ابدأوا عبر /gquiz');
 
     let text = '🏁 <b>متصدرين الجروب (إجمالي)</b>\n\n';
@@ -548,10 +632,7 @@ class GroupGamesHandler {
   static async handleWeeklyCommand(ctx) {
     if (!this.isGroupChat(ctx)) return;
     const group = await this.ensureGroupRecord(ctx);
-    const rows = [...group.gameSystem.scores]
-      .sort((a, b) => (b.weeklyPoints || 0) - (a.weeklyPoints || 0))
-      .slice(0, 10);
-
+    const rows = [...group.gameSystem.scores].sort((a, b) => (b.weeklyPoints || 0) - (a.weeklyPoints || 0)).slice(0, 10);
     if (rows.length === 0) return ctx.reply('📊 لا يوجد نقاط أسبوعية بعد.');
 
     let text = '📅 <b>سباق الأسبوع</b>\n\n';
@@ -569,37 +650,23 @@ class GroupGamesHandler {
     const userId = Number(ctx.from.id);
 
     if (args.length === 0) {
-      return ctx.reply(
-        '👥 أوامر الفرق:\n' +
-          '/gteam create اسم_الفريق\n' +
-          '/gteam join اسم_الفريق\n' +
-          '/gteam leave\n' +
-          '/gteam info'
-      );
+      return ctx.reply('👥 أوامر الفرق:\n/gteam create اسم_الفريق\n/gteam join اسم_الفريق\n/gteam leave\n/gteam info');
     }
 
     const mode = String(args[0]).toLowerCase();
     if (mode === 'create') {
-      const name = this.normalizeTeamName(args.slice(1).join(' '));
+      const name = args.slice(1).join(' ').trim().replace(/\s+/g, ' ').slice(0, 24);
       if (!name) return ctx.reply('❌ اكتب اسم فريق. مثال: /gteam create الصقور');
       if (this.getUserTeam(group, userId)) return ctx.reply('❌ أنت ضمن فريق بالفعل. استخدم /gteam leave أولاً.');
       if (this.findTeamByName(group, name)) return ctx.reply('❌ هذا الاسم مستخدم بالفعل.');
 
-      group.gameSystem.teams.push({
-        name,
-        captainId: userId,
-        members: [userId],
-        points: 0,
-        wins: 0,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      });
+      group.gameSystem.teams.push({ name, captainId: userId, members: [userId], points: 0, wins: 0, createdAt: new Date(), updatedAt: new Date() });
       await group.save();
       return ctx.reply(`✅ تم إنشاء فريق: ${name}`);
     }
 
     if (mode === 'join') {
-      const name = this.normalizeTeamName(args.slice(1).join(' '));
+      const name = args.slice(1).join(' ').trim().replace(/\s+/g, ' ');
       if (!name) return ctx.reply('❌ اكتب اسم الفريق. مثال: /gteam join الصقور');
       if (this.getUserTeam(group, userId)) return ctx.reply('❌ أنت ضمن فريق بالفعل. استخدم /gteam leave أولاً.');
 
@@ -617,12 +684,8 @@ class GroupGamesHandler {
       if (!team) return ctx.reply('ℹ️ أنت لست ضمن أي فريق.');
 
       team.members = (team.members || []).filter((id) => Number(id) !== userId);
-      if (Number(team.captainId) === userId && team.members.length > 0) {
-        team.captainId = Number(team.members[0]);
-      }
-      if (team.members.length === 0) {
-        group.gameSystem.teams = group.gameSystem.teams.filter((t) => this.normalizeText(t.name) !== this.normalizeText(team.name));
-      }
+      if (Number(team.captainId) === userId && team.members.length > 0) team.captainId = Number(team.members[0]);
+      if (team.members.length === 0) group.gameSystem.teams = group.gameSystem.teams.filter((t) => this.normalizeText(t.name) !== this.normalizeText(team.name));
       await group.save();
       return ctx.reply('✅ تم خروجك من الفريق.');
     }
@@ -630,14 +693,7 @@ class GroupGamesHandler {
     if (mode === 'info') {
       const team = this.getUserTeam(group, userId);
       if (!team) return ctx.reply('ℹ️ أنت لست ضمن أي فريق.');
-      return ctx.reply(
-        `👥 <b>${team.name}</b>\n` +
-          `🧑‍✈️ القائد: <code>${team.captainId}</code>\n` +
-          `👤 الأعضاء: ${team.members.length}\n` +
-          `🏅 نقاط الفريق: ${team.points || 0}\n` +
-          `🏆 مرات الفوز: ${team.wins || 0}`,
-        { parse_mode: 'HTML' }
-      );
+      return ctx.reply(`👥 <b>${team.name}</b>\n🧑‍✈️ القائد: <code>${team.captainId}</code>\n👤 الأعضاء: ${team.members.length}\n🏅 نقاط الفريق: ${team.points || 0}\n🏆 مرات الفوز: ${team.wins || 0}`, { parse_mode: 'HTML' });
     }
 
     return ctx.reply('❌ صيغة غير صحيحة. استخدم /gteam');
@@ -646,10 +702,7 @@ class GroupGamesHandler {
   static async handleTeamsCommand(ctx) {
     if (!this.isGroupChat(ctx)) return;
     const group = await this.ensureGroupRecord(ctx);
-    const teams = [...(group.gameSystem.teams || [])]
-      .sort((a, b) => (b.points || 0) - (a.points || 0))
-      .slice(0, 10);
-
+    const teams = [...(group.gameSystem.teams || [])].sort((a, b) => (b.points || 0) - (a.points || 0)).slice(0, 10);
     if (teams.length === 0) return ctx.reply('📊 لا توجد فرق بعد. ابدأ عبر /gteam create');
 
     let text = '🏟️ <b>ترتيب الفرق</b>\n\n';
@@ -669,31 +722,16 @@ class GroupGamesHandler {
     const t = group.gameSystem.tournament;
 
     if (args.length === 0 || String(args[0]).toLowerCase() === 'status') {
-      const top = [...(group.gameSystem.teams || [])]
-        .sort((a, b) => (b.points || 0) - (a.points || 0))
-        .slice(0, 3);
-      let text =
-        '🏆 <b>حالة البطولة الأسبوعية</b>\n\n' +
-        `الحالة: ${t.active ? '✅ نشطة' : '❌ متوقفة'}\n` +
-        `الموسم: ${t.season}\n` +
-        `الجوائز: ${t.rewards.first}/${t.rewards.second}/${t.rewards.third}\n\n` +
-        '<b>المراكز الحالية:</b>\n';
-      if (top.length === 0) {
-        text += 'لا توجد فرق بعد.';
-      } else {
-        top.forEach((team, i) => {
-          text += `${i + 1}. ${team.name} — ${team.points || 0}\n`;
-        });
-      }
+      const top = [...(group.gameSystem.teams || [])].sort((a, b) => (b.points || 0) - (a.points || 0)).slice(0, 3);
+      let text = '🏆 <b>حالة البطولة الأسبوعية</b>\n\n' + `الحالة: ${t.active ? '✅ نشطة' : '❌ متوقفة'}\n` + `الموسم: ${t.season}\n` + `الجوائز: ${t.rewards.first}/${t.rewards.second}/${t.rewards.third}\n\n` + '<b>المراكز الحالية:</b>\n';
+      if (top.length === 0) text += 'لا توجد فرق بعد.';
+      else top.forEach((team, i) => { text += `${i + 1}. ${team.name} — ${team.points || 0}\n`; });
       return ctx.reply(text, { parse_mode: 'HTML' });
     }
 
     const mode = String(args[0]).toLowerCase();
     if (mode === 'start') {
-      group.gameSystem.teams.forEach((team) => {
-        team.points = 0;
-        team.updatedAt = new Date();
-      });
+      group.gameSystem.teams.forEach((team) => { team.points = 0; team.updatedAt = new Date(); });
       t.active = true;
       t.startedAt = new Date();
       t.endedAt = null;
@@ -705,12 +743,8 @@ class GroupGamesHandler {
       const first = parseInt(args[1] || '', 10);
       const second = parseInt(args[2] || '', 10);
       const third = parseInt(args[3] || '', 10);
-      if (!Number.isInteger(first) || !Number.isInteger(second) || !Number.isInteger(third)) {
-        return ctx.reply('❌ استخدم: /gtour rewards 100 60 40');
-      }
-      if (first <= 0 || second <= 0 || third <= 0 || !(first >= second && second >= third)) {
-        return ctx.reply('❌ القيم غير منطقية. يجب أن تكون first >= second >= third');
-      }
+      if (!Number.isInteger(first) || !Number.isInteger(second) || !Number.isInteger(third)) return ctx.reply('❌ استخدم: /gtour rewards 100 60 40');
+      if (first <= 0 || second <= 0 || third <= 0 || !(first >= second && second >= third)) return ctx.reply('❌ القيم غير منطقية. يجب أن تكون first >= second >= third');
       t.rewards = { first, second, third };
       await group.save();
       return ctx.reply(`✅ تم تحديث الجوائز إلى: ${first}/${second}/${third}`);
@@ -719,10 +753,7 @@ class GroupGamesHandler {
     if (mode === 'end' || mode === 'stop') {
       if (!t.active) return ctx.reply('ℹ️ لا توجد بطولة نشطة حالياً.');
 
-      const top = [...(group.gameSystem.teams || [])]
-        .sort((a, b) => (b.points || 0) - (a.points || 0))
-        .slice(0, 3);
-
+      const top = [...(group.gameSystem.teams || [])].sort((a, b) => (b.points || 0) - (a.points || 0)).slice(0, 3);
       const rewards = [t.rewards.first, t.rewards.second, t.rewards.third];
       top.forEach((team, idx) => {
         const bonus = rewards[idx] || 0;
@@ -736,13 +767,8 @@ class GroupGamesHandler {
       await group.save();
 
       let text = '🏁 <b>انتهت البطولة</b>\n\n';
-      if (top.length === 0) {
-        text += 'لا توجد فرق مشاركة.';
-      } else {
-        top.forEach((team, idx) => {
-          text += `${idx + 1}. ${team.name} — ${team.points || 0} نقطة | جائزة لكل عضو: ${rewards[idx] || 0}\n`;
-        });
-      }
+      if (top.length === 0) text += 'لا توجد فرق مشاركة.';
+      else top.forEach((team, idx) => { text += `${idx + 1}. ${team.name} — ${team.points || 0} نقطة | جائزة لكل عضو: ${rewards[idx] || 0}\n`; });
       return ctx.reply(text, { parse_mode: 'HTML' });
     }
 
@@ -757,13 +783,15 @@ class GroupGamesHandler {
       '• /gmath تحدي حساب ذهني\n' +
       '• /gword ترتيب كلمة\n' +
       '• /gdaily تحدي يومي\n' +
+      '• /gmcq سؤال اختيارات بأزرار\n' +
+      '• /gvote تصويت تفاعلي\n' +
       '• /gleader لوحة المتصدرين\n' +
       '• /gweekly سباق الأسبوع\n' +
       '• /ggame إعدادات نظام الألعاب (للمشرفين)\n' +
       '• /gteam إدارة فريقك\n' +
       '• /gteams ترتيب الفرق\n' +
       '• /gtour إدارة البطولة الأسبوعية (للمشرفين)\n\n' +
-      'نظام الستريك: كل فوز يومي متتالي يزيد الستريك 🔥',
+      'نظام الستريك: كل 3 فوز متتالي = بونص نقاط 🔥',
       { parse_mode: 'HTML' }
     );
   }

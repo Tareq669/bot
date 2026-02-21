@@ -103,7 +103,7 @@ const PRIVATE_ONLY_COMMANDS = new Set([
 const GROUP_ONLY_COMMANDS = new Set([
   'gpanel', 'ghelp', 'gsettings', 'gwarn', 'gwarns', 'gunwarn', 'gresetwarn',
   'gmute', 'gunmute', 'gban', 'gunban', 'gclear', 'glogs', 'gpolicy',
-  'gquiz', 'gmath', 'gword', 'gdaily', 'gleader', 'gweekly', 'ggame', 'ggames',
+  'gquiz', 'gmath', 'gword', 'gdaily', 'gmcq', 'gvote', 'gleader', 'gweekly', 'ggame', 'ggames',
   'gteam', 'gteams', 'gtour'
 ]);
 
@@ -194,6 +194,8 @@ Promise.all([
       { command: 'gmath', description: 'تحدي حساب ذهني' },
       { command: 'gword', description: 'ترتيب كلمة' },
       { command: 'gdaily', description: 'التحدي اليومي' },
+      { command: 'gmcq', description: 'سؤال اختيارات' },
+      { command: 'gvote', description: 'تصويت تفاعلي' },
       { command: 'gleader', description: 'متصدرين الجروب' },
       { command: 'gweekly', description: 'متصدرين الأسبوع' },
       { command: 'ggame', description: 'إعدادات ألعاب الجروب' },
@@ -264,6 +266,8 @@ bot.command('gquiz', (ctx) => GroupGamesHandler.handleQuizCommand(ctx));
 bot.command('gmath', (ctx) => GroupGamesHandler.handleMathCommand(ctx));
 bot.command('gword', (ctx) => GroupGamesHandler.handleWordCommand(ctx));
 bot.command('gdaily', (ctx) => GroupGamesHandler.handleDailyCommand(ctx));
+bot.command('gmcq', (ctx) => GroupGamesHandler.handleMcqCommand(ctx));
+bot.command('gvote', (ctx) => GroupGamesHandler.handleVoteCommand(ctx));
 bot.command('gleader', (ctx) => GroupGamesHandler.handleLeaderCommand(ctx));
 bot.command('gweekly', (ctx) => GroupGamesHandler.handleWeeklyCommand(ctx));
 bot.command('ggame', (ctx) => GroupGamesHandler.handleGameToggleCommand(ctx));
@@ -1310,6 +1314,8 @@ bot.action('owner:cleanup:confirm', async (ctx) => {
 });
 
 // --- MENU CALLBACKS ---
+bot.action(/^group:mcq:([a-z0-9]+):(\d+)$/i, (ctx) => GroupGamesHandler.handleMcqCallback(ctx, ctx.match[1], ctx.match[2]));
+bot.action(/^group:vote:([a-z0-9]+):(\d+)$/i, (ctx) => GroupGamesHandler.handleVoteCallback(ctx, ctx.match[1], ctx.match[2]));
 bot.action(/^group:.+$/, (ctx) => GroupAdminHandler.handleGroupCallback(ctx));
 bot.action('menu:main', (ctx) => MenuHandler.handleMainMenu(ctx));
 bot.action('menu:khatma', (ctx) => MenuHandler.handleKhatmaMenu(ctx));
