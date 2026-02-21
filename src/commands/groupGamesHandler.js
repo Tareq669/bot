@@ -626,6 +626,28 @@ class GroupGamesHandler {
     }
     payload.options = this.shuffleArray(payload.options);
 
+    // Prefer native Telegram poll so options always render on all clients.
+    try {
+      const pollQuestion = String(payload.question || '').trim().slice(0, 300);
+      const pollOptions = payload.options
+        .map((opt) => String(opt || '').trim().slice(0, 100))
+        .filter(Boolean)
+        .slice(0, 10);
+
+      if (pollQuestion && pollOptions.length >= 2) {
+        const openPeriod = Math.min(600, Math.max(20, Number(payload.durationSec || 90)));
+        await ctx.telegram.sendPoll(ctx.chat.id, pollQuestion, pollOptions, {
+          is_anonymous: false,
+          allows_multiple_answers: false,
+          open_period: openPeriod,
+          reply_to_message_id: ctx.callbackQuery?.message?.message_id || undefined
+        });
+        return;
+      }
+    } catch (_pollError) {
+      // Fall back to inline vote below.
+    }
+
     const oldToken = this.activeVoteByChat.get(String(ctx.chat.id));
     if (oldToken) {
       const oldSession = this.activeVotes.get(oldToken);
