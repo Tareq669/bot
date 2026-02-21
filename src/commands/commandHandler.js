@@ -650,12 +650,30 @@ class CommandHandler {
 
   static async handleLibrary(ctx) {
     try {
+      const IslamicLibrary = require('../features/islamicLibrary');
+      const stats = IslamicLibrary.getLibraryStats();
+
       let message = '📚 <b>المكتبة الإسلامية</b>\n\n';
-      message += 'اختر من الفئات:';
+      message += 'نظام العرض: <b>عنصر واحد كامل في كل مرة</b> (مثل نظام الأدعية).\n\n';
+      message += `📦 <b>إجمالي المحتوى:</b> ${stats.totalItems}\n`;
+      message += `📖 التفسير: ${stats.byCategory.tafsir || 0}\n`;
+      message += `📿 الأحاديث: ${stats.byCategory.hadith || 0}\n`;
+      message += `📚 الفقه: ${stats.byCategory.fiqh || 0}\n`;
+      message += `📕 القصص: ${stats.byCategory.stories || 0}\n`;
+      message += `👤 الصحابة: ${stats.byCategory.sahabi || 0}\n`;
+      message += `🤲 الأوراد: ${stats.byCategory.awrad || 0}\n\n`;
+      message += 'اختر الفئة التي تريدها:';
 
       const keyboard = UIManager.islamicContentKeyboard();
 
-      await ctx.reply(message, { parse_mode: 'HTML', reply_markup: keyboard.reply_markup });
+      try {
+        await ctx.editMessageText(message, {
+          parse_mode: 'HTML',
+          reply_markup: keyboard.reply_markup
+        });
+      } catch (_e) {
+        await ctx.reply(message, { parse_mode: 'HTML', reply_markup: keyboard.reply_markup });
+      }
     } catch (error) {
       console.error('Error in handleLibrary:', error);
       await ctx.reply('❌ حدث خطأ');

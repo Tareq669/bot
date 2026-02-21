@@ -1270,37 +1270,62 @@ bot.action(
 bot.action('dua:menu', (ctx) => CommandHandler.handleDua(ctx));
 
 // --- LIBRARY ACTIONS ---
-bot.action('library:tafsir', async (ctx) => {
+const showSingleLibraryFromCategory = async (ctx, category) => {
   const IslamicLibrary = require('./features/islamicLibrary');
-  const tafsir = await IslamicLibrary.getTafsir(1, 1, 'السعدي');
-  await ctx.reply(IslamicLibrary.formatLibraryContent('tafsir', tafsir), { parse_mode: 'HTML' });
+  const collection = IslamicLibrary.getCollection(category);
+
+  if (!collection) {
+    await ctx.answerCbQuery('❌ الفئة غير موجودة');
+    return;
+  }
+
+  const item = IslamicLibrary.getRandomLibraryItem(category);
+  if (!item) {
+    await ctx.answerCbQuery('❌ لا يوجد محتوى في هذه الفئة');
+    return;
+  }
+
+  const stats = IslamicLibrary.getLibraryStats();
+  const count = stats.byCategory[category] || 0;
+  const contentType = category === 'stories' ? 'stories' : category;
+  const content = IslamicLibrary.formatLibraryContent(contentType, item);
+
+  const message =
+    `${collection.icon} <b>${collection.name}</b>\n` +
+    `📚 <b>عدد العناصر في الفئة:</b> ${count}\n\n` +
+    `${content}`;
+
+  const buttons = Markup.inlineKeyboard([
+    [Markup.button.callback('🆕 عنصر آخر', `library:next:${category}`)],
+    [Markup.button.callback('📂 أقسام المكتبة', 'library:menu'), Markup.button.callback('⬅️ الرئيسية', 'menu:main')]
+  ]);
+
+  try {
+    await ctx.editMessageText(message, {
+      parse_mode: 'HTML',
+      reply_markup: buttons.reply_markup
+    });
+  } catch (_e) {
+    await ctx.reply(message, {
+      parse_mode: 'HTML',
+      reply_markup: buttons.reply_markup
+    });
+  }
+};
+
+bot.action(/^library:(tafsir|hadith|fiqh|stories|sahabi|awrad)$/, async (ctx) => {
+  const category = ctx.match[1];
+  await showSingleLibraryFromCategory(ctx, category);
+  await ctx.answerCbQuery('📚 تم عرض عنصر');
 });
 
-bot.action('library:hadith', async (ctx) => {
-  const IslamicLibrary = require('./features/islamicLibrary');
-  const hadith = await IslamicLibrary.getHadith('all');
-  await ctx.reply(IslamicLibrary.formatLibraryContent('hadith', hadith), { parse_mode: 'HTML' });
+bot.action(/^library:next:(tafsir|hadith|fiqh|stories|sahabi|awrad)$/, async (ctx) => {
+  const category = ctx.match[1];
+  await showSingleLibraryFromCategory(ctx, category);
+  await ctx.answerCbQuery('🆕 عنصر جديد');
 });
 
-bot.action('library:fiqh', async (ctx) => {
-  const IslamicLibrary = require('./features/islamicLibrary');
-  const fiqh = await IslamicLibrary.getFiqhRuling('الصلاة');
-  await ctx.reply(IslamicLibrary.formatLibraryContent('fiqh', fiqh), { parse_mode: 'HTML' });
-});
-
-bot.action('library:stories', async (ctx) => {
-  const IslamicLibrary = require('./features/islamicLibrary');
-  const story = await IslamicLibrary.getQuranStory('موسى');
-  await ctx.reply(IslamicLibrary.formatLibraryContent('story', story), { parse_mode: 'HTML' });
-});
-
-bot.action('library:sahabi', async (ctx) => {
-  const IslamicLibrary = require('./features/islamicLibrary');
-  const sahabi = await IslamicLibrary.getSahabiBiography('أبو بكر');
-  await ctx.reply(IslamicLibrary.formatLibraryContent('sahabi', sahabi), { parse_mode: 'HTML' });
-});
-
-bot.action('library:awrad', (ctx) => CommandHandler.handleDua(ctx));
+bot.action('library:menu', (ctx) => CommandHandler.handleLibrary(ctx));
 
 // --- TEAMS ACTIONS ---
 bot.action('team:create', async (ctx) => {
