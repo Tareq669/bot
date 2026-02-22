@@ -24,6 +24,7 @@ const QuranicGamesHandler = require('./commands/quranicGamesHandler');
 const EconomyHandler = require('./commands/economyHandler');
 const ContentHandler = require('./commands/contentHandler');
 const ProfileHandler = require('./commands/profileHandler');
+const JoeChatHandler = require('./handlers/joeChatHandler');
 const { logger } = require('./utils/helpers');
 const ReconnectManager = require('./utils/reconnect');
 const connectionMonitor = require('./utils/connectionMonitor');
@@ -97,7 +98,8 @@ const PRIVATE_ONLY_COMMANDS = new Set([
   'khatma', 'adhkar', 'quran', 'quotes', 'poetry', 'games', 'economy', 'stats', 'rewards',
   'image', 'shop', 'transfer', 'notifications', 'notif', 'backup', 'qgames', 'profile',
   'balance', 'leaderboard', 'daily', 'features', 'goals', 'charity', 'memorization', 'dua',
-  'referral', 'events', 'teams', 'owner', 'panel', 'owners', 'myid', 'health', 'givecoins'
+  'referral', 'events', 'teams', 'owner', 'panel', 'owners', 'myid', 'health', 'givecoins',
+  'jo', 'jooff', 'jomode', 'joclear'
 ]);
 
 const GROUP_ONLY_COMMANDS = new Set([
@@ -113,7 +115,7 @@ const PRIVATE_REPLY_BUTTONS = new Set([
   '🕌 الختمة', '📿 الأذكار', '📖 القرآن', '💭 الاقتباسات', '✍️ الشعر', '🎮 الألعاب',
   '💰 الاقتصاد', '👤 حسابي', '🏆 المتصدرين', '⚙️ الإعدادات', '✨ الميزات', '📚 المكتبة',
   '📊 إحصائيات', '🎁 المكافآت', '🛍️ المتجر', '💸 التحويلات والتبرعات', '🔔 الإشعارات الذكية',
-  '📁 النسخ الاحتياطية', '⚡ التخزين المؤقت', '🛡️ حماية من الإساءة', '🎨 توليد صورة', '👑 لوحة المالك'
+  '📁 النسخ الاحتياطية', '⚡ التخزين المؤقت', '🛡️ حماية من الإساءة', '🎨 توليد صورة', '👑 لوحة المالك', '🤖 جو'
 ]);
 
 bot.use(async (ctx, next) => {
@@ -172,6 +174,10 @@ Promise.all([
       { command: 'leaderboard', description: '🏆 المتصدرين' },
       { command: 'notifications', description: '🔔 الإشعارات' },
       { command: 'image', description: '🎨 توليد صورة' },
+      { command: 'jo', description: '🤖 دردشة جو' },
+      { command: 'jooff', description: '⏹️ إيقاف جو' },
+      { command: 'jomode', description: '🎛️ وضع جو' },
+      { command: 'joclear', description: '🧹 مسح ذاكرة جو' },
       { command: 'help', description: '❓ المساعدة' }
     ],
     { scope: { type: 'all_private_chats' } }
@@ -347,6 +353,10 @@ bot.command('rewards', (ctx) => CommandHandler.handleRewards(ctx));
 
 // --- IMAGE GENERATION COMMAND ---
 bot.command('image', (ctx) => imageHandler.handleImageCommand(ctx));
+bot.command('jo', (ctx) => JoeChatHandler.handleStart(ctx));
+bot.command('jooff', (ctx) => JoeChatHandler.handleStop(ctx));
+bot.command('jomode', (ctx) => JoeChatHandler.handleMode(ctx));
+bot.command('joclear', (ctx) => JoeChatHandler.handleClear(ctx));
 
 // --- NEW FEATURES COMMANDS ---
 // Shop System
@@ -1381,6 +1391,7 @@ bot.action('menu:games', (ctx) => MenuHandler.handleGamesMenu(ctx));
 bot.action('menu:economy', (ctx) => MenuHandler.handleEconomyMenu(ctx));
 bot.action('menu:profile', (ctx) => MenuHandler.handleProfileMenu(ctx));
 bot.action('menu:features', (ctx) => CommandHandler.handleFeaturesMenu(ctx));
+bot.action('menu:joe', (ctx) => JoeChatHandler.handleStart(ctx));
 bot.action('menu:library', (ctx) => CommandHandler.handleLibrary(ctx));
 bot.action('menu:leaderboard', (ctx) => MenuHandler.handleLeaderboardMenu(ctx));
 bot.action('menu:settings', (ctx) => MenuHandler.handleSettingsMenu(ctx));
@@ -2339,6 +2350,8 @@ bot.hears('📁 النسخ الاحتياطية', (ctx) => MenuHandler.handleBac
 bot.hears('⚡ التخزين المؤقت', (ctx) => MenuHandler.handleCacheMenu(ctx));
 bot.hears('🛡️ حماية من الإساءة', (ctx) => MenuHandler.handleProtectionMenu(ctx));
 bot.hears('🎨 توليد صورة', (ctx) => imageHandler.handleImageButton(ctx));
+bot.hears('🤖 جو', (ctx) => JoeChatHandler.handleStart(ctx));
+bot.hears('Joe', (ctx) => JoeChatHandler.handleStart(ctx));
 
 // --- TEXT HANDLER FOR IMAGE GENERATION AND QURANIC GAMES ---
 bot.on('text', async (ctx, next) => {
@@ -3983,6 +3996,9 @@ bot.on('text', async (ctx) => {
         return ctx.reply('❌ حدث خطأ أثناء حفظ الإعداد');
       }
     }
+
+    const handledJoeChat = await JoeChatHandler.handlePrivateText(ctx, message);
+    if (handledJoeChat) return;
 
     // Default response for unrecognized messages (private chats only)
     if (ctx.chat?.type === 'private') {

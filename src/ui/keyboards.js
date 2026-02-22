@@ -93,6 +93,9 @@ class UIManager {
       ],
       [
         Markup.button.text('🎨 توليد صورة'),
+        Markup.button.text('Joe')
+      ],
+      [
         Markup.button.text('🎁 المكافآت')
       ],
       [
@@ -147,6 +150,9 @@ class UIManager {
       // الصف التاسع: النسخ الاحتياطية والتخزين المؤقت
       [
         Markup.button.callback('⚡ التخزين المؤقت', 'menu:cache')
+      ],
+      [
+        Markup.button.callback('Joe', 'menu:joe')
       ],
       // الصف العاشر: الحماية والمميزات الإضافية
       [
