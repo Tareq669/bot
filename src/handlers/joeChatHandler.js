@@ -124,13 +124,13 @@ class JoeChatHandler {
 
     const fetchTask = (async () => {
       const endpoint = process.env.OPENRESEARCHER_ROWS_ENDPOINT
-        || 'https://datasets-server.huggingface.co/rows?dataset=OpenResearcher%2FOpenResearcher-Dataset&config=seed_42&split=train&offset=0&length=300';
-      const res = await axios.get(endpoint, { timeout: 30000 });
+        || 'https://datasets-server.huggingface.co/rows?dataset=OpenResearcher%2FOpenResearcher-Dataset&config=seed_42&split=train&offset=0&length=120';
+      const res = await axios.get(endpoint, { timeout: 12000 });
       const rows = Array.isArray(res?.data?.rows) ? res.data.rows : [];
       const docs = rows
         .map((r) => this.pickTextFromRow(r?.row || r))
         .filter((x) => x && x.length >= 40)
-        .slice(0, 500);
+        .slice(0, 200);
 
       this.researchCache.docs = docs;
       this.researchCache.fetchedAt = Date.now();
@@ -145,10 +145,20 @@ class JoeChatHandler {
     return fetchTask;
   }
 
+  static refreshResearchInBackground() {
+    const now = Date.now();
+    const ttlMs = Number(process.env.OPENRESEARCHER_CACHE_TTL_MS || 60 * 60 * 1000);
+    const stale = !this.researchCache.fetchedAt || (now - this.researchCache.fetchedAt >= ttlMs);
+    if (!stale) return;
+    if (this.researchCache.loading) return;
+    this.loadOpenResearcher().catch(() => {});
+  }
+
   static async buildResearchContext(userText) {
     const enabled = String(process.env.JOE_RESEARCH_ENABLED || 'true').toLowerCase() !== 'false';
     if (!enabled) return '';
-    const docs = await this.loadOpenResearcher();
+    this.refreshResearchInBackground();
+    const docs = this.researchCache.docs;
     if (!docs.length) return '';
 
     const q = this.tokenize(userText).slice(0, 12);
@@ -158,7 +168,7 @@ class JoeChatHandler {
       .map((d) => ({ d, s: this.scoreDoc(q, d) }))
       .filter((x) => x.s > 0)
       .sort((a, b) => b.s - a.s)
-      .slice(0, 2)
+      .slice(0, 1)
       .map((x, i) => `[مرجع ${i + 1}]\n${x.d.slice(0, 700)}`)
       .join('\n\n');
 
@@ -172,7 +182,7 @@ class JoeChatHandler {
     const url = `${endpoint}/${encodeURIComponent(prompt)}?model=${encodeURIComponent(model)}`;
 
     const response = await axios.get(url, {
-      timeout: 30000,
+      timeout: 10000,
       responseType: 'text',
       transformResponse: [(d) => d]
     });
@@ -187,19 +197,22 @@ class JoeChatHandler {
     const messages = [
       { role: 'system', content: this.buildSystemPrompt(session.mode) },
       ...(context ? [{ role: 'system', content: `استخدم المراجع التالية كخلفية مساعدة فقط إذا كانت مرتبطة بالسؤال:\n\n${context}` }] : []),
-      ...session.history.slice(-10),
+      ...session.history.slice(-6),
       { role: 'user', content: String(userText || '') }
     ];
 
     let out = await this.callFreeChat(messages);
     if (!this.looksCorruptedText(out)) return out;
 
-    const repair = [
-      ...messages,
-      { role: 'user', content: 'أعد كتابة الرد السابق بالعربية الواضحة فقط وبدون أحرف مشوهة.' }
-    ];
-    out = await this.callFreeChat(repair);
-    if (!this.looksCorruptedText(out)) return out;
+    const repairEnabled = String(process.env.JOE_REPAIR_ENABLED || 'false').toLowerCase() === 'true';
+    if (repairEnabled) {
+      const repair = [
+        ...messages,
+        { role: 'user', content: 'أعد كتابة الرد السابق بالعربية الواضحة فقط وبدون أحرف مشوهة.' }
+      ];
+      out = await this.callFreeChat(repair);
+      if (!this.looksCorruptedText(out)) return out;
+    }
 
     return 'ولا يهمك، صار خلل بسيط. ابعت رسالتك مرة ثانية.';
   }
@@ -209,6 +222,7 @@ class JoeChatHandler {
     const session = this.getSession(ctx.from.id);
     session.active = true;
     if (!this.modes[session.mode]) session.mode = 'fun';
+    this.refreshResearchInBackground();
 
     return ctx.reply(
       `🤖 أهلين! أنا جو\nاختار النمط وبعدين احكي معي عادي.\n\nالنمط الحالي: ${this.modes[session.mode].label}`,
