@@ -28,9 +28,9 @@ class JoeChatHandler {
   }
 
   static pushHistory(session, role, content) {
-    session.history.push({ role, content: String(content || '').slice(0, 2200) });
-    if (session.history.length > 24) {
-      session.history = session.history.slice(session.history.length - 24);
+    session.history.push({ role, content: String(content || '').slice(0, 2000) });
+    if (session.history.length > 20) {
+      session.history = session.history.slice(session.history.length - 20);
     }
   }
 
@@ -43,7 +43,6 @@ class JoeChatHandler {
     const letters = (t.match(/[A-Za-z\u0600-\u06FF]/g) || []).length;
     const arabic = (t.match(/[\u0600-\u06FF]/g) || []).length;
     if (letters > 20 && arabic / letters < 0.15) return true;
-
     return false;
   }
 
@@ -74,89 +73,45 @@ class JoeChatHandler {
     ]);
   }
 
-  static async callHfChat(messages, temperature = 0.75) {
-    const model = process.env.HF_CHAT_MODEL || 'zai-org/GLM-4.7-Flash';
-    const response = await axios.post(
-      'https://router.huggingface.co/v1/chat/completions',
-      {
-        model,
-        messages,
-        temperature,
-        max_tokens: 340
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.HF_TOKEN}`,
-          'Content-Type': 'application/json'
-        },
-        timeout: 40000
-      }
-    );
-
-    const out = response?.data?.choices?.[0]?.message?.content;
-    if (!out || typeof out !== 'string') throw new Error('HF chat empty response');
-    return out.trim();
-  }
-
-  static async callHfFallback(messages, temperature = 0.7) {
-    const model = process.env.HF_CHAT_FALLBACK_MODEL || 'openai/gpt-oss-120b';
-    const prompt = messages
+  static buildPrompt(messages) {
+    return messages
       .map((m) => `${m.role === 'system' ? 'System' : m.role === 'assistant' ? 'Assistant' : 'User'}: ${m.content}`)
       .join('\n') + '\nAssistant:';
-
-    const response = await axios.post(
-      `https://router.huggingface.co/hf-inference/models/${model}`,
-      {
-        inputs: prompt,
-        parameters: {
-          max_new_tokens: 300,
-          temperature,
-          return_full_text: false
-        },
-        options: { wait_for_model: true }
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.HF_TOKEN}`,
-          'Content-Type': 'application/json'
-        },
-        timeout: 40000
-      }
-    );
-
-    const data = response?.data;
-    if (Array.isArray(data) && typeof data[0]?.generated_text === 'string') return data[0].generated_text.trim();
-    if (typeof data?.generated_text === 'string') return data.generated_text.trim();
-    throw new Error('HF fallback empty response');
   }
 
-  static async generate(session, userText, temperature = 0.75) {
+  static async callFreeChat(messages) {
+    const model = process.env.FREE_CHAT_MODEL || 'openai';
+    const endpoint = process.env.FREE_CHAT_ENDPOINT || 'https://text.pollinations.ai';
+    const prompt = this.buildPrompt(messages);
+    const url = `${endpoint}/${encodeURIComponent(prompt)}?model=${encodeURIComponent(model)}`;
+
+    const response = await axios.get(url, {
+      timeout: 30000,
+      responseType: 'text',
+      transformResponse: [(d) => d]
+    });
+
+    const out = typeof response?.data === 'string' ? response.data.trim() : '';
+    if (!out) throw new Error('FREE provider returned empty response');
+    return out;
+  }
+
+  static async generate(session, userText) {
     const messages = [
       { role: 'system', content: this.buildSystemPrompt(session.mode) },
-      ...session.history.slice(-14),
+      ...session.history.slice(-10),
       { role: 'user', content: String(userText || '') }
     ];
 
-    let out;
-    try {
-      out = await this.callHfChat(messages, temperature);
-    } catch (_error) {
-      out = await this.callHfFallback(messages, temperature);
-    }
-
+    let out = await this.callFreeChat(messages);
     if (!this.looksCorruptedText(out)) return out;
 
-    const repairMessages = [
+    const repair = [
       ...messages,
-      { role: 'user', content: 'أعد كتابة ردك السابق بالعربية الواضحة فقط وبدون أي أحرف مشوهة.' }
+      { role: 'user', content: 'أعد كتابة الرد السابق بالعربية الواضحة فقط وبدون أحرف مشوهة.' }
     ];
-
-    try {
-      const fixed = await this.callHfChat(repairMessages, 0.4);
-      if (!this.looksCorruptedText(fixed)) return fixed;
-    } catch (_error) {
-      // ignore and fall through
-    }
+    out = await this.callFreeChat(repair);
+    if (!this.looksCorruptedText(out)) return out;
 
     return 'ولا يهمك، صار خلل بسيط. ابعت رسالتك مرة ثانية.';
   }
@@ -169,9 +124,7 @@ class JoeChatHandler {
 
     return ctx.reply(
       `🤖 أهلين! أنا جو\nاختار النمط وبعدين احكي معي عادي.\n\nالنمط الحالي: ${this.modes[session.mode].label}`,
-      {
-        reply_markup: this.buildModeKeyboard(session.mode).reply_markup
-      }
+      { reply_markup: this.buildModeKeyboard(session.mode).reply_markup }
     );
   }
 
@@ -249,7 +202,7 @@ class JoeChatHandler {
       try {
         const prompt = 'أعطني رد عربي قصير ومضحك بلهجة فلسطينية.';
         this.pushHistory(session, 'user', prompt);
-        const out = await this.generate(session, prompt, 0.95);
+        const out = await this.generate(session, prompt);
         this.pushHistory(session, 'assistant', out);
         return ctx.reply(out);
       } catch (_error) {
@@ -281,11 +234,11 @@ class JoeChatHandler {
     try {
       await ctx.sendChatAction('typing').catch(() => {});
       this.pushHistory(session, 'user', msg);
-      const out = await this.generate(session, msg, session.mode === 'funny' ? 0.95 : 0.75);
+      const out = await this.generate(session, msg);
       this.pushHistory(session, 'assistant', out);
       await ctx.reply(out || 'ما طلع رد هالمرة، جرب مرة ثانية.');
     } catch (_error) {
-      await ctx.reply('Joe مشغول شوي. جرب بعد لحظة.');
+      await ctx.reply('الخدمة المجانية مشغولة الآن. جرب بعد لحظة.');
     }
     return true;
   }

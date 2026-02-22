@@ -53,7 +53,7 @@ const isMissingRequiredEnv = (value) => {
   return invalidLiterals.has(normalized.toLowerCase());
 };
 
-const requiredEnvVars = ['BOT_TOKEN', 'HF_TOKEN'];
+const requiredEnvVars = ['BOT_TOKEN'];
 const missingEnvVars = requiredEnvVars.filter((envName) => {
   const value = process.env[envName];
   return isMissingRequiredEnv(value);
@@ -67,6 +67,9 @@ if (missingEnvVars.length > 0) {
 
 process.env.BOT_TOKEN = normalizeEnvValue(process.env.BOT_TOKEN);
 process.env.HF_TOKEN = normalizeEnvValue(process.env.HF_TOKEN);
+if (isMissingRequiredEnv(process.env.HF_TOKEN)) {
+  logger.warn('⚠️ HF_TOKEN غير موجود: توليد الصور قد لا يعمل، لكن دردشة Joe المجانية ستعمل.');
+}
 
 const imageHandler = require('./handlers/imageHandler');
 
