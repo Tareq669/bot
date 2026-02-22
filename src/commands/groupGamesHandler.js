@@ -37,16 +37,46 @@ const QUICK_QUESTIONS = [
 ];
 
 const MCQ_QUESTIONS = [
-  { question: 'ما أكبر كوكب؟', options: ['المريخ', 'المشتري', 'زحل', 'الزهرة'], answerIndex: 1, reward: 10 },
-  { question: 'عاصمة اليابان؟', options: ['سيؤول', 'طوكيو', 'بكين', 'بانكوك'], answerIndex: 1, reward: 9 },
-  { question: 'ناتج 9 × 7 ؟', options: ['63', '56', '72', '49'], answerIndex: 0, reward: 8 },
-  { question: 'العنصر O ؟', options: ['الأكسجين', 'الهيدروجين', 'الحديد', 'الذهب'], answerIndex: 0, reward: 8 },
-  { question: 'عدد القارات؟', options: ['5', '6', '7', '8'], answerIndex: 2, reward: 8 },
-  { question: 'عاصمة فرنسا؟', options: ['باريس', 'روما', 'برلين', 'مدريد'], answerIndex: 0, reward: 8 },
-  { question: 'كم ساعة في اليوم؟', options: ['12', '18', '24', '30'], answerIndex: 2, reward: 7 },
-  { question: 'ناتج 100 ÷ 5 ؟', options: ['10', '15', '20', '25'], answerIndex: 2, reward: 7 },
-  { question: 'أكبر محيط؟', options: ['الأطلسي', 'الهندي', 'الهادي', 'المتجمد'], answerIndex: 2, reward: 9 },
-  { question: 'عاصمة ألمانيا؟', options: ['برلين', 'ميونخ', 'فرانكفورت', 'هامبورغ'], answerIndex: 0, reward: 8 }
+  { question: 'ما أكبر كوكب؟', options: ['المريخ', 'المشتري', 'زحل', 'الزهرة'], answerIndex: 1, reward: 1, category: 'culture' },
+  { question: 'عاصمة اليابان؟', options: ['سيؤول', 'طوكيو', 'بكين', 'بانكوك'], answerIndex: 1, reward: 1, category: 'culture' },
+  { question: 'ناتج 9 × 7 ؟', options: ['63', '56', '72', '49'], answerIndex: 0, reward: 1, category: 'math' },
+  { question: 'العنصر O ؟', options: ['الأكسجين', 'الهيدروجين', 'الحديد', 'الذهب'], answerIndex: 0, reward: 1, category: 'culture' },
+  { question: 'عدد القارات؟', options: ['5', '6', '7', '8'], answerIndex: 2, reward: 1, category: 'culture' },
+  { question: 'عاصمة فرنسا؟', options: ['باريس', 'روما', 'برلين', 'مدريد'], answerIndex: 0, reward: 1, category: 'culture' },
+  { question: 'كم ساعة في اليوم؟', options: ['12', '18', '24', '30'], answerIndex: 2, reward: 1, category: 'math' },
+  { question: 'ناتج 100 ÷ 5 ؟', options: ['10', '15', '20', '25'], answerIndex: 2, reward: 1, category: 'math' },
+  { question: 'أكبر محيط؟', options: ['الأطلسي', 'الهندي', 'الهادي', 'المتجمد'], answerIndex: 2, reward: 1, category: 'culture' },
+  { question: 'عاصمة ألمانيا؟', options: ['برلين', 'ميونخ', 'فرانكفورت', 'هامبورغ'], answerIndex: 0, reward: 1, category: 'culture' }
+];
+
+const RELIGIOUS_MCQ_QUESTIONS = [
+  { question: 'كم عدد أركان الإسلام؟', options: ['4', '5', '6', '7'], answerIndex: 1, reward: 1, category: 'religious' },
+  { question: 'كم عدد الصلوات المفروضة يوميًا؟', options: ['3', '4', '5', '6'], answerIndex: 2, reward: 1, category: 'religious' },
+  { question: 'ما أول سورة في القرآن؟', options: ['البقرة', 'الفاتحة', 'الإخلاص', 'يس'], answerIndex: 1, reward: 1, category: 'religious' },
+  { question: 'في أي شهر يصوم المسلمون؟', options: ['شعبان', 'رمضان', 'محرم', 'رجب'], answerIndex: 1, reward: 1, category: 'religious' },
+  { question: 'القبلة للمسلمين هي:', options: ['المسجد الأقصى', 'الكعبة', 'المسجد النبوي', 'مسجد قباء'], answerIndex: 1, reward: 1, category: 'religious' },
+  { question: 'كم عدد أجزاء القرآن الكريم؟', options: ['20', '25', '30', '40'], answerIndex: 2, reward: 1, category: 'religious' },
+  { question: 'كم عدد سور القرآن؟', options: ['110', '112', '114', '120'], answerIndex: 2, reward: 1, category: 'religious' },
+  { question: 'أول مسجد بُني في الإسلام هو:', options: ['المسجد الحرام', 'مسجد قباء', 'المسجد النبوي', 'المسجد الأقصى'], answerIndex: 1, reward: 1, category: 'religious' },
+  { question: 'ليلة القدر تكون في شهر:', options: ['شعبان', 'رمضان', 'رجب', 'ذو الحجة'], answerIndex: 1, reward: 1, category: 'religious' },
+  { question: 'عدد أيام صيام رمضان غالبًا:', options: ['20', '25', '29 أو 30', '35'], answerIndex: 2, reward: 1, category: 'religious' },
+  { question: 'الزكاة ركن رقم:', options: ['الأول', 'الثاني', 'الثالث', 'الرابع'], answerIndex: 2, reward: 1, category: 'religious' },
+  { question: 'الحج يكون في شهر:', options: ['رمضان', 'ذو الحجة', 'محرم', 'شوال'], answerIndex: 1, reward: 1, category: 'religious' }
+];
+
+const SCIENCE_MCQ_QUESTIONS = [
+  { question: 'ما الكوكب المعروف بالكوكب الأحمر؟', options: ['الزهرة', 'المريخ', 'عطارد', 'زحل'], answerIndex: 1, reward: 1, category: 'science' },
+  { question: 'ما الغاز الأكثر وجودًا في الغلاف الجوي للأرض؟', options: ['الأكسجين', 'الهيدروجين', 'النيتروجين', 'ثاني أكسيد الكربون'], answerIndex: 2, reward: 1, category: 'science' },
+  { question: 'ما الوحدة الأساسية لقياس شدة التيار الكهربائي؟', options: ['فولت', 'أوم', 'واط', 'أمبير'], answerIndex: 3, reward: 1, category: 'science' },
+  { question: 'أي جزء في الخلية يُعد مركز التحكم؟', options: ['الغشاء', 'السيتوبلازم', 'النواة', 'الميتوكوندريا'], answerIndex: 2, reward: 1, category: 'science' },
+  { question: 'ما الرمز الكيميائي للماء؟', options: ['CO2', 'H2O', 'O2', 'NaCl'], answerIndex: 1, reward: 1, category: 'science' },
+  { question: 'كم عدد الكواكب في المجموعة الشمسية؟', options: ['7', '8', '9', '10'], answerIndex: 1, reward: 1, category: 'science' },
+  { question: 'أين يحدث البناء الضوئي في النبات؟', options: ['الجذر', 'الساق', 'الورقة', 'الزهرة'], answerIndex: 2, reward: 1, category: 'science' },
+  { question: 'ما الجهاز المسؤول عن ضخ الدم؟', options: ['الرئتان', 'الكبد', 'القلب', 'الكلى'], answerIndex: 2, reward: 1, category: 'science' },
+  { question: 'أي الكواكب أقرب إلى الشمس؟', options: ['المريخ', 'الزهرة', 'عطارد', 'الأرض'], answerIndex: 2, reward: 1, category: 'science' },
+  { question: 'ما الرمز الكيميائي للذهب؟', options: ['Ag', 'Au', 'Fe', 'Gd'], answerIndex: 1, reward: 1, category: 'science' },
+  { question: 'ما سرعة الضوء تقريبًا؟', options: ['300 ألف كم/ث', '30 ألف كم/ث', '3 آلاف كم/ث', '3 مليون كم/ث'], answerIndex: 0, reward: 1, category: 'science' },
+  { question: 'أي هذه الكواكب غازي عملاق؟', options: ['الأرض', 'المشتري', 'المريخ', 'عطارد'], answerIndex: 1, reward: 1, category: 'science' }
 ];
 
 const CAPITALS_BANK = [
@@ -92,7 +122,8 @@ const buildGeneratedMathMcq = () => {
       question,
       options,
       answerIndex: options.indexOf(String(answer)),
-      reward: answer >= 40 ? 10 : 8
+      reward: 1,
+      category: 'math'
     });
   }
   return list;
@@ -110,13 +141,16 @@ const buildGeneratedCapitalsMcq = () => {
       question: `ما عاصمة ${country}؟`,
       options,
       answerIndex: 0,
-      reward: 9
+      reward: 1,
+      category: 'culture'
     };
   });
 };
 
 const ALL_MCQ_QUESTIONS = [
   ...MCQ_QUESTIONS,
+  ...RELIGIOUS_MCQ_QUESTIONS,
+  ...SCIENCE_MCQ_QUESTIONS,
   ...buildGeneratedMathMcq(),
   ...buildGeneratedCapitalsMcq()
 ];
@@ -250,13 +284,45 @@ class GroupGamesHandler {
     return null;
   }
 
+  static parseCategory(arg) {
+    const x = String(arg || '').toLowerCase();
+    if (['ثقافي', 'ثقافيه', 'ثقافية', 'culture', 'cultural', 'عام', 'عامة'].includes(x)) return 'culture';
+    if (['ديني', 'دينيه', 'دينية', 'religion', 'religious'].includes(x)) return 'religious';
+    if (['رياضي', 'رياضيه', 'رياضية', 'math', 'رياضيات'].includes(x)) return 'math';
+    if (['علمي', 'علميه', 'علمية', 'science', 'scientific'].includes(x)) return 'science';
+    return null;
+  }
+
+  static parseQuizOptions(args = [], defaultTimeoutSec = 25) {
+    let difficulty = null;
+    let category = null;
+    let timeoutSec = defaultTimeoutSec;
+    args.forEach((arg) => {
+      const d = this.parseDifficulty(arg);
+      if (d) difficulty = d;
+      const c = this.parseCategory(arg);
+      if (c) category = c;
+      const n = parseInt(String(arg), 10);
+      if (Number.isInteger(n) && n >= 10 && n <= 120) timeoutSec = n;
+    });
+    return { difficulty, category, timeoutSec };
+  }
+
   static questionMatchesDifficulty(question, difficulty) {
     if (!difficulty) return true;
-    const reward = Number(question?.reward || 0);
-    if (difficulty === 'easy') return reward <= 7;
-    if (difficulty === 'medium') return reward >= 8 && reward <= 9;
-    if (difficulty === 'hard') return reward >= 10;
+    const text = String(question?.question || '');
+    let sum = 0;
+    for (let i = 0; i < text.length; i += 1) sum += text.charCodeAt(i);
+    const bucket = sum % 3;
+    if (difficulty === 'easy') return bucket === 0;
+    if (difficulty === 'medium') return bucket === 1;
+    if (difficulty === 'hard') return bucket === 2;
     return true;
+  }
+
+  static questionMatchesCategory(question, category) {
+    if (!category) return true;
+    return String(question?.category || 'culture') === String(category);
   }
 
   static async ensureGroupRecord(ctx) {
@@ -363,13 +429,14 @@ class GroupGamesHandler {
     const deadline = Date.now() + roundPayload.timeoutSec * 1000;
     this.activeRounds.set(groupId, {
       ...roundPayload,
+      reward: 1,
       answersNorm: roundPayload.answers.map((a) => this.normalizeText(String(a))),
       deadline
     });
 
     const sent = await this.bot.telegram.sendMessage(
       Number(chatId),
-      `${roundPayload.prompt}\n\n⏱️ المدة: ${roundPayload.timeoutSec} ثانية\n💰 الجائزة: ${roundPayload.reward} نقطة`,
+      `${roundPayload.prompt}\n\n⏱️ المدة: ${roundPayload.timeoutSec} ثانية\n💰 الجائزة: 1 نقطة`,
       { parse_mode: 'HTML' }
     );
 
@@ -388,7 +455,7 @@ class GroupGamesHandler {
   }
   static buildDailyRound() {
     const daily = this.pickRandom(DAILY_CHALLENGES);
-    return { type: 'daily', prompt: `🧠 <b>التحدي اليومي</b>\n\n${daily.question}`, answers: daily.answers, reward: daily.reward, timeoutSec: 120 };
+    return { type: 'daily', prompt: `🧠 <b>التحدي اليومي</b>\n\n${daily.question}`, answers: daily.answers, reward: 1, timeoutSec: 120 };
   }
 
   static buildQuizRound(difficulty = null, groupId = null) {
@@ -396,7 +463,7 @@ class GroupGamesHandler {
     const effectivePool = pool.length > 0 ? pool : QUICK_QUESTIONS;
     const key = `quiz:${String(groupId || 'global')}`;
     const quiz = this.pickFromQueue(effectivePool, key);
-    return { type: 'quiz', prompt: `❓ <b>سؤال سريع</b>\n\n${quiz.question}`, answers: quiz.answers, reward: quiz.reward, timeoutSec: 30 };
+    return { type: 'quiz', prompt: `❓ <b>سؤال سريع</b>\n\n${quiz.question}`, answers: quiz.answers, reward: 1, timeoutSec: 30 };
   }
 
   static buildMathRound() {
@@ -405,13 +472,13 @@ class GroupGamesHandler {
     const ops = ['+', '-', '*'];
     const op = this.pickRandom(ops);
     const answer = op === '+' ? (a + b) : op === '-' ? (a - b) : (a * b);
-    return { type: 'math', prompt: `➗ <b>تحدي حساب ذهني</b>\n\nما ناتج: <b>${a} ${op} ${b}</b> ؟`, answers: [String(answer)], reward: 9, timeoutSec: 25 };
+    return { type: 'math', prompt: `➗ <b>تحدي حساب ذهني</b>\n\nما ناتج: <b>${a} ${op} ${b}</b> ؟`, answers: [String(answer)], reward: 1, timeoutSec: 25 };
   }
 
   static buildWordRound() {
     const word = this.pickRandom(WORDS);
     const shuffled = this.shuffleWord(word);
-    return { type: 'word', prompt: `🔤 <b>ترتيب كلمة</b>\n\nرتّب هذه الأحرف: <b>${shuffled}</b>`, answers: [word], reward: 10, timeoutSec: 35 };
+    return { type: 'word', prompt: `🔤 <b>ترتيب كلمة</b>\n\nرتّب هذه الأحرف: <b>${shuffled}</b>`, answers: [word], reward: 1, timeoutSec: 35 };
   }
 
   static async sendQuizPoll(chatId, question, reward, timeoutSec = 25) {
@@ -439,7 +506,7 @@ class GroupGamesHandler {
 
     this.activeQuizPolls.set(pollId, {
       chatId: String(chatId),
-      reward: Number(reward || 8),
+      reward: 1,
       correctOptionId,
       awardedUsers: new Set(),
       cleanup
@@ -535,12 +602,7 @@ class GroupGamesHandler {
     row.bestStreak = Math.max(row.bestStreak || 0, row.streak || 1);
     row.lastWinDate = new Date();
 
-    let streakBonus = 0;
-    if ((row.streak || 0) > 0 && row.streak % 3 === 0) {
-      streakBonus = 3;
-      row.points += streakBonus;
-      row.weeklyPoints += streakBonus;
-    }
+    const streakBonus = 0;
 
     const finalReward = reward + streakBonus;
     if (group.gameSystem.tournament?.active) {
@@ -673,11 +735,12 @@ class GroupGamesHandler {
     const status = await this.canStartRound(ctx);
     if (!status.ok) return;
     const args = this.parseCommandArgs(ctx);
-    const difficulty = this.parseDifficulty(args[0]);
-    const pool = ALL_MCQ_QUESTIONS.filter((q) => this.questionMatchesDifficulty(q, difficulty));
+    const opts = this.parseQuizOptions(args, status.group.gameSystem.settings.questionTimeoutSec || 25);
+    const pool = ALL_MCQ_QUESTIONS.filter((q) => this.questionMatchesDifficulty(q, opts.difficulty))
+      .filter((q) => this.questionMatchesCategory(q, opts.category));
     const source = pool.length > 0 ? pool : ALL_MCQ_QUESTIONS;
-    const question = this.pickFromQueue(source, `quizpoll:${String(ctx.chat.id)}:${difficulty || 'all'}`);
-    const timeoutSec = Math.max(10, status.group.gameSystem.settings.questionTimeoutSec || 25);
+    const question = this.pickFromQueue(source, `quizpoll:${String(ctx.chat.id)}:${opts.difficulty || 'all'}:${opts.category || 'all'}`);
+    const timeoutSec = Math.max(10, opts.timeoutSec || 25);
     await this.sendQuizPoll(ctx.chat.id, question, question.reward, timeoutSec);
   }
 
@@ -715,11 +778,12 @@ class GroupGamesHandler {
     const status = await this.canStartRound(ctx);
     if (!status.ok) return;
     const args = this.parseCommandArgs(ctx);
-    const difficulty = this.parseDifficulty(args[0]);
-    const pool = ALL_MCQ_QUESTIONS.filter((q) => this.questionMatchesDifficulty(q, difficulty));
+    const opts = this.parseQuizOptions(args, status.group.gameSystem.settings.questionTimeoutSec || 25);
+    const pool = ALL_MCQ_QUESTIONS.filter((q) => this.questionMatchesDifficulty(q, opts.difficulty))
+      .filter((q) => this.questionMatchesCategory(q, opts.category));
     const source = pool.length > 0 ? pool : ALL_MCQ_QUESTIONS;
-    const question = this.pickFromQueue(source, `mcq:${String(ctx.chat.id)}:${difficulty || 'all'}`);
-    const timeoutSec = Math.max(10, status.group.gameSystem.settings.questionTimeoutSec || 25);
+    const question = this.pickFromQueue(source, `mcq:${String(ctx.chat.id)}:${opts.difficulty || 'all'}:${opts.category || 'all'}`);
+    const timeoutSec = Math.max(10, opts.timeoutSec || 25);
     await this.sendQuizPoll(ctx.chat.id, question, question.reward, timeoutSec);
   }
 
@@ -732,9 +796,10 @@ class GroupGamesHandler {
       return;
     }
 
-    const pool = ALL_MCQ_QUESTIONS.filter((q) => this.questionMatchesDifficulty(q, session.difficulty));
+    const pool = ALL_MCQ_QUESTIONS.filter((q) => this.questionMatchesDifficulty(q, session.difficulty))
+      .filter((q) => this.questionMatchesCategory(q, session.category));
     const source = pool.length > 0 ? pool : ALL_MCQ_QUESTIONS;
-    const question = this.pickFromQueue(source, `series:${String(chatId)}:${session.difficulty || 'all'}`);
+    const question = this.pickFromQueue(source, `series:${String(chatId)}:${session.difficulty || 'all'}:${session.category || 'all'}`);
     await this.sendQuizPoll(chatId, question, question.reward, session.timeoutSec);
     session.remaining -= 1;
 
@@ -785,18 +850,19 @@ class GroupGamesHandler {
     }
 
     const count = Math.max(2, Math.min(20, parseInt(args[0] || '5', 10) || 5));
-    const difficulty = this.parseDifficulty(args[1]) || null;
+    const quizOpts = this.parseQuizOptions(args.slice(1), 25);
     const group = await this.ensureGroupRecord(ctx);
-    const timeoutSec = Math.max(10, group.gameSystem.settings.questionTimeoutSec || 25);
+    const timeoutSec = Math.max(10, quizOpts.timeoutSec || group.gameSystem.settings.questionTimeoutSec || 25);
 
     this.activeQuizSeries.set(chatKey, {
       remaining: count,
-      difficulty,
+      difficulty: quizOpts.difficulty,
+      category: quizOpts.category,
       timeoutSec,
       timer: null
     });
 
-    await ctx.reply(`🚀 بدأت سلسلة QuizBot: ${count} أسئلة${difficulty ? ` (${difficulty})` : ''}.`);
+    await ctx.reply(`🚀 بدأت سلسلة QuizBot: ${count} أسئلة${quizOpts.category ? ` | نوع: ${quizOpts.category}` : ''}${quizOpts.difficulty ? ` | صعوبة: ${quizOpts.difficulty}` : ''}${timeoutSec ? ` | وقت: ${timeoutSec}ث` : ''}.`);
     await this.dispatchQuizSeries(ctx.chat.id);
   }
 
@@ -1150,14 +1216,18 @@ class GroupGamesHandler {
     return ctx.reply(
       '🎮 <b>ألعاب الجروب التفاعلية</b>\n\n' +
       '• /gquiz سؤال سريع\n' +
+      'مثال: <code>/gquiz دينية 30</code>\n' +
+      'مثال: <code>/gquiz علمية 25</code>\n' +
       '• /gmath تحدي حساب ذهني\n' +
       '• /gword ترتيب كلمة\n' +
       '• /gdaily تحدي يومي\n' +
       '• /gmcq سؤال اختيارات بأزرار\n' +
+      'مثال: <code>/gmcq رياضية 25</code>\n' +
+      'مثال: <code>/gmcq علمية 20</code>\n' +
       '• /gvote تصويت تفاعلي (مؤقت)\n' +
       'صيغة مخصصة: <code>/gvote 120 | السؤال | خيار1 | خيار2 | خيار3</code>\n' +
       '• /gquizset 5 سلسلة QuizBot\n' +
-      '• /gquizset 7 hard سلسلة مع صعوبة\n' +
+      '• /gquizset 7 hard دينية 30\n' +
       '• /gquizset stop إيقاف السلسلة\n' +
       '• /gleader لوحة المتصدرين\n' +
       '• /gweekly سباق الأسبوع\n' +
@@ -1165,9 +1235,10 @@ class GroupGamesHandler {
       '• /gteam إدارة فريقك\n' +
       '• /gteams ترتيب الفرق\n' +
       '• /gtour إدارة البطولة الأسبوعية (للمشرفين)\n\n' +
-      'مستويات الصعوبة: <code>/gquiz easy</code> | <code>/gquiz medium</code> | <code>/gquiz hard</code>\n' +
-      '<code>/gmcq easy</code> | <code>/gmcq medium</code> | <code>/gmcq hard</code>\n\n' +
-      'نظام الستريك: كل 3 فوز متتالي = بونص نقاط 🔥\n' +
+      'الأنواع: <code>ثقافية</code> | <code>دينية</code> | <code>رياضية</code> | <code>علمية</code>\n' +
+      'الوقت: أضف الثواني مثل <code>30</code>\n' +
+      'مستويات الصعوبة: <code>easy</code> | <code>medium</code> | <code>hard</code>\n\n' +
+      'النقاط: كل إجابة صحيحة = <b>1 نقطة</b>\n' +
       'نمط الكويز الآن يعمل بأسلوب Quiz Poll مثل QuizBot.',
       { parse_mode: 'HTML', reply_markup: keyboard.reply_markup }
     );
