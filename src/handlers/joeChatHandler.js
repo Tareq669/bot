@@ -1,17 +1,17 @@
-﻿const axios = require('axios');
+const axios = require('axios');
 const Markup = require('telegraf/markup');
 
 class JoeChatHandler {
   static sessions = new Map();
 
   static modes = {
-    fun: { label: '🎭 فوكاهي', line: 'خليك فوكاهي لطيف ومرح.' },
-    funny: { label: '😂 مضحك', line: 'ركز على النكتة والتعليقات الطريفة بدون إساءة.' },
-    plus18: { label: '🔞 18+ (آمن)', line: 'أسلوب ناضج للكبار فقط بدون أي محتوى جنسي صريح.' },
-    helper: { label: '🧠 مساعد', line: 'جاوب بشكل عملي وخطوات واضحة.' },
-    tech: { label: '💻 تقني', line: 'ركز على الدقة التقنية والحلول المباشرة.' },
-    creative: { label: '🧪 مبدع', line: 'اعط أفكار مبتكرة وصياغة جذابة.' },
-    short: { label: '⚡ مختصر', line: 'اختصر قدر الإمكان.' }
+    fun: { label: '🎭 فوكاهي', style: 'مرِح وخفيف' },
+    funny: { label: '😂 مضحك', style: 'نكتة وتعليقات طريفة' },
+    plus18: { label: '🔞 18+ (آمن)', style: 'أسلوب ناضج بدون أي محتوى جنسي صريح' },
+    helper: { label: '🧠 مساعد', style: 'عملي وخطوات واضحة' },
+    tech: { label: '💻 تقني', style: 'تقني ودقيق' },
+    creative: { label: '🧪 مبدع', style: 'أفكار مبتكرة' },
+    short: { label: '⚡ مختصر', style: 'مختصر جدًا' }
   };
 
   static getSession(userId) {
@@ -28,9 +28,9 @@ class JoeChatHandler {
   }
 
   static pushHistory(session, role, content) {
-    session.history.push({ role, content: String(content || '').slice(0, 2000) });
-    if (session.history.length > 16) {
-      session.history = session.history.slice(session.history.length - 16);
+    session.history.push({ role, content: String(content || '').slice(0, 1800) });
+    if (session.history.length > 14) {
+      session.history = session.history.slice(session.history.length - 14);
     }
   }
 
@@ -40,7 +40,6 @@ class JoeChatHandler {
       const prefix = currentMode === id ? '✅ ' : '';
       return Markup.button.callback(`${prefix}${label}`, `joe:mode:${id}`);
     };
-
     return Markup.inlineKeyboard([
       [mk('fun'), mk('funny')],
       [mk('plus18'), mk('helper')],
@@ -50,132 +49,110 @@ class JoeChatHandler {
     ]);
   }
 
-  static buildSystemInstruction(mode = 'fun') {
-    const modeCfg = this.modes[mode] || this.modes.fun;
+  static buildSystemPrompt(mode = 'fun') {
+    const m = this.modes[mode] || this.modes.fun;
     return [
       'اسمك جو.',
-      'جاوب بالعربية فقط وبلهجة فلسطينية مفهومة.',
-      'ممنوع الإهانة أو خطاب الكراهية أو المحتوى الجنسي الصريح.',
-      modeCfg.line,
-      'خلّي الرد غالبًا مختصر (2-6 أسطر) إلا إذا طلب المستخدم تفصيل.'
+      'الرد دائمًا بالعربية وبلهجة فلسطينية واضحة وسهلة.',
+      'الأسلوب الحالي: ' + m.style + '.',
+      'ممنوع الإهانة وخطاب الكراهية والمحتوى الجنسي الصريح.',
+      'الرد غالبًا 2-6 أسطر إلا إذا طلب المستخدم تفصيل.'
     ].join(' ');
   }
 
   static mapHistoryToGemini(history) {
-    return history
-      .filter((x) => x && typeof x.content === 'string' && x.content.trim())
-      .map((x) => ({
-        role: x.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: x.content }]
-      }));
-  }
-
-  static buildFallbackPrompt(session, userText) {
-    const history = session.history
-      .slice(-6)
-      .map((h) => `${h.role === 'assistant' ? 'المساعد' : 'المستخدم'}: ${h.content}`)
-      .join('\n');
-
-    return [
-      this.buildSystemInstruction(session.mode),
-      history ? `\nسياق سابق:\n${history}` : '',
-      `\nسؤال المستخدم:\n${String(userText || '')}`,
-      '\nجاوب بالعربية الواضحة فقط.'
-    ].join('\n');
-  }
-
-  static async callFreeFallback(session, userText) {
-    const endpoint = process.env.FREE_CHAT_ENDPOINT || 'https://text.pollinations.ai';
-    const model = process.env.FREE_CHAT_MODEL || 'openai';
-    const prompt = this.buildFallbackPrompt(session, userText);
-    const url = `${endpoint}/${encodeURIComponent(prompt)}?model=${encodeURIComponent(model)}`;
-
-    const response = await axios.get(url, {
-      timeout: 10000,
-      responseType: 'text',
-      transformResponse: [(d) => d]
-    });
-    const out = typeof response?.data === 'string' ? response.data.trim() : '';
-    if (!out) throw new Error('FREE_FALLBACK_EMPTY');
-    return out;
-  }
-
-  static formatError(err) {
-    if (!err) return 'UNKNOWN_ERROR';
-    const status = err?.response?.status;
-    const payload = err?.response?.data;
-    const payloadText = typeof payload === 'string' ? payload : JSON.stringify(payload || {});
-    const shortPayload = String(payloadText || '').slice(0, 220);
-    const msg = String(err?.message || 'ERROR');
-    return status ? `HTTP_${status} ${msg} ${shortPayload}` : `${msg} ${shortPayload}`;
+    return history.map((h) => ({
+      role: h.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: h.content }]
+    }));
   }
 
   static async callGemini(session, userText) {
     const apiKey = String(process.env.GEMINI_API_KEY || '').trim();
-    if (!apiKey) {
-      throw new Error('GEMINI_API_KEY_MISSING');
-    }
+    if (!apiKey) throw new Error('NO_GEMINI_KEY');
 
     const models = [
       String(process.env.GEMINI_MODEL || 'gemini-2.0-flash').trim(),
       String(process.env.GEMINI_MODEL_FALLBACK || 'gemini-1.5-flash').trim()
     ].filter(Boolean);
 
-    const contents = [
-      ...this.mapHistoryToGemini(session.history.slice(-10)),
-      { role: 'user', parts: [{ text: String(userText || '') }] }
-    ];
-
     const payload = {
       systemInstruction: {
-        parts: [{ text: this.buildSystemInstruction(session.mode) }]
+        parts: [{ text: this.buildSystemPrompt(session.mode) }]
       },
-      contents,
+      contents: [
+        ...this.mapHistoryToGemini(session.history.slice(-8)),
+        { role: 'user', parts: [{ text: String(userText || '') }] }
+      ],
       generationConfig: {
         temperature: session.mode === 'funny' ? 0.9 : 0.7,
-        maxOutputTokens: session.mode === 'short' ? 220 : 420
+        maxOutputTokens: session.mode === 'short' ? 180 : 360
       }
     };
 
-    let lastError = null;
+    let lastErr = null;
     for (const model of models) {
       try {
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
-        const response = await axios.post(url, payload, {
-          timeout: 15000,
+        const res = await axios.post(url, payload, {
+          timeout: 12000,
           headers: { 'Content-Type': 'application/json' }
         });
-
-        const candidate = response?.data?.candidates?.[0];
-        const parts = candidate?.content?.parts || [];
-        const text = parts
+        const text = (res?.data?.candidates?.[0]?.content?.parts || [])
           .map((p) => (typeof p?.text === 'string' ? p.text : ''))
           .join('\n')
           .trim();
-
-        if (!text) {
-          const finish = candidate?.finishReason || 'UNKNOWN';
-          throw new Error(`GEMINI_EMPTY_${finish}`);
-        }
-        return text;
+        if (text) return text;
+        throw new Error('EMPTY_GEMINI_TEXT');
       } catch (err) {
-        lastError = err;
+        lastErr = err;
       }
     }
-    throw lastError || new Error('GEMINI_ALL_MODELS_FAILED');
+    throw lastErr || new Error('GEMINI_FAILED');
+  }
+
+  static async callFreeProvider(session, userText) {
+    const endpoint = process.env.FREE_CHAT_ENDPOINT || 'https://text.pollinations.ai';
+    const model = process.env.FREE_CHAT_MODEL || 'openai';
+    const context = session.history.slice(-6).map((h) => `${h.role === 'assistant' ? 'المساعد' : 'المستخدم'}: ${h.content}`).join('\n');
+    const prompt = [
+      this.buildSystemPrompt(session.mode),
+      context ? `\nسياق:\n${context}` : '',
+      `\nسؤال المستخدم:\n${String(userText || '')}`,
+      '\nجاوب بالعربية الواضحة فقط.'
+    ].join('\n');
+
+    const url = `${endpoint}/${encodeURIComponent(prompt)}?model=${encodeURIComponent(model)}`;
+    const res = await axios.get(url, {
+      timeout: 9000,
+      responseType: 'text',
+      transformResponse: [(d) => d]
+    });
+    const text = typeof res?.data === 'string' ? res.data.trim() : '';
+    if (!text) throw new Error('FREE_EMPTY');
+    return text;
+  }
+
+  static localFallback(userText) {
+    const q = String(userText || '').trim();
+    if (!q) return 'احكيلي شو بدك وأنا معك.';
+    if (q.includes('مرحبا') || q.includes('هلا')) return 'هلا والله 🙌 شو الأخبار؟';
+    if (q.endsWith('?') || q.includes('كيف')) return 'سؤال ممتاز، ابعته بشكل أقصر شوي وبجاوبك بسرعة.';
+    return 'وصلت فكرتك 👌 كمل وأنا معك خطوة بخطوة.';
   }
 
   static async generate(session, userText) {
     try {
-      const text = await this.callGemini(session, userText);
-      return text;
-    } catch (geminiError) {
+      return await this.callGemini(session, userText);
+    } catch (gemErr) {
       try {
-        return await this.callFreeFallback(session, userText);
-      } catch (freeError) {
-        throw new Error(
-          `JOE_ALL_FAILED | GEMINI: ${this.formatError(geminiError)} | FREE: ${this.formatError(freeError)}`
-        );
+        return await this.callFreeProvider(session, userText);
+      } catch (freeErr) {
+        console.error('Joe providers failed:', {
+          gemini: String(gemErr?.message || gemErr),
+          free: String(freeErr?.message || freeErr)
+        });
+        return this.localFallback(userText);
       }
     }
   }
@@ -185,17 +162,8 @@ class JoeChatHandler {
     const session = this.getSession(ctx.from.id);
     session.active = true;
     if (!this.modes[session.mode]) session.mode = 'fun';
-
-    const hasKey = Boolean(String(process.env.GEMINI_API_KEY || '').trim());
-    if (!hasKey) {
-      return ctx.reply(
-        '⚠️ Gemini غير مفعّل بعد.\nضيف GEMINI_API_KEY في Railway Variables ثم أعد النشر.',
-        { reply_markup: this.buildModeKeyboard(session.mode).reply_markup }
-      );
-    }
-
     return ctx.reply(
-      `🤖 أهلين! أنا جو\nاختار النمط وبعدين احكي معي عادي.\n\nالنمط الحالي: ${this.modes[session.mode].label}`,
+      `🤖 أهلين! أنا جو.\nاختار النمط وبعدين احكي معي عادي.\n\nالنمط الحالي: ${this.modes[session.mode].label}`,
       { reply_markup: this.buildModeKeyboard(session.mode).reply_markup }
     );
   }
@@ -204,7 +172,7 @@ class JoeChatHandler {
     if (ctx.chat?.type !== 'private') return;
     const session = this.getSession(ctx.from.id);
     session.active = false;
-    return ctx.reply('✅ تم إيقاف جو. إذا بدك تشغله ارجع اضغط Joe أو اكتب /jo');
+    return ctx.reply('✅ تم إيقاف جو.');
   }
 
   static async handleClear(ctx) {
@@ -221,7 +189,6 @@ class JoeChatHandler {
     if (!mode || !this.modes[mode]) {
       return ctx.reply('استخدم: /jomode fun|funny|plus18|helper|tech|creative|short');
     }
-
     const session = this.getSession(ctx.from.id);
     session.mode = mode;
     session.active = true;
@@ -236,9 +203,7 @@ class JoeChatHandler {
     if (!data.startsWith('joe:')) return;
 
     const session = this.getSession(ctx.from.id);
-    const parts = data.split(':');
-    const action = parts[1] || '';
-    const arg = parts[2] || '';
+    const [, action, arg] = data.split(':');
 
     if (action === 'open') {
       session.active = true;
@@ -258,7 +223,7 @@ class JoeChatHandler {
 
     if (action === 'clear') {
       session.history = [];
-      await ctx.answerCbQuery('تم مسح الذاكرة', { show_alert: false }).catch(() => {});
+      await ctx.answerCbQuery('تم المسح', { show_alert: false }).catch(() => {});
       return ctx.reply('🧹 تم مسح الذاكرة.');
     }
 
@@ -271,15 +236,11 @@ class JoeChatHandler {
     if (action === 'random') {
       session.active = true;
       await ctx.answerCbQuery('لحظة...', { show_alert: false }).catch(() => {});
-      try {
-        const prompt = 'أعطني رد عربي قصير ومضحك بلهجة فلسطينية.';
-        this.pushHistory(session, 'user', prompt);
-        const out = await this.generate(session, prompt);
-        this.pushHistory(session, 'assistant', out);
-        return ctx.reply(out);
-      } catch (_error) {
-        return ctx.reply('صار خطأ بسيط، جرب مرة ثانية.');
-      }
+      const prompt = 'أعطني رد عربي قصير ومضحك بلهجة فلسطينية.';
+      this.pushHistory(session, 'user', prompt);
+      const out = await this.generate(session, prompt);
+      this.pushHistory(session, 'assistant', out);
+      return ctx.reply(out);
     }
   }
 
@@ -290,40 +251,26 @@ class JoeChatHandler {
 
     const msg = String(text || '').trim();
     if (!msg || msg.startsWith('/')) return false;
-
     if (msg.length > 1800) {
       await ctx.reply('✂️ الرسالة طويلة، ابعت نص أقصر.');
       return true;
     }
 
     const now = Date.now();
-    if (now - (session.lastReplyAt || 0) < 1000) {
+    if (now - (session.lastReplyAt || 0) < 900) {
       await ctx.reply('⏳ لحظة شوي :)');
       return true;
     }
     session.lastReplyAt = now;
 
-    try {
-      await ctx.sendChatAction('typing').catch(() => {});
-      this.pushHistory(session, 'user', msg);
-      const out = await this.generate(session, msg);
-      this.pushHistory(session, 'assistant', out);
-      await ctx.reply(out || 'ما طلع رد هالمرة، جرب مرة ثانية.');
-    } catch (error) {
-      const message = String(error.message || '');
-      // Log exact provider failure for debugging in Railway logs.
-      console.error('Joe chat error:', message);
-
-      if (message.includes('GEMINI_API_KEY_MISSING')) {
-        await ctx.reply('⚠️ لازم تضيف GEMINI_API_KEY في Railway Variables.');
-      } else if (message.includes('JOE_ALL_FAILED')) {
-        await ctx.reply('⚠️ تعذر الاتصال بمزودات الذكاء الآن. جرب بعد لحظة.');
-      } else {
-        await ctx.reply('⚠️ صار خطأ مؤقت. جرب مرة ثانية.');
-      }
-    }
+    await ctx.sendChatAction('typing').catch(() => {});
+    this.pushHistory(session, 'user', msg);
+    const out = await this.generate(session, msg);
+    this.pushHistory(session, 'assistant', out);
+    await ctx.reply(out || 'ما طلع رد هالمرة، جرب مرة ثانية.');
     return true;
   }
 }
 
 module.exports = JoeChatHandler;
+
