@@ -70,6 +70,46 @@ class JoeChatHandler {
       }));
   }
 
+  static buildFallbackPrompt(session, userText) {
+    const history = session.history
+      .slice(-6)
+      .map((h) => `${h.role === 'assistant' ? 'المساعد' : 'المستخدم'}: ${h.content}`)
+      .join('\n');
+
+    return [
+      this.buildSystemInstruction(session.mode),
+      history ? `\nسياق سابق:\n${history}` : '',
+      `\nسؤال المستخدم:\n${String(userText || '')}`,
+      '\nجاوب بالعربية الواضحة فقط.'
+    ].join('\n');
+  }
+
+  static async callFreeFallback(session, userText) {
+    const endpoint = process.env.FREE_CHAT_ENDPOINT || 'https://text.pollinations.ai';
+    const model = process.env.FREE_CHAT_MODEL || 'openai';
+    const prompt = this.buildFallbackPrompt(session, userText);
+    const url = `${endpoint}/${encodeURIComponent(prompt)}?model=${encodeURIComponent(model)}`;
+
+    const response = await axios.get(url, {
+      timeout: 10000,
+      responseType: 'text',
+      transformResponse: [(d) => d]
+    });
+    const out = typeof response?.data === 'string' ? response.data.trim() : '';
+    if (!out) throw new Error('FREE_FALLBACK_EMPTY');
+    return out;
+  }
+
+  static formatError(err) {
+    if (!err) return 'UNKNOWN_ERROR';
+    const status = err?.response?.status;
+    const payload = err?.response?.data;
+    const payloadText = typeof payload === 'string' ? payload : JSON.stringify(payload || {});
+    const shortPayload = String(payloadText || '').slice(0, 220);
+    const msg = String(err?.message || 'ERROR');
+    return status ? `HTTP_${status} ${msg} ${shortPayload}` : `${msg} ${shortPayload}`;
+  }
+
   static async callGemini(session, userText) {
     const apiKey = String(process.env.GEMINI_API_KEY || '').trim();
     if (!apiKey) {
@@ -126,8 +166,18 @@ class JoeChatHandler {
   }
 
   static async generate(session, userText) {
-    const text = await this.callGemini(session, userText);
-    return text;
+    try {
+      const text = await this.callGemini(session, userText);
+      return text;
+    } catch (geminiError) {
+      try {
+        return await this.callFreeFallback(session, userText);
+      } catch (freeError) {
+        throw new Error(
+          `JOE_ALL_FAILED | GEMINI: ${this.formatError(geminiError)} | FREE: ${this.formatError(freeError)}`
+        );
+      }
+    }
   }
 
   static async handleStart(ctx) {
@@ -260,10 +310,16 @@ class JoeChatHandler {
       this.pushHistory(session, 'assistant', out);
       await ctx.reply(out || 'ما طلع رد هالمرة، جرب مرة ثانية.');
     } catch (error) {
-      if (String(error.message || '').includes('GEMINI_API_KEY_MISSING')) {
+      const message = String(error.message || '');
+      // Log exact provider failure for debugging in Railway logs.
+      console.error('Joe chat error:', message);
+
+      if (message.includes('GEMINI_API_KEY_MISSING')) {
         await ctx.reply('⚠️ لازم تضيف GEMINI_API_KEY في Railway Variables.');
+      } else if (message.includes('JOE_ALL_FAILED')) {
+        await ctx.reply('⚠️ تعذر الاتصال بمزودات الذكاء الآن. جرب بعد لحظة.');
       } else {
-        await ctx.reply('Gemini مشغول الآن. جرب بعد لحظة.');
+        await ctx.reply('⚠️ صار خطأ مؤقت. جرب مرة ثانية.');
       }
     }
     return true;
