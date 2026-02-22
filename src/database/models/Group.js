@@ -53,7 +53,52 @@ const groupSchema = new mongoose.Schema({
         type: Number,
         default: 10
       }
-    }
+    },
+    requireReasonsForModeration: {
+      type: Boolean,
+      default: false
+    },
+    disableGameEngagement: {
+      type: Boolean,
+      default: false
+    },
+    notifyAdminLeave: {
+      type: Boolean,
+      default: false
+    },
+    detectForAdminsOnly: {
+      type: Boolean,
+      default: false
+    },
+    onlineForOwnersOnly: {
+      type: Boolean,
+      default: false
+    },
+    primaryOwnerId: {
+      type: Number,
+      default: null
+    },
+    basicOwnerId: {
+      type: Number,
+      default: null
+    },
+    exceptions: [Number],
+    templates: {
+      member: {
+        image: String,
+        caption: String,
+        buttonText: String,
+        buttonUrl: String
+      },
+      admin: {
+        image: String,
+        caption: String,
+        buttonText: String,
+        buttonUrl: String
+      }
+    },
+    idealMemberId: Number,
+    idealAdminId: Number
   },
   admins: [
     {

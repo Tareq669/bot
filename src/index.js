@@ -85,7 +85,7 @@ const bot = new Telegraf(process.env.BOT_TOKEN, {
   polling: {
     timeout: 30,
     limit: 100,
-    allowedUpdates: ['message', 'callback_query', 'inline_query', 'poll_answer']
+    allowedUpdates: ['message', 'callback_query', 'inline_query', 'poll_answer', 'chat_member']
   }
 });
 
@@ -103,6 +103,8 @@ const PRIVATE_ONLY_COMMANDS = new Set([
 const GROUP_ONLY_COMMANDS = new Set([
   'gpanel', 'ghelp', 'gsettings', 'gwarn', 'gwarns', 'gunwarn', 'gresetwarn',
   'gmute', 'gunmute', 'gban', 'gunban', 'gclear', 'glogs', 'gpolicy',
+  'gadminstats', 'gprint', 'greasons', 'gbasic', 'gexceptions', 'granks', 'gdetect', 'gonline', 'gadminleave',
+  'gtemplate_member', 'gtemplate_admin', 'gideal_member', 'gideal_admin', 'gshow_ideal_member', 'gshow_ideal_admin',
   'gquiz', 'gmath', 'gword', 'gdaily', 'gmcq', 'gvote', 'gquizset', 'gleader', 'gweekly', 'ggame', 'ggames',
   'gteam', 'gteams', 'gtour'
 ]);
@@ -190,6 +192,21 @@ Promise.all([
       { command: 'gunban', description: 'رفع حظر عضو (ID)' },
       { command: 'gclear', description: 'حذف رسالة (بالرد)' },
       { command: 'glogs', description: 'عرض سجل الإدارة' },
+      { command: 'gadminstats', description: 'تقرير تفاعل مشرف' },
+      { command: 'gprint', description: 'برنت سجل عضو' },
+      { command: 'greasons', description: 'تفعيل/تعطيل الأسباب' },
+      { command: 'gbasic', description: 'إدارة رتبة الأساسي' },
+      { command: 'gexceptions', description: 'إدارة الاستثناءات' },
+      { command: 'granks', description: 'عدد الرتب' },
+      { command: 'gdetect', description: 'تفعيل/تعطيل الكشف' },
+      { command: 'gonline', description: 'قفل/فتح الانلاين' },
+      { command: 'gadminleave', description: 'تنبيه مغادرة المشرفين' },
+      { command: 'gtemplate_member', description: 'إعداد كليشة عضو مثالي' },
+      { command: 'gtemplate_admin', description: 'إعداد كليشة مشرف مثالي' },
+      { command: 'gideal_member', description: 'رفع عضو مثالي' },
+      { command: 'gideal_admin', description: 'رفع مشرف مثالي' },
+      { command: 'gshow_ideal_member', description: 'عرض العضو المثالي' },
+      { command: 'gshow_ideal_admin', description: 'عرض المشرف المثالي' },
       { command: 'gquiz', description: 'سؤال سريع للجروب' },
       { command: 'gmath', description: 'تحدي حساب ذهني' },
       { command: 'gword', description: 'ترتيب كلمة' },
@@ -239,6 +256,15 @@ bot.start((ctx) => {
   if (GroupAdminHandler.isGroupChat(ctx)) {
     return GroupAdminHandler.handleGroupStart(ctx);
   }
+  const text = String(ctx.message?.text || '');
+  const payload = text.replace(/^\/start(?:@\w+)?\s*/i, '').trim();
+  if (payload) {
+    return GroupAdminHandler.handlePrivateTemplateStart(ctx, payload)
+      .then((handled) => {
+        if (handled) return;
+        return CommandHandler.handleStart(ctx);
+      });
+  }
   return CommandHandler.handleStart(ctx);
 });
 bot.help((ctx) => {
@@ -263,6 +289,21 @@ bot.command('gban', (ctx) => GroupAdminHandler.handleBanCommand(ctx));
 bot.command('gunban', (ctx) => GroupAdminHandler.handleUnbanCommand(ctx));
 bot.command('gclear', (ctx) => GroupAdminHandler.handleClearCommand(ctx));
 bot.command('glogs', (ctx) => GroupAdminHandler.handleLogsCommand(ctx));
+bot.command('gadminstats', (ctx) => GroupAdminHandler.handleAdminInteractionCommand(ctx));
+bot.command('gprint', (ctx) => GroupAdminHandler.handlePrintCommand(ctx));
+bot.command('greasons', (ctx) => GroupAdminHandler.handleReasonsToggle(ctx));
+bot.command('gbasic', (ctx) => GroupAdminHandler.handleBasicOwnerCommand(ctx));
+bot.command('gexceptions', (ctx) => GroupAdminHandler.handleExceptionsCommand(ctx));
+bot.command('granks', (ctx) => GroupAdminHandler.handleRanksCountCommand(ctx));
+bot.command('gdetect', (ctx) => GroupAdminHandler.handleDetectToggle(ctx));
+bot.command('gonline', (ctx) => GroupAdminHandler.handleOnlineToggle(ctx));
+bot.command('gadminleave', (ctx) => GroupAdminHandler.handleAdminLeaveToggle(ctx));
+bot.command('gtemplate_member', (ctx) => GroupAdminHandler.handleTemplateSetupRequest(ctx, 'member'));
+bot.command('gtemplate_admin', (ctx) => GroupAdminHandler.handleTemplateSetupRequest(ctx, 'admin'));
+bot.command('gideal_member', (ctx) => GroupAdminHandler.handleIdealAssignCommand(ctx, 'member'));
+bot.command('gideal_admin', (ctx) => GroupAdminHandler.handleIdealAssignCommand(ctx, 'admin'));
+bot.command('gshow_ideal_member', (ctx) => GroupAdminHandler.handleShowIdealCard(ctx, 'member'));
+bot.command('gshow_ideal_admin', (ctx) => GroupAdminHandler.handleShowIdealCard(ctx, 'admin'));
 bot.command('gquiz', (ctx) => GroupGamesHandler.handleQuizCommand(ctx));
 bot.command('gmath', (ctx) => GroupGamesHandler.handleMathCommand(ctx));
 bot.command('gword', (ctx) => GroupGamesHandler.handleWordCommand(ctx));
@@ -1321,6 +1362,15 @@ bot.action(/^group:vote:([a-z0-9]+):(\d+)$/i, (ctx) => GroupGamesHandler.handleV
 bot.action(/^group:games:(gquiz|gmath|gword|gdaily|gmcq|gvote|gleader|gweekly)$/i, (ctx) => GroupGamesHandler.handleGamesMenuAction(ctx, ctx.match[1].toLowerCase()));
 bot.action(/^group:.+$/, (ctx) => GroupAdminHandler.handleGroupCallback(ctx));
 bot.on('poll_answer', (ctx) => GroupGamesHandler.handlePollAnswer(ctx));
+bot.on('chat_member', (ctx) => GroupAdminHandler.handleChatMemberUpdate(ctx));
+bot.on('photo', async (ctx) => {
+  try {
+    const handledTemplate = await GroupAdminHandler.handlePrivateTemplatePhoto(ctx);
+    if (handledTemplate) return;
+  } catch (error) {
+    logger.error('Photo handler error:', error.message);
+  }
+});
 bot.action('menu:main', (ctx) => MenuHandler.handleMainMenu(ctx));
 bot.action('menu:khatma', (ctx) => MenuHandler.handleKhatmaMenu(ctx));
 bot.action('menu:adhkar', (ctx) => MenuHandler.handleAdhkarMenu(ctx));
@@ -3086,6 +3136,9 @@ bot.on('text', async (ctx) => {
 
     logger.info(`TEXT_RECEIVED: ${String(message).substring(0, 30)}`);
 
+    const handledTemplateText = await GroupAdminHandler.handlePrivateTemplateText(ctx, message);
+    if (handledTemplateText) return;
+
     // Handle feature awaiting input
     if (ctx.session && ctx.session.featureAwait) {
       const awaiting = ctx.session.featureAwait;
@@ -3967,7 +4020,7 @@ const botStart = async () => {
       // Launch bot with explicit update types so quiz poll answers are always received.
       bot
         .launch({
-          allowedUpdates: ['message', 'callback_query', 'inline_query', 'poll_answer']
+          allowedUpdates: ['message', 'callback_query', 'inline_query', 'poll_answer', 'chat_member']
         })
         .then(() => {
           reconnectManager.isConnected = true;
