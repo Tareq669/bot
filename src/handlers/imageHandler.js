@@ -18,9 +18,12 @@ class ImageHandler {
     this.model = String(process.env.GEMINI_IMAGE_MODEL || 'imagen-4.0-generate-001').trim();
     this.timeoutMs = this.toInt(process.env.GEMINI_IMAGE_TIMEOUT_MS, 30000, 5000, 120000);
     this.hfModel = String(process.env.HF_IMAGE_MODEL || 'stabilityai/stable-diffusion-xl-base-1.0').trim();
+    this.hfTranslationModel = String(process.env.HF_TRANSLATION_MODEL || 'Helsinki-NLP/opus-mt-ar-en').trim();
+    this.translateArabicPrompts = String(process.env.HF_TRANSLATE_ARABIC_PROMPTS || 'true').trim().toLowerCase() !== 'false';
     this.hfTimeoutMs = this.toInt(process.env.HF_IMAGE_TIMEOUT_MS, this.timeoutMs, 5000, 120000);
     this.fallbackEnabled = String(process.env.FREE_IMAGE_FALLBACK || 'true').trim().toLowerCase() !== 'false';
     this.fallbackEndpoints = this.parseFallbackEndpoints();
+    this.geminiBillingLocked = false;
 
     if (!this.getGeminiKey()) {
       logger.warn('⚠️ GEMINI_API_KEY not found in environment variables (image generation disabled).');
@@ -88,6 +91,69 @@ class ImageHandler {
       /كراهية/i, /hate/i, /racist/i
     ];
     return patterns.some((pattern) => pattern.test(prompt));
+  }
+
+  hasArabicText(text) {
+    return /[\u0600-\u06FF]/.test(String(text || ''));
+  }
+
+  extractTranslatedText(payload) {
+    if (Array.isArray(payload) && payload.length > 0) {
+      const first = payload[0];
+      if (typeof first === 'string') return first;
+      if (first && typeof first === 'object') {
+        if (typeof first.translation_text === 'string') return first.translation_text;
+        if (typeof first.generated_text === 'string') return first.generated_text;
+      }
+    }
+    if (payload && typeof payload === 'object') {
+      if (typeof payload.translation_text === 'string') return payload.translation_text;
+      if (typeof payload.generated_text === 'string') return payload.generated_text;
+    }
+    return '';
+  }
+
+  async translatePromptIfNeeded(prompt) {
+    const input = String(prompt || '').trim();
+    if (!input || !this.translateArabicPrompts || !this.hasArabicText(input)) {
+      return input;
+    }
+
+    const token = this.getHfToken();
+    if (!token) {
+      return input;
+    }
+
+    try {
+      const url = `https://router.huggingface.co/hf-inference/models/${encodeURIComponent(this.hfTranslationModel)}`;
+      const response = await fetch(url, {
+        method: 'POST',
+        timeout: this.hfTimeoutMs,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          inputs: input,
+          options: { wait_for_model: true }
+        })
+      });
+
+      if (!response.ok) {
+        const body = await response.text().catch(() => '');
+        logger.warn(`Arabic translation failed (${response.status}): ${body}`);
+        return input;
+      }
+
+      const payload = await response.json();
+      const translated = this.extractTranslatedText(payload).trim();
+      if (!translated) return input;
+      logger.info(`Arabic prompt translated: ${translated.substring(0, 100)}`);
+      return translated;
+    } catch (error) {
+      logger.warn(`Arabic translation error: ${String(error?.message || error)}`);
+      return input;
+    }
   }
 
   extractImageBytes(response) {
@@ -226,52 +292,85 @@ class ImageHandler {
       }
 
       const cleanPrompt = String(prompt).trim();
-      logger.info(`🎨 Generating image for: ${cleanPrompt.substring(0, 40)}...`);
+      const promptForGeneration = await this.translatePromptIfNeeded(cleanPrompt);
+      logger.info(`🎨 Generating image for: ${promptForGeneration.substring(0, 40)}...`);
 
-      try {
-        const geminiBuffer = await this.generateWithGemini(cleanPrompt);
-        logger.info('✅ Gemini image generated successfully');
-        return { success: true, buffer: geminiBuffer };
-      } catch (geminiError) {
-        const geminiMsg = String(geminiError?.message || geminiError);
-        const isBillingLocked = /billed users|only accessible to billed users|billing/i.test(geminiMsg);
-        const canFallback = this.fallbackEnabled;
+      if (!this.geminiBillingLocked) {
+        try {
+          const geminiBuffer = await this.generateWithGemini(promptForGeneration);
+          logger.info('✅ Gemini image generated successfully');
+          return { success: true, buffer: geminiBuffer };
+        } catch (geminiError) {
+          const geminiMsg = String(geminiError?.message || geminiError);
+          const isBillingLocked = /billed users|only accessible to billed users|billing/i.test(geminiMsg);
+          const canFallback = this.fallbackEnabled;
 
-        logger.warn(`Gemini image failed: ${geminiMsg}`);
+          logger.warn(`Gemini image failed: ${geminiMsg}`);
 
-        // Step 2 fallback: Hugging Face (if token exists)
-        if (this.getHfToken()) {
-          try {
-            const hfBuffer = await this.generateWithHuggingFace(cleanPrompt);
-            logger.info('✅ HF fallback image generated successfully');
-            return { success: true, buffer: hfBuffer };
-          } catch (hfError) {
-            const hfMsg = String(hfError?.message || hfError);
-            logger.warn(`HF fallback image failed: ${hfMsg}`);
+          if (isBillingLocked) {
+            this.geminiBillingLocked = true;
+            logger.warn('⚠️ Gemini image temporarily disabled due to billing requirement; using fallbacks.');
           }
-        }
 
-        // Step 3 fallback: free endpoints
-        if (canFallback) {
-          try {
-            const fallbackBuffer = await this.generateWithFreeFallback(cleanPrompt);
-            return { success: true, buffer: fallbackBuffer };
-          } catch (fallbackError) {
-            const fallbackMsg = String(fallbackError?.message || fallbackError);
-            logger.error(`❌ Free fallback image failed: ${fallbackMsg}`);
-            throw new Error(`${geminiMsg} | fallback: ${fallbackMsg}`);
+          // Step 2 fallback: Hugging Face (if token exists)
+          if (this.getHfToken()) {
+            try {
+              const hfBuffer = await this.generateWithHuggingFace(promptForGeneration);
+              logger.info('✅ HF fallback image generated successfully');
+              return { success: true, buffer: hfBuffer };
+            } catch (hfError) {
+              const hfMsg = String(hfError?.message || hfError);
+              logger.warn(`HF fallback image failed: ${hfMsg}`);
+            }
           }
-        }
 
-        if (isBillingLocked) {
-          return {
-            success: false,
-            error: 'توليد الصور عبر Gemini يحتاج Billing مفعل. فعّل Billing أو فعّل fallback المجاني.'
-          };
-        }
+          // Step 3 fallback: free endpoints
+          if (canFallback) {
+            try {
+              const fallbackBuffer = await this.generateWithFreeFallback(promptForGeneration);
+              return { success: true, buffer: fallbackBuffer };
+            } catch (fallbackError) {
+              const fallbackMsg = String(fallbackError?.message || fallbackError);
+              logger.error(`❌ Free fallback image failed: ${fallbackMsg}`);
+              throw new Error(`${geminiMsg} | fallback: ${fallbackMsg}`);
+            }
+          }
 
-        throw geminiError;
+          if (isBillingLocked) {
+            return {
+              success: false,
+              error: 'توليد الصور عبر Gemini يحتاج Billing مفعل. فعّل Billing أو فعّل fallback المجاني.'
+            };
+          }
+
+          throw geminiError;
+        }
       }
+
+      // Gemini is disabled due billing in this runtime, go directly to fallbacks
+      if (this.getHfToken()) {
+        try {
+          const hfBuffer = await this.generateWithHuggingFace(promptForGeneration);
+          logger.info('✅ HF fallback image generated successfully');
+          return { success: true, buffer: hfBuffer };
+        } catch (hfError) {
+          const hfMsg = String(hfError?.message || hfError);
+          logger.warn(`HF fallback image failed: ${hfMsg}`);
+        }
+      }
+
+      if (this.fallbackEnabled) {
+        try {
+          const fallbackBuffer = await this.generateWithFreeFallback(promptForGeneration);
+          return { success: true, buffer: fallbackBuffer };
+        } catch (fallbackError) {
+          const fallbackMsg = String(fallbackError?.message || fallbackError);
+          logger.error(`❌ Free fallback image failed: ${fallbackMsg}`);
+          throw new Error(`FALLBACK_FAILED: ${fallbackMsg}`);
+        }
+      }
+
+      return { success: false, error: 'لا يوجد مزود صور متاح حاليا.' };
     } catch (error) {
       const message = String(error?.message || error);
       logger.error('❌ Image generation error:', message);
