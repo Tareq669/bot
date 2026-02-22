@@ -355,7 +355,7 @@ bot.command('rewards', (ctx) => CommandHandler.handleRewards(ctx));
 bot.command('image', (ctx) => imageHandler.handleImageCommand(ctx));
 bot.command('jo', (ctx) => JoeChatHandler.handleStart(ctx));
 bot.command('jooff', (ctx) => JoeChatHandler.handleStop(ctx));
-bot.command('jomode', (ctx) => JoeChatHandler.handleMode(ctx));
+bot.command('jomode', (ctx) => JoeChatHandler.handleModeCommand(ctx));
 bot.command('joclear', (ctx) => JoeChatHandler.handleClear(ctx));
 
 // --- NEW FEATURES COMMANDS ---
@@ -1392,6 +1392,7 @@ bot.action('menu:economy', (ctx) => MenuHandler.handleEconomyMenu(ctx));
 bot.action('menu:profile', (ctx) => MenuHandler.handleProfileMenu(ctx));
 bot.action('menu:features', (ctx) => CommandHandler.handleFeaturesMenu(ctx));
 bot.action('menu:joe', (ctx) => JoeChatHandler.handleStart(ctx));
+bot.action(/^joe:(open|mode|clear|stop|random)(:[a-z0-9_+-]+)?$/i, (ctx) => JoeChatHandler.handleAction(ctx));
 bot.action('menu:library', (ctx) => CommandHandler.handleLibrary(ctx));
 bot.action('menu:leaderboard', (ctx) => MenuHandler.handleLeaderboardMenu(ctx));
 bot.action('menu:settings', (ctx) => MenuHandler.handleSettingsMenu(ctx));
