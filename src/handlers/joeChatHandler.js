@@ -3,6 +3,7 @@ const Markup = require('telegraf/markup');
 
 class JoeChatHandler {
   static sessions = new Map();
+  static researchCache = { docs: [], fetchedAt: 0, loading: null };
 
   static modes = {
     fun: { label: '🎭 فوكاهي', line: 'خليك فوكاهي لطيف ومرح.' },
@@ -79,6 +80,91 @@ class JoeChatHandler {
       .join('\n') + '\nAssistant:';
   }
 
+  static tokenize(text) {
+    return String(text || '')
+      .toLowerCase()
+      .replace(/[^\u0600-\u06FFa-z0-9\s]/gi, ' ')
+      .split(/\s+/)
+      .filter((x) => x.length >= 3);
+  }
+
+  static scoreDoc(queryTokens, docText) {
+    if (!queryTokens.length) return 0;
+    const hay = ` ${String(docText || '').toLowerCase()} `;
+    let score = 0;
+    for (const t of queryTokens) {
+      if (hay.includes(` ${t} `)) score += 2;
+      else if (hay.includes(t)) score += 1;
+    }
+    return score;
+  }
+
+  static pickTextFromRow(rowObj) {
+    if (!rowObj || typeof rowObj !== 'object') return '';
+    const preferred = ['question', 'instruction', 'input', 'query', 'prompt', 'answer', 'output', 'response', 'text', 'content', 'title', 'abstract'];
+    const parts = [];
+    for (const key of preferred) {
+      const v = rowObj[key];
+      if (typeof v === 'string' && v.trim()) parts.push(v.trim());
+    }
+    if (parts.length > 0) return parts.join('\n').slice(0, 1800);
+
+    // Generic fallback for unknown schema.
+    const anyStrings = Object.values(rowObj).filter((v) => typeof v === 'string' && v.trim()).slice(0, 8);
+    return anyStrings.join('\n').slice(0, 1800);
+  }
+
+  static async loadOpenResearcher() {
+    const now = Date.now();
+    const ttlMs = Number(process.env.OPENRESEARCHER_CACHE_TTL_MS || 60 * 60 * 1000);
+    if (this.researchCache.docs.length && now - this.researchCache.fetchedAt < ttlMs) {
+      return this.researchCache.docs;
+    }
+    if (this.researchCache.loading) return this.researchCache.loading;
+
+    const fetchTask = (async () => {
+      const endpoint = process.env.OPENRESEARCHER_ROWS_ENDPOINT
+        || 'https://datasets-server.huggingface.co/rows?dataset=OpenResearcher%2FOpenResearcher-Dataset&config=seed_42&split=train&offset=0&length=300';
+      const res = await axios.get(endpoint, { timeout: 30000 });
+      const rows = Array.isArray(res?.data?.rows) ? res.data.rows : [];
+      const docs = rows
+        .map((r) => this.pickTextFromRow(r?.row || r))
+        .filter((x) => x && x.length >= 40)
+        .slice(0, 500);
+
+      this.researchCache.docs = docs;
+      this.researchCache.fetchedAt = Date.now();
+      this.researchCache.loading = null;
+      return docs;
+    })().catch((_err) => {
+      this.researchCache.loading = null;
+      return this.researchCache.docs;
+    });
+
+    this.researchCache.loading = fetchTask;
+    return fetchTask;
+  }
+
+  static async buildResearchContext(userText) {
+    const enabled = String(process.env.JOE_RESEARCH_ENABLED || 'true').toLowerCase() !== 'false';
+    if (!enabled) return '';
+    const docs = await this.loadOpenResearcher();
+    if (!docs.length) return '';
+
+    const q = this.tokenize(userText).slice(0, 12);
+    if (!q.length) return '';
+
+    const ranked = docs
+      .map((d) => ({ d, s: this.scoreDoc(q, d) }))
+      .filter((x) => x.s > 0)
+      .sort((a, b) => b.s - a.s)
+      .slice(0, 2)
+      .map((x, i) => `[مرجع ${i + 1}]\n${x.d.slice(0, 700)}`)
+      .join('\n\n');
+
+    return ranked;
+  }
+
   static async callFreeChat(messages) {
     const model = process.env.FREE_CHAT_MODEL || 'openai';
     const endpoint = process.env.FREE_CHAT_ENDPOINT || 'https://text.pollinations.ai';
@@ -97,8 +183,10 @@ class JoeChatHandler {
   }
 
   static async generate(session, userText) {
+    const context = await this.buildResearchContext(userText);
     const messages = [
       { role: 'system', content: this.buildSystemPrompt(session.mode) },
+      ...(context ? [{ role: 'system', content: `استخدم المراجع التالية كخلفية مساعدة فقط إذا كانت مرتبطة بالسؤال:\n\n${context}` }] : []),
       ...session.history.slice(-10),
       { role: 'user', content: String(userText || '') }
     ];
