@@ -5,13 +5,13 @@ class JoeChatHandler {
   static sessions = new Map();
 
   static modes = {
-    fun: { label: '🎭 فوكاهي', line: 'خليك فوكاهي لطيف وردودك مرحة وخفيفة.' },
-    funny: { label: '😂 مضحك', line: 'ركز على النكتة والتعليقات الطريفة بدون إساءة.' },
-    plus18: { label: '🔞 18+', line: 'اسلوب للكبار وناضج فقط، بدون محتوى جنسي صريح أو مخالف.' },
-    helper: { label: '🧠 مساعد', line: 'ردود عملية واضحة وخطوات مباشرة.' },
-    tech: { label: '💻 تقني', line: 'حلول تقنية دقيقة مع أمثلة قصيرة.' },
-    creative: { label: '🧪 مبدع', line: 'اقتراحات وأفكار مبتكرة مع لمسة ممتعة.' },
-    short: { label: '⚡ سريع', line: 'اختصر جدا واجب في سطرين إلى أربعة.' }
+    fun: { label: 'Fun', line: 'Be playful, friendly, and light.' },
+    funny: { label: 'Funny', line: 'Prioritize humor and witty responses without insults.' },
+    plus18: { label: '18+ Safe', line: 'Adult tone only, but no explicit sexual content.' },
+    helper: { label: 'Helper', line: 'Give practical and structured help.' },
+    tech: { label: 'Tech', line: 'Focus on technical accuracy and clear steps.' },
+    creative: { label: 'Creative', line: 'Give creative ideas and fresh angles.' },
+    short: { label: 'Short', line: 'Keep answers very concise.' }
   };
 
   static getSession(userId) {
@@ -34,24 +34,36 @@ class JoeChatHandler {
     }
   }
 
+  static looksCorruptedText(text) {
+    const t = String(text || '');
+    if (!t) return true;
+    if (/[����]/.test(t)) return true;
+    if (/\uFFFD/.test(t) || t.includes('?')) return true;
+
+    const letters = (t.match(/[A-Za-z\u0600-\u06FF]/g) || []).length;
+    const arabic = (t.match(/[\u0600-\u06FF]/g) || []).length;
+    if (letters > 20 && arabic / letters < 0.12) return true;
+
+    return false;
+  }
+
   static buildSystemPrompt(mode = 'fun') {
     const modeCfg = this.modes[mode] || this.modes.fun;
     return [
-      'اسمك "جو" فقط.',
-      'تحكي عربي بلهجة فلسطينية لطيفة ومفهومة.',
-      'ممنوع خطاب الكراهية او الاهانة او التحرش او المحتوى الجنسي الصريح.',
-      'لو المستخدم طلب شيء مخالف، ارفض بلطف واقترح بديل آمن.',
+      'Your name is Joe (Arabic: \"??\").',
+      'Always reply in clear Arabic.',
+      'Preferred style: light Palestinian dialect, readable and natural.',
+      'No hate, harassment, explicit sexual content, or illegal guidance.',
       modeCfg.line,
-      'الافضل تكون الاجابة مختصرة (2-6 سطور) الا اذا طلب المستخدم تفصيل.',
-      'لو السؤال تقني: جاوب بنقاط عملية واضحة.',
-      'لا تقل ان اسمك "جو فوكاهي"، اسمك فقط "جو".'
+      'Default response length: 2-6 short lines unless user asks for detail.',
+      'If technical question: answer with actionable steps.'
     ].join(' ');
   }
 
   static buildModeKeyboard(currentMode = 'fun') {
     const mk = (id) => {
       const label = this.modes[id]?.label || id;
-      const prefix = currentMode === id ? '✅ ' : '';
+      const prefix = currentMode === id ? '? ' : '';
       return Markup.button.callback(`${prefix}${label}`, `joe:mode:${id}`);
     };
     return Markup.inlineKeyboard([
@@ -59,26 +71,26 @@ class JoeChatHandler {
       [mk('plus18'), mk('helper')],
       [mk('tech'), mk('creative')],
       [mk('short')],
-      [Markup.button.callback('🧹 مسح الذاكرة', 'joe:clear'), Markup.button.callback('⏹️ إيقاف جو', 'joe:stop')]
+      [Markup.button.callback('Clear Memory', 'joe:clear'), Markup.button.callback('Stop Joe', 'joe:stop')]
     ]);
   }
 
   static buildChatControls() {
     return Markup.inlineKeyboard([
-      [Markup.button.callback('🎛️ تغيير النمط', 'joe:open'), Markup.button.callback('🎲 رد عشوائي', 'joe:random')],
-      [Markup.button.callback('🧹 مسح الذاكرة', 'joe:clear'), Markup.button.callback('⏹️ إيقاف جو', 'joe:stop')]
+      [Markup.button.callback('Change Mode', 'joe:open'), Markup.button.callback('Random Reply', 'joe:random')],
+      [Markup.button.callback('Clear Memory', 'joe:clear'), Markup.button.callback('Stop Joe', 'joe:stop')]
     ]);
   }
 
-  static async callHfChat(messages, temperature = 0.8) {
-    const model = process.env.HF_CHAT_MODEL || 'meta-llama/Llama-3.1-8B-Instruct';
+  static async callHfChat(messages, temperature = 0.75) {
+    const model = process.env.HF_CHAT_MODEL || 'zai-org/GLM-4.7-Flash';
     const response = await axios.post(
       'https://router.huggingface.co/v1/chat/completions',
       {
         model,
         messages,
         temperature,
-        max_tokens: 360
+        max_tokens: 340
       },
       {
         headers: {
@@ -93,8 +105,8 @@ class JoeChatHandler {
     return out.trim();
   }
 
-  static async callHfFallback(messages, temperature = 0.8) {
-    const model = process.env.HF_CHAT_FALLBACK_MODEL || 'Qwen/Qwen2.5-7B-Instruct';
+  static async callHfFallback(messages, temperature = 0.7) {
+    const model = process.env.HF_CHAT_FALLBACK_MODEL || 'openai/gpt-oss-120b';
     const prompt = messages
       .map((m) => `${m.role === 'system' ? 'System' : m.role === 'assistant' ? 'Assistant' : 'User'}: ${m.content}`)
       .join('\n') + '\nAssistant:';
@@ -104,7 +116,7 @@ class JoeChatHandler {
       {
         inputs: prompt,
         parameters: {
-          max_new_tokens: 320,
+          max_new_tokens: 300,
           temperature,
           return_full_text: false
         },
@@ -125,17 +137,38 @@ class JoeChatHandler {
     throw new Error('HF fallback empty response');
   }
 
-  static async generate(session, userText, temperature = 0.8) {
+  static async generate(session, userText, temperature = 0.75) {
     const messages = [
       { role: 'system', content: this.buildSystemPrompt(session.mode) },
       ...session.history.slice(-14),
       { role: 'user', content: String(userText || '') }
     ];
+
+    let out;
     try {
-      return await this.callHfChat(messages, temperature);
+      out = await this.callHfChat(messages, temperature);
     } catch (_error) {
-      return this.callHfFallback(messages, temperature);
+      out = await this.callHfFallback(messages, temperature);
     }
+
+    if (!this.looksCorruptedText(out)) return out;
+
+    const repairMessages = [
+      ...messages,
+      {
+        role: 'user',
+        content: 'Rewrite your last answer in clear Arabic only. No broken characters. Keep it natural and short.'
+      }
+    ];
+
+    try {
+      const fixed = await this.callHfChat(repairMessages, 0.4);
+      if (!this.looksCorruptedText(fixed)) return fixed;
+    } catch (_error) {
+      // ignore and fallback below
+    }
+
+    return '??? ????? ????? ????? ???????. ???? ????? ??? ????? ???? ????.';
   }
 
   static async handleStart(ctx) {
@@ -144,11 +177,8 @@ class JoeChatHandler {
     session.active = true;
     if (!this.modes[session.mode]) session.mode = 'fun';
     return ctx.reply(
-      `🤖 هلا! أنا <b>جو</b>\n` +
-        `اختر النمط اللي بناسبك وابعثلي عادي.\n` +
-        `النمط الحالي: <b>${this.modes[session.mode].label}</b>`,
+      'Joe is on. ????? ????? ?????? ???? ??? ??????.',
       {
-        parse_mode: 'HTML',
         reply_markup: this.buildModeKeyboard(session.mode).reply_markup
       }
     );
@@ -158,14 +188,14 @@ class JoeChatHandler {
     if (ctx.chat?.type !== 'private') return;
     const session = this.getSession(ctx.from.id);
     session.active = false;
-    return ctx.reply('✅ تم إيقاف جو. إذا بدك ترجّعه اكتب /jo أو اضغط Joe من القائمة.');
+    return ctx.reply('?? ????? Joe. ???? ?? ???? ??? Joe ?? /jo');
   }
 
   static async handleClear(ctx) {
     if (ctx.chat?.type !== 'private') return;
     const session = this.getSession(ctx.from.id);
     session.history = [];
-    return ctx.reply('🧹 تمام، مسحت ذاكرة جو.');
+    return ctx.reply('?? ??? ????? Joe.');
   }
 
   static async handleModeCommand(ctx) {
@@ -173,12 +203,12 @@ class JoeChatHandler {
     const text = String(ctx.message?.text || '').trim();
     const mode = String(text.split(/\s+/)[1] || '').toLowerCase();
     if (!mode || !this.modes[mode]) {
-      return ctx.reply('🎛️ استخدم: /jomode fun|funny|plus18|helper|tech|creative|short');
+      return ctx.reply('Use: /jomode fun|funny|plus18|helper|tech|creative|short');
     }
     const session = this.getSession(ctx.from.id);
     session.mode = mode;
     session.active = true;
-    return ctx.reply(`✅ تم تحويل النمط إلى: ${this.modes[mode].label}`, {
+    return ctx.reply(`Mode: ${this.modes[mode].label}`, {
       reply_markup: this.buildModeKeyboard(session.mode).reply_markup
     });
   }
@@ -195,43 +225,43 @@ class JoeChatHandler {
 
     if (action === 'open') {
       session.active = true;
-      await ctx.answerCbQuery('جاهز يا بطل ✅', { show_alert: false }).catch(() => {});
+      await ctx.answerCbQuery('Ready', { show_alert: false }).catch(() => {});
       return ctx.editMessageReplyMarkup(this.buildModeKeyboard(session.mode).reply_markup).catch(() => {});
     }
 
     if (action === 'mode') {
       if (!this.modes[arg]) {
-        return ctx.answerCbQuery('وضع غير معروف', { show_alert: false }).catch(() => {});
+        return ctx.answerCbQuery('Unknown mode', { show_alert: false }).catch(() => {});
       }
       session.mode = arg;
       session.active = true;
-      await ctx.answerCbQuery(`تم التبديل: ${this.modes[arg].label}`, { show_alert: false }).catch(() => {});
+      await ctx.answerCbQuery(`Mode: ${this.modes[arg].label}`, { show_alert: false }).catch(() => {});
       return ctx.editMessageReplyMarkup(this.buildModeKeyboard(session.mode).reply_markup).catch(() => {});
     }
 
     if (action === 'clear') {
       session.history = [];
-      await ctx.answerCbQuery('تم مسح الذاكرة', { show_alert: false }).catch(() => {});
-      return ctx.reply('🧹 تم مسح ذاكرة جو.', { reply_markup: this.buildChatControls().reply_markup });
+      await ctx.answerCbQuery('Memory cleared', { show_alert: false }).catch(() => {});
+      return ctx.reply('?? ??? ???????.');
     }
 
     if (action === 'stop') {
       session.active = false;
-      await ctx.answerCbQuery('تم الإيقاف', { show_alert: false }).catch(() => {});
-      return ctx.reply('⏹️ تم إيقاف جو. للرجوع اضغط Joe مرة ثانية.');
+      await ctx.answerCbQuery('Stopped', { show_alert: false }).catch(() => {});
+      return ctx.reply('?? ????? Joe.');
     }
 
     if (action === 'random') {
       session.active = true;
-      await ctx.answerCbQuery('لحظة... 🎲', { show_alert: false }).catch(() => {});
+      await ctx.answerCbQuery('Working...', { show_alert: false }).catch(() => {});
       try {
-        const prompt = 'اعطيني رد خفيف وعفوي وجملة مضحكة قصيرة.';
+        const prompt = 'Give one short funny Arabic reply in Palestinian style.';
         this.pushHistory(session, 'user', prompt);
         const out = await this.generate(session, prompt, 0.95);
         this.pushHistory(session, 'assistant', out);
-        return ctx.reply(out, { reply_markup: this.buildChatControls().reply_markup });
+        return ctx.reply(out);
       } catch (_error) {
-        return ctx.reply('⚠️ ما زبطت هالمرة، جرّب كمان مرة.');
+        return ctx.reply('??? ??? ????? ??? ??? ?????.');
       }
     }
   }
@@ -245,17 +275,13 @@ class JoeChatHandler {
     if (!msg || msg.startsWith('/')) return false;
 
     if (msg.length > 1800) {
-      await ctx.reply('✂️ طول الرسالة كبير. ابعت أقل من 1800 حرف.', {
-        reply_markup: this.buildChatControls().reply_markup
-      });
+      await ctx.reply('??????? ????? ???. ???? ?? ????.');
       return true;
     }
 
     const now = Date.now();
     if (now - (session.lastReplyAt || 0) < 1200) {
-      await ctx.reply('⏳ شوي شوي عليّ يا غالي.', {
-        reply_markup: this.buildChatControls().reply_markup
-      });
+      await ctx.reply('???? ??? :)');
       return true;
     }
     session.lastReplyAt = now;
@@ -263,19 +289,16 @@ class JoeChatHandler {
     try {
       await ctx.sendChatAction('typing').catch(() => {});
       this.pushHistory(session, 'user', msg);
-      const out = await this.generate(session, msg, session.mode === 'funny' ? 0.95 : 0.8);
+      const out = await this.generate(session, msg, session.mode === 'funny' ? 0.95 : 0.75);
       this.pushHistory(session, 'assistant', out);
-      await ctx.reply(out || 'ما طلع معي رد هالمرة 😅', {
-        reply_markup: this.buildChatControls().reply_markup
-      });
+      await ctx.reply(out || '?? ??? ?? ??????? ??? ??? ?????.');
     } catch (_error) {
-      await ctx.reply('⚠️ جو مشغول شوي. جرّب بعد لحظة.', {
-        reply_markup: this.buildChatControls().reply_markup
-      });
+      await ctx.reply('Joe ????? ???. ??? ??? ????.');
     }
     return true;
   }
 }
 
 module.exports = JoeChatHandler;
+
 
