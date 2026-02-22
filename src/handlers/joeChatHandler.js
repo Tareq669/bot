@@ -3,7 +3,6 @@ const Markup = require('telegraf/markup');
 
 class JoeChatHandler {
   static sessions = new Map();
-  static researchCache = { docs: [], fetchedAt: 0, loading: null };
 
   static modes = {
     fun: { label: '🎭 فوكاهي', line: 'خليك فوكاهي لطيف ومرح.' },
@@ -30,32 +29,9 @@ class JoeChatHandler {
 
   static pushHistory(session, role, content) {
     session.history.push({ role, content: String(content || '').slice(0, 2000) });
-    if (session.history.length > 20) {
-      session.history = session.history.slice(session.history.length - 20);
+    if (session.history.length > 16) {
+      session.history = session.history.slice(session.history.length - 16);
     }
-  }
-
-  static looksCorruptedText(text) {
-    const t = String(text || '');
-    if (!t.trim()) return true;
-    if (t.includes('�') || /\?\?\?/.test(t)) return true;
-    if (/[ÃØÙÐ]/.test(t)) return true;
-
-    const letters = (t.match(/[A-Za-z\u0600-\u06FF]/g) || []).length;
-    const arabic = (t.match(/[\u0600-\u06FF]/g) || []).length;
-    if (letters > 20 && arabic / letters < 0.15) return true;
-    return false;
-  }
-
-  static buildSystemPrompt(mode = 'fun') {
-    const modeCfg = this.modes[mode] || this.modes.fun;
-    return [
-      'اسمك جو.',
-      'جاوب بالعربية فقط وبلهجة فلسطينية مفهومة.',
-      'ممنوع الإهانة أو خطاب الكراهية أو المحتوى الجنسي الصريح.',
-      modeCfg.line,
-      'خلّي الرد غالبًا مختصر (2-6 أسطر) إلا إذا طلب المستخدم تفصيل.'
-    ].join(' ');
   }
 
   static buildModeKeyboard(currentMode = 'fun') {
@@ -74,147 +50,84 @@ class JoeChatHandler {
     ]);
   }
 
-  static buildPrompt(messages) {
-    return messages
-      .map((m) => `${m.role === 'system' ? 'System' : m.role === 'assistant' ? 'Assistant' : 'User'}: ${m.content}`)
-      .join('\n') + '\nAssistant:';
+  static buildSystemInstruction(mode = 'fun') {
+    const modeCfg = this.modes[mode] || this.modes.fun;
+    return [
+      'اسمك جو.',
+      'جاوب بالعربية فقط وبلهجة فلسطينية مفهومة.',
+      'ممنوع الإهانة أو خطاب الكراهية أو المحتوى الجنسي الصريح.',
+      modeCfg.line,
+      'خلّي الرد غالبًا مختصر (2-6 أسطر) إلا إذا طلب المستخدم تفصيل.'
+    ].join(' ');
   }
 
-  static tokenize(text) {
-    return String(text || '')
-      .toLowerCase()
-      .replace(/[^\u0600-\u06FFa-z0-9\s]/gi, ' ')
-      .split(/\s+/)
-      .filter((x) => x.length >= 3);
+  static mapHistoryToGemini(history) {
+    return history
+      .filter((x) => x && typeof x.content === 'string' && x.content.trim())
+      .map((x) => ({
+        role: x.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: x.content }]
+      }));
   }
 
-  static scoreDoc(queryTokens, docText) {
-    if (!queryTokens.length) return 0;
-    const hay = ` ${String(docText || '').toLowerCase()} `;
-    let score = 0;
-    for (const t of queryTokens) {
-      if (hay.includes(` ${t} `)) score += 2;
-      else if (hay.includes(t)) score += 1;
+  static async callGemini(session, userText) {
+    const apiKey = String(process.env.GEMINI_API_KEY || '').trim();
+    if (!apiKey) {
+      throw new Error('GEMINI_API_KEY_MISSING');
     }
-    return score;
-  }
 
-  static pickTextFromRow(rowObj) {
-    if (!rowObj || typeof rowObj !== 'object') return '';
-    const preferred = ['question', 'instruction', 'input', 'query', 'prompt', 'answer', 'output', 'response', 'text', 'content', 'title', 'abstract'];
-    const parts = [];
-    for (const key of preferred) {
-      const v = rowObj[key];
-      if (typeof v === 'string' && v.trim()) parts.push(v.trim());
+    const models = [
+      String(process.env.GEMINI_MODEL || 'gemini-2.0-flash').trim(),
+      String(process.env.GEMINI_MODEL_FALLBACK || 'gemini-1.5-flash').trim()
+    ].filter(Boolean);
+
+    const contents = [
+      ...this.mapHistoryToGemini(session.history.slice(-10)),
+      { role: 'user', parts: [{ text: String(userText || '') }] }
+    ];
+
+    const payload = {
+      systemInstruction: {
+        parts: [{ text: this.buildSystemInstruction(session.mode) }]
+      },
+      contents,
+      generationConfig: {
+        temperature: session.mode === 'funny' ? 0.9 : 0.7,
+        maxOutputTokens: session.mode === 'short' ? 220 : 420
+      }
+    };
+
+    let lastError = null;
+    for (const model of models) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+        const response = await axios.post(url, payload, {
+          timeout: 15000,
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        const candidate = response?.data?.candidates?.[0];
+        const parts = candidate?.content?.parts || [];
+        const text = parts
+          .map((p) => (typeof p?.text === 'string' ? p.text : ''))
+          .join('\n')
+          .trim();
+
+        if (!text) {
+          const finish = candidate?.finishReason || 'UNKNOWN';
+          throw new Error(`GEMINI_EMPTY_${finish}`);
+        }
+        return text;
+      } catch (err) {
+        lastError = err;
+      }
     }
-    if (parts.length > 0) return parts.join('\n').slice(0, 1800);
-
-    // Generic fallback for unknown schema.
-    const anyStrings = Object.values(rowObj).filter((v) => typeof v === 'string' && v.trim()).slice(0, 8);
-    return anyStrings.join('\n').slice(0, 1800);
-  }
-
-  static async loadOpenResearcher() {
-    const now = Date.now();
-    const ttlMs = Number(process.env.OPENRESEARCHER_CACHE_TTL_MS || 60 * 60 * 1000);
-    if (this.researchCache.docs.length && now - this.researchCache.fetchedAt < ttlMs) {
-      return this.researchCache.docs;
-    }
-    if (this.researchCache.loading) return this.researchCache.loading;
-
-    const fetchTask = (async () => {
-      const endpoint = process.env.OPENRESEARCHER_ROWS_ENDPOINT
-        || 'https://datasets-server.huggingface.co/rows?dataset=OpenResearcher%2FOpenResearcher-Dataset&config=seed_42&split=train&offset=0&length=120';
-      const res = await axios.get(endpoint, { timeout: 12000 });
-      const rows = Array.isArray(res?.data?.rows) ? res.data.rows : [];
-      const docs = rows
-        .map((r) => this.pickTextFromRow(r?.row || r))
-        .filter((x) => x && x.length >= 40)
-        .slice(0, 200);
-
-      this.researchCache.docs = docs;
-      this.researchCache.fetchedAt = Date.now();
-      this.researchCache.loading = null;
-      return docs;
-    })().catch((_err) => {
-      this.researchCache.loading = null;
-      return this.researchCache.docs;
-    });
-
-    this.researchCache.loading = fetchTask;
-    return fetchTask;
-  }
-
-  static refreshResearchInBackground() {
-    const now = Date.now();
-    const ttlMs = Number(process.env.OPENRESEARCHER_CACHE_TTL_MS || 60 * 60 * 1000);
-    const stale = !this.researchCache.fetchedAt || (now - this.researchCache.fetchedAt >= ttlMs);
-    if (!stale) return;
-    if (this.researchCache.loading) return;
-    this.loadOpenResearcher().catch(() => {});
-  }
-
-  static async buildResearchContext(userText) {
-    const enabled = String(process.env.JOE_RESEARCH_ENABLED || 'true').toLowerCase() !== 'false';
-    if (!enabled) return '';
-    this.refreshResearchInBackground();
-    const docs = this.researchCache.docs;
-    if (!docs.length) return '';
-
-    const q = this.tokenize(userText).slice(0, 12);
-    if (!q.length) return '';
-
-    const ranked = docs
-      .map((d) => ({ d, s: this.scoreDoc(q, d) }))
-      .filter((x) => x.s > 0)
-      .sort((a, b) => b.s - a.s)
-      .slice(0, 1)
-      .map((x, i) => `[مرجع ${i + 1}]\n${x.d.slice(0, 700)}`)
-      .join('\n\n');
-
-    return ranked;
-  }
-
-  static async callFreeChat(messages) {
-    const model = process.env.FREE_CHAT_MODEL || 'openai';
-    const endpoint = process.env.FREE_CHAT_ENDPOINT || 'https://text.pollinations.ai';
-    const prompt = this.buildPrompt(messages);
-    const url = `${endpoint}/${encodeURIComponent(prompt)}?model=${encodeURIComponent(model)}`;
-
-    const response = await axios.get(url, {
-      timeout: 10000,
-      responseType: 'text',
-      transformResponse: [(d) => d]
-    });
-
-    const out = typeof response?.data === 'string' ? response.data.trim() : '';
-    if (!out) throw new Error('FREE provider returned empty response');
-    return out;
+    throw lastError || new Error('GEMINI_ALL_MODELS_FAILED');
   }
 
   static async generate(session, userText) {
-    const context = await this.buildResearchContext(userText);
-    const messages = [
-      { role: 'system', content: this.buildSystemPrompt(session.mode) },
-      ...(context ? [{ role: 'system', content: `استخدم المراجع التالية كخلفية مساعدة فقط إذا كانت مرتبطة بالسؤال:\n\n${context}` }] : []),
-      ...session.history.slice(-6),
-      { role: 'user', content: String(userText || '') }
-    ];
-
-    let out = await this.callFreeChat(messages);
-    if (!this.looksCorruptedText(out)) return out;
-
-    const repairEnabled = String(process.env.JOE_REPAIR_ENABLED || 'false').toLowerCase() === 'true';
-    if (repairEnabled) {
-      const repair = [
-        ...messages,
-        { role: 'user', content: 'أعد كتابة الرد السابق بالعربية الواضحة فقط وبدون أحرف مشوهة.' }
-      ];
-      out = await this.callFreeChat(repair);
-      if (!this.looksCorruptedText(out)) return out;
-    }
-
-    return 'ولا يهمك، صار خلل بسيط. ابعت رسالتك مرة ثانية.';
+    const text = await this.callGemini(session, userText);
+    return text;
   }
 
   static async handleStart(ctx) {
@@ -222,7 +135,14 @@ class JoeChatHandler {
     const session = this.getSession(ctx.from.id);
     session.active = true;
     if (!this.modes[session.mode]) session.mode = 'fun';
-    this.refreshResearchInBackground();
+
+    const hasKey = Boolean(String(process.env.GEMINI_API_KEY || '').trim());
+    if (!hasKey) {
+      return ctx.reply(
+        '⚠️ Gemini غير مفعّل بعد.\nضيف GEMINI_API_KEY في Railway Variables ثم أعد النشر.',
+        { reply_markup: this.buildModeKeyboard(session.mode).reply_markup }
+      );
+    }
 
     return ctx.reply(
       `🤖 أهلين! أنا جو\nاختار النمط وبعدين احكي معي عادي.\n\nالنمط الحالي: ${this.modes[session.mode].label}`,
@@ -327,7 +247,7 @@ class JoeChatHandler {
     }
 
     const now = Date.now();
-    if (now - (session.lastReplyAt || 0) < 1200) {
+    if (now - (session.lastReplyAt || 0) < 1000) {
       await ctx.reply('⏳ لحظة شوي :)');
       return true;
     }
@@ -339,8 +259,12 @@ class JoeChatHandler {
       const out = await this.generate(session, msg);
       this.pushHistory(session, 'assistant', out);
       await ctx.reply(out || 'ما طلع رد هالمرة، جرب مرة ثانية.');
-    } catch (_error) {
-      await ctx.reply('الخدمة المجانية مشغولة الآن. جرب بعد لحظة.');
+    } catch (error) {
+      if (String(error.message || '').includes('GEMINI_API_KEY_MISSING')) {
+        await ctx.reply('⚠️ لازم تضيف GEMINI_API_KEY في Railway Variables.');
+      } else {
+        await ctx.reply('Gemini مشغول الآن. جرب بعد لحظة.');
+      }
     }
     return true;
   }

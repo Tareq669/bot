@@ -68,7 +68,10 @@ if (missingEnvVars.length > 0) {
 process.env.BOT_TOKEN = normalizeEnvValue(process.env.BOT_TOKEN);
 process.env.HF_TOKEN = normalizeEnvValue(process.env.HF_TOKEN);
 if (isMissingRequiredEnv(process.env.HF_TOKEN)) {
-  logger.warn('⚠️ HF_TOKEN غير موجود: توليد الصور قد لا يعمل، لكن دردشة Joe المجانية ستعمل.');
+  logger.warn('⚠️ HF_TOKEN غير موجود: توليد الصور قد لا يعمل.');
+}
+if (isMissingRequiredEnv(process.env.GEMINI_API_KEY)) {
+  logger.warn('⚠️ GEMINI_API_KEY غير موجود: دردشة Joe عبر Gemini لن تعمل حتى تضيف المفتاح.');
 }
 
 const imageHandler = require('./handlers/imageHandler');
