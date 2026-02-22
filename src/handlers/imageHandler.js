@@ -18,13 +18,26 @@ class ImageHandler {
     this.model = String(process.env.GEMINI_IMAGE_MODEL || 'imagen-4.0-generate-001').trim();
     this.timeoutMs = this.toInt(process.env.GEMINI_IMAGE_TIMEOUT_MS, 30000, 5000, 120000);
     this.fallbackEnabled = String(process.env.FREE_IMAGE_FALLBACK || 'true').trim().toLowerCase() !== 'false';
-    this.fallbackEndpoint = String(process.env.FREE_IMAGE_ENDPOINT || 'https://image.pollinations.ai/prompt').trim();
+    this.fallbackEndpoints = this.parseFallbackEndpoints();
 
     if (!this.getGeminiKey()) {
       logger.warn('⚠️ GEMINI_API_KEY not found in environment variables (image generation disabled).');
     } else {
       logger.info(`✅ Image Generator initialized with Gemini model: ${this.model}`);
     }
+  }
+
+  parseFallbackEndpoints() {
+    const configured = String(
+      process.env.FREE_IMAGE_ENDPOINTS ||
+      process.env.FREE_IMAGE_ENDPOINT ||
+      'https://pollinations.ai/p,https://image.pollinations.ai/prompt'
+    ).trim();
+
+    return configured
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
   }
 
   toInt(value, fallback, min, max) {
@@ -113,23 +126,42 @@ class ImageHandler {
   }
 
   async generateWithFreeFallback(prompt) {
-    const url = `${this.fallbackEndpoint}/${encodeURIComponent(prompt)}?nologo=true&private=true&safe=true`;
-    const response = await fetch(url, {
-      method: 'GET',
-      timeout: this.timeoutMs
-    });
+    let lastError = null;
 
-    if (!response.ok) {
-      const body = await response.text().catch(() => '');
-      throw new Error(`FREE_IMAGE_HTTP_${response.status}: ${body}`);
+    for (const endpoint of this.fallbackEndpoints) {
+      const base = endpoint.replace(/\/+$/, '');
+      const url = `${base}/${encodeURIComponent(prompt)}?nologo=true&private=true&safe=true`;
+
+      try {
+        const response = await fetch(url, {
+          method: 'GET',
+          timeout: this.timeoutMs,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (compatible; Bot/1.0)'
+          }
+        });
+
+        if (!response.ok) {
+          const body = await response.text().catch(() => '');
+          throw new Error(`FREE_IMAGE_HTTP_${response.status}: ${body}`);
+        }
+
+        const arrayBuffer = await response.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        if (!buffer || buffer.length < 32) {
+          throw new Error('EMPTY_FREE_IMAGE');
+        }
+
+        logger.info(`✅ Free fallback image generated from: ${base}`);
+        return buffer;
+      } catch (error) {
+        const message = String(error?.message || error);
+        logger.warn(`Free fallback endpoint failed (${base}): ${message}`);
+        lastError = error;
+      }
     }
 
-    const arrayBuffer = await response.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-    if (!buffer || buffer.length === 0) {
-      throw new Error('EMPTY_FREE_IMAGE');
-    }
-    return buffer;
+    throw lastError || new Error('FREE_IMAGE_ALL_ENDPOINTS_FAILED');
   }
 
   async generateImageBuffer(prompt) {
@@ -163,7 +195,6 @@ class ImageHandler {
         if (canFallback) {
           try {
             const fallbackBuffer = await this.generateWithFreeFallback(cleanPrompt);
-            logger.info('✅ Free fallback image generated successfully');
             return { success: true, buffer: fallbackBuffer };
           } catch (fallbackError) {
             const fallbackMsg = String(fallbackError?.message || fallbackError);
