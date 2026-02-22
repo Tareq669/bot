@@ -17,6 +17,8 @@ class ImageHandler {
 
     this.model = String(process.env.GEMINI_IMAGE_MODEL || 'imagen-4.0-generate-001').trim();
     this.timeoutMs = this.toInt(process.env.GEMINI_IMAGE_TIMEOUT_MS, 30000, 5000, 120000);
+    this.hfModel = String(process.env.HF_IMAGE_MODEL || 'stabilityai/stable-diffusion-xl-base-1.0').trim();
+    this.hfTimeoutMs = this.toInt(process.env.HF_IMAGE_TIMEOUT_MS, this.timeoutMs, 5000, 120000);
     this.fallbackEnabled = String(process.env.FREE_IMAGE_FALLBACK || 'true').trim().toLowerCase() !== 'false';
     this.fallbackEndpoints = this.parseFallbackEndpoints();
 
@@ -24,6 +26,10 @@ class ImageHandler {
       logger.warn('⚠️ GEMINI_API_KEY not found in environment variables (image generation disabled).');
     } else {
       logger.info(`✅ Image Generator initialized with Gemini model: ${this.model}`);
+    }
+
+    if (this.getHfToken()) {
+      logger.info(`✅ HF image fallback enabled with model: ${this.hfModel}`);
     }
   }
 
@@ -53,6 +59,12 @@ class ImageHandler {
     return rawKey.trim().replace(/^["']|["']$/g, '');
   }
 
+  getHfToken() {
+    const rawToken = process.env.HF_TOKEN;
+    if (typeof rawToken !== 'string') return '';
+    return rawToken.trim().replace(/^["']|["']$/g, '');
+  }
+
   getClient() {
     const key = this.getGeminiKey();
     if (!key) return null;
@@ -66,7 +78,7 @@ class ImageHandler {
   }
 
   isAvailable() {
-    return this.isInitialized && !!this.getClient();
+    return this.isInitialized && (Boolean(this.getClient()) || Boolean(this.getHfToken()) || this.fallbackEnabled);
   }
 
   checkInappropriateContent(prompt) {
@@ -164,6 +176,41 @@ class ImageHandler {
     throw lastError || new Error('FREE_IMAGE_ALL_ENDPOINTS_FAILED');
   }
 
+  async generateWithHuggingFace(prompt) {
+    const token = this.getHfToken();
+    if (!token) {
+      throw new Error('HF_TOKEN_MISSING');
+    }
+
+    const url = `https://router.huggingface.co/hf-inference/models/${encodeURIComponent(this.hfModel)}`;
+    const response = await fetch(url, {
+      method: 'POST',
+      timeout: this.hfTimeoutMs,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        inputs: prompt,
+        options: {
+          wait_for_model: true
+        }
+      })
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.text().catch(() => '');
+      throw new Error(`HF_IMAGE_HTTP_${response.status}: ${errorBody}`);
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    if (!buffer || buffer.length < 32) {
+      throw new Error('EMPTY_HF_IMAGE');
+    }
+    return buffer;
+  }
+
   async generateImageBuffer(prompt) {
     try {
       if (!prompt || !String(prompt).trim()) {
@@ -192,6 +239,19 @@ class ImageHandler {
 
         logger.warn(`Gemini image failed: ${geminiMsg}`);
 
+        // Step 2 fallback: Hugging Face (if token exists)
+        if (this.getHfToken()) {
+          try {
+            const hfBuffer = await this.generateWithHuggingFace(cleanPrompt);
+            logger.info('✅ HF fallback image generated successfully');
+            return { success: true, buffer: hfBuffer };
+          } catch (hfError) {
+            const hfMsg = String(hfError?.message || hfError);
+            logger.warn(`HF fallback image failed: ${hfMsg}`);
+          }
+        }
+
+        // Step 3 fallback: free endpoints
         if (canFallback) {
           try {
             const fallbackBuffer = await this.generateWithFreeFallback(cleanPrompt);
@@ -221,6 +281,9 @@ class ImageHandler {
       }
       if (message.includes('401') || message.includes('403') || /api key|unauth|permission/i.test(message)) {
         return { success: false, error: 'مفتاح GEMINI_API_KEY غير صالح أو بدون صلاحية.' };
+      }
+      if (message.includes('HF_IMAGE_HTTP_401') || message.includes('HF_IMAGE_HTTP_403')) {
+        return { success: false, error: 'HF_TOKEN غير صالح أو بدون صلاحيات inference.' };
       }
       if (message.includes('429') || /quota|rate/i.test(message)) {
         return { success: false, error: 'تم تجاوز حد الطلبات أو الحصة. حاول لاحقا.' };
