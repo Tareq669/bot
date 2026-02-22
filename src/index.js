@@ -3964,9 +3964,11 @@ const botStart = async () => {
           logger.warn('⚠️ خطأ في حذف الـ Webhook:', webhookError.message);
         });
 
-      // Launch bot
+      // Launch bot with explicit update types so quiz poll answers are always received.
       bot
-        .launch()
+        .launch({
+          allowedUpdates: ['message', 'callback_query', 'inline_query', 'poll_answer']
+        })
         .then(() => {
           reconnectManager.isConnected = true;
           logger.info('✅ تم تشغيل البوت بنجاح!');

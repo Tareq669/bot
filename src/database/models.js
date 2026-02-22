@@ -1,9 +1,7 @@
 const mongoose = require('mongoose');
 const Auction = require('./models/Auction');
+const Group = require('./models/Group');
 
-/**
- * نموذج المستخدم
- */
 const userSchema = new mongoose.Schema({
   userId: { type: Number, required: true, unique: true },
   firstName: String,
@@ -34,23 +32,6 @@ const userSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now }
 });
 
-/**
- * نموذج المجموعات
- */
-const groupSchema = new mongoose.Schema({
-  groupId: { type: Number, required: true, unique: true },
-  groupName: String,
-  settings: {
-    antiSpam: { type: Boolean, default: true },
-    antiLink: { type: Boolean, default: false },
-    welcomeMessage: { type: Boolean, default: true }
-  },
-  createdAt: { type: Date, default: Date.now }
-});
-
-/**
- * نموذج المعاملات
- */
 const transactionSchema = new mongoose.Schema({
   userId: { type: Number, required: true },
   type: {
@@ -72,9 +53,6 @@ const transactionSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now }
 });
 
-/**
- * نموذج عناصر المتجر
- */
 const shopItemSchema = new mongoose.Schema({
   name: {
     type: String,
@@ -97,7 +75,7 @@ const shopItemSchema = new mongoose.Schema({
   },
   icon: {
     type: String,
-    default: '📦'
+    default: '??'
   },
   active: {
     type: Boolean,
@@ -113,9 +91,6 @@ const shopItemSchema = new mongoose.Schema({
   }
 });
 
-/**
- * نموذج إحصائيات اللعبة
- */
 const gameStatsSchema = new mongoose.Schema({
   userId: { type: Number, required: true },
   gameType: String,
@@ -124,14 +99,11 @@ const gameStatsSchema = new mongoose.Schema({
   playedAt: { type: Date, default: Date.now }
 });
 
-// إنشاء النماذج
 const User = mongoose.model('User', userSchema);
-const Group = mongoose.model('Group', groupSchema);
 const Transaction = mongoose.model('Transaction', transactionSchema);
 const ShopItem = mongoose.model('ShopItem', shopItemSchema);
 const GameStats = mongoose.model('GameStats', gameStatsSchema);
 
-// تصدير جميع النماذج
 module.exports = {
   User,
   Group,
@@ -140,3 +112,4 @@ module.exports = {
   GameStats,
   Auction
 };
+
