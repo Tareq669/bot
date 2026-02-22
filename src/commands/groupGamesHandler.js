@@ -49,6 +49,78 @@ const MCQ_QUESTIONS = [
   { question: 'عاصمة ألمانيا؟', options: ['برلين', 'ميونخ', 'فرانكفورت', 'هامبورغ'], answerIndex: 0, reward: 8 }
 ];
 
+const CAPITALS_BANK = [
+  ['السعودية', 'الرياض'], ['مصر', 'القاهرة'], ['المغرب', 'الرباط'], ['الجزائر', 'الجزائر'],
+  ['تونس', 'تونس'], ['الأردن', 'عمان'], ['العراق', 'بغداد'], ['سوريا', 'دمشق'],
+  ['لبنان', 'بيروت'], ['الإمارات', 'أبوظبي'], ['الكويت', 'الكويت'], ['قطر', 'الدوحة'],
+  ['عُمان', 'مسقط'], ['اليمن', 'صنعاء'], ['تركيا', 'أنقرة'], ['اليابان', 'طوكيو'],
+  ['فرنسا', 'باريس'], ['ألمانيا', 'برلين'], ['إيطاليا', 'روما'], ['إسبانيا', 'مدريد'],
+  ['كندا', 'أوتاوا'], ['أستراليا', 'كانبيرا'], ['البرازيل', 'برازيليا'], ['الأرجنتين', 'بوينس آيرس'],
+  ['المكسيك', 'مكسيكو سيتي'], ['الهند', 'نيودلهي'], ['الصين', 'بكين'], ['روسيا', 'موسكو'],
+  ['إندونيسيا', 'جاكرتا'], ['جنوب أفريقيا', 'بريتوريا']
+];
+
+const buildGeneratedMathMcq = () => {
+  const list = [];
+  for (let i = 1; i <= 140; i += 1) {
+    const a = (i % 29) + 3;
+    const b = (i % 17) + 2;
+    const mode = i % 4;
+    let question = '';
+    let answer = 0;
+    if (mode === 0) {
+      question = `كم ناتج ${a} + ${b} ؟`;
+      answer = a + b;
+    } else if (mode === 1) {
+      question = `كم ناتج ${a + b} - ${b} ؟`;
+      answer = a;
+    } else if (mode === 2) {
+      question = `كم ناتج ${a} × ${b} ؟`;
+      answer = a * b;
+    } else {
+      question = `كم ناتج ${(a * b)} ÷ ${b} ؟`;
+      answer = a;
+    }
+    const wrong1 = answer + ((i % 5) + 1);
+    const wrong2 = Math.max(0, answer - ((i % 4) + 1));
+    const wrong3 = answer + ((i % 7) + 2);
+    const options = [...new Set([String(answer), String(wrong1), String(wrong2), String(wrong3)])].slice(0, 4);
+    while (options.length < 4) {
+      options.push(String(Number(options[options.length - 1]) + 3));
+    }
+    list.push({
+      question,
+      options,
+      answerIndex: options.indexOf(String(answer)),
+      reward: answer >= 40 ? 10 : 8
+    });
+  }
+  return list;
+};
+
+const buildGeneratedCapitalsMcq = () => {
+  const capitals = CAPITALS_BANK.map((x) => x[1]);
+  return CAPITALS_BANK.map(([country, capital], idx) => {
+    const wrong = capitals.filter((c) => c !== capital).slice(idx % 10, (idx % 10) + 3);
+    while (wrong.length < 3) {
+      wrong.push(capitals[(idx + wrong.length + 5) % capitals.length]);
+    }
+    const options = [capital, ...wrong.slice(0, 3)];
+    return {
+      question: `ما عاصمة ${country}؟`,
+      options,
+      answerIndex: 0,
+      reward: 9
+    };
+  });
+};
+
+const ALL_MCQ_QUESTIONS = [
+  ...MCQ_QUESTIONS,
+  ...buildGeneratedMathMcq(),
+  ...buildGeneratedCapitalsMcq()
+];
+
 const DAILY_CHALLENGES = [
   { question: 'تحدي يومي: كم ناتج 14 × 7 ؟', answers: ['98'], reward: 25 },
   { question: 'تحدي يومي: اكتب اسم أطول نهر شائع عربيًا.', answers: ['النيل', 'نهر النيل'], reward: 25 },
@@ -83,6 +155,7 @@ class GroupGamesHandler {
   static activeVotes = new Map();
   static activeVoteByChat = new Map();
   static lastQuestionByGroup = new Map();
+  static questionQueues = new Map();
 
   static isGroupChat(ctx) {
     return GROUP_TYPES.has(ctx?.chat?.type);
@@ -148,6 +221,19 @@ class GroupGamesHandler {
     const picked = this.pickRandom(pool.length > 0 ? pool : items);
     this.lastQuestionByGroup.set(key, picked.question || picked.prompt || JSON.stringify(picked));
     return picked;
+  }
+
+  static pickFromQueue(items, key) {
+    if (!Array.isArray(items) || items.length === 0) return null;
+    let state = this.questionQueues.get(key);
+    if (!state || state.sourceSize !== items.length || !Array.isArray(state.queue) || state.queue.length === 0) {
+      state = {
+        sourceSize: items.length,
+        queue: this.shuffleArray([...items])
+      };
+      this.questionQueues.set(key, state);
+    }
+    return state.queue.pop();
   }
 
   static parseCommandArgs(ctx) {
@@ -256,7 +342,7 @@ class GroupGamesHandler {
       const lastAutoAt = group.gameSystem.state.lastAutoAt ? new Date(group.gameSystem.state.lastAutoAt).getTime() : 0;
       if (Date.now() - lastAutoAt < intervalMinutes * 60 * 1000) continue;
 
-      const base = this.pickNonRepeating(QUICK_QUESTIONS, `auto:${groupId}`);
+      const base = this.pickFromQueue(QUICK_QUESTIONS, `auto:${groupId}`);
       await this.startRoundInternal(Number(group.groupId), {
         type: 'quiz',
         prompt: `⚡ <b>سؤال تلقائي</b>\n\n${base.question}`,
@@ -309,7 +395,7 @@ class GroupGamesHandler {
     const pool = QUICK_QUESTIONS.filter((q) => this.questionMatchesDifficulty(q, difficulty));
     const effectivePool = pool.length > 0 ? pool : QUICK_QUESTIONS;
     const key = `quiz:${String(groupId || 'global')}`;
-    const quiz = this.pickNonRepeating(effectivePool, key);
+    const quiz = this.pickFromQueue(effectivePool, key);
     return { type: 'quiz', prompt: `❓ <b>سؤال سريع</b>\n\n${quiz.question}`, answers: quiz.answers, reward: quiz.reward, timeoutSec: 30 };
   }
 
@@ -588,9 +674,9 @@ class GroupGamesHandler {
     if (!status.ok) return;
     const args = this.parseCommandArgs(ctx);
     const difficulty = this.parseDifficulty(args[0]);
-    const pool = MCQ_QUESTIONS.filter((q) => this.questionMatchesDifficulty(q, difficulty));
-    const source = pool.length > 0 ? pool : MCQ_QUESTIONS;
-    const question = this.pickNonRepeating(source, `quizpoll:${String(ctx.chat.id)}`);
+    const pool = ALL_MCQ_QUESTIONS.filter((q) => this.questionMatchesDifficulty(q, difficulty));
+    const source = pool.length > 0 ? pool : ALL_MCQ_QUESTIONS;
+    const question = this.pickFromQueue(source, `quizpoll:${String(ctx.chat.id)}:${difficulty || 'all'}`);
     const timeoutSec = Math.max(10, status.group.gameSystem.settings.questionTimeoutSec || 25);
     await this.sendQuizPoll(ctx.chat.id, question, question.reward, timeoutSec);
   }
@@ -630,9 +716,9 @@ class GroupGamesHandler {
     if (!status.ok) return;
     const args = this.parseCommandArgs(ctx);
     const difficulty = this.parseDifficulty(args[0]);
-    const pool = MCQ_QUESTIONS.filter((q) => this.questionMatchesDifficulty(q, difficulty));
-    const source = pool.length > 0 ? pool : MCQ_QUESTIONS;
-    const question = this.pickNonRepeating(source, `mcq:${String(ctx.chat.id)}`);
+    const pool = ALL_MCQ_QUESTIONS.filter((q) => this.questionMatchesDifficulty(q, difficulty));
+    const source = pool.length > 0 ? pool : ALL_MCQ_QUESTIONS;
+    const question = this.pickFromQueue(source, `mcq:${String(ctx.chat.id)}:${difficulty || 'all'}`);
     const timeoutSec = Math.max(10, status.group.gameSystem.settings.questionTimeoutSec || 25);
     await this.sendQuizPoll(ctx.chat.id, question, question.reward, timeoutSec);
   }
@@ -646,9 +732,9 @@ class GroupGamesHandler {
       return;
     }
 
-    const pool = MCQ_QUESTIONS.filter((q) => this.questionMatchesDifficulty(q, session.difficulty));
-    const source = pool.length > 0 ? pool : MCQ_QUESTIONS;
-    const question = this.pickNonRepeating(source, `series:${String(chatId)}`);
+    const pool = ALL_MCQ_QUESTIONS.filter((q) => this.questionMatchesDifficulty(q, session.difficulty));
+    const source = pool.length > 0 ? pool : ALL_MCQ_QUESTIONS;
+    const question = this.pickFromQueue(source, `series:${String(chatId)}:${session.difficulty || 'all'}`);
     await this.sendQuizPoll(chatId, question, question.reward, session.timeoutSec);
     session.remaining -= 1;
 
