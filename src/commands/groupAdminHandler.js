@@ -202,8 +202,12 @@ class GroupAdminHandler {
     if (!group.settings) group.settings = {};
     if (typeof group.settings.lockLinks !== 'boolean') group.settings.lockLinks = false;
     if (typeof group.settings.filterBadWords !== 'boolean') group.settings.filterBadWords = true;
+    if (typeof group.settings.blockExplicitContent !== 'boolean') group.settings.blockExplicitContent = true;
     if (typeof group.settings.floodProtection !== 'boolean') group.settings.floodProtection = true;
     if (typeof group.settings.exemptAdminsFromProtection !== 'boolean') group.settings.exemptAdminsFromProtection = false;
+    if (typeof group.settings.blockLongMessages !== 'boolean') group.settings.blockLongMessages = true;
+    if (!Number.isInteger(group.settings.maxMessageLength)) group.settings.maxMessageLength = 700;
+    group.settings.maxMessageLength = Math.max(100, Math.min(4000, group.settings.maxMessageLength));
 
     if (!group.settings.warningPolicy) {
       group.settings.warningPolicy = { enabled: true, muteAt: 2, banAt: 3, muteMinutes: 10 };
@@ -276,7 +280,9 @@ class GroupAdminHandler {
       '<b>الإعدادات الحالية:</b>\n' +
       `• منع الروابط: ${settings.lockLinks ? '✅' : '❌'}\n` +
       `• فلتر الكلمات: ${settings.filterBadWords ? '✅' : '❌'}\n` +
+      `• منع الإباحي: ${settings.blockExplicitContent ? '✅' : '❌'}\n` +
       `• حماية التكرار: ${settings.floodProtection ? '✅' : '❌'}\n` +
+      `• منع الرسائل الطويلة: ${settings.blockLongMessages ? '✅' : '❌'} (الحد: ${settings.maxMessageLength})\n` +
       `• استثناء المشرفين من الحماية: ${settings.exemptAdminsFromProtection ? '✅' : '❌'}\n` +
       `• سياسة العقوبات: ${this.formatPolicy(policy)}\n\n` +
       '<b>أوامر الإدارة:</b>\n' +
@@ -294,6 +300,9 @@ class GroupAdminHandler {
       '• /gprotect links on|off\n' +
       '• /gprotect words on|off\n' +
       '• /gprotect flood on|off\n' +
+      '• /gprotect nsfw on|off\n' +
+      '• /gprotect long on|off\n' +
+      '• /gprotect maxlen 700\n' +
       '• /gprotect admins on|off\n' +
       '• /glogs\n' +
       '• /gclear (بالرد)\n' +
@@ -415,16 +424,23 @@ class GroupAdminHandler {
       '🛡️ <b>حالة الحماية الحالية</b>\n\n' +
       `• الروابط: ${group.settings?.lockLinks ? '✅ مقفلة' : '❌ مفتوحة'}\n` +
       `• الكلمات: ${group.settings?.filterBadWords ? '✅ مفعلة' : '❌ معطلة'}\n` +
+      `• الإباحي: ${group.settings?.blockExplicitContent ? '✅ مفعلة' : '❌ معطلة'}\n` +
       `• التكرار: ${group.settings?.floodProtection ? '✅ مفعلة' : '❌ معطلة'}\n` +
+      `• الرسائل الطويلة: ${group.settings?.blockLongMessages ? '✅ مفعلة' : '❌ معطلة'} (الحد: ${group.settings?.maxMessageLength || 700})\n` +
       `• استثناء المشرفين: ${group.settings?.exemptAdminsFromProtection ? '✅ مفعل' : '❌ معطل'}\n\n` +
       '<b>أوامر سريعة:</b>\n' +
       '• قفل الروابط | فتح الروابط\n' +
       '• تفعيل الكلمات | تعطيل الكلمات\n' +
       '• تفعيل التكرار | تعطيل التكرار\n' +
+      '• تفعيل منع الاباحية | تعطيل منع الاباحية\n' +
+      '• تفعيل منع الرسائل الطويلة | تعطيل منع الرسائل الطويلة\n' +
       '• استثناء المشرفين من الحماية | الغاء استثناء المشرفين من الحماية\n' +
       '• /gprotect links on|off\n' +
       '• /gprotect words on|off\n' +
       '• /gprotect flood on|off\n' +
+      '• /gprotect nsfw on|off\n' +
+      '• /gprotect long on|off\n' +
+      '• /gprotect maxlen 700\n' +
       '• /gprotect admins on|off'
     );
   }
@@ -469,6 +485,19 @@ class GroupAdminHandler {
     }
 
     const target = String(args[0] || '').toLowerCase();
+    if (target === 'maxlen') {
+      const lengthValue = parseInt(args[1] || '', 10);
+      if (!Number.isInteger(lengthValue) || lengthValue < 100 || lengthValue > 4000) {
+        return ctx.reply('❌ استخدم رقمًا بين 100 و 4000.\nمثال: /gprotect maxlen 700');
+      }
+      group.settings.maxMessageLength = lengthValue;
+      group.updatedAt = new Date();
+      await this.addModerationLog(group, 'toggle_setting', ctx.from.id, null, `maxMessageLength => ${lengthValue} (gprotect)`);
+      await group.save();
+      const refreshed = await this.ensureGroupRecord(ctx);
+      return ctx.reply(this.getProtectionStatusText(refreshed), { parse_mode: 'HTML' });
+    }
+
     const switchValue = this.parseOnOff(args[1]);
     if (switchValue === null) {
       return ctx.reply('❌ استخدم on أو off.\nمثال: /gprotect links on');
@@ -478,11 +507,13 @@ class GroupAdminHandler {
       links: 'lockLinks',
       words: 'filterBadWords',
       flood: 'floodProtection',
+      nsfw: 'blockExplicitContent',
+      long: 'blockLongMessages',
       admins: 'exemptAdminsFromProtection'
     };
     const key = keyMap[target];
     if (!key) {
-      return ctx.reply('❌ الخيار غير معروف. استخدم: links أو words أو flood أو admins');
+      return ctx.reply('❌ الخيار غير معروف. استخدم: links أو words أو flood أو nsfw أو long أو maxlen أو admins');
     }
 
     const result = await this.setProtectionSetting(ctx, key, switchValue, 'gprotect');
@@ -1730,7 +1761,7 @@ class GroupAdminHandler {
       return true;
     }
     if (
-      /^(قفل الروابط|فتح الروابط|تفعيل الكلمات|تعطيل الكلمات|تفعيل التكرار|تعطيل التكرار|استثناء المشرفين من الحماية|الغاء استثناء المشرفين من الحماية|إلغاء استثناء المشرفين من الحماية|الحماية|\/gprotect\b)/i.test(rawText)
+      /^(قفل الروابط|فتح الروابط|تفعيل الكلمات|تعطيل الكلمات|تفعيل التكرار|تعطيل التكرار|تفعيل منع الاباحية|تعطيل منع الاباحية|تفعيل منع الرسائل الطويلة|تعطيل منع الرسائل الطويلة|استثناء المشرفين من الحماية|الغاء استثناء المشرفين من الحماية|إلغاء استثناء المشرفين من الحماية|الحماية|\/gprotect\b)/i.test(rawText)
     ) {
       if (/^قفل الروابط$/i.test(rawText)) {
         const result = await this.setProtectionSetting(ctx, 'lockLinks', true, 'text');
@@ -1766,6 +1797,30 @@ class GroupAdminHandler {
         const result = await this.setProtectionSetting(ctx, 'floodProtection', false, 'text');
         if (!result?.ok) return true;
         await ctx.reply('✅ تم تعطيل حماية التكرار.');
+        return true;
+      }
+      if (/^تفعيل منع الاباحية$/i.test(rawText)) {
+        const result = await this.setProtectionSetting(ctx, 'blockExplicitContent', true, 'text');
+        if (!result?.ok) return true;
+        await ctx.reply('✅ تم تفعيل منع المحتوى الإباحي.');
+        return true;
+      }
+      if (/^تعطيل منع الاباحية$/i.test(rawText)) {
+        const result = await this.setProtectionSetting(ctx, 'blockExplicitContent', false, 'text');
+        if (!result?.ok) return true;
+        await ctx.reply('✅ تم تعطيل منع المحتوى الإباحي.');
+        return true;
+      }
+      if (/^تفعيل منع الرسائل الطويلة$/i.test(rawText)) {
+        const result = await this.setProtectionSetting(ctx, 'blockLongMessages', true, 'text');
+        if (!result?.ok) return true;
+        await ctx.reply(`✅ تم تفعيل منع الرسائل الطويلة (الحد الحالي: ${group.settings?.maxMessageLength || 700}).`);
+        return true;
+      }
+      if (/^تعطيل منع الرسائل الطويلة$/i.test(rawText)) {
+        const result = await this.setProtectionSetting(ctx, 'blockLongMessages', false, 'text');
+        if (!result?.ok) return true;
+        await ctx.reply('✅ تم تعطيل منع الرسائل الطويلة.');
         return true;
       }
       if (/^استثناء المشرفين من الحماية$/i.test(rawText)) {
@@ -1826,6 +1881,21 @@ class GroupAdminHandler {
 
     const text = lowered;
 
+    if (group.settings?.blockLongMessages) {
+      const maxLength = Number.isInteger(group.settings?.maxMessageLength) ? group.settings.maxMessageLength : 700;
+      if (rawText.length > maxLength) {
+        try {
+          await ctx.telegram.deleteMessage(ctx.chat.id, ctx.message.message_id);
+          await this.addModerationLog(group, 'delete_long_message', ctx.botInfo.id, ctx.from.id, `len=${rawText.length}, max=${maxLength}`);
+          await group.save();
+          await ctx.reply(`📏 تم حذف رسالة طويلة (الحد المسموح: ${maxLength} حرف).`);
+        } catch (_error) {
+          await ctx.reply('⚠️ تم اكتشاف رسالة طويلة لكن لا يمكن حذفها. فعّل صلاحية حذف الرسائل للبوت.');
+        }
+        return true;
+      }
+    }
+
     if (group.settings?.lockLinks) {
       const hasLink = /(https?:\/\/|t\.me\/|telegram\.me\/|www\.|(?:[a-z0-9-]+\.)+(?:com|net|org|io|me|co|ai|dev|app|xyz|info|ly|ru|uk|de|fr|sa|ae|qa|eg|tr)\b)/i.test(text);
       if (hasLink) {
@@ -1836,6 +1906,21 @@ class GroupAdminHandler {
           await ctx.reply('🔒 الروابط ممنوعة في هذا الجروب.');
         } catch (_error) {
           await ctx.reply('⚠️ تم اكتشاف رابط لكن لا يمكن حذفه. فعّل صلاحية حذف الرسائل للبوت.');
+        }
+        return true;
+      }
+    }
+
+    if (group.settings?.blockExplicitContent) {
+      const explicitPattern = /(?:\b(?:porn|xxx|sex|xvideos|xnxx|redtube|onlyfans|nsfw)\b|اباحي|اباحية|سكس|جنس صريح|نيك)/i;
+      if (explicitPattern.test(text)) {
+        try {
+          await ctx.telegram.deleteMessage(ctx.chat.id, ctx.message.message_id);
+          await this.addModerationLog(group, 'delete_explicit_message', ctx.botInfo.id, ctx.from.id, 'explicit content blocked');
+          await group.save();
+          await ctx.reply('🚫 تم حذف رسالة تحتوي على محتوى إباحي.');
+        } catch (_error) {
+          await ctx.reply('⚠️ تم اكتشاف محتوى إباحي لكن لا يمكن حذفه. فعّل صلاحية حذف الرسائل للبوت.');
         }
         return true;
       }

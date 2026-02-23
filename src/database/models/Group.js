@@ -24,6 +24,10 @@ const groupSchema = new mongoose.Schema({
       type: Boolean,
       default: true
     },
+    blockExplicitContent: {
+      type: Boolean,
+      default: true
+    },
     floodProtection: {
       type: Boolean,
       default: true
@@ -39,6 +43,14 @@ const groupSchema = new mongoose.Schema({
     lockMedia: {
       type: Boolean,
       default: false
+    },
+    blockLongMessages: {
+      type: Boolean,
+      default: true
+    },
+    maxMessageLength: {
+      type: Number,
+      default: 700
     },
     warningPolicy: {
       enabled: {
