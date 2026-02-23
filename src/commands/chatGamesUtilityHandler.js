@@ -5,12 +5,12 @@ class ChatGamesUtilityHandler {
   static xoGames = new Map();
 
   static cityAliases = {
-    'غزة': 'Gaza',
-    'غزه': 'Gaza',
-    'القدس': 'Jerusalem',
-    'جدة': 'Jeddah',
-    'مكة': 'Mecca',
-    'مكه': 'Mecca'
+    غزة: 'Gaza',
+    غزه: 'Gaza',
+    القدس: 'Jerusalem',
+    جدة: 'Jeddah',
+    مكة: 'Mecca',
+    مكه: 'Mecca'
   };
 
   static weatherCodes = {
@@ -86,23 +86,44 @@ class ChatGamesUtilityHandler {
     return Markup.inlineKeyboard(rows);
   }
 
+  static buildChallengeKeyboard(game) {
+    return Markup.inlineKeyboard([
+      [
+        Markup.button.callback('✅ قبول التحدي', `xo:challenge:accept:${game.id}`),
+        Markup.button.callback('❌ رفض', `xo:challenge:decline:${game.id}`)
+      ]
+    ]);
+  }
+
   static renderXoText(game) {
     const p1 = game.player1Name || 'اللاعب 1';
     const p2 = game.player2Name || 'اللاعب 2';
 
+    if (game.status === 'pending') {
+      return (
+        '❌⭕ تحدي XO\n\n' +
+        `🎯 ${p1} تحدى ${p2}\n` +
+        'بانتظار قبول التحدي...'
+      );
+    }
+
+    if (game.status === 'declined') {
+      return `❌⭕ تم رفض تحدي XO بين ${p1} و ${p2}.`;
+    }
+
     if (game.status === 'done') {
       if (game.winnerUserId) {
         const winnerName = game.winnerUserId === game.player1Id ? p1 : p2;
-        return `❌⭕ لعبة XO\n\n🏁 الفائز: ${winnerName}\n\nاكتب "اكس اوه" بالرد لبدء لعبة جديدة.`;
+        return `❌⭕ لعبة XO\n\n🏁 الفائز: ${winnerName}\n\nاكتب "اكس اوه" لبدء لعبة جديدة.`;
       }
-      return '❌⭕ لعبة XO\n\n🤝 تعادل!\n\nاكتب "اكس اوه" بالرد لبدء لعبة جديدة.';
+      return '❌⭕ لعبة XO\n\n🤝 تعادل!\n\nاكتب "اكس اوه" لبدء لعبة جديدة.';
     }
 
     const turnName = game.currentUserId === game.player1Id ? p1 : p2;
     const turnSymbol = game.currentUserId === game.player1Id ? '❌' : '⭕';
 
     return (
-      `❌⭕ لعبة XO\n\n` +
+      '❌⭕ لعبة XO\n\n' +
       `👤 ${p1} = ❌\n` +
       `👤 ${p2} = ⭕\n\n` +
       `🎯 الدور الآن: ${turnName} (${turnSymbol})`
@@ -124,13 +145,13 @@ class ChatGamesUtilityHandler {
       id,
       createdAt: Date.now(),
       chatId: ctx.chat.id,
+      status: 'active',
       player1Id: ctx.from.id,
       player2Id: 0,
       player1Name: ctx.from.first_name || 'أنت',
-      player2Name: 'جو',
+      player2Name: 'البوت',
       currentUserId: ctx.from.id,
       board: Array(9).fill(null),
-      status: 'active',
       winnerUserId: null
     };
     this.xoGames.set(id, game);
@@ -140,7 +161,7 @@ class ChatGamesUtilityHandler {
   static async handleXoGroupStart(ctx) {
     const target = ctx.message?.reply_to_message?.from;
     if (!target || target.is_bot) {
-      await ctx.reply('ℹ️ لبدء XO، اعمل "اكس اوه" بالرد على رسالة الشخص الذي تريد اللعب معه.');
+      await ctx.reply('ℹ️ لبدء XO في الجروب: اكتب "اكس اوه" بالرد على رسالة الشخص الذي تريد اللعب معه.');
       return;
     }
     if (target.id === ctx.from.id) {
@@ -154,18 +175,24 @@ class ChatGamesUtilityHandler {
       id,
       createdAt: Date.now(),
       chatId: ctx.chat.id,
+      status: 'pending',
+      challengerId: ctx.from.id,
+      opponentId: target.id,
       player1Id: ctx.from.id,
       player2Id: target.id,
       player1Name: ctx.from.first_name || 'لاعب 1',
       player2Name: target.first_name || 'لاعب 2',
-      currentUserId: ctx.from.id,
+      currentUserId: null,
       board: Array(9).fill(null),
-      status: 'active',
       winnerUserId: null
     };
 
     this.xoGames.set(id, game);
-    await ctx.reply(this.renderXoText(game), this.buildXoKeyboard(game));
+    const sent = await ctx.reply(
+      this.renderXoText(game),
+      this.buildChallengeKeyboard(game)
+    );
+    game.messageId = sent?.message_id || null;
   }
 
   static playBotMove(game) {
@@ -176,6 +203,62 @@ class ChatGamesUtilityHandler {
     if (freeIndexes.length === 0) return;
     const pick = freeIndexes[Math.floor(Math.random() * freeIndexes.length)];
     game.board[pick] = '⭕';
+  }
+
+  static async handleXoChallengeAction(ctx) {
+    const action = String(ctx.match?.[1] || '').toLowerCase();
+    const gameId = String(ctx.match?.[2] || '');
+    const game = this.xoGames.get(gameId);
+
+    if (!game) {
+      await ctx.answerCbQuery('التحدي غير موجود أو انتهى', { show_alert: false }).catch(() => {});
+      return;
+    }
+    if (game.chatId !== ctx.chat?.id) {
+      await ctx.answerCbQuery('هذا التحدي ليس في هذه المحادثة', { show_alert: false }).catch(() => {});
+      return;
+    }
+    if (game.status !== 'pending') {
+      await ctx.answerCbQuery('تم التعامل مع هذا التحدي مسبقا', { show_alert: false }).catch(() => {});
+      return;
+    }
+
+    const userId = ctx.from.id;
+    const isOpponent = userId === game.opponentId;
+    const isChallenger = userId === game.challengerId;
+
+    if (!isOpponent && !isChallenger) {
+      await ctx.answerCbQuery('هذا التحدي ليس لك', { show_alert: false }).catch(() => {});
+      return;
+    }
+
+    if (action === 'decline') {
+      if (!isOpponent && !isChallenger) {
+        await ctx.answerCbQuery('لا يمكنك رفض هذا التحدي', { show_alert: false }).catch(() => {});
+        return;
+      }
+      game.status = 'declined';
+      await ctx.answerCbQuery('تم رفض التحدي', { show_alert: false }).catch(() => {});
+      await ctx.editMessageText(this.renderXoText(game)).catch(() => {});
+      this.xoGames.delete(gameId);
+      return;
+    }
+
+    if (action !== 'accept') {
+      await ctx.answerCbQuery('إجراء غير معروف', { show_alert: false }).catch(() => {});
+      return;
+    }
+
+    if (!isOpponent) {
+      await ctx.answerCbQuery('فقط الشخص المتحدَّى يمكنه قبول التحدي', { show_alert: false }).catch(() => {});
+      return;
+    }
+
+    game.status = 'active';
+    game.currentUserId = game.player1Id;
+
+    await ctx.answerCbQuery('تم قبول التحدي', { show_alert: false }).catch(() => {});
+    await ctx.editMessageText(this.renderXoText(game), this.buildXoKeyboard(game)).catch(() => {});
   }
 
   static async handleXoAction(ctx) {
@@ -192,7 +275,7 @@ class ChatGamesUtilityHandler {
       return;
     }
     if (game.status !== 'active') {
-      await ctx.answerCbQuery('اللعبة انتهت', { show_alert: false }).catch(() => {});
+      await ctx.answerCbQuery('اللعبة غير نشطة', { show_alert: false }).catch(() => {});
       return;
     }
 
@@ -226,7 +309,7 @@ class ChatGamesUtilityHandler {
     } else {
       game.currentUserId = userId === game.player1Id ? game.player2Id : game.player1Id;
 
-      // Private mode: bot plays automatically.
+      // Private mode: player2 is bot (id=0), so it plays instantly.
       if (game.player2Id === 0 && game.currentUserId === 0) {
         this.playBotMove(game);
         const botWinner = this.getXoWinner(game.board);
@@ -292,7 +375,7 @@ class ChatGamesUtilityHandler {
     try {
       const city = await this.resolveCity(cityText);
       if (!city) {
-        await ctx.reply('❌ لم أتعرف على المدينة. جرّب كتابة الاسم بشكل أوضح، مثال: طقس غزة');
+        await ctx.reply('❌ لم أتعرف على المدينة. جرب مثل: طقس غزة');
         return;
       }
 
@@ -317,8 +400,8 @@ class ChatGamesUtilityHandler {
         `☁️ الحالة: ${weatherText}`;
 
       await ctx.reply(message);
-    } catch (error) {
-      await ctx.reply('❌ تعذر جلب بيانات الطقس حاليا. حاول مرة أخرى لاحقا.');
+    } catch (_error) {
+      await ctx.reply('❌ تعذر جلب بيانات الطقس حاليا. حاول لاحقا.');
     }
   }
 
@@ -331,7 +414,7 @@ class ChatGamesUtilityHandler {
     try {
       const city = await this.resolveCity(cityText);
       if (!city) {
-        await ctx.reply('❌ لم أتعرف على المدينة. جرّب مثل: اذان غزة');
+        await ctx.reply('❌ لم أتعرف على المدينة. جرب مثل: اذان غزة');
         return;
       }
 
@@ -357,8 +440,8 @@ class ChatGamesUtilityHandler {
         `العشاء: ${t.Isha || '-'}`;
 
       await ctx.reply(message);
-    } catch (error) {
-      await ctx.reply('❌ تعذر جلب مواقيت الأذان حاليا. حاول مرة أخرى لاحقا.');
+    } catch (_error) {
+      await ctx.reply('❌ تعذر جلب مواقيت الأذان حاليا. حاول لاحقا.');
     }
   }
 }

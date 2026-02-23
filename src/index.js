@@ -107,7 +107,7 @@ const PRIVATE_ONLY_COMMANDS = new Set([
 
 const GROUP_ONLY_COMMANDS = new Set([
   'gpanel', 'ghelp', 'gsettings', 'gwarn', 'gwarns', 'gunwarn', 'gresetwarn',
-  'gmute', 'gunmute', 'gban', 'gunban', 'gclear', 'glogs', 'gpolicy',
+  'gmute', 'gunmute', 'gban', 'gunban', 'gclear', 'glogs', 'gpolicy', 'gprotect',
   'gadminstats', 'gprint', 'greasons', 'gbasic', 'gexceptions', 'granks', 'gdetect', 'gonline', 'gadminleave',
   'gtemplate_member', 'gtemplate_admin', 'gideal_member', 'gideal_admin', 'gshow_ideal_member', 'gshow_ideal_admin',
   'gquiz', 'gmath', 'gword', 'gdaily', 'gmcq', 'gvote', 'gquizset', 'gleader', 'gweekly', 'ggame', 'ggames',
@@ -207,6 +207,7 @@ Promise.all([
       { command: 'gclear', description: 'حذف رسالة (بالرد)' },
       { command: 'glogs', description: 'عرض سجل الإدارة' },
       { command: 'gadminstats', description: 'تقرير تفاعل مشرف' },
+      { command: 'gprotect', description: 'إعدادات الحماية السريعة' },
       { command: 'gprint', description: 'برنت سجل عضو' },
       { command: 'greasons', description: 'تفعيل/تعطيل الأسباب' },
       { command: 'gbasic', description: 'إدارة رتبة الأساسي' },
@@ -303,6 +304,7 @@ bot.command('gban', (ctx) => GroupAdminHandler.handleBanCommand(ctx));
 bot.command('gunban', (ctx) => GroupAdminHandler.handleUnbanCommand(ctx));
 bot.command('gclear', (ctx) => GroupAdminHandler.handleClearCommand(ctx));
 bot.command('glogs', (ctx) => GroupAdminHandler.handleLogsCommand(ctx));
+bot.command('gprotect', (ctx) => GroupAdminHandler.handleProtectCommand(ctx));
 bot.command('gadminstats', (ctx) => GroupAdminHandler.handleAdminInteractionCommand(ctx));
 bot.command('gprint', (ctx) => GroupAdminHandler.handlePrintCommand(ctx));
 bot.command('greasons', (ctx) => GroupAdminHandler.handleReasonsToggle(ctx));
@@ -2367,6 +2369,7 @@ bot.hears(/^طقس\s+(.+)$/i, (ctx) => ChatGamesUtilityHandler.handleWeatherText
 bot.hears(/^(?:اذان|أذان)\s+(.+)$/i, (ctx) => ChatGamesUtilityHandler.handleAdhanText(ctx, ctx.match[1]));
 
 bot.action(/^xo:move:([a-z0-9]+):([0-8])$/i, (ctx) => ChatGamesUtilityHandler.handleXoAction(ctx));
+bot.action(/^xo:challenge:(accept|decline):([a-z0-9]+)$/i, (ctx) => ChatGamesUtilityHandler.handleXoChallengeAction(ctx));
 
 // --- TEXT HANDLER FOR IMAGE GENERATION AND QURANIC GAMES ---
 bot.on('text', async (ctx, next) => {

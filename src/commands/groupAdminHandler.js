@@ -288,6 +288,10 @@ class GroupAdminHandler {
       '• /gresetwarn (بالرد)\n' +
       '• /gpolicy\n' +
       '• /gpolicy 2 3 10\n' +
+      '• /gprotect\n' +
+      '• /gprotect links on|off\n' +
+      '• /gprotect words on|off\n' +
+      '• /gprotect flood on|off\n' +
       '• /glogs\n' +
       '• /gclear (بالرد)\n' +
       '• تفاعل مشرف /gadminstats\n' +
@@ -365,6 +369,7 @@ class GroupAdminHandler {
       '• /gunwarn إزالة تحذير واحد (بالرد)\n' +
       '• /gresetwarn تصفير التحذيرات (بالرد)\n' +
       '• /gpolicy عرض/تعديل سياسة العقوبات\n' +
+      '• /gprotect إعدادات الحماية السريعة\n' +
       '• /glogs عرض سجل الإدارة\n' +
       '• /gclear حذف رسالة بالرد\n' +
       '• تفاعل مشرف /gadminstats\n' +
@@ -396,6 +401,84 @@ class GroupAdminHandler {
       '• /gtour إدارة البطولة',
       { parse_mode: 'HTML' }
     );
+  }
+
+  static getProtectionStatusText(group) {
+    return (
+      '🛡️ <b>حالة الحماية الحالية</b>\n\n' +
+      `• الروابط: ${group.settings?.lockLinks ? '✅ مقفلة' : '❌ مفتوحة'}\n` +
+      `• الكلمات: ${group.settings?.filterBadWords ? '✅ مفعلة' : '❌ معطلة'}\n` +
+      `• التكرار: ${group.settings?.floodProtection ? '✅ مفعلة' : '❌ معطلة'}\n\n` +
+      '<b>أوامر سريعة:</b>\n' +
+      '• قفل الروابط | فتح الروابط\n' +
+      '• تفعيل الكلمات | تعطيل الكلمات\n' +
+      '• تفعيل التكرار | تعطيل التكرار\n' +
+      '• /gprotect links on|off\n' +
+      '• /gprotect words on|off\n' +
+      '• /gprotect flood on|off'
+    );
+  }
+
+  static async setProtectionSetting(ctx, key, value, source = 'manual') {
+    if (!this.isGroupChat(ctx)) return false;
+
+    const isAdmin = await this.isGroupAdmin(ctx);
+    if (!isAdmin) {
+      await ctx.reply('❌ أوامر الحماية للمشرفين فقط.');
+      return { ok: false };
+    }
+
+    const group = await this.ensureGroupRecord(ctx);
+    this.normalizeGroupState(group);
+    group.settings[key] = Boolean(value);
+    group.updatedAt = new Date();
+    await this.addModerationLog(group, 'toggle_setting', ctx.from.id, null, `${key} => ${group.settings[key] ? 'on' : 'off'} (${source})`);
+    await group.save();
+    return { ok: true };
+  }
+
+  static parseOnOff(value) {
+    const v = String(value || '').trim().toLowerCase();
+    if (['on', '1', 'true', 'yes', 'enable', 'enabled'].includes(v)) return true;
+    if (['off', '0', 'false', 'no', 'disable', 'disabled'].includes(v)) return false;
+    return null;
+  }
+
+  static async handleProtectCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+
+    const isAdmin = await this.isGroupAdmin(ctx);
+    if (!isAdmin) return ctx.reply('❌ هذا الأمر للمشرفين فقط.');
+
+    const group = await this.ensureGroupRecord(ctx);
+    this.normalizeGroupState(group);
+
+    const args = this.parseCommandArgs(ctx);
+    if (args.length < 2) {
+      return ctx.reply(this.getProtectionStatusText(group), { parse_mode: 'HTML' });
+    }
+
+    const target = String(args[0] || '').toLowerCase();
+    const switchValue = this.parseOnOff(args[1]);
+    if (switchValue === null) {
+      return ctx.reply('❌ استخدم on أو off.\nمثال: /gprotect links on');
+    }
+
+    const keyMap = {
+      links: 'lockLinks',
+      words: 'filterBadWords',
+      flood: 'floodProtection'
+    };
+    const key = keyMap[target];
+    if (!key) {
+      return ctx.reply('❌ الخيار غير معروف. استخدم: links أو words أو flood');
+    }
+
+    const result = await this.setProtectionSetting(ctx, key, switchValue, 'gprotect');
+    if (!result?.ok) return;
+
+    const freshGroup = await this.ensureGroupRecord(ctx);
+    return ctx.reply(this.getProtectionStatusText(freshGroup), { parse_mode: 'HTML' });
   }
 
   static async handleGroupPanel(ctx) {
@@ -1634,6 +1717,54 @@ class GroupAdminHandler {
     if (/^(تفعيل مغادره المشرفين|تعطيل مغادره المشرفين|\/gadminleave\b)/i.test(rawText)) {
       await this.handleAdminLeaveToggle(ctx);
       return true;
+    }
+    if (
+      /^(قفل الروابط|فتح الروابط|تفعيل الكلمات|تعطيل الكلمات|تفعيل التكرار|تعطيل التكرار|الحماية|\/gprotect\b)/i.test(rawText)
+    ) {
+      if (/^قفل الروابط$/i.test(rawText)) {
+        const result = await this.setProtectionSetting(ctx, 'lockLinks', true, 'text');
+        if (!result?.ok) return true;
+        await ctx.reply('✅ تم قفل الروابط.');
+        return true;
+      }
+      if (/^فتح الروابط$/i.test(rawText)) {
+        const result = await this.setProtectionSetting(ctx, 'lockLinks', false, 'text');
+        if (!result?.ok) return true;
+        await ctx.reply('✅ تم فتح الروابط.');
+        return true;
+      }
+      if (/^تفعيل الكلمات$/i.test(rawText)) {
+        const result = await this.setProtectionSetting(ctx, 'filterBadWords', true, 'text');
+        if (!result?.ok) return true;
+        await ctx.reply('✅ تم تفعيل فلتر الكلمات.');
+        return true;
+      }
+      if (/^تعطيل الكلمات$/i.test(rawText)) {
+        const result = await this.setProtectionSetting(ctx, 'filterBadWords', false, 'text');
+        if (!result?.ok) return true;
+        await ctx.reply('✅ تم تعطيل فلتر الكلمات.');
+        return true;
+      }
+      if (/^تفعيل التكرار$/i.test(rawText)) {
+        const result = await this.setProtectionSetting(ctx, 'floodProtection', true, 'text');
+        if (!result?.ok) return true;
+        await ctx.reply('✅ تم تفعيل حماية التكرار.');
+        return true;
+      }
+      if (/^تعطيل التكرار$/i.test(rawText)) {
+        const result = await this.setProtectionSetting(ctx, 'floodProtection', false, 'text');
+        if (!result?.ok) return true;
+        await ctx.reply('✅ تم تعطيل حماية التكرار.');
+        return true;
+      }
+      if (/^الحماية$/i.test(rawText)) {
+        await ctx.reply(this.getProtectionStatusText(group), { parse_mode: 'HTML' });
+        return true;
+      }
+      if (/^\/gprotect\b/i.test(rawText)) {
+        await this.handleProtectCommand(ctx);
+        return true;
+      }
     }
     if (/^(ضع كليشه عضو|\/gtemplate_member\b)/i.test(rawText)) {
       await this.handleTemplateSetupRequest(ctx, 'member');
