@@ -448,15 +448,35 @@ class ChatGamesUtilityHandler {
     return data?.current || {};
   }
 
+  static getWeatherText(code) {
+    const map = {
+      0: '\u0635\u062D\u0648',
+      1: '\u063A\u0627\u0626\u0645 \u062C\u0632\u0626\u064A\u0627',
+      2: '\u063A\u0627\u0626\u0645',
+      3: '\u063A\u0627\u0626\u0645 \u062C\u062F\u0627',
+      45: '\u0636\u0628\u0627\u0628',
+      48: '\u0636\u0628\u0627\u0628 \u0645\u062A\u062C\u0645\u062F',
+      61: '\u0645\u0637\u0631 \u062E\u0641\u064A\u0641',
+      63: '\u0645\u0637\u0631 \u0645\u062A\u0648\u0633\u0637',
+      65: '\u0645\u0637\u0631 \u063A\u0632\u064A\u0631',
+      71: '\u062B\u0644\u062C \u062E\u0641\u064A\u0641',
+      73: '\u062B\u0644\u062C \u0645\u062A\u0648\u0633\u0637',
+      75: '\u062B\u0644\u062C \u0643\u062B\u064A\u0641',
+      80: '\u0632\u062E\u0627\u062A \u0645\u0637\u0631',
+      95: '\u0639\u0627\u0635\u0641\u0629 \u0631\u0639\u062F\u064A\u0629'
+    };
+    return map[code] || '\u063A\u064A\u0631 \u0645\u062D\u062F\u062F';
+  }
+
   static formatWeatherMessage(locationLabel, current) {
-    const weatherText = this.weatherCodes[current.weather_code] || 'ØºÙŠØ± Ù…Ø­Ø¯Ø¯';
+    const weatherText = this.getWeatherText(current.weather_code);
     return (
-      `ðŸŒ¤ï¸ Ø§Ù„Ø·Ù‚Ø³ Ø§Ù„Ø¢Ù† ÙÙŠ ${locationLabel}\n\n` +
-      `ðŸŒ¡ï¸ Ø§Ù„Ø­Ø±Ø§Ø±Ø©: ${current.temperature_2m ?? '-'}Â°C\n` +
-      `ðŸ¤— Ø§Ù„Ù…Ø­Ø³ÙˆØ³Ø©: ${current.apparent_temperature ?? '-'}Â°C\n` +
-      `ðŸ’§ Ø§Ù„Ø±Ø·ÙˆØ¨Ø©: ${current.relative_humidity_2m ?? '-'}%\n` +
-      `ðŸŒ¬ï¸ Ø§Ù„Ø±ÙŠØ§Ø­: ${current.wind_speed_10m ?? '-'} ÙƒÙ…/Ø³\n` +
-      `â˜ï¸ Ø§Ù„Ø­Ø§Ù„Ø©: ${weatherText}`
+      `\u{1F324}\uFE0F \u0627\u0644\u0637\u0642\u0633 \u0627\u0644\u0622\u0646 \u0641\u064A ${locationLabel}\n\n` +
+      `\u{1F321}\uFE0F \u0627\u0644\u062D\u0631\u0627\u0631\u0629: ${current.temperature_2m ?? '-'}\u00B0C\n` +
+      `\u{1F976} \u0627\u0644\u0645\u062D\u0633\u0648\u0633\u0629: ${current.apparent_temperature ?? '-'}\u00B0C\n` +
+      `\u{1F4A7} \u0627\u0644\u0631\u0637\u0648\u0628\u0629: ${current.relative_humidity_2m ?? '-'}%\n` +
+      `\u{1F32C}\uFE0F \u0627\u0644\u0631\u064A\u0627\u062D: ${current.wind_speed_10m ?? '-'} \u0643\u0645/\u0633\n` +
+      `\u2601\uFE0F \u0627\u0644\u062D\u0627\u0644\u0629: ${weatherText}`
     );
   }
 
@@ -478,15 +498,15 @@ class ChatGamesUtilityHandler {
 
   static formatAdhanMessage(locationLabel, adhanData) {
     const t = adhanData?.timings || {};
-    const dateLine = adhanData?.date ? `ðŸ“… ${adhanData.date}\n\n` : '\n';
+    const dateLine = adhanData?.date ? `\u{1F4C5} ${adhanData.date}\n\n` : '\n';
     return (
-      `ðŸ•Œ Ù…ÙˆØ§Ù‚ÙŠØª Ø§Ù„Ø£Ø°Ø§Ù† ÙÙŠ ${locationLabel}\n` +
+      `\u{1F54C} \u0645\u0648\u0627\u0642\u064A\u062A \u0627\u0644\u0623\u0630\u0627\u0646 \u0641\u064A ${locationLabel}\n` +
       dateLine +
-      `Ø§Ù„ÙØ¬Ø±: ${t.Fajr || '-'}\n` +
-      `Ø§Ù„Ø¸Ù‡Ø±: ${t.Dhuhr || '-'}\n` +
-      `Ø§Ù„Ø¹ØµØ±: ${t.Asr || '-'}\n` +
-      `Ø§Ù„Ù…ØºØ±Ø¨: ${t.Maghrib || '-'}\n` +
-      `Ø§Ù„Ø¹Ø´Ø§Ø¡: ${t.Isha || '-'}`
+      `\u0627\u0644\u0641\u062C\u0631: ${t.Fajr || '-'}\n` +
+      `\u0627\u0644\u0638\u0647\u0631: ${t.Dhuhr || '-'}\n` +
+      `\u0627\u0644\u0639\u0635\u0631: ${t.Asr || '-'}\n` +
+      `\u0627\u0644\u0645\u063A\u0631\u0628: ${t.Maghrib || '-'}\n` +
+      `\u0627\u0644\u0639\u0634\u0627\u0621: ${t.Isha || '-'}`
     );
   }
 
@@ -504,20 +524,20 @@ class ChatGamesUtilityHandler {
         latitude,
         longitude,
         city: reverse.cityName || '',
-        displayName: reverse.displayName || 'Ù…ÙˆÙ‚Ø¹Ùƒ Ø§Ù„Ø­Ø§Ù„ÙŠ'
+        displayName: reverse.displayName || '\u0645\u0648\u0642\u0639\u0643 \u0627\u0644\u062D\u0627\u0644\u064A'
       });
 
       const intent = String(ctx.session?.utilityIntent || 'weather').toLowerCase();
       if (intent === 'adhan') {
         const adhanData = await this.fetchAdhanByCoordinates(latitude, longitude);
-        await ctx.reply(this.formatAdhanMessage(reverse.displayName || 'Ù…ÙˆÙ‚Ø¹Ùƒ Ø§Ù„Ø­Ø§Ù„ÙŠ', adhanData));
+        await ctx.reply(this.formatAdhanMessage(reverse.displayName || '\u0645\u0648\u0642\u0639\u0643 \u0627\u0644\u062D\u0627\u0644\u064A', adhanData));
       } else {
         const current = await this.fetchWeatherByCoordinates(latitude, longitude);
-        await ctx.reply(this.formatWeatherMessage(reverse.displayName || 'Ù…ÙˆÙ‚Ø¹Ùƒ Ø§Ù„Ø­Ø§Ù„ÙŠ', current));
+        await ctx.reply(this.formatWeatherMessage(reverse.displayName || '\u0645\u0648\u0642\u0639\u0643 \u0627\u0644\u062D\u0627\u0644\u064A', current));
       }
       return true;
     } catch (_error) {
-      await ctx.reply('âŒ ØªØ¹Ø°Ø± Ù‚Ø±Ø§Ø¡Ø© Ù…ÙˆÙ‚Ø¹Ùƒ Ø§Ù„Ø¢Ù†. Ø­Ø§ÙˆÙ„ Ù…Ø±Ø© Ø£Ø®Ø±Ù‰.');
+      await ctx.reply('\u274C \u062A\u0639\u0630\u0631 \u0642\u0631\u0627\u0621\u0629 \u0645\u0648\u0642\u0639\u0643 \u0627\u0644\u0622\u0646. \u062D\u0627\u0648\u0644 \u0645\u0631\u0629 \u0623\u062E\u0631\u0649.');
       return true;
     }
   }
@@ -531,7 +551,7 @@ class ChatGamesUtilityHandler {
       if (cityInput) {
         const city = await this.resolveCity(cityInput);
         if (!city) {
-          await ctx.reply('âŒ Ù„Ù… Ø£ØªØ¹Ø±Ù Ø¹Ù„Ù‰ Ø§Ù„Ù…Ø¯ÙŠÙ†Ø©. Ø¬Ø±Ø¨ Ù…Ø«Ù„: Ø·Ù‚Ø³ ØºØ²Ø©');
+          await ctx.reply('\u274C \u0644\u0645 \u0623\u062A\u0639\u0631\u0641 \u0639\u0644\u0649 \u0627\u0644\u0645\u062F\u064A\u0646\u0629. \u062C\u0631\u0628 \u0645\u062B\u0644: \u0637\u0642\u0633 \u063A\u0632\u0629');
           return;
         }
 
@@ -557,9 +577,9 @@ class ChatGamesUtilityHandler {
             latitude,
             longitude,
             city: reverse.cityName || '',
-            displayName: reverse.displayName || 'Ù…ÙˆÙ‚Ø¹Ùƒ Ø§Ù„Ø­Ø§Ù„ÙŠ'
+            displayName: reverse.displayName || '\u0645\u0648\u0642\u0639\u0643 \u0627\u0644\u062D\u0627\u0644\u064A'
           });
-          await ctx.reply(this.formatWeatherMessage(reverse.displayName || 'Ù…ÙˆÙ‚Ø¹Ùƒ Ø§Ù„Ø­Ø§Ù„ÙŠ', current));
+          await ctx.reply(this.formatWeatherMessage(reverse.displayName || '\u0645\u0648\u0642\u0639\u0643 \u0627\u0644\u062D\u0627\u0644\u064A', current));
           return;
         }
       }
@@ -567,19 +587,19 @@ class ChatGamesUtilityHandler {
       const savedLocation = await this.getUserWeatherLocation(ctx.from?.id);
       if (savedLocation) {
         const current = await this.fetchWeatherByCoordinates(savedLocation.latitude, savedLocation.longitude);
-        const label = savedLocation.displayName || savedLocation.city || 'Ù…ÙˆÙ‚Ø¹Ùƒ Ø§Ù„Ù…Ø­ÙÙˆØ¸';
+        const label = savedLocation.displayName || savedLocation.city || '\u0645\u0648\u0642\u0639\u0643 \u0627\u0644\u0645\u062D\u0641\u0648\u0638';
         await ctx.reply(this.formatWeatherMessage(label, current));
         return;
       }
 
       await ctx.reply(
-        'â„¹ï¸ Ù„Ù„Ø­ØµÙˆÙ„ Ø¹Ù„Ù‰ Ø·Ù‚Ø³ Ø­Ù‚ÙŠÙ‚ÙŠ Ø­Ø³Ø¨ Ù…ÙˆÙ‚Ø¹Ùƒ:\n' +
-          '1) Ø£Ø±Ø³Ù„ Ù…ÙˆÙ‚Ø¹Ùƒ Ù…Ù† ØªÙŠÙ„ÙŠØ¬Ø±Ø§Ù… (ðŸ“Ž > Ø§Ù„Ù…ÙˆÙ‚Ø¹)\n' +
-          '2) Ø£Ùˆ Ø§ÙƒØªØ¨: Ø·Ù‚Ø³ ØºØ²Ø©\n' +
-          '3) Ø£Ùˆ Ø§Ø³ØªØ®Ø¯Ù…: Ø·Ù‚Ø³ (Ø¨Ø¹Ø¯ Ø­ÙØ¸ Ù…ÙˆÙ‚Ø¹Ùƒ Ù…Ø±Ø© ÙˆØ§Ø­Ø¯Ø©)'
+        '\u2139\uFE0F \u0644\u0644\u062D\u0635\u0648\u0644 \u0639\u0644\u0649 \u0637\u0642\u0633 \u062D\u0642\u064A\u0642\u064A \u062D\u0633\u0628 \u0645\u0648\u0642\u0639\u0643:\n' +
+          '1) \u0623\u0631\u0633\u0644 \u0645\u0648\u0642\u0639\u0643 \u0645\u0646 \u062A\u064A\u0644\u064A\u062C\u0631\u0627\u0645 (\uD83D\uDCCE > \u0627\u0644\u0645\u0648\u0642\u0639)\n' +
+          '2) \u0623\u0648 \u0627\u0643\u062A\u0628: \u0637\u0642\u0633 \u063A\u0632\u0629\n' +
+          '3) \u0623\u0648 \u0627\u0633\u062A\u062E\u062F\u0645: \u0637\u0642\u0633 (\u0628\u0639\u062F \u062D\u0641\u0638 \u0645\u0648\u0642\u0639\u0643 \u0645\u0631\u0629 \u0648\u0627\u062D\u062F\u0629)'
       );
     } catch (_error) {
-      await ctx.reply('âŒ ØªØ¹Ø°Ø± Ø¬Ù„Ø¨ Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø·Ù‚Ø³ Ø­Ø§Ù„ÙŠØ§. Ø­Ø§ÙˆÙ„ Ù„Ø§Ø­Ù‚Ø§.');
+      await ctx.reply('\u274C \u062A\u0639\u0630\u0631 \u062C\u0644\u0628 \u0628\u064A\u0627\u0646\u0627\u062A \u0627\u0644\u0637\u0642\u0633 \u062D\u0627\u0644\u064A\u0627. \u062D\u0627\u0648\u0644 \u0644\u0627\u062D\u0642\u0627.');
     }
   }
 
@@ -592,7 +612,7 @@ class ChatGamesUtilityHandler {
       if (cityInput) {
         const city = await this.resolveCity(cityInput);
         if (!city) {
-          await ctx.reply('âŒ Ù„Ù… Ø£ØªØ¹Ø±Ù Ø¹Ù„Ù‰ Ø§Ù„Ù…Ø¯ÙŠÙ†Ø©. Ø¬Ø±Ø¨ Ù…Ø«Ù„: Ø§Ø°Ø§Ù† ØºØ²Ø©');
+          await ctx.reply('\u274C \u0644\u0645 \u0623\u062A\u0639\u0631\u0641 \u0639\u0644\u0649 \u0627\u0644\u0645\u062F\u064A\u0646\u0629. \u062C\u0631\u0628 \u0645\u062B\u0644: \u0627\u0630\u0627\u0646 \u063A\u0632\u0629');
           return;
         }
         const adhanData = await this.fetchAdhanByCoordinates(city.latitude, city.longitude);
@@ -616,10 +636,10 @@ class ChatGamesUtilityHandler {
             latitude,
             longitude,
             city: reverse.cityName || '',
-            displayName: reverse.displayName || 'Ù…ÙˆÙ‚Ø¹Ùƒ Ø§Ù„Ø­Ø§Ù„ÙŠ'
+            displayName: reverse.displayName || '\u0645\u0648\u0642\u0639\u0643 \u0627\u0644\u062D\u0627\u0644\u064A'
           });
           const adhanData = await this.fetchAdhanByCoordinates(latitude, longitude);
-          await ctx.reply(this.formatAdhanMessage(reverse.displayName || 'Ù…ÙˆÙ‚Ø¹Ùƒ Ø§Ù„Ø­Ø§Ù„ÙŠ', adhanData));
+          await ctx.reply(this.formatAdhanMessage(reverse.displayName || '\u0645\u0648\u0642\u0639\u0643 \u0627\u0644\u062D\u0627\u0644\u064A', adhanData));
           return;
         }
       }
@@ -627,19 +647,19 @@ class ChatGamesUtilityHandler {
       const savedLocation = await this.getUserWeatherLocation(ctx.from?.id);
       if (savedLocation) {
         const adhanData = await this.fetchAdhanByCoordinates(savedLocation.latitude, savedLocation.longitude);
-        const label = savedLocation.displayName || savedLocation.city || 'Ù…ÙˆÙ‚Ø¹Ùƒ Ø§Ù„Ù…Ø­ÙÙˆØ¸';
+        const label = savedLocation.displayName || savedLocation.city || '\u0645\u0648\u0642\u0639\u0643 \u0627\u0644\u0645\u062D\u0641\u0648\u0638';
         await ctx.reply(this.formatAdhanMessage(label, adhanData));
         return;
       }
 
       await ctx.reply(
-        'â„¹ï¸ Ù„Ù„Ø­ØµÙˆÙ„ Ø¹Ù„Ù‰ Ø§Ù„Ø£Ø°Ø§Ù† Ø­Ø³Ø¨ Ù…ÙˆÙ‚Ø¹Ùƒ:\n' +
-          '1) Ø£Ø±Ø³Ù„ Ù…ÙˆÙ‚Ø¹Ùƒ Ù…Ù† ØªÙŠÙ„ÙŠØ¬Ø±Ø§Ù… (ðŸ“Ž > Ø§Ù„Ù…ÙˆÙ‚Ø¹)\n' +
-          '2) Ø£Ùˆ Ø§ÙƒØªØ¨: Ø§Ø°Ø§Ù† ØºØ²Ø©\n' +
-          '3) Ø£Ùˆ Ø§Ø³ØªØ®Ø¯Ù…: Ø§Ø°Ø§Ù† (Ø¨Ø¹Ø¯ Ø­ÙØ¸ Ù…ÙˆÙ‚Ø¹Ùƒ Ù…Ø±Ø© ÙˆØ§Ø­Ø¯Ø©)'
+        '\u2139\uFE0F \u0644\u0644\u062D\u0635\u0648\u0644 \u0639\u0644\u0649 \u0627\u0644\u0623\u0630\u0627\u0646 \u062D\u0633\u0628 \u0645\u0648\u0642\u0639\u0643:\n' +
+          '1) \u0623\u0631\u0633\u0644 \u0645\u0648\u0642\u0639\u0643 \u0645\u0646 \u062A\u064A\u0644\u064A\u062C\u0631\u0627\u0645 (\uD83D\uDCCE > \u0627\u0644\u0645\u0648\u0642\u0639)\n' +
+          '2) \u0623\u0648 \u0627\u0643\u062A\u0628: \u0627\u0630\u0627\u0646 \u063A\u0632\u0629\n' +
+          '3) \u0623\u0648 \u0627\u0633\u062A\u062E\u062F\u0645: \u0627\u0630\u0627\u0646 (\u0628\u0639\u062F \u062D\u0641\u0638 \u0645\u0648\u0642\u0639\u0643 \u0645\u0631\u0629 \u0648\u0627\u062D\u062F\u0629)'
       );
     } catch (_error) {
-      await ctx.reply('âŒ ØªØ¹Ø°Ø± Ø¬Ù„Ø¨ Ù…ÙˆØ§Ù‚ÙŠØª Ø§Ù„Ø£Ø°Ø§Ù† Ø­Ø§Ù„ÙŠØ§. Ø­Ø§ÙˆÙ„ Ù„Ø§Ø­Ù‚Ø§.');
+      await ctx.reply('\u274C \u062A\u0639\u0630\u0631 \u062C\u0644\u0628 \u0645\u0648\u0627\u0642\u064A\u062A \u0627\u0644\u0623\u0630\u0627\u0646 \u062D\u0627\u0644\u064A\u0627. \u062D\u0627\u0648\u0644 \u0644\u0627\u062D\u0642\u0627.');
     }
   }
 }

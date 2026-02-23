@@ -25,7 +25,6 @@ const EconomyHandler = require('./commands/economyHandler');
 const ContentHandler = require('./commands/contentHandler');
 const ProfileHandler = require('./commands/profileHandler');
 const ChatGamesUtilityHandler = require('./commands/chatGamesUtilityHandler');
-const JoeChatHandler = require('./handlers/joeChatHandler');
 const SponsoredAdsSystem = require('./features/sponsoredAdsSystem');
 const { logger } = require('./utils/helpers');
 const ReconnectManager = require('./utils/reconnect');
@@ -54,6 +53,14 @@ const isMissingRequiredEnv = (value) => {
   ]);
   return invalidLiterals.has(normalized.toLowerCase());
 };
+
+const parseOwnerIds = () =>
+  String(process.env.BOT_OWNERS || '')
+    .split(',')
+    .map((id) => String(id).trim().replace(/^["']|["']$/g, ''))
+    .filter(Boolean)
+    .map((id) => parseInt(id, 10))
+    .filter((id) => Number.isInteger(id));
 
 const requiredEnvVars = ['BOT_TOKEN'];
 const missingEnvVars = requiredEnvVars.filter((envName) => {
@@ -102,8 +109,7 @@ const PRIVATE_ONLY_COMMANDS = new Set([
   'khatma', 'adhkar', 'quran', 'quotes', 'poetry', 'games', 'economy', 'stats', 'rewards',
   'image', 'shop', 'transfer', 'notifications', 'notif', 'backup', 'qgames', 'profile',
   'balance', 'leaderboard', 'daily', 'features', 'goals', 'charity', 'memorization', 'dua',
-  'referral', 'events', 'teams', 'owner', 'panel', 'owners', 'myid', 'health', 'givecoins',
-  'jo', 'jooff', 'jomode', 'joclear'
+  'referral', 'events', 'teams', 'owner', 'panel', 'owners', 'myid', 'health', 'givecoins'
 ]);
 
 const GROUP_ONLY_COMMANDS = new Set([
@@ -119,7 +125,7 @@ const PRIVATE_REPLY_BUTTONS = new Set([
   '🕌 الختمة', '📿 الأذكار', '📖 القرآن', '💭 الاقتباسات', '✍️ الشعر', '🎮 الألعاب',
   '💰 الاقتصاد', '👤 حسابي', '🏆 المتصدرين', '⚙️ الإعدادات', '✨ الميزات', '📚 المكتبة',
   '📊 إحصائيات', '🎁 المكافآت', '🛍️ المتجر', '💸 التحويلات والتبرعات', '🔔 الإشعارات الذكية',
-  '📁 النسخ الاحتياطية', '⚡ التخزين المؤقت', '🛡️ حماية من الإساءة', '🎨 توليد صورة', '🌤️ الطقس', '🕌 الأذان', '👑 لوحة المالك', '🤖 جو'
+  '📁 النسخ الاحتياطية', '⚡ التخزين المؤقت', '🛡️ حماية من الإساءة', '🎨 توليد صورة', '🌤️ الطقس', '🕌 الأذان', '👑 لوحة المالك'
 ]);
 
 bot.use(async (ctx, next) => {
@@ -188,10 +194,6 @@ Promise.all([
       { command: 'leaderboard', description: '🏆 المتصدرين' },
       { command: 'notifications', description: '🔔 الإشعارات' },
       { command: 'image', description: '🎨 توليد صورة' },
-      { command: 'jo', description: '🤖 دردشة جو' },
-      { command: 'jooff', description: '⏹️ إيقاف جو' },
-      { command: 'jomode', description: '🎛️ وضع جو' },
-      { command: 'joclear', description: '🧹 مسح ذاكرة جو' },
       { command: 'help', description: '❓ المساعدة' }
     ],
     { scope: { type: 'all_private_chats' } }
@@ -369,10 +371,6 @@ bot.command('rewards', (ctx) => CommandHandler.handleRewards(ctx));
 
 // --- IMAGE GENERATION COMMAND ---
 bot.command('image', (ctx) => imageHandler.handleImageCommand(ctx));
-bot.command('jo', (ctx) => JoeChatHandler.handleStart(ctx));
-bot.command('jooff', (ctx) => JoeChatHandler.handleStop(ctx));
-bot.command('jomode', (ctx) => JoeChatHandler.handleModeCommand(ctx));
-bot.command('joclear', (ctx) => JoeChatHandler.handleClear(ctx));
 
 // --- NEW FEATURES COMMANDS ---
 // Shop System
@@ -444,7 +442,7 @@ bot.command('notif', async (ctx) => {
 
 // Backup System
 bot.command('backup', async (ctx) => {
-  const ownerIds = (process.env.BOT_OWNERS || '').split(',').filter(Boolean).map(Number);
+  const ownerIds = parseOwnerIds();
 
   if (!ownerIds.includes(ctx.from.id)) {
     return ctx.reply('❌ ليس لديك صلاحية');
@@ -478,7 +476,7 @@ bot.command('qgames', async (ctx) => {
 
 // --- ADMIN COMMANDS ---
 bot.command('health', async (ctx) => {
-  const ownerIds = (process.env.BOT_OWNERS || '').split(',').filter(Boolean).map(Number);
+  const ownerIds = parseOwnerIds();
 
   if (ownerIds.includes(ctx.from.id)) {
     const report = healthMonitor.getFullReport();
@@ -489,7 +487,7 @@ bot.command('health', async (ctx) => {
 });
 
 bot.command('myid', async (ctx) => {
-  const ownerIds = (process.env.BOT_OWNERS || '').split(',').filter(Boolean).map(Number);
+  const ownerIds = parseOwnerIds();
   const isOwner = ownerIds.includes(ctx.from.id);
 
   await ctx.reply(
@@ -503,7 +501,7 @@ bot.command('myid', async (ctx) => {
 });
 
 bot.command('owners', async (ctx) => {
-  const ownerIds = (process.env.BOT_OWNERS || '').split(',').filter(Boolean).map(Number);
+  const ownerIds = parseOwnerIds();
 
   if (!ownerIds.includes(ctx.from.id)) {
     return ctx.reply('❌ ليس لديك صلاحية لهذا الأمر');
@@ -522,7 +520,7 @@ bot.command('owners', async (ctx) => {
 });
 
 bot.command('givecoins', async (ctx) => {
-  const ownerIds = (process.env.BOT_OWNERS || '').split(',').filter(Boolean).map(Number);
+  const ownerIds = parseOwnerIds();
 
   if (!ownerIds.includes(ctx.from.id)) {
     return ctx.reply('❌ ليس لديك صلاحية لهذا الأمر');
@@ -1407,8 +1405,6 @@ bot.action('menu:games', (ctx) => MenuHandler.handleGamesMenu(ctx));
 bot.action('menu:economy', (ctx) => MenuHandler.handleEconomyMenu(ctx));
 bot.action('menu:profile', (ctx) => MenuHandler.handleProfileMenu(ctx));
 bot.action('menu:features', (ctx) => CommandHandler.handleFeaturesMenu(ctx));
-bot.action('menu:joe', (ctx) => JoeChatHandler.handleStart(ctx));
-bot.action(/^joe:(open|mode|clear|stop|random)(:[a-z0-9_+-]+)?$/i, (ctx) => JoeChatHandler.handleAction(ctx));
 bot.action('menu:library', (ctx) => CommandHandler.handleLibrary(ctx));
 bot.action('menu:leaderboard', (ctx) => MenuHandler.handleLeaderboardMenu(ctx));
 bot.action('menu:settings', (ctx) => MenuHandler.handleSettingsMenu(ctx));
@@ -2370,8 +2366,6 @@ bot.hears('🛡️ حماية من الإساءة', (ctx) => MenuHandler.handleP
 bot.hears('🎨 توليد صورة', (ctx) => imageHandler.handleImageButton(ctx));
 bot.hears('🌤️ الطقس', (ctx) => ChatGamesUtilityHandler.handleWeatherText(ctx, ''));
 bot.hears('🕌 الأذان', (ctx) => ChatGamesUtilityHandler.handleAdhanText(ctx, ''));
-bot.hears('🤖 جو', (ctx) => JoeChatHandler.handleStart(ctx));
-bot.hears('Joe', (ctx) => JoeChatHandler.handleStart(ctx));
 bot.hears(/^اكس\s*اوه$/i, (ctx) => ChatGamesUtilityHandler.handleXoStart(ctx));
 bot.hears(/^طقس(?:\s+(.+))?$/i, (ctx) => ChatGamesUtilityHandler.handleWeatherText(ctx, ctx.match[1]));
 bot.hears(/^(?:اذان|أذان)(?:\s+(.+))?$/i, (ctx) => ChatGamesUtilityHandler.handleAdhanText(ctx, ctx.match[1]));
@@ -4024,9 +4018,6 @@ bot.on('text', async (ctx) => {
         return ctx.reply('❌ حدث خطأ أثناء حفظ الإعداد');
       }
     }
-
-    const handledJoeChat = await JoeChatHandler.handlePrivateText(ctx, message);
-    if (handledJoeChat) return;
 
     // Default response for unrecognized messages (private chats only)
     if (ctx.chat?.type === 'private') {
