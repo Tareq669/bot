@@ -1796,12 +1796,6 @@ class GroupAdminHandler {
     group.updatedAt = new Date();
     await group.save();
 
-    const isAdmin = await this.isGroupAdmin(ctx);
-    if (isAdmin) return false;
-
-    const botRights = await this.ensureBotModerationRights(ctx);
-    if (!botRights.ok) return false;
-
     const text = lowered;
 
     if (group.settings?.lockLinks) {
