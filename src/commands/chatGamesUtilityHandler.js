@@ -1,5 +1,6 @@
 const axios = require('axios');
 const Markup = require('telegraf/markup');
+const { User } = require('../database/models');
 
 class ChatGamesUtilityHandler {
   static xoGames = new Map();
@@ -366,40 +367,179 @@ class ChatGamesUtilityHandler {
     return pieces.join(' - ');
   }
 
-  static async handleWeatherText(ctx, cityText) {
-    if (ctx.chat?.type !== 'private') {
-      await ctx.reply('ℹ️ أمر الطقس مخصص للخاصة. استخدمه في الخاص مثل: طقس غزة');
-      return;
+  static extractLocationFromCtx(ctx) {
+    return (
+      ctx.message?.location ||
+      ctx.message?.reply_to_message?.location ||
+      ctx.callbackQuery?.message?.reply_to_message?.location ||
+      null
+    );
+  }
+
+  static async reverseGeocode(latitude, longitude) {
+    try {
+      const { data } = await axios.get('https://nominatim.openstreetmap.org/reverse', {
+        params: {
+          lat: latitude,
+          lon: longitude,
+          format: 'jsonv2',
+          'accept-language': 'ar,en'
+        },
+        timeout: 12000,
+        headers: {
+          'User-Agent': 'ArabTelegramBot/1.0 (weather reverse geocode)'
+        }
+      });
+
+      const address = data?.address || {};
+      const cityName =
+        address.city ||
+        address.town ||
+        address.village ||
+        address.county ||
+        address.state ||
+        data?.name ||
+        null;
+
+      return {
+        cityName,
+        displayName: data?.display_name || cityName || 'موقعك الحالي'
+      };
+    } catch (_error) {
+      return {
+        cityName: null,
+        displayName: 'موقعك الحالي'
+      };
     }
+  }
+
+  static async saveUserWeatherLocation(userId, locationInfo) {
+    if (!userId || !locationInfo) return;
+    const update = {
+      $set: {
+        'preferences.weatherLocation.latitude': locationInfo.latitude,
+        'preferences.weatherLocation.longitude': locationInfo.longitude,
+        'preferences.weatherLocation.city': locationInfo.city || '',
+        'preferences.weatherLocation.displayName': locationInfo.displayName || '',
+        'preferences.weatherLocation.updatedAt': new Date()
+      }
+    };
+    await User.findOneAndUpdate({ userId }, update, { upsert: false }).catch(() => {});
+  }
+
+  static async getUserWeatherLocation(userId) {
+    if (!userId) return null;
+    const user = await User.findOne({ userId }).lean().catch(() => null);
+    const loc = user?.preferences?.weatherLocation;
+    if (!loc || typeof loc.latitude !== 'number' || typeof loc.longitude !== 'number') return null;
+    return loc;
+  }
+
+  static async fetchWeatherByCoordinates(latitude, longitude) {
+    const { data } = await axios.get('https://api.open-meteo.com/v1/forecast', {
+      params: {
+        latitude,
+        longitude,
+        current: 'temperature_2m,apparent_temperature,weather_code,wind_speed_10m,relative_humidity_2m',
+        timezone: 'auto'
+      },
+      timeout: 12000
+    });
+    return data?.current || {};
+  }
+
+  static formatWeatherMessage(locationLabel, current) {
+    const weatherText = this.weatherCodes[current.weather_code] || 'غير محدد';
+    return (
+      `🌤️ الطقس الآن في ${locationLabel}\n\n` +
+      `🌡️ الحرارة: ${current.temperature_2m ?? '-'}°C\n` +
+      `🤗 المحسوسة: ${current.apparent_temperature ?? '-'}°C\n` +
+      `💧 الرطوبة: ${current.relative_humidity_2m ?? '-'}%\n` +
+      `🌬️ الرياح: ${current.wind_speed_10m ?? '-'} كم/س\n` +
+      `☁️ الحالة: ${weatherText}`
+    );
+  }
+
+  static async handleLocationMessage(ctx) {
+    const location = this.extractLocationFromCtx(ctx);
+    if (!location) return false;
 
     try {
-      const city = await this.resolveCity(cityText);
-      if (!city) {
-        await ctx.reply('❌ لم أتعرف على المدينة. جرب مثل: طقس غزة');
+      const latitude = Number(location.latitude);
+      const longitude = Number(location.longitude);
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return false;
+
+      const reverse = await this.reverseGeocode(latitude, longitude);
+      await this.saveUserWeatherLocation(ctx.from?.id, {
+        latitude,
+        longitude,
+        city: reverse.cityName || '',
+        displayName: reverse.displayName || 'موقعك الحالي'
+      });
+
+      const current = await this.fetchWeatherByCoordinates(latitude, longitude);
+      await ctx.reply(this.formatWeatherMessage(reverse.displayName || 'موقعك الحالي', current));
+      return true;
+    } catch (_error) {
+      await ctx.reply('❌ تعذر قراءة موقعك الآن. حاول مرة أخرى.');
+      return true;
+    }
+  }
+
+  static async handleWeatherText(ctx, cityText) {
+    try {
+      const cityInput = String(cityText || '').trim();
+
+      if (cityInput) {
+        const city = await this.resolveCity(cityInput);
+        if (!city) {
+          await ctx.reply('❌ لم أتعرف على المدينة. جرب مثل: طقس غزة');
+          return;
+        }
+
+        const current = await this.fetchWeatherByCoordinates(city.latitude, city.longitude);
+        await this.saveUserWeatherLocation(ctx.from?.id, {
+          latitude: city.latitude,
+          longitude: city.longitude,
+          city: city.name || '',
+          displayName: this.formatCityLabel(city)
+        });
+        await ctx.reply(this.formatWeatherMessage(this.formatCityLabel(city), current));
         return;
       }
 
-      const { data } = await axios.get('https://api.open-meteo.com/v1/forecast', {
-        params: {
-          latitude: city.latitude,
-          longitude: city.longitude,
-          current: 'temperature_2m,apparent_temperature,weather_code,wind_speed_10m,relative_humidity_2m',
-          timezone: 'auto'
-        },
-        timeout: 12000
-      });
+      const sharedLocation = this.extractLocationFromCtx(ctx);
+      if (sharedLocation) {
+        const latitude = Number(sharedLocation.latitude);
+        const longitude = Number(sharedLocation.longitude);
+        if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+          const reverse = await this.reverseGeocode(latitude, longitude);
+          const current = await this.fetchWeatherByCoordinates(latitude, longitude);
+          await this.saveUserWeatherLocation(ctx.from?.id, {
+            latitude,
+            longitude,
+            city: reverse.cityName || '',
+            displayName: reverse.displayName || 'موقعك الحالي'
+          });
+          await ctx.reply(this.formatWeatherMessage(reverse.displayName || 'موقعك الحالي', current));
+          return;
+        }
+      }
 
-      const current = data?.current || {};
-      const weatherText = this.weatherCodes[current.weather_code] || 'غير محدد';
-      const message =
-        `🌤️ الطقس الآن في ${this.formatCityLabel(city)}\n\n` +
-        `🌡️ الحرارة: ${current.temperature_2m ?? '-'}°C\n` +
-        `🤗 المحسوسة: ${current.apparent_temperature ?? '-'}°C\n` +
-        `💧 الرطوبة: ${current.relative_humidity_2m ?? '-'}%\n` +
-        `🌬️ الرياح: ${current.wind_speed_10m ?? '-'} كم/س\n` +
-        `☁️ الحالة: ${weatherText}`;
+      const savedLocation = await this.getUserWeatherLocation(ctx.from?.id);
+      if (savedLocation) {
+        const current = await this.fetchWeatherByCoordinates(savedLocation.latitude, savedLocation.longitude);
+        const label = savedLocation.displayName || savedLocation.city || 'موقعك المحفوظ';
+        await ctx.reply(this.formatWeatherMessage(label, current));
+        return;
+      }
 
-      await ctx.reply(message);
+      await ctx.reply(
+        'ℹ️ للحصول على طقس حقيقي حسب موقعك:\n' +
+          '1) أرسل موقعك من تيليجرام (📎 > الموقع)\n' +
+          '2) أو اكتب: طقس غزة\n' +
+          '3) أو استخدم: طقس (بعد حفظ موقعك مرة واحدة)'
+      );
     } catch (_error) {
       await ctx.reply('❌ تعذر جلب بيانات الطقس حاليا. حاول لاحقا.');
     }

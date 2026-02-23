@@ -2365,11 +2365,13 @@ bot.hears('🎨 توليد صورة', (ctx) => imageHandler.handleImageButton(ct
 bot.hears('🤖 جو', (ctx) => JoeChatHandler.handleStart(ctx));
 bot.hears('Joe', (ctx) => JoeChatHandler.handleStart(ctx));
 bot.hears(/^اكس\s*اوه$/i, (ctx) => ChatGamesUtilityHandler.handleXoStart(ctx));
-bot.hears(/^طقس\s+(.+)$/i, (ctx) => ChatGamesUtilityHandler.handleWeatherText(ctx, ctx.match[1]));
+bot.hears(/^طقس(?:\s+(.+))?$/i, (ctx) => ChatGamesUtilityHandler.handleWeatherText(ctx, ctx.match[1]));
 bot.hears(/^(?:اذان|أذان)\s+(.+)$/i, (ctx) => ChatGamesUtilityHandler.handleAdhanText(ctx, ctx.match[1]));
 
 bot.action(/^xo:move:([a-z0-9]+):([0-8])$/i, (ctx) => ChatGamesUtilityHandler.handleXoAction(ctx));
 bot.action(/^xo:challenge:(accept|decline):([a-z0-9]+)$/i, (ctx) => ChatGamesUtilityHandler.handleXoChallengeAction(ctx));
+
+bot.on('location', (ctx) => ChatGamesUtilityHandler.handleLocationMessage(ctx));
 
 // --- TEXT HANDLER FOR IMAGE GENERATION AND QURANIC GAMES ---
 bot.on('text', async (ctx, next) => {
