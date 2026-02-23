@@ -203,6 +203,7 @@ class GroupAdminHandler {
     if (typeof group.settings.lockLinks !== 'boolean') group.settings.lockLinks = false;
     if (typeof group.settings.filterBadWords !== 'boolean') group.settings.filterBadWords = true;
     if (typeof group.settings.floodProtection !== 'boolean') group.settings.floodProtection = true;
+    if (typeof group.settings.exemptAdminsFromProtection !== 'boolean') group.settings.exemptAdminsFromProtection = false;
 
     if (!group.settings.warningPolicy) {
       group.settings.warningPolicy = { enabled: true, muteAt: 2, banAt: 3, muteMinutes: 10 };
@@ -276,6 +277,7 @@ class GroupAdminHandler {
       `• منع الروابط: ${settings.lockLinks ? '✅' : '❌'}\n` +
       `• فلتر الكلمات: ${settings.filterBadWords ? '✅' : '❌'}\n` +
       `• حماية التكرار: ${settings.floodProtection ? '✅' : '❌'}\n` +
+      `• استثناء المشرفين من الحماية: ${settings.exemptAdminsFromProtection ? '✅' : '❌'}\n` +
       `• سياسة العقوبات: ${this.formatPolicy(policy)}\n\n` +
       '<b>أوامر الإدارة:</b>\n' +
       '• /gwarn (بالرد)\n' +
@@ -292,6 +294,7 @@ class GroupAdminHandler {
       '• /gprotect links on|off\n' +
       '• /gprotect words on|off\n' +
       '• /gprotect flood on|off\n' +
+      '• /gprotect admins on|off\n' +
       '• /glogs\n' +
       '• /gclear (بالرد)\n' +
       '• تفاعل مشرف /gadminstats\n' +
@@ -328,6 +331,7 @@ class GroupAdminHandler {
     const lockLinks = Boolean(group?.settings?.lockLinks);
     const filterBadWords = Boolean(group?.settings?.filterBadWords);
     const floodProtection = Boolean(group?.settings?.floodProtection);
+    const exemptAdmins = Boolean(group?.settings?.exemptAdminsFromProtection);
 
     return Markup.inlineKeyboard([
       [
@@ -336,6 +340,9 @@ class GroupAdminHandler {
       ],
       [
         Markup.button.callback(floodProtection ? '🔓 تكرار' : '🔒 تكرار', 'group:toggle:floodProtection')
+      ],
+      [
+        Markup.button.callback(exemptAdmins ? '👮✅ استثناء المشرفين' : '👮❌ استثناء المشرفين', 'group:toggle:exemptAdminsFromProtection')
       ],
       [
         Markup.button.callback('📊 إحصائيات', 'group:stats'),
@@ -408,14 +415,17 @@ class GroupAdminHandler {
       '🛡️ <b>حالة الحماية الحالية</b>\n\n' +
       `• الروابط: ${group.settings?.lockLinks ? '✅ مقفلة' : '❌ مفتوحة'}\n` +
       `• الكلمات: ${group.settings?.filterBadWords ? '✅ مفعلة' : '❌ معطلة'}\n` +
-      `• التكرار: ${group.settings?.floodProtection ? '✅ مفعلة' : '❌ معطلة'}\n\n` +
+      `• التكرار: ${group.settings?.floodProtection ? '✅ مفعلة' : '❌ معطلة'}\n` +
+      `• استثناء المشرفين: ${group.settings?.exemptAdminsFromProtection ? '✅ مفعل' : '❌ معطل'}\n\n` +
       '<b>أوامر سريعة:</b>\n' +
       '• قفل الروابط | فتح الروابط\n' +
       '• تفعيل الكلمات | تعطيل الكلمات\n' +
       '• تفعيل التكرار | تعطيل التكرار\n' +
+      '• استثناء المشرفين من الحماية | الغاء استثناء المشرفين من الحماية\n' +
       '• /gprotect links on|off\n' +
       '• /gprotect words on|off\n' +
-      '• /gprotect flood on|off'
+      '• /gprotect flood on|off\n' +
+      '• /gprotect admins on|off'
     );
   }
 
@@ -467,11 +477,12 @@ class GroupAdminHandler {
     const keyMap = {
       links: 'lockLinks',
       words: 'filterBadWords',
-      flood: 'floodProtection'
+      flood: 'floodProtection',
+      admins: 'exemptAdminsFromProtection'
     };
     const key = keyMap[target];
     if (!key) {
-      return ctx.reply('❌ الخيار غير معروف. استخدم: links أو words أو flood');
+      return ctx.reply('❌ الخيار غير معروف. استخدم: links أو words أو flood أو admins');
     }
 
     const result = await this.setProtectionSetting(ctx, key, switchValue, 'gprotect');
@@ -508,7 +519,7 @@ class GroupAdminHandler {
       return;
     }
 
-    const allowedKeys = new Set(['lockLinks', 'filterBadWords', 'floodProtection']);
+    const allowedKeys = new Set(['lockLinks', 'filterBadWords', 'floodProtection', 'exemptAdminsFromProtection']);
     if (!allowedKeys.has(key)) {
       await ctx.answerCbQuery('❌ إعداد غير معروف', { show_alert: false });
       return;
@@ -1719,7 +1730,7 @@ class GroupAdminHandler {
       return true;
     }
     if (
-      /^(قفل الروابط|فتح الروابط|تفعيل الكلمات|تعطيل الكلمات|تفعيل التكرار|تعطيل التكرار|الحماية|\/gprotect\b)/i.test(rawText)
+      /^(قفل الروابط|فتح الروابط|تفعيل الكلمات|تعطيل الكلمات|تفعيل التكرار|تعطيل التكرار|استثناء المشرفين من الحماية|الغاء استثناء المشرفين من الحماية|إلغاء استثناء المشرفين من الحماية|الحماية|\/gprotect\b)/i.test(rawText)
     ) {
       if (/^قفل الروابط$/i.test(rawText)) {
         const result = await this.setProtectionSetting(ctx, 'lockLinks', true, 'text');
@@ -1755,6 +1766,18 @@ class GroupAdminHandler {
         const result = await this.setProtectionSetting(ctx, 'floodProtection', false, 'text');
         if (!result?.ok) return true;
         await ctx.reply('✅ تم تعطيل حماية التكرار.');
+        return true;
+      }
+      if (/^استثناء المشرفين من الحماية$/i.test(rawText)) {
+        const result = await this.setProtectionSetting(ctx, 'exemptAdminsFromProtection', true, 'text');
+        if (!result?.ok) return true;
+        await ctx.reply('✅ تم تفعيل استثناء المشرفين من الحماية.');
+        return true;
+      }
+      if (/^(الغاء استثناء المشرفين من الحماية|إلغاء استثناء المشرفين من الحماية)$/i.test(rawText)) {
+        const result = await this.setProtectionSetting(ctx, 'exemptAdminsFromProtection', false, 'text');
+        if (!result?.ok) return true;
+        await ctx.reply('✅ تم إلغاء استثناء المشرفين من الحماية.');
         return true;
       }
       if (/^الحماية$/i.test(rawText)) {
@@ -1795,6 +1818,11 @@ class GroupAdminHandler {
     group.statistics.messagesCount = (group.statistics.messagesCount || 0) + 1;
     group.updatedAt = new Date();
     await group.save();
+
+    const isAdmin = await this.isGroupAdmin(ctx);
+    if (isAdmin && group.settings?.exemptAdminsFromProtection) {
+      return false;
+    }
 
     const text = lowered;
 

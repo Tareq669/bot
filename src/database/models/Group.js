@@ -32,6 +32,10 @@ const groupSchema = new mongoose.Schema({
       type: Boolean,
       default: false
     },
+    exemptAdminsFromProtection: {
+      type: Boolean,
+      default: false
+    },
     lockMedia: {
       type: Boolean,
       default: false
