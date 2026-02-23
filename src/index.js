@@ -118,7 +118,7 @@ const PRIVATE_REPLY_BUTTONS = new Set([
   '🕌 الختمة', '📿 الأذكار', '📖 القرآن', '💭 الاقتباسات', '✍️ الشعر', '🎮 الألعاب',
   '💰 الاقتصاد', '👤 حسابي', '🏆 المتصدرين', '⚙️ الإعدادات', '✨ الميزات', '📚 المكتبة',
   '📊 إحصائيات', '🎁 المكافآت', '🛍️ المتجر', '💸 التحويلات والتبرعات', '🔔 الإشعارات الذكية',
-  '📁 النسخ الاحتياطية', '⚡ التخزين المؤقت', '🛡️ حماية من الإساءة', '🎨 توليد صورة', '👑 لوحة المالك', '🤖 جو'
+  '📁 النسخ الاحتياطية', '⚡ التخزين المؤقت', '🛡️ حماية من الإساءة', '🎨 توليد صورة', '🌤️ الطقس', '👑 لوحة المالك', '🤖 جو'
 ]);
 
 bot.use(async (ctx, next) => {
@@ -2362,6 +2362,7 @@ bot.hears('📁 النسخ الاحتياطية', (ctx) => MenuHandler.handleBac
 bot.hears('⚡ التخزين المؤقت', (ctx) => MenuHandler.handleCacheMenu(ctx));
 bot.hears('🛡️ حماية من الإساءة', (ctx) => MenuHandler.handleProtectionMenu(ctx));
 bot.hears('🎨 توليد صورة', (ctx) => imageHandler.handleImageButton(ctx));
+bot.hears('🌤️ الطقس', (ctx) => ChatGamesUtilityHandler.handleWeatherText(ctx, ''));
 bot.hears('🤖 جو', (ctx) => JoeChatHandler.handleStart(ctx));
 bot.hears('Joe', (ctx) => JoeChatHandler.handleStart(ctx));
 bot.hears(/^اكس\s*اوه$/i, (ctx) => ChatGamesUtilityHandler.handleXoStart(ctx));

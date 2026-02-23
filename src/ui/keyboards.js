@@ -93,6 +93,9 @@ class UIManager {
       ],
       [
         Markup.button.text('🎨 توليد صورة'),
+        Markup.button.text('🌤️ الطقس')
+      ],
+      [
         Markup.button.text('Joe')
       ],
       [
