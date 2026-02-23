@@ -2818,7 +2818,7 @@ bot.action('quote:share', async (ctx) => {
     const ContentProvider = require('./content/contentProvider');
     const quote = await ContentProvider.getQuote();
 
-    const shareMessage = `🌟 اقتباس من البوت الإسلامي الذكي 🤖\n\n${quote}\n\n� <i>شارك هذا الاقتباس مع أصدقائك!</i>`;
+    const shareMessage = `🌟 اقتباس من البوت الإسلامي الذكي 🤖\n\n${quote}\n\n✨ <i>شارك هذا الاقتباس مع أصدقائك!</i>`;
 
     const buttons = Markup.inlineKeyboard([
       [Markup.button.callback('❤️ حفظ', 'quote:save')],

@@ -15,7 +15,7 @@ class AdvancedNotificationSystem {
   }
 
   /**
-   *初始化النظام وإعداد المهام المجدولة
+   * تهيئة النظام وإعداد المهام المجدولة
    */
   initialize() {
     logger.info('📬 تهيئة نظام الإشعارات المتقدم...');
@@ -151,7 +151,7 @@ class AdvancedNotificationSystem {
         'notifications.adhkarReminder': true
       }).select('userId firstName');
 
-      const message = `🌅 <b>صباح الخير يا�</b> ${users[0]?.firstName || 'صديقي'}!
+      const message = `🌅 <b>صباح الخير يا</b> ${users[0]?.firstName || 'صديقي'}!
 
 📿 <b>حان وقت الأذكار الصباحية</b>
 
@@ -250,7 +250,7 @@ class AdvancedNotificationSystem {
 ⭐ مستواك: <b>${level}</b> (${xp}/${xpNeeded} XP)
 📖 الختمة: <b>${khatma}/114 صفحة</b>
 
-${streak >= 7 ? '🔥 ما شاء الله!连续 7 أيام!' : '💪 واصل بنفسك!'}
+${streak >= 7 ? '🔥 ما شاء الله! مستمر 7 أيام!' : '💪 واصل بنفسك!'}
 
 اضغط /start للعودة للقائمة`;
   }
@@ -274,19 +274,19 @@ ${streak >= 7 ? '🔥 ما شاء الله!连续 7 أيام!' : '💪 واصل 
 
       for (const user of inactiveUsers) {
         const messages = [
-          `💔 <b>نفتقدك يا}</b> ${user.firstName}!
+          `💔 <b>نفتقدك يا ${user.firstName}!</b>
 
-🌟 هل عدت للعب؟我们有想念你！
+🌟 هل عدت للعب؟ ننتظرك!
 اضغط /start للعودة`,
 
-          `🔥 <b>يا}</b> ${user.firstName}!
+          `🔥 <b>مرحبًا ${user.firstName}!</b>
 
-🎮 أصدقاؤك يفتقدونك في البوت！
-هل تشاركوني اللعب؟`,
+🎮 أصدقاؤك يفتقدونك في البوت!
+هل ترجع تكمل اللعب معنا؟`,
 
-          `🌅 <b>صباح الخير يا}</b> ${user.firstName}!
+          `🌅 <b>صباح الخير يا ${user.firstName}!</b>
 
-✨ يوم جديد مليان بالفرص！
+✨ يوم جديد مليان بالفرص!
 شاركنا نشاطك اليوم!`
         ];
 
@@ -360,7 +360,7 @@ ${streak >= 7 ? '🔥 ما شاء الله!连续 7 أيام!' : '💪 واصل 
 
       const motivationalMessages = [
         { text: '🌟 <b>تذكر:</b> كل يوم فرصة جديدة للتقرب من الله', icon: '🌟' },
-        { text: '📖 <b>اقرأ:</b> صفحة واحدة يومياً改变 حياتك', icon: '📖' },
+        { text: '📖 <b>اقرأ:</b> صفحة واحدة يومياً تغيّر حياتك', icon: '📖' },
         { text: '🤲 <b>دع:</b> الله يسهل أمورك', icon: '🤲' },
         { text: '💪 <b> اصبر:</b> الخير قادم بإذن الله', icon: '💪' },
         { text: '🔥 <b>نجاح:</b> أنت على الطريق الصحيح', icon: '🔥' }
@@ -392,7 +392,7 @@ ${streak >= 7 ? '🔥 ما شاء الله!连续 7 أيام!' : '💪 واصل 
         message += `${medal} <b>${user.firstName}</b>: ${user.xp} XP (مستوى ${user.level})\n`;
       });
 
-      message += '\n💪 هل你能登上榜单吗؟';
+      message += '\n💪 هل تقدر تدخل قائمة المتصدرين؟';
 
       await this.broadcastToActiveUsers(message);
     });

@@ -33,7 +33,7 @@ class NotificationsHandler {
       const allEnabled = user.notifications.enabled;
       buttons.push([
         Markup.button.callback(
-          allEnabled ? '🔕关闭 الإشعارات' : '🔔开启 الإشعارات',
+          allEnabled ? '🔕 تعطيل الإشعارات' : '🔔 تفعيل الإشعارات',
           'notify:toggle:all'
         )
       ]);
@@ -208,7 +208,7 @@ ${user.notifications.enabled ? 'الإشعارات مفعلة ✅' : 'الإشع
     const allEnabled = user.notifications.enabled;
     buttons.push([
       Markup.button.callback(
-        allEnabled ? '🔕关闭 الإشعارات' : '🔔开启 الإشعارات',
+        allEnabled ? '🔕 تعطيل الإشعارات' : '🔔 تفعيل الإشعارات',
         'notify:toggle:all'
       )
     ]);
