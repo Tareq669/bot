@@ -1,4 +1,4 @@
-const { GoogleGenAI } = require('@google/genai');
+﻿const { GoogleGenAI } = require('@google/genai');
 const fetch = require('node-fetch');
 
 class JoeChatHandler {
@@ -13,7 +13,9 @@ class JoeChatHandler {
         active: false,
         history: [],
         lastReplyAt: 0,
-        pending: false
+        pending: false,
+        lastBusyNoticeAt: 0,
+        queuedText: ''
       });
     }
     return this.sessions.get(key);
@@ -42,7 +44,11 @@ class JoeChatHandler {
   }
 
   static getModelName() {
-    return String(process.env.JOE_CHAT_MODEL || 'gemini-2.5-flash-lite').trim();
+    return String(process.env.JOE_CHAT_MODEL || 'gemini-2.5-flash-lite').replace(/\s+/g, ' ').trim();
+  }
+
+  static getFallbackModelName() {
+    return String(process.env.GEMINI_MODEL_FALLBACK || 'gemini-1.5-flash').replace(/\s+/g, ' ').trim();
   }
 
   static getAllowList() {
@@ -80,7 +86,7 @@ class JoeChatHandler {
   static buildSystemPrompt({ firstName, userLang, textLang }) {
     const dateNow = new Date().toISOString();
     const langLine = textLang === 'ar'
-      ? 'Respond in Arabic with clear Palestinian-friendly tone.'
+      ? 'Respond in Arabic, with natural Palestinian-friendly tone, clear and smart.'
       : 'Respond in the same language as user input.';
 
     return [
@@ -112,15 +118,13 @@ class JoeChatHandler {
     ].join('\n');
   }
 
-  static async callGemini(session, userText, firstName, userLang) {
+  static async callGeminiWithModel(session, userText, firstName, userLang, model) {
     const client = this.getClient();
     if (!client) throw new Error('NO_GEMINI_KEY');
 
-    const model = this.getModelName();
     const timeoutMs = this.toInt(process.env.JOE_CHAT_TIMEOUT_MS, 4500, 1200, 30000);
     const maxTokens = this.toInt(process.env.JOE_CHAT_MAX_TOKENS, 260, 64, 1024);
     const temperature = this.toFloat(process.env.JOE_CHAT_TEMPERATURE, 0.6, 0, 1.5);
-
     const prompt = this.buildPrompt(session, userText, firstName, userLang);
 
     const response = await Promise.race([
@@ -140,13 +144,27 @@ class JoeChatHandler {
     return text;
   }
 
+  static async callGemini(session, userText, firstName, userLang) {
+    const primary = this.getModelName();
+    const fallback = this.getFallbackModelName();
+
+    try {
+      return await this.callGeminiWithModel(session, userText, firstName, userLang, primary);
+    } catch (primaryErr) {
+      if (!fallback || fallback === primary) {
+        throw primaryErr;
+      }
+      return this.callGeminiWithModel(session, userText, firstName, userLang, fallback);
+    }
+  }
+
   static async callFreeFallback(session, userText, firstName, userLang) {
     const endpoint = String(process.env.JOE_FREE_CHAT_ENDPOINT || 'https://text.pollinations.ai').trim().replace(/\/+$/, '');
     const model = String(process.env.JOE_FREE_CHAT_MODEL || 'openai').trim();
     const timeoutMs = this.toInt(process.env.JOE_FREE_TIMEOUT_MS, 4200, 1000, 30000);
     const textLang = this.detectLanguage(userText, userLang);
     const langInstruction = textLang === 'ar'
-      ? 'الرد بالعربية فقط وبأسلوب واضح ومختصر.'
+      ? 'الرد بالعربية فقط وبأسلوب واضح وذكي ومختصر.'
       : 'Reply in the same language as the user.';
 
     const context = session.history
@@ -179,31 +197,46 @@ class JoeChatHandler {
     return text;
   }
 
-  static localFallback(userText, userLang) {
-    const textLang = this.detectLanguage(userText, userLang);
+  static localFallback(_userText, userLang) {
+    const textLang = this.detectLanguage('', userLang);
     if (textLang === 'ar') {
-      return 'وصلت رسالتك. جرّب إعادة السؤال بصياغة أقصر أو أوضح وسأرد فورًا.';
+      return 'حالياً مزود الذكاء مشغول. أعد إرسال سؤالك خلال ثواني بشكل مختصر وسأجاوبك فورًا.';
     }
-    return 'Got your message. Please ask in a shorter/clearer way and I will reply immediately.';
+    return 'AI provider is busy right now. Please retry in a few seconds with a shorter prompt.';
   }
 
   static async generate(session, userText, firstName, userLang) {
     try {
       return await this.callGemini(session, userText, firstName, userLang);
-    } catch (gemErr) {
+    } catch (_gemErr) {
       try {
         return await this.callFreeFallback(session, userText, firstName, userLang);
-      } catch (freeErr) {
+      } catch (_freeErr) {
         return this.localFallback(userText, userLang);
       }
     }
+  }
+
+  static async processOneMessage(ctx, session, msg) {
+    await ctx.sendChatAction('typing').catch(() => {});
+    this.pushHistory(session, 'user', msg);
+
+    const output = await this.generate(
+      session,
+      msg,
+      ctx.from?.first_name || '',
+      ctx.from?.language_code || ''
+    );
+
+    this.pushHistory(session, 'assistant', output);
+    await ctx.reply(output);
   }
 
   static async handleStart(ctx) {
     if (ctx.chat?.type !== 'private') return;
     const session = this.getSession(ctx.from.id);
     session.active = true;
-    return ctx.reply('🤖 تم تفعيل جو. ابعت أي رسالة وسأرد بسرعة.');
+    return ctx.reply('🤖 تم تفعيل جو. ابعث أي رسالة وسأرد بسرعة.');
   }
 
   static async handleStop(ctx) {
@@ -211,6 +244,7 @@ class JoeChatHandler {
     const session = this.getSession(ctx.from.id);
     session.active = false;
     session.pending = false;
+    session.queuedText = '';
     return ctx.reply('✅ تم إيقاف جو.');
   }
 
@@ -260,34 +294,50 @@ class JoeChatHandler {
     if (!msg || msg.startsWith('/')) return false;
 
     if (msg.length > 2500) {
-      await ctx.reply('✂️ الرسالة طويلة. اختصرها قليلا.');
+      await ctx.reply('✂️ الرسالة طويلة. اختصرها قليلاً.');
       return true;
     }
 
     const now = Date.now();
     const minInterval = this.toInt(process.env.JOE_MIN_REPLY_INTERVAL_MS, 250, 80, 5000);
-    if (now - (session.lastReplyAt || 0) < minInterval) return true;
+
+    if (now - (session.lastReplyAt || 0) < minInterval) {
+      if (now - (session.lastBusyNoticeAt || 0) > 1800) {
+        session.lastBusyNoticeAt = now;
+        await ctx.reply('لحظة صغيرة... اكتب رسالة واحدة واضحة وأنا أرد مباشرة.');
+      }
+      return true;
+    }
+
+    if (session.pending) {
+      session.queuedText = msg;
+      if (now - (session.lastBusyNoticeAt || 0) > 1800) {
+        session.lastBusyNoticeAt = now;
+        await ctx.reply('مستلم رسالتك. سأرد على آخر رسالة بعد ثواني.');
+      }
+      return true;
+    }
+
+    session.pending = true;
     session.lastReplyAt = now;
 
-    if (session.pending) return true;
-    session.pending = true;
-
     try {
-      await ctx.sendChatAction('typing').catch(() => {});
-      this.pushHistory(session, 'user', msg);
-
-      const output = await this.generate(
-        session,
-        msg,
-        ctx.from?.first_name || '',
-        ctx.from?.language_code || ''
-      );
-
-      this.pushHistory(session, 'assistant', output);
-      await ctx.reply(output);
+      await this.processOneMessage(ctx, session, msg);
       return true;
     } finally {
       session.pending = false;
+
+      const queued = String(session.queuedText || '').trim();
+      session.queuedText = '';
+      if (queued && queued !== msg) {
+        session.pending = true;
+        session.lastReplyAt = Date.now();
+        try {
+          await this.processOneMessage(ctx, session, queued);
+        } finally {
+          session.pending = false;
+        }
+      }
     }
   }
 }
