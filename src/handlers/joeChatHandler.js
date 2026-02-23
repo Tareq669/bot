@@ -1,4 +1,5 @@
 const { GoogleGenAI } = require('@google/genai');
+const fetch = require('node-fetch');
 
 class JoeChatHandler {
   static sessions = new Map();
@@ -18,6 +19,18 @@ class JoeChatHandler {
     return this.sessions.get(key);
   }
 
+  static toInt(value, fallback, min, max) {
+    const num = Number(value);
+    if (!Number.isFinite(num) || num < min || num > max) return fallback;
+    return Math.floor(num);
+  }
+
+  static toFloat(value, fallback, min, max) {
+    const num = Number(value);
+    if (!Number.isFinite(num) || num < min || num > max) return fallback;
+    return num;
+  }
+
   static getClient() {
     const key = String(process.env.GEMINI_API_KEY || '').trim();
     if (!key) return null;
@@ -32,14 +45,24 @@ class JoeChatHandler {
     return String(process.env.JOE_CHAT_MODEL || 'gemini-2.5-flash-lite').trim();
   }
 
-  static toInt(value, fallback, min, max) {
-    const num = Number(value);
-    if (!Number.isFinite(num)) return fallback;
-    if (num < min || num > max) return fallback;
-    return Math.floor(num);
+  static getAllowList() {
+    const raw = String(process.env.JOE_ALLOWLIST_IDS || '').trim();
+    if (!raw) return null;
+    return new Set(
+      raw
+        .split(',')
+        .map((v) => v.trim())
+        .filter(Boolean)
+    );
   }
 
-  static detectLanguageFromText(text, userLang) {
+  static isAuthorized(userId) {
+    const allow = this.getAllowList();
+    if (!allow || allow.size === 0) return true;
+    return allow.has(String(userId));
+  }
+
+  static detectLanguage(text, userLang) {
     const raw = String(text || '');
     if (/[\u0600-\u06FF]/.test(raw)) return 'ar';
     if ((userLang || '').toLowerCase().startsWith('ar')) return 'ar';
@@ -47,59 +70,58 @@ class JoeChatHandler {
   }
 
   static pushHistory(session, role, content) {
-    session.history.push({ role, content: String(content || '').slice(0, 1400) });
-    if (session.history.length > 10) {
-      session.history = session.history.slice(-10);
+    const limit = this.toInt(process.env.JOE_MEMORY_TURNS, 10, 4, 30);
+    session.history.push({ role, content: String(content || '').slice(0, 1600) });
+    if (session.history.length > limit) {
+      session.history = session.history.slice(-limit);
     }
   }
 
-  static buildSystemPrompt(userFirstName, userLang, textLang) {
-    const langInstruction = textLang === 'ar'
-      ? 'Reply in Arabic clearly, with a light Palestinian tone.'
-      : 'Reply in the same language as the user text.';
+  static buildSystemPrompt({ firstName, userLang, textLang }) {
+    const dateNow = new Date().toISOString();
+    const langLine = textLang === 'ar'
+      ? 'Respond in Arabic with clear Palestinian-friendly tone.'
+      : 'Respond in the same language as user input.';
 
     return [
-      'Your name is Joe.',
-      `User first name: ${userFirstName || 'User'}.`,
-      `User profile language: ${userLang || 'unknown'}.`,
-      langInstruction,
-      'Be concise, practical, and friendly.',
-      'Avoid repetitive openings and generic filler.',
-      'Default length: 2-6 lines unless user asks for detail.',
-      'For technical questions: answer as clear steps.',
-      'No hate/abuse/explicit sexual content.'
+      'You are Joe, a helpful assistant.',
+      `Current datetime: ${dateNow}`,
+      `User first name: ${firstName || 'User'}`,
+      `User language code: ${userLang || 'unknown'}`,
+      langLine,
+      'Be concise and practical.',
+      'No repetitive filler or generic openers.',
+      'Default answer length 2-6 lines unless detail is requested.',
+      'For technical tasks, provide clear ordered steps.',
+      'No hate, abuse, or explicit sexual content.'
     ].join(' ');
   }
 
-  static buildPrompt(session, userText, userFirstName, userLang) {
-    const textLang = this.detectLanguageFromText(userText, userLang);
-    const system = this.buildSystemPrompt(userFirstName, userLang, textLang);
+  static buildPrompt(session, userText, firstName, userLang) {
+    const textLang = this.detectLanguage(userText, userLang);
+    const system = this.buildSystemPrompt({ firstName, userLang, textLang });
     const context = session.history
-      .map((item) => `${item.role === 'assistant' ? 'Joe' : 'User'}: ${item.content}`)
+      .map((h) => `${h.role === 'assistant' ? 'Joe' : 'User'}: ${h.content}`)
       .join('\n');
 
     return [
       `System:\n${system}`,
       context ? `\nConversation context:\n${context}` : '',
       `\nUser message:\n${String(userText || '')}`,
-      '\nAssistant reply:'
+      '\nAssistant response:'
     ].join('\n');
   }
 
-  static async generate(session, userText, userFirstName, userLang) {
+  static async callGemini(session, userText, firstName, userLang) {
     const client = this.getClient();
-    if (!client) {
-      return '⚠️ خدمة الذكاء غير مفعلة. أضف GEMINI_API_KEY في Railway Variables.';
-    }
+    if (!client) throw new Error('NO_GEMINI_KEY');
 
     const model = this.getModelName();
-    const timeoutMs = this.toInt(process.env.JOE_CHAT_TIMEOUT_MS, 4200, 1200, 30000);
-    const maxOutputTokens = this.toInt(process.env.JOE_CHAT_MAX_TOKENS, 260, 64, 1024);
-    const temperature = Number.isFinite(Number(process.env.JOE_CHAT_TEMPERATURE))
-      ? Number(process.env.JOE_CHAT_TEMPERATURE)
-      : 0.6;
+    const timeoutMs = this.toInt(process.env.JOE_CHAT_TIMEOUT_MS, 4500, 1200, 30000);
+    const maxTokens = this.toInt(process.env.JOE_CHAT_MAX_TOKENS, 260, 64, 1024);
+    const temperature = this.toFloat(process.env.JOE_CHAT_TEMPERATURE, 0.6, 0, 1.5);
 
-    const prompt = this.buildPrompt(session, userText, userFirstName, userLang);
+    const prompt = this.buildPrompt(session, userText, firstName, userLang);
 
     const response = await Promise.race([
       client.models.generateContent({
@@ -107,22 +129,81 @@ class JoeChatHandler {
         contents: prompt,
         config: {
           temperature,
-          maxOutputTokens
+          maxOutputTokens: maxTokens
         }
       }),
       new Promise((_, reject) => setTimeout(() => reject(new Error('JOE_TIMEOUT')), timeoutMs))
     ]);
 
     const text = String(response?.text || '').trim();
-    if (!text) throw new Error('JOE_EMPTY_RESPONSE');
+    if (!text) throw new Error('EMPTY_GEMINI_TEXT');
     return text;
+  }
+
+  static async callFreeFallback(session, userText, firstName, userLang) {
+    const endpoint = String(process.env.JOE_FREE_CHAT_ENDPOINT || 'https://text.pollinations.ai').trim().replace(/\/+$/, '');
+    const model = String(process.env.JOE_FREE_CHAT_MODEL || 'openai').trim();
+    const timeoutMs = this.toInt(process.env.JOE_FREE_TIMEOUT_MS, 4200, 1000, 30000);
+    const textLang = this.detectLanguage(userText, userLang);
+    const langInstruction = textLang === 'ar'
+      ? 'الرد بالعربية فقط وبأسلوب واضح ومختصر.'
+      : 'Reply in the same language as the user.';
+
+    const context = session.history
+      .slice(-6)
+      .map((h) => `${h.role === 'assistant' ? 'Joe' : 'User'}: ${h.content}`)
+      .join('\n');
+
+    const prompt = [
+      `Assistant name: Joe. User: ${firstName || 'User'}.`,
+      langInstruction,
+      'Avoid repetitive phrases.',
+      context ? `Context:\n${context}` : '',
+      `User message:\n${String(userText || '')}`
+    ].join('\n');
+
+    const url = `${endpoint}/${encodeURIComponent(prompt)}?model=${encodeURIComponent(model)}`;
+    const res = await fetch(url, {
+      method: 'GET',
+      timeout: timeoutMs,
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Bot/1.0)' }
+    });
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      throw new Error(`FREE_CHAT_HTTP_${res.status}: ${body}`);
+    }
+
+    const text = String(await res.text()).trim();
+    if (!text) throw new Error('EMPTY_FREE_TEXT');
+    return text;
+  }
+
+  static localFallback(userText, userLang) {
+    const textLang = this.detectLanguage(userText, userLang);
+    if (textLang === 'ar') {
+      return 'وصلت رسالتك. جرّب إعادة السؤال بصياغة أقصر أو أوضح وسأرد فورًا.';
+    }
+    return 'Got your message. Please ask in a shorter/clearer way and I will reply immediately.';
+  }
+
+  static async generate(session, userText, firstName, userLang) {
+    try {
+      return await this.callGemini(session, userText, firstName, userLang);
+    } catch (gemErr) {
+      try {
+        return await this.callFreeFallback(session, userText, firstName, userLang);
+      } catch (freeErr) {
+        return this.localFallback(userText, userLang);
+      }
+    }
   }
 
   static async handleStart(ctx) {
     if (ctx.chat?.type !== 'private') return;
     const session = this.getSession(ctx.from.id);
     session.active = true;
-    return ctx.reply('🤖 تم تفعيل جو. ابعت أي رسالة وأنا أرد مباشرة وبسرعة.');
+    return ctx.reply('🤖 تم تفعيل جو. ابعت أي رسالة وسأرد بسرعة.');
   }
 
   static async handleStop(ctx) {
@@ -142,7 +223,7 @@ class JoeChatHandler {
 
   static async handleModeCommand(ctx) {
     if (ctx.chat?.type !== 'private') return;
-    return ctx.reply('ℹ️ جو الآن يعمل بوضع ذكي موحد وسريع.');
+    return ctx.reply('ℹ️ جو يعمل الآن بوضع ذكي سريع.');
   }
 
   static async handleAction(ctx) {
@@ -170,6 +251,11 @@ class JoeChatHandler {
     const session = this.getSession(ctx.from.id);
     if (!session.active) return false;
 
+    if (!this.isAuthorized(ctx.from.id)) {
+      await ctx.reply('⛔ هذا المساعد غير مفعل لهذا الحساب.');
+      return true;
+    }
+
     const msg = String(text || '').trim();
     if (!msg || msg.startsWith('/')) return false;
 
@@ -179,7 +265,7 @@ class JoeChatHandler {
     }
 
     const now = Date.now();
-    const minInterval = this.toInt(process.env.JOE_MIN_REPLY_INTERVAL_MS, 280, 80, 5000);
+    const minInterval = this.toInt(process.env.JOE_MIN_REPLY_INTERVAL_MS, 250, 80, 5000);
     if (now - (session.lastReplyAt || 0) < minInterval) return true;
     session.lastReplyAt = now;
 
@@ -199,14 +285,6 @@ class JoeChatHandler {
 
       this.pushHistory(session, 'assistant', output);
       await ctx.reply(output);
-      return true;
-    } catch (error) {
-      const errorText = String(error?.message || error);
-      if (errorText === 'JOE_TIMEOUT') {
-        await ctx.reply('⏱️ الرد تأخر. أعد السؤال بصياغة أقصر.');
-      } else {
-        await ctx.reply('❌ تعذر الاتصال بخدمة الذكاء حاليا. حاول بعد لحظات.');
-      }
       return true;
     } finally {
       session.pending = false;
