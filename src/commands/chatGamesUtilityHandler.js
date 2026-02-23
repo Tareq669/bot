@@ -1,4 +1,4 @@
-const axios = require('axios');
+﻿const axios = require('axios');
 const Markup = require('telegraf/markup');
 const { User } = require('../database/models');
 
@@ -6,43 +6,43 @@ class ChatGamesUtilityHandler {
   static xoGames = new Map();
 
   static cityAliases = {
-    غزة: 'Gaza',
-    غزه: 'Gaza',
-    القدس: 'Jerusalem',
-    جدة: 'Jeddah',
-    مكة: 'Mecca',
-    مكه: 'Mecca'
+    '\u063A\u0632\u0629': 'Gaza',
+    '\u063A\u0632\u0647': 'Gaza',
+    '\u0627\u0644\u0642\u062F\u0633': 'Jerusalem',
+    '\u062C\u062F\u0629': 'Jeddah',
+    '\u0645\u0643\u0629': 'Mecca',
+    '\u0645\u0643\u0647': 'Mecca'
   };
 
   static weatherCodes = {
-    0: 'صحو',
-    1: 'غائم جزئيا',
-    2: 'غائم',
-    3: 'غائم جدا',
-    45: 'ضباب',
-    48: 'ضباب متجمد',
-    51: 'رذاذ خفيف',
-    53: 'رذاذ متوسط',
-    55: 'رذاذ كثيف',
-    56: 'رذاذ متجمد خفيف',
-    57: 'رذاذ متجمد كثيف',
-    61: 'مطر خفيف',
-    63: 'مطر متوسط',
-    65: 'مطر غزير',
-    66: 'مطر متجمد خفيف',
-    67: 'مطر متجمد غزير',
-    71: 'ثلج خفيف',
-    73: 'ثلج متوسط',
-    75: 'ثلج كثيف',
-    77: 'حبوب ثلج',
-    80: 'زخات مطر خفيفة',
-    81: 'زخات مطر متوسطة',
-    82: 'زخات مطر غزيرة',
-    85: 'زخات ثلج خفيفة',
-    86: 'زخات ثلج غزيرة',
-    95: 'عاصفة رعدية',
-    96: 'عاصفة رعدية مع برد خفيف',
-    99: 'عاصفة رعدية مع برد كثيف'
+    0: 'ØµØ­Ùˆ',
+    1: 'ØºØ§Ø¦Ù… Ø¬Ø²Ø¦ÙŠØ§',
+    2: 'ØºØ§Ø¦Ù…',
+    3: 'ØºØ§Ø¦Ù… Ø¬Ø¯Ø§',
+    45: 'Ø¶Ø¨Ø§Ø¨',
+    48: 'Ø¶Ø¨Ø§Ø¨ Ù…ØªØ¬Ù…Ø¯',
+    51: 'Ø±Ø°Ø§Ø° Ø®ÙÙŠÙ',
+    53: 'Ø±Ø°Ø§Ø° Ù…ØªÙˆØ³Ø·',
+    55: 'Ø±Ø°Ø§Ø° ÙƒØ«ÙŠÙ',
+    56: 'Ø±Ø°Ø§Ø° Ù…ØªØ¬Ù…Ø¯ Ø®ÙÙŠÙ',
+    57: 'Ø±Ø°Ø§Ø° Ù…ØªØ¬Ù…Ø¯ ÙƒØ«ÙŠÙ',
+    61: 'Ù…Ø·Ø± Ø®ÙÙŠÙ',
+    63: 'Ù…Ø·Ø± Ù…ØªÙˆØ³Ø·',
+    65: 'Ù…Ø·Ø± ØºØ²ÙŠØ±',
+    66: 'Ù…Ø·Ø± Ù…ØªØ¬Ù…Ø¯ Ø®ÙÙŠÙ',
+    67: 'Ù…Ø·Ø± Ù…ØªØ¬Ù…Ø¯ ØºØ²ÙŠØ±',
+    71: 'Ø«Ù„Ø¬ Ø®ÙÙŠÙ',
+    73: 'Ø«Ù„Ø¬ Ù…ØªÙˆØ³Ø·',
+    75: 'Ø«Ù„Ø¬ ÙƒØ«ÙŠÙ',
+    77: 'Ø­Ø¨ÙˆØ¨ Ø«Ù„Ø¬',
+    80: 'Ø²Ø®Ø§Øª Ù…Ø·Ø± Ø®ÙÙŠÙØ©',
+    81: 'Ø²Ø®Ø§Øª Ù…Ø·Ø± Ù…ØªÙˆØ³Ø·Ø©',
+    82: 'Ø²Ø®Ø§Øª Ù…Ø·Ø± ØºØ²ÙŠØ±Ø©',
+    85: 'Ø²Ø®Ø§Øª Ø«Ù„Ø¬ Ø®ÙÙŠÙØ©',
+    86: 'Ø²Ø®Ø§Øª Ø«Ù„Ø¬ ØºØ²ÙŠØ±Ø©',
+    95: 'Ø¹Ø§ØµÙØ© Ø±Ø¹Ø¯ÙŠØ©',
+    96: 'Ø¹Ø§ØµÙØ© Ø±Ø¹Ø¯ÙŠØ© Ù…Ø¹ Ø¨Ø±Ø¯ Ø®ÙÙŠÙ',
+    99: 'Ø¹Ø§ØµÙØ© Ø±Ø¹Ø¯ÙŠØ© Ù…Ø¹ Ø¨Ø±Ø¯ ÙƒØ«ÙŠÙ'
   };
 
   static cleanupXoGames() {
@@ -77,7 +77,7 @@ class ChatGamesUtilityHandler {
         const cell = game.board[idx];
         row.push(
           Markup.button.callback(
-            cell || '▫️',
+            cell || 'â–«ï¸',
             `xo:move:${game.id}:${idx}`
           )
         );
@@ -90,44 +90,44 @@ class ChatGamesUtilityHandler {
   static buildChallengeKeyboard(game) {
     return Markup.inlineKeyboard([
       [
-        Markup.button.callback('✅ قبول التحدي', `xo:challenge:accept:${game.id}`),
-        Markup.button.callback('❌ رفض', `xo:challenge:decline:${game.id}`)
+        Markup.button.callback('âœ… Ù‚Ø¨ÙˆÙ„ Ø§Ù„ØªØ­Ø¯ÙŠ', `xo:challenge:accept:${game.id}`),
+        Markup.button.callback('âŒ Ø±ÙØ¶', `xo:challenge:decline:${game.id}`)
       ]
     ]);
   }
 
   static renderXoText(game) {
-    const p1 = game.player1Name || 'اللاعب 1';
-    const p2 = game.player2Name || 'اللاعب 2';
+    const p1 = game.player1Name || 'Ø§Ù„Ù„Ø§Ø¹Ø¨ 1';
+    const p2 = game.player2Name || 'Ø§Ù„Ù„Ø§Ø¹Ø¨ 2';
 
     if (game.status === 'pending') {
       return (
-        '❌⭕ تحدي XO\n\n' +
-        `🎯 ${p1} تحدى ${p2}\n` +
-        'بانتظار قبول التحدي...'
+        'âŒâ­• ØªØ­Ø¯ÙŠ XO\n\n' +
+        `ðŸŽ¯ ${p1} ØªØ­Ø¯Ù‰ ${p2}\n` +
+        'Ø¨Ø§Ù†ØªØ¸Ø§Ø± Ù‚Ø¨ÙˆÙ„ Ø§Ù„ØªØ­Ø¯ÙŠ...'
       );
     }
 
     if (game.status === 'declined') {
-      return `❌⭕ تم رفض تحدي XO بين ${p1} و ${p2}.`;
+      return `âŒâ­• ØªÙ… Ø±ÙØ¶ ØªØ­Ø¯ÙŠ XO Ø¨ÙŠÙ† ${p1} Ùˆ ${p2}.`;
     }
 
     if (game.status === 'done') {
       if (game.winnerUserId) {
         const winnerName = game.winnerUserId === game.player1Id ? p1 : p2;
-        return `❌⭕ لعبة XO\n\n🏁 الفائز: ${winnerName}\n\nاكتب "اكس اوه" لبدء لعبة جديدة.`;
+        return `âŒâ­• Ù„Ø¹Ø¨Ø© XO\n\nðŸ Ø§Ù„ÙØ§Ø¦Ø²: ${winnerName}\n\nØ§ÙƒØªØ¨ "Ø§ÙƒØ³ Ø§ÙˆÙ‡" Ù„Ø¨Ø¯Ø¡ Ù„Ø¹Ø¨Ø© Ø¬Ø¯ÙŠØ¯Ø©.`;
       }
-      return '❌⭕ لعبة XO\n\n🤝 تعادل!\n\nاكتب "اكس اوه" لبدء لعبة جديدة.';
+      return 'âŒâ­• Ù„Ø¹Ø¨Ø© XO\n\nðŸ¤ ØªØ¹Ø§Ø¯Ù„!\n\nØ§ÙƒØªØ¨ "Ø§ÙƒØ³ Ø§ÙˆÙ‡" Ù„Ø¨Ø¯Ø¡ Ù„Ø¹Ø¨Ø© Ø¬Ø¯ÙŠØ¯Ø©.';
     }
 
     const turnName = game.currentUserId === game.player1Id ? p1 : p2;
-    const turnSymbol = game.currentUserId === game.player1Id ? '❌' : '⭕';
+    const turnSymbol = game.currentUserId === game.player1Id ? 'âŒ' : 'â­•';
 
     return (
-      '❌⭕ لعبة XO\n\n' +
-      `👤 ${p1} = ❌\n` +
-      `👤 ${p2} = ⭕\n\n` +
-      `🎯 الدور الآن: ${turnName} (${turnSymbol})`
+      'âŒâ­• Ù„Ø¹Ø¨Ø© XO\n\n' +
+      `ðŸ‘¤ ${p1} = âŒ\n` +
+      `ðŸ‘¤ ${p2} = â­•\n\n` +
+      `ðŸŽ¯ Ø§Ù„Ø¯ÙˆØ± Ø§Ù„Ø¢Ù†: ${turnName} (${turnSymbol})`
     );
   }
 
@@ -149,8 +149,8 @@ class ChatGamesUtilityHandler {
       status: 'active',
       player1Id: ctx.from.id,
       player2Id: 0,
-      player1Name: ctx.from.first_name || 'أنت',
-      player2Name: 'البوت',
+      player1Name: ctx.from.first_name || 'Ø£Ù†Øª',
+      player2Name: 'Ø§Ù„Ø¨ÙˆØª',
       currentUserId: ctx.from.id,
       board: Array(9).fill(null),
       winnerUserId: null
@@ -162,11 +162,11 @@ class ChatGamesUtilityHandler {
   static async handleXoGroupStart(ctx) {
     const target = ctx.message?.reply_to_message?.from;
     if (!target || target.is_bot) {
-      await ctx.reply('ℹ️ لبدء XO في الجروب: اكتب "اكس اوه" بالرد على رسالة الشخص الذي تريد اللعب معه.');
+      await ctx.reply('â„¹ï¸ Ù„Ø¨Ø¯Ø¡ XO ÙÙŠ Ø§Ù„Ø¬Ø±ÙˆØ¨: Ø§ÙƒØªØ¨ "Ø§ÙƒØ³ Ø§ÙˆÙ‡" Ø¨Ø§Ù„Ø±Ø¯ Ø¹Ù„Ù‰ Ø±Ø³Ø§Ù„Ø© Ø§Ù„Ø´Ø®Øµ Ø§Ù„Ø°ÙŠ ØªØ±ÙŠØ¯ Ø§Ù„Ù„Ø¹Ø¨ Ù…Ø¹Ù‡.');
       return;
     }
     if (target.id === ctx.from.id) {
-      await ctx.reply('ℹ️ لا يمكنك بدء XO مع نفسك.');
+      await ctx.reply('â„¹ï¸ Ù„Ø§ ÙŠÙ…ÙƒÙ†Ùƒ Ø¨Ø¯Ø¡ XO Ù…Ø¹ Ù†ÙØ³Ùƒ.');
       return;
     }
 
@@ -181,8 +181,8 @@ class ChatGamesUtilityHandler {
       opponentId: target.id,
       player1Id: ctx.from.id,
       player2Id: target.id,
-      player1Name: ctx.from.first_name || 'لاعب 1',
-      player2Name: target.first_name || 'لاعب 2',
+      player1Name: ctx.from.first_name || 'Ù„Ø§Ø¹Ø¨ 1',
+      player2Name: target.first_name || 'Ù„Ø§Ø¹Ø¨ 2',
       currentUserId: null,
       board: Array(9).fill(null),
       winnerUserId: null
@@ -203,7 +203,7 @@ class ChatGamesUtilityHandler {
     }
     if (freeIndexes.length === 0) return;
     const pick = freeIndexes[Math.floor(Math.random() * freeIndexes.length)];
-    game.board[pick] = '⭕';
+    game.board[pick] = 'â­•';
   }
 
   static async handleXoChallengeAction(ctx) {
@@ -212,15 +212,15 @@ class ChatGamesUtilityHandler {
     const game = this.xoGames.get(gameId);
 
     if (!game) {
-      await ctx.answerCbQuery('التحدي غير موجود أو انتهى', { show_alert: false }).catch(() => {});
+      await ctx.answerCbQuery('Ø§Ù„ØªØ­Ø¯ÙŠ ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯ Ø£Ùˆ Ø§Ù†ØªÙ‡Ù‰', { show_alert: false }).catch(() => {});
       return;
     }
     if (game.chatId !== ctx.chat?.id) {
-      await ctx.answerCbQuery('هذا التحدي ليس في هذه المحادثة', { show_alert: false }).catch(() => {});
+      await ctx.answerCbQuery('Ù‡Ø°Ø§ Ø§Ù„ØªØ­Ø¯ÙŠ Ù„ÙŠØ³ ÙÙŠ Ù‡Ø°Ù‡ Ø§Ù„Ù…Ø­Ø§Ø¯Ø«Ø©', { show_alert: false }).catch(() => {});
       return;
     }
     if (game.status !== 'pending') {
-      await ctx.answerCbQuery('تم التعامل مع هذا التحدي مسبقا', { show_alert: false }).catch(() => {});
+      await ctx.answerCbQuery('ØªÙ… Ø§Ù„ØªØ¹Ø§Ù…Ù„ Ù…Ø¹ Ù‡Ø°Ø§ Ø§Ù„ØªØ­Ø¯ÙŠ Ù…Ø³Ø¨Ù‚Ø§', { show_alert: false }).catch(() => {});
       return;
     }
 
@@ -229,36 +229,36 @@ class ChatGamesUtilityHandler {
     const isChallenger = userId === game.challengerId;
 
     if (!isOpponent && !isChallenger) {
-      await ctx.answerCbQuery('هذا التحدي ليس لك', { show_alert: false }).catch(() => {});
+      await ctx.answerCbQuery('Ù‡Ø°Ø§ Ø§Ù„ØªØ­Ø¯ÙŠ Ù„ÙŠØ³ Ù„Ùƒ', { show_alert: false }).catch(() => {});
       return;
     }
 
     if (action === 'decline') {
       if (!isOpponent && !isChallenger) {
-        await ctx.answerCbQuery('لا يمكنك رفض هذا التحدي', { show_alert: false }).catch(() => {});
+        await ctx.answerCbQuery('Ù„Ø§ ÙŠÙ…ÙƒÙ†Ùƒ Ø±ÙØ¶ Ù‡Ø°Ø§ Ø§Ù„ØªØ­Ø¯ÙŠ', { show_alert: false }).catch(() => {});
         return;
       }
       game.status = 'declined';
-      await ctx.answerCbQuery('تم رفض التحدي', { show_alert: false }).catch(() => {});
+      await ctx.answerCbQuery('ØªÙ… Ø±ÙØ¶ Ø§Ù„ØªØ­Ø¯ÙŠ', { show_alert: false }).catch(() => {});
       await ctx.editMessageText(this.renderXoText(game)).catch(() => {});
       this.xoGames.delete(gameId);
       return;
     }
 
     if (action !== 'accept') {
-      await ctx.answerCbQuery('إجراء غير معروف', { show_alert: false }).catch(() => {});
+      await ctx.answerCbQuery('Ø¥Ø¬Ø±Ø§Ø¡ ØºÙŠØ± Ù…Ø¹Ø±ÙˆÙ', { show_alert: false }).catch(() => {});
       return;
     }
 
     if (!isOpponent) {
-      await ctx.answerCbQuery('فقط الشخص المتحدَّى يمكنه قبول التحدي', { show_alert: false }).catch(() => {});
+      await ctx.answerCbQuery('ÙÙ‚Ø· Ø§Ù„Ø´Ø®Øµ Ø§Ù„Ù…ØªØ­Ø¯Ù‘ÙŽÙ‰ ÙŠÙ…ÙƒÙ†Ù‡ Ù‚Ø¨ÙˆÙ„ Ø§Ù„ØªØ­Ø¯ÙŠ', { show_alert: false }).catch(() => {});
       return;
     }
 
     game.status = 'active';
     game.currentUserId = game.player1Id;
 
-    await ctx.answerCbQuery('تم قبول التحدي', { show_alert: false }).catch(() => {});
+    await ctx.answerCbQuery('ØªÙ… Ù‚Ø¨ÙˆÙ„ Ø§Ù„ØªØ­Ø¯ÙŠ', { show_alert: false }).catch(() => {});
     await ctx.editMessageText(this.renderXoText(game), this.buildXoKeyboard(game)).catch(() => {});
   }
 
@@ -268,43 +268,43 @@ class ChatGamesUtilityHandler {
     const game = this.xoGames.get(gameId);
 
     if (!game) {
-      await ctx.answerCbQuery('اللعبة غير موجودة أو انتهت', { show_alert: false }).catch(() => {});
+      await ctx.answerCbQuery('Ø§Ù„Ù„Ø¹Ø¨Ø© ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø© Ø£Ùˆ Ø§Ù†ØªÙ‡Øª', { show_alert: false }).catch(() => {});
       return;
     }
     if (game.chatId !== ctx.chat?.id) {
-      await ctx.answerCbQuery('هذه اللعبة ليست في هذه المحادثة', { show_alert: false }).catch(() => {});
+      await ctx.answerCbQuery('Ù‡Ø°Ù‡ Ø§Ù„Ù„Ø¹Ø¨Ø© Ù„ÙŠØ³Øª ÙÙŠ Ù‡Ø°Ù‡ Ø§Ù„Ù…Ø­Ø§Ø¯Ø«Ø©', { show_alert: false }).catch(() => {});
       return;
     }
     if (game.status !== 'active') {
-      await ctx.answerCbQuery('اللعبة غير نشطة', { show_alert: false }).catch(() => {});
+      await ctx.answerCbQuery('Ø§Ù„Ù„Ø¹Ø¨Ø© ØºÙŠØ± Ù†Ø´Ø·Ø©', { show_alert: false }).catch(() => {});
       return;
     }
 
     const userId = ctx.from.id;
     const isPlayer = userId === game.player1Id || userId === game.player2Id;
     if (!isPlayer) {
-      await ctx.answerCbQuery('هذه اللعبة ليست لك', { show_alert: false }).catch(() => {});
+      await ctx.answerCbQuery('Ù‡Ø°Ù‡ Ø§Ù„Ù„Ø¹Ø¨Ø© Ù„ÙŠØ³Øª Ù„Ùƒ', { show_alert: false }).catch(() => {});
       return;
     }
     if (userId !== game.currentUserId) {
-      await ctx.answerCbQuery('ليس دورك الآن', { show_alert: false }).catch(() => {});
+      await ctx.answerCbQuery('Ù„ÙŠØ³ Ø¯ÙˆØ±Ùƒ Ø§Ù„Ø¢Ù†', { show_alert: false }).catch(() => {});
       return;
     }
     if (!Number.isInteger(index) || index < 0 || index > 8) {
-      await ctx.answerCbQuery('اختيار غير صالح', { show_alert: false }).catch(() => {});
+      await ctx.answerCbQuery('Ø§Ø®ØªÙŠØ§Ø± ØºÙŠØ± ØµØ§Ù„Ø­', { show_alert: false }).catch(() => {});
       return;
     }
     if (game.board[index]) {
-      await ctx.answerCbQuery('الخانة محجوزة', { show_alert: false }).catch(() => {});
+      await ctx.answerCbQuery('Ø§Ù„Ø®Ø§Ù†Ø© Ù…Ø­Ø¬ÙˆØ²Ø©', { show_alert: false }).catch(() => {});
       return;
     }
 
-    game.board[index] = userId === game.player1Id ? '❌' : '⭕';
+    game.board[index] = userId === game.player1Id ? 'âŒ' : 'â­•';
     const winnerSymbol = this.getXoWinner(game.board);
 
     if (winnerSymbol) {
       game.status = 'done';
-      game.winnerUserId = winnerSymbol === '❌' ? game.player1Id : game.player2Id;
+      game.winnerUserId = winnerSymbol === 'âŒ' ? game.player1Id : game.player2Id;
     } else if (game.board.every(Boolean)) {
       game.status = 'done';
     } else {
@@ -316,7 +316,7 @@ class ChatGamesUtilityHandler {
         const botWinner = this.getXoWinner(game.board);
         if (botWinner) {
           game.status = 'done';
-          game.winnerUserId = botWinner === '❌' ? game.player1Id : game.player2Id;
+          game.winnerUserId = botWinner === 'âŒ' ? game.player1Id : game.player2Id;
         } else if (game.board.every(Boolean)) {
           game.status = 'done';
         } else {
@@ -325,7 +325,7 @@ class ChatGamesUtilityHandler {
       }
     }
 
-    await ctx.answerCbQuery('تم', { show_alert: false }).catch(() => {});
+    await ctx.answerCbQuery('ØªÙ…', { show_alert: false }).catch(() => {});
     await ctx.editMessageText(this.renderXoText(game), this.buildXoKeyboard(game)).catch(() => {});
 
     if (game.status === 'done') {
@@ -403,12 +403,12 @@ class ChatGamesUtilityHandler {
 
       return {
         cityName,
-        displayName: data?.display_name || cityName || 'موقعك الحالي'
+        displayName: data?.display_name || cityName || 'Ù…ÙˆÙ‚Ø¹Ùƒ Ø§Ù„Ø­Ø§Ù„ÙŠ'
       };
     } catch (_error) {
       return {
         cityName: null,
-        displayName: 'موقعك الحالي'
+        displayName: 'Ù…ÙˆÙ‚Ø¹Ùƒ Ø§Ù„Ø­Ø§Ù„ÙŠ'
       };
     }
   }
@@ -449,14 +449,14 @@ class ChatGamesUtilityHandler {
   }
 
   static formatWeatherMessage(locationLabel, current) {
-    const weatherText = this.weatherCodes[current.weather_code] || 'غير محدد';
+    const weatherText = this.weatherCodes[current.weather_code] || 'ØºÙŠØ± Ù…Ø­Ø¯Ø¯';
     return (
-      `🌤️ الطقس الآن في ${locationLabel}\n\n` +
-      `🌡️ الحرارة: ${current.temperature_2m ?? '-'}°C\n` +
-      `🤗 المحسوسة: ${current.apparent_temperature ?? '-'}°C\n` +
-      `💧 الرطوبة: ${current.relative_humidity_2m ?? '-'}%\n` +
-      `🌬️ الرياح: ${current.wind_speed_10m ?? '-'} كم/س\n` +
-      `☁️ الحالة: ${weatherText}`
+      `ðŸŒ¤ï¸ Ø§Ù„Ø·Ù‚Ø³ Ø§Ù„Ø¢Ù† ÙÙŠ ${locationLabel}\n\n` +
+      `ðŸŒ¡ï¸ Ø§Ù„Ø­Ø±Ø§Ø±Ø©: ${current.temperature_2m ?? '-'}Â°C\n` +
+      `ðŸ¤— Ø§Ù„Ù…Ø­Ø³ÙˆØ³Ø©: ${current.apparent_temperature ?? '-'}Â°C\n` +
+      `ðŸ’§ Ø§Ù„Ø±Ø·ÙˆØ¨Ø©: ${current.relative_humidity_2m ?? '-'}%\n` +
+      `ðŸŒ¬ï¸ Ø§Ù„Ø±ÙŠØ§Ø­: ${current.wind_speed_10m ?? '-'} ÙƒÙ…/Ø³\n` +
+      `â˜ï¸ Ø§Ù„Ø­Ø§Ù„Ø©: ${weatherText}`
     );
   }
 
@@ -478,15 +478,15 @@ class ChatGamesUtilityHandler {
 
   static formatAdhanMessage(locationLabel, adhanData) {
     const t = adhanData?.timings || {};
-    const dateLine = adhanData?.date ? `📅 ${adhanData.date}\n\n` : '\n';
+    const dateLine = adhanData?.date ? `ðŸ“… ${adhanData.date}\n\n` : '\n';
     return (
-      `🕌 مواقيت الأذان في ${locationLabel}\n` +
+      `ðŸ•Œ Ù…ÙˆØ§Ù‚ÙŠØª Ø§Ù„Ø£Ø°Ø§Ù† ÙÙŠ ${locationLabel}\n` +
       dateLine +
-      `الفجر: ${t.Fajr || '-'}\n` +
-      `الظهر: ${t.Dhuhr || '-'}\n` +
-      `العصر: ${t.Asr || '-'}\n` +
-      `المغرب: ${t.Maghrib || '-'}\n` +
-      `العشاء: ${t.Isha || '-'}`
+      `Ø§Ù„ÙØ¬Ø±: ${t.Fajr || '-'}\n` +
+      `Ø§Ù„Ø¸Ù‡Ø±: ${t.Dhuhr || '-'}\n` +
+      `Ø§Ù„Ø¹ØµØ±: ${t.Asr || '-'}\n` +
+      `Ø§Ù„Ù…ØºØ±Ø¨: ${t.Maghrib || '-'}\n` +
+      `Ø§Ù„Ø¹Ø´Ø§Ø¡: ${t.Isha || '-'}`
     );
   }
 
@@ -504,26 +504,34 @@ class ChatGamesUtilityHandler {
         latitude,
         longitude,
         city: reverse.cityName || '',
-        displayName: reverse.displayName || 'موقعك الحالي'
+        displayName: reverse.displayName || 'Ù…ÙˆÙ‚Ø¹Ùƒ Ø§Ù„Ø­Ø§Ù„ÙŠ'
       });
 
-      const current = await this.fetchWeatherByCoordinates(latitude, longitude);
-      await ctx.reply(this.formatWeatherMessage(reverse.displayName || 'موقعك الحالي', current));
+      const intent = String(ctx.session?.utilityIntent || 'weather').toLowerCase();
+      if (intent === 'adhan') {
+        const adhanData = await this.fetchAdhanByCoordinates(latitude, longitude);
+        await ctx.reply(this.formatAdhanMessage(reverse.displayName || 'Ù…ÙˆÙ‚Ø¹Ùƒ Ø§Ù„Ø­Ø§Ù„ÙŠ', adhanData));
+      } else {
+        const current = await this.fetchWeatherByCoordinates(latitude, longitude);
+        await ctx.reply(this.formatWeatherMessage(reverse.displayName || 'Ù…ÙˆÙ‚Ø¹Ùƒ Ø§Ù„Ø­Ø§Ù„ÙŠ', current));
+      }
       return true;
     } catch (_error) {
-      await ctx.reply('❌ تعذر قراءة موقعك الآن. حاول مرة أخرى.');
+      await ctx.reply('âŒ ØªØ¹Ø°Ø± Ù‚Ø±Ø§Ø¡Ø© Ù…ÙˆÙ‚Ø¹Ùƒ Ø§Ù„Ø¢Ù†. Ø­Ø§ÙˆÙ„ Ù…Ø±Ø© Ø£Ø®Ø±Ù‰.');
       return true;
     }
   }
 
   static async handleWeatherText(ctx, cityText) {
     try {
+      ctx.session = ctx.session || {};
+      ctx.session.utilityIntent = 'weather';
       const cityInput = String(cityText || '').trim();
 
       if (cityInput) {
         const city = await this.resolveCity(cityInput);
         if (!city) {
-          await ctx.reply('❌ لم أتعرف على المدينة. جرب مثل: طقس غزة');
+          await ctx.reply('âŒ Ù„Ù… Ø£ØªØ¹Ø±Ù Ø¹Ù„Ù‰ Ø§Ù„Ù…Ø¯ÙŠÙ†Ø©. Ø¬Ø±Ø¨ Ù…Ø«Ù„: Ø·Ù‚Ø³ ØºØ²Ø©');
           return;
         }
 
@@ -549,9 +557,9 @@ class ChatGamesUtilityHandler {
             latitude,
             longitude,
             city: reverse.cityName || '',
-            displayName: reverse.displayName || 'موقعك الحالي'
+            displayName: reverse.displayName || 'Ù…ÙˆÙ‚Ø¹Ùƒ Ø§Ù„Ø­Ø§Ù„ÙŠ'
           });
-          await ctx.reply(this.formatWeatherMessage(reverse.displayName || 'موقعك الحالي', current));
+          await ctx.reply(this.formatWeatherMessage(reverse.displayName || 'Ù…ÙˆÙ‚Ø¹Ùƒ Ø§Ù„Ø­Ø§Ù„ÙŠ', current));
           return;
         }
       }
@@ -559,30 +567,32 @@ class ChatGamesUtilityHandler {
       const savedLocation = await this.getUserWeatherLocation(ctx.from?.id);
       if (savedLocation) {
         const current = await this.fetchWeatherByCoordinates(savedLocation.latitude, savedLocation.longitude);
-        const label = savedLocation.displayName || savedLocation.city || 'موقعك المحفوظ';
+        const label = savedLocation.displayName || savedLocation.city || 'Ù…ÙˆÙ‚Ø¹Ùƒ Ø§Ù„Ù…Ø­ÙÙˆØ¸';
         await ctx.reply(this.formatWeatherMessage(label, current));
         return;
       }
 
       await ctx.reply(
-        'ℹ️ للحصول على طقس حقيقي حسب موقعك:\n' +
-          '1) أرسل موقعك من تيليجرام (📎 > الموقع)\n' +
-          '2) أو اكتب: طقس غزة\n' +
-          '3) أو استخدم: طقس (بعد حفظ موقعك مرة واحدة)'
+        'â„¹ï¸ Ù„Ù„Ø­ØµÙˆÙ„ Ø¹Ù„Ù‰ Ø·Ù‚Ø³ Ø­Ù‚ÙŠÙ‚ÙŠ Ø­Ø³Ø¨ Ù…ÙˆÙ‚Ø¹Ùƒ:\n' +
+          '1) Ø£Ø±Ø³Ù„ Ù…ÙˆÙ‚Ø¹Ùƒ Ù…Ù† ØªÙŠÙ„ÙŠØ¬Ø±Ø§Ù… (ðŸ“Ž > Ø§Ù„Ù…ÙˆÙ‚Ø¹)\n' +
+          '2) Ø£Ùˆ Ø§ÙƒØªØ¨: Ø·Ù‚Ø³ ØºØ²Ø©\n' +
+          '3) Ø£Ùˆ Ø§Ø³ØªØ®Ø¯Ù…: Ø·Ù‚Ø³ (Ø¨Ø¹Ø¯ Ø­ÙØ¸ Ù…ÙˆÙ‚Ø¹Ùƒ Ù…Ø±Ø© ÙˆØ§Ø­Ø¯Ø©)'
       );
     } catch (_error) {
-      await ctx.reply('❌ تعذر جلب بيانات الطقس حاليا. حاول لاحقا.');
+      await ctx.reply('âŒ ØªØ¹Ø°Ø± Ø¬Ù„Ø¨ Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø·Ù‚Ø³ Ø­Ø§Ù„ÙŠØ§. Ø­Ø§ÙˆÙ„ Ù„Ø§Ø­Ù‚Ø§.');
     }
   }
 
   static async handleAdhanText(ctx, cityText) {
     try {
+      ctx.session = ctx.session || {};
+      ctx.session.utilityIntent = 'adhan';
       const cityInput = String(cityText || '').trim();
 
       if (cityInput) {
         const city = await this.resolveCity(cityInput);
         if (!city) {
-          await ctx.reply('❌ لم أتعرف على المدينة. جرب مثل: اذان غزة');
+          await ctx.reply('âŒ Ù„Ù… Ø£ØªØ¹Ø±Ù Ø¹Ù„Ù‰ Ø§Ù„Ù…Ø¯ÙŠÙ†Ø©. Ø¬Ø±Ø¨ Ù…Ø«Ù„: Ø§Ø°Ø§Ù† ØºØ²Ø©');
           return;
         }
         const adhanData = await this.fetchAdhanByCoordinates(city.latitude, city.longitude);
@@ -606,10 +616,10 @@ class ChatGamesUtilityHandler {
             latitude,
             longitude,
             city: reverse.cityName || '',
-            displayName: reverse.displayName || 'موقعك الحالي'
+            displayName: reverse.displayName || 'Ù…ÙˆÙ‚Ø¹Ùƒ Ø§Ù„Ø­Ø§Ù„ÙŠ'
           });
           const adhanData = await this.fetchAdhanByCoordinates(latitude, longitude);
-          await ctx.reply(this.formatAdhanMessage(reverse.displayName || 'موقعك الحالي', adhanData));
+          await ctx.reply(this.formatAdhanMessage(reverse.displayName || 'Ù…ÙˆÙ‚Ø¹Ùƒ Ø§Ù„Ø­Ø§Ù„ÙŠ', adhanData));
           return;
         }
       }
@@ -617,21 +627,22 @@ class ChatGamesUtilityHandler {
       const savedLocation = await this.getUserWeatherLocation(ctx.from?.id);
       if (savedLocation) {
         const adhanData = await this.fetchAdhanByCoordinates(savedLocation.latitude, savedLocation.longitude);
-        const label = savedLocation.displayName || savedLocation.city || 'موقعك المحفوظ';
+        const label = savedLocation.displayName || savedLocation.city || 'Ù…ÙˆÙ‚Ø¹Ùƒ Ø§Ù„Ù…Ø­ÙÙˆØ¸';
         await ctx.reply(this.formatAdhanMessage(label, adhanData));
         return;
       }
 
       await ctx.reply(
-        'ℹ️ للحصول على الأذان حسب موقعك:\n' +
-          '1) أرسل موقعك من تيليجرام (📎 > الموقع)\n' +
-          '2) أو اكتب: اذان غزة\n' +
-          '3) أو استخدم: اذان (بعد حفظ موقعك مرة واحدة)'
+        'â„¹ï¸ Ù„Ù„Ø­ØµÙˆÙ„ Ø¹Ù„Ù‰ Ø§Ù„Ø£Ø°Ø§Ù† Ø­Ø³Ø¨ Ù…ÙˆÙ‚Ø¹Ùƒ:\n' +
+          '1) Ø£Ø±Ø³Ù„ Ù…ÙˆÙ‚Ø¹Ùƒ Ù…Ù† ØªÙŠÙ„ÙŠØ¬Ø±Ø§Ù… (ðŸ“Ž > Ø§Ù„Ù…ÙˆÙ‚Ø¹)\n' +
+          '2) Ø£Ùˆ Ø§ÙƒØªØ¨: Ø§Ø°Ø§Ù† ØºØ²Ø©\n' +
+          '3) Ø£Ùˆ Ø§Ø³ØªØ®Ø¯Ù…: Ø§Ø°Ø§Ù† (Ø¨Ø¹Ø¯ Ø­ÙØ¸ Ù…ÙˆÙ‚Ø¹Ùƒ Ù…Ø±Ø© ÙˆØ§Ø­Ø¯Ø©)'
       );
     } catch (_error) {
-      await ctx.reply('❌ تعذر جلب مواقيت الأذان حاليا. حاول لاحقا.');
+      await ctx.reply('âŒ ØªØ¹Ø°Ø± Ø¬Ù„Ø¨ Ù…ÙˆØ§Ù‚ÙŠØª Ø§Ù„Ø£Ø°Ø§Ù† Ø­Ø§Ù„ÙŠØ§. Ø­Ø§ÙˆÙ„ Ù„Ø§Ø­Ù‚Ø§.');
     }
   }
 }
 
 module.exports = ChatGamesUtilityHandler;
+

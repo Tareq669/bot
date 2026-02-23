@@ -200,12 +200,27 @@ class JoeChatHandler {
   static localFallback(_userText, userLang) {
     const textLang = this.detectLanguage('', userLang);
     if (textLang === 'ar') {
-      return 'حالياً مزود الذكاء مشغول. أعد إرسال سؤالك خلال ثواني بشكل مختصر وسأجاوبك فورًا.';
+      return 'ما قدرت أوصل لمزود الذكاء الآن. اكتب سؤالك بشكل أقصر وسأحاول مباشرة.';
     }
-    return 'AI provider is busy right now. Please retry in a few seconds with a shorter prompt.';
+    return 'I could not reach the AI provider. Please retry with a shorter prompt.';
   }
 
   static async generate(session, userText, firstName, userLang) {
+    const freeFirst = String(process.env.JOE_USE_FREE_FIRST || 'true').trim().toLowerCase();
+    const useFreeFirst = ['1', 'true', 'yes', 'on'].includes(freeFirst);
+
+    if (useFreeFirst) {
+      try {
+        return await this.callFreeFallback(session, userText, firstName, userLang);
+      } catch (_freeErr) {
+        try {
+          return await this.callGemini(session, userText, firstName, userLang);
+        } catch (_gemErr) {
+          return this.localFallback(userText, userLang);
+        }
+      }
+    }
+
     try {
       return await this.callGemini(session, userText, firstName, userLang);
     } catch (_gemErr) {
@@ -302,19 +317,11 @@ class JoeChatHandler {
     const minInterval = this.toInt(process.env.JOE_MIN_REPLY_INTERVAL_MS, 250, 80, 5000);
 
     if (now - (session.lastReplyAt || 0) < minInterval) {
-      if (now - (session.lastBusyNoticeAt || 0) > 1800) {
-        session.lastBusyNoticeAt = now;
-        await ctx.reply('لحظة صغيرة... اكتب رسالة واحدة واضحة وأنا أرد مباشرة.');
-      }
       return true;
     }
 
     if (session.pending) {
       session.queuedText = msg;
-      if (now - (session.lastBusyNoticeAt || 0) > 1800) {
-        session.lastBusyNoticeAt = now;
-        await ctx.reply('مستلم رسالتك. سأرد على آخر رسالة بعد ثواني.');
-      }
       return true;
     }
 
