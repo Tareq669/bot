@@ -26,6 +26,7 @@ const ContentHandler = require('./commands/contentHandler');
 const ProfileHandler = require('./commands/profileHandler');
 const ChatGamesUtilityHandler = require('./commands/chatGamesUtilityHandler');
 const JoeChatHandler = require('./handlers/joeChatHandler');
+const SponsoredAdsSystem = require('./features/sponsoredAdsSystem');
 const { logger } = require('./utils/helpers');
 const ReconnectManager = require('./utils/reconnect');
 const connectionMonitor = require('./utils/connectionMonitor');
@@ -162,6 +163,11 @@ bot.use(async (ctx, next) => {
   }
 
   return next();
+});
+
+bot.use(async (ctx, next) => {
+  await next();
+  await SponsoredAdsSystem.maybeShowAd(ctx);
 });
 
 
@@ -4363,6 +4369,70 @@ async function startBot() {
 // ==========================================
 const app = express();
 const PORT = process.env.PORT || 3000;
+app.use(express.json({ limit: '256kb' }));
+app.use(express.urlencoded({ extended: true }));
+
+const parseRewardUserId = (req) => {
+  const body = req.body || {};
+  const query = req.query || {};
+  const raw =
+    body.user_id ||
+    body.userId ||
+    body.tg_id ||
+    body.telegram_id ||
+    query.user_id ||
+    query.userId ||
+    query.tg_id ||
+    query.telegram_id ||
+    query.uid;
+  const n = parseInt(String(raw || '').trim(), 10);
+  return Number.isInteger(n) && n > 0 ? n : null;
+};
+
+const hasValidAdsgramSecret = (req) => {
+  const expected = String(process.env.ADSGRAM_REWARD_SECRET || '').trim();
+  if (!expected) return true; // optional for quick setup, recommended to set in production
+  const provided =
+    String(req.query?.secret || '').trim() ||
+    String(req.headers['x-adsgram-secret'] || '').trim() ||
+    String(req.body?.secret || '').trim();
+  return provided === expected;
+};
+
+app.all('/adsgram/reward', async (req, res) => {
+  try {
+    if (!hasValidAdsgramSecret(req)) {
+      return res.status(403).json({ ok: false, error: 'forbidden' });
+    }
+
+    const userId = parseRewardUserId(req);
+    if (!userId) {
+      return res.status(400).json({ ok: false, error: 'missing_user_id' });
+    }
+
+    const rewardCoins = Math.max(1, parseInt(process.env.ADSGRAM_REWARD_COINS || '5', 10) || 5);
+    const EconomyManager = require('./economy/economyManager');
+    const newBalance = await EconomyManager.addCoins(userId, rewardCoins, 'adsgram_reward');
+    if (newBalance === null) {
+      return res.status(500).json({ ok: false, error: 'reward_failed' });
+    }
+
+    try {
+      await bot.telegram.sendMessage(
+        userId,
+        `🎁 مكافأة إعلان\n\nتم إضافة ${rewardCoins} عملة إلى رصيدك.\n💰 رصيدك الحالي: ${newBalance}`
+      );
+    } catch (_notifyError) {
+      // user may block bot; ignore
+    }
+
+    logger.info(`✅ AdsGram reward applied: user=${userId}, coins=${rewardCoins}`);
+    return res.status(200).json({ ok: true, userId, rewardCoins, balance: newBalance });
+  } catch (error) {
+    logger.error('❌ AdsGram reward endpoint error:', error.message);
+    return res.status(500).json({ ok: false, error: 'internal_error' });
+  }
+});
 
 app.get('/', (req, res) => {
   res.json({
