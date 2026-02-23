@@ -2367,7 +2367,7 @@ bot.hears('🤖 جو', (ctx) => JoeChatHandler.handleStart(ctx));
 bot.hears('Joe', (ctx) => JoeChatHandler.handleStart(ctx));
 bot.hears(/^اكس\s*اوه$/i, (ctx) => ChatGamesUtilityHandler.handleXoStart(ctx));
 bot.hears(/^طقس(?:\s+(.+))?$/i, (ctx) => ChatGamesUtilityHandler.handleWeatherText(ctx, ctx.match[1]));
-bot.hears(/^(?:اذان|أذان)\s+(.+)$/i, (ctx) => ChatGamesUtilityHandler.handleAdhanText(ctx, ctx.match[1]));
+bot.hears(/^(?:اذان|أذان)(?:\s+(.+))?$/i, (ctx) => ChatGamesUtilityHandler.handleAdhanText(ctx, ctx.match[1]));
 
 bot.action(/^xo:move:([a-z0-9]+):([0-8])$/i, (ctx) => ChatGamesUtilityHandler.handleXoAction(ctx));
 bot.action(/^xo:challenge:(accept|decline):([a-z0-9]+)$/i, (ctx) => ChatGamesUtilityHandler.handleXoChallengeAction(ctx));

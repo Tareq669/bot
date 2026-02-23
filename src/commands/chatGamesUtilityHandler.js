@@ -460,6 +460,36 @@ class ChatGamesUtilityHandler {
     );
   }
 
+  static async fetchAdhanByCoordinates(latitude, longitude) {
+    const { data } = await axios.get('https://api.aladhan.com/v1/timings', {
+      params: {
+        latitude,
+        longitude,
+        method: 4,
+        school: 1
+      },
+      timeout: 12000
+    });
+    return {
+      timings: data?.data?.timings || {},
+      date: data?.data?.date?.readable || ''
+    };
+  }
+
+  static formatAdhanMessage(locationLabel, adhanData) {
+    const t = adhanData?.timings || {};
+    const dateLine = adhanData?.date ? `📅 ${adhanData.date}\n\n` : '\n';
+    return (
+      `🕌 مواقيت الأذان في ${locationLabel}\n` +
+      dateLine +
+      `الفجر: ${t.Fajr || '-'}\n` +
+      `الظهر: ${t.Dhuhr || '-'}\n` +
+      `العصر: ${t.Asr || '-'}\n` +
+      `المغرب: ${t.Maghrib || '-'}\n` +
+      `العشاء: ${t.Isha || '-'}`
+    );
+  }
+
   static async handleLocationMessage(ctx) {
     const location = this.extractLocationFromCtx(ctx);
     if (!location) return false;
@@ -546,40 +576,58 @@ class ChatGamesUtilityHandler {
   }
 
   static async handleAdhanText(ctx, cityText) {
-    if (ctx.chat?.type !== 'private') {
-      await ctx.reply('ℹ️ أمر الأذان مخصص للخاصة. استخدمه في الخاص مثل: اذان غزة');
-      return;
-    }
-
     try {
-      const city = await this.resolveCity(cityText);
-      if (!city) {
-        await ctx.reply('❌ لم أتعرف على المدينة. جرب مثل: اذان غزة');
+      const cityInput = String(cityText || '').trim();
+
+      if (cityInput) {
+        const city = await this.resolveCity(cityInput);
+        if (!city) {
+          await ctx.reply('❌ لم أتعرف على المدينة. جرب مثل: اذان غزة');
+          return;
+        }
+        const adhanData = await this.fetchAdhanByCoordinates(city.latitude, city.longitude);
+        await this.saveUserWeatherLocation(ctx.from?.id, {
+          latitude: city.latitude,
+          longitude: city.longitude,
+          city: city.name || '',
+          displayName: this.formatCityLabel(city)
+        });
+        await ctx.reply(this.formatAdhanMessage(this.formatCityLabel(city), adhanData));
         return;
       }
 
-      const { data } = await axios.get('https://api.aladhan.com/v1/timings', {
-        params: {
-          latitude: city.latitude,
-          longitude: city.longitude,
-          method: 4,
-          school: 1
-        },
-        timeout: 12000
-      });
+      const sharedLocation = this.extractLocationFromCtx(ctx);
+      if (sharedLocation) {
+        const latitude = Number(sharedLocation.latitude);
+        const longitude = Number(sharedLocation.longitude);
+        if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+          const reverse = await this.reverseGeocode(latitude, longitude);
+          await this.saveUserWeatherLocation(ctx.from?.id, {
+            latitude,
+            longitude,
+            city: reverse.cityName || '',
+            displayName: reverse.displayName || 'موقعك الحالي'
+          });
+          const adhanData = await this.fetchAdhanByCoordinates(latitude, longitude);
+          await ctx.reply(this.formatAdhanMessage(reverse.displayName || 'موقعك الحالي', adhanData));
+          return;
+        }
+      }
 
-      const t = data?.data?.timings || {};
-      const date = data?.data?.date?.readable || '';
-      const message =
-        `🕌 مواقيت الأذان في ${this.formatCityLabel(city)}\n` +
-        `${date ? `📅 ${date}\n\n` : '\n'}` +
-        `الفجر: ${t.Fajr || '-'}\n` +
-        `الظهر: ${t.Dhuhr || '-'}\n` +
-        `العصر: ${t.Asr || '-'}\n` +
-        `المغرب: ${t.Maghrib || '-'}\n` +
-        `العشاء: ${t.Isha || '-'}`;
+      const savedLocation = await this.getUserWeatherLocation(ctx.from?.id);
+      if (savedLocation) {
+        const adhanData = await this.fetchAdhanByCoordinates(savedLocation.latitude, savedLocation.longitude);
+        const label = savedLocation.displayName || savedLocation.city || 'موقعك المحفوظ';
+        await ctx.reply(this.formatAdhanMessage(label, adhanData));
+        return;
+      }
 
-      await ctx.reply(message);
+      await ctx.reply(
+        'ℹ️ للحصول على الأذان حسب موقعك:\n' +
+          '1) أرسل موقعك من تيليجرام (📎 > الموقع)\n' +
+          '2) أو اكتب: اذان غزة\n' +
+          '3) أو استخدم: اذان (بعد حفظ موقعك مرة واحدة)'
+      );
     } catch (_error) {
       await ctx.reply('❌ تعذر جلب مواقيت الأذان حاليا. حاول لاحقا.');
     }
