@@ -5,15 +5,6 @@ class SponsoredAdsSystem {
 
   static adCache = { ad: null, at: 0 };
 
-  static escapeHtml(text) {
-    return String(text ?? '')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-  }
-
   static getConfig() {
     const enabledRaw = String(process.env.ADS_AUTO_ENABLED || 'false').trim().toLowerCase();
     const enabled = ['1', 'true', 'on', 'yes'].includes(enabledRaw);
@@ -26,7 +17,8 @@ class SponsoredAdsSystem {
       provider: String(process.env.ADS_PROVIDER || 'adsgram').trim().toLowerCase(),
       adsgramToken: String(process.env.ADSGRAM_TOKEN || '').trim(),
       adsgramBlockId: String(process.env.ADSGRAM_BLOCK_ID || '').trim(),
-      cacheMs: Math.max(10, Math.min(600, parseInt(process.env.ADS_CACHE_SECONDS || '60', 10) || 60)) * 1000
+      cacheMs: Math.max(10, Math.min(600, parseInt(process.env.ADS_CACHE_SECONDS || '60', 10) || 60)) * 1000,
+      language: String(process.env.ADS_LANGUAGE || 'ar').trim()
     };
   }
 
@@ -49,44 +41,58 @@ class SponsoredAdsSystem {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const response = await fetch(url, { ...options, signal: controller.signal });
-      return response;
+      return await fetch(url, { ...options, signal: controller.signal });
     } finally {
       clearTimeout(timer);
     }
   }
 
+  static parseNumericBlockId(blockId) {
+    const raw = String(blockId || '').trim();
+    const stripped = raw.replace(/^bot-/i, '');
+    return /^\d+$/.test(stripped) ? stripped : null;
+  }
+
   static async fetchAdsGramAd(cfg, userId) {
-    if (!cfg.adsgramToken || !cfg.adsgramBlockId) {
-      return null;
-    }
+    if (!cfg.adsgramToken || !cfg.adsgramBlockId) return null;
 
     const now = Date.now();
     if (this.adCache.ad && now - this.adCache.at < cfg.cacheMs) {
       return this.adCache.ad;
     }
 
-    const apiUrl = `https://api.adsgram.ai/adv?block_id=${encodeURIComponent(cfg.adsgramBlockId)}&tg_id=${encodeURIComponent(userId)}&token=${encodeURIComponent(cfg.adsgramToken)}`;
+    const numericBlockId = this.parseNumericBlockId(cfg.adsgramBlockId);
+    if (!numericBlockId) return null;
+
+    const apiUrl =
+      `https://api.adsgram.ai/advbot?` +
+      `tgid=${encodeURIComponent(userId)}` +
+      `&blockid=${encodeURIComponent(numericBlockId)}` +
+      `&language=${encodeURIComponent(cfg.language || 'ar')}` +
+      `&token=${encodeURIComponent(cfg.adsgramToken)}`;
+
     const response = await this.fetchWithTimeout(apiUrl, { method: 'GET' }, 6000);
     if (!response.ok) return null;
+
     const data = await response.json().catch(() => null);
-    if (!data || !data.banner || !data.banner.trackings || !data.banner.trackings.click_url) return null;
+    if (!data || !data.click_url) return null;
 
     const ad = {
-      title: data.banner.title || 'إعلان',
-      text: data.banner.description || 'محتوى ممول',
-      cta: data.banner.button || 'فتح',
-      clickUrl: data.banner.trackings.click_url
+      textHtml: String(data.text_html || '<b>إعلان</b>'),
+      clickUrl: String(data.click_url || ''),
+      cta: String(data.button_name || 'فتح الإعلان'),
+      imageUrl: String(data.image_url || ''),
+      rewardUrl: String(data.reward_url || ''),
+      rewardCta: String(data.button_reward_name || 'Claim reward')
     };
+
     this.adCache = { ad, at: now };
     return ad;
   }
 
   static async getAd(cfg, userId) {
-    if (cfg.provider === 'adsgram') {
-      return this.fetchAdsGramAd(cfg, userId);
-    }
-    return null;
+    if (cfg.provider !== 'adsgram') return null;
+    return this.fetchAdsGramAd(cfg, userId);
   }
 
   static async maybeShowAd(ctx) {
@@ -94,12 +100,14 @@ class SponsoredAdsSystem {
       const cfg = this.getConfig();
       if (!cfg.enabled) return;
       if (!this.shouldShowAd(ctx)) return;
+
       const userId = Number(ctx.from?.id || 0);
       if (!userId) return;
 
       const rt = this.runtimeForUser(userId);
       rt.count += 1;
       const now = Date.now();
+
       if (rt.count < cfg.frequency) return;
       if (now - rt.lastShownAt < cfg.cooldownMs) return;
 
@@ -109,19 +117,33 @@ class SponsoredAdsSystem {
       rt.count = 0;
       rt.lastShownAt = now;
 
-      const message =
-        '📢 <b>إعلان</b>\n\n' +
-        `🧾 <b>${this.escapeHtml(ad.title)}</b>\n` +
-        `${this.escapeHtml(ad.text)}`;
+      const rows = [[Markup.button.url(ad.cta || 'فتح الإعلان', ad.clickUrl)]];
+      if (ad.rewardUrl) {
+        rows.push([Markup.button.url(ad.rewardCta || 'استلام المكافأة', ad.rewardUrl)]);
+      }
+      const keyboard = Markup.inlineKeyboard(rows);
 
-      const keyboard = Markup.inlineKeyboard([[Markup.button.url(ad.cta || 'فتح الإعلان', ad.clickUrl)]]);
-      await ctx.reply(message, {
+      if (ad.imageUrl) {
+        await ctx.replyWithPhoto(
+          { url: ad.imageUrl },
+          {
+            caption: ad.textHtml,
+            parse_mode: 'HTML',
+            reply_markup: keyboard.reply_markup,
+            protect_content: true
+          }
+        );
+        return;
+      }
+
+      await ctx.reply(ad.textHtml, {
         parse_mode: 'HTML',
         reply_markup: keyboard.reply_markup,
-        disable_web_page_preview: true
+        disable_web_page_preview: true,
+        protect_content: true
       });
     } catch (_error) {
-      // Never break bot flow because of ads.
+      // Never break bot flow because of ad errors.
     }
   }
 }
