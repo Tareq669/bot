@@ -180,7 +180,10 @@ class UIManager {
         Markup.button.callback('🔢 التخمين', 'game:guess')
       ],
       [
-        Markup.button.callback('🍀 لعبة الحظ', 'game:luck'),
+        Markup.button.callback('❌⭕ اكس اوه', 'game:xo'),
+        Markup.button.callback('🍀 لعبة الحظ', 'game:luck')
+      ],
+      [
         Markup.button.callback('🧠 أسئلة ثقافية', 'game:quiz')
       ],
       [
