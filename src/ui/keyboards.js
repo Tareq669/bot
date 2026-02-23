@@ -96,6 +96,7 @@ class UIManager {
         Markup.button.text('🌤️ الطقس')
       ],
       [
+        Markup.button.text('🕌 الأذان'),
         Markup.button.text('Joe')
       ],
       [
