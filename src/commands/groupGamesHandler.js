@@ -784,7 +784,7 @@ class GroupGamesHandler {
       const lastAutoAt = group.gameSystem.state.lastAutoAt ? new Date(group.gameSystem.state.lastAutoAt).getTime() : 0;
       if (Date.now() - lastAutoAt < intervalMinutes * 60 * 1000) continue;
 
-      const base = this.pickFromQueue(QUICK_QUESTIONS, `auto:${groupId}`);
+      const base = this.pickNonRepeating(QUICK_QUESTIONS, `auto:${groupId}`);
       await this.startRoundInternal(Number(group.groupId), {
         type: 'quiz',
         prompt: `⚡ <b>سؤال تلقائي</b>\n\n${base.question}`,
@@ -840,7 +840,7 @@ class GroupGamesHandler {
     const pool = QUICK_QUESTIONS.filter((q) => this.questionMatchesDifficulty(q, difficulty));
     const effectivePool = pool.length > 0 ? pool : QUICK_QUESTIONS;
     const key = `quiz:${String(groupId || 'global')}`;
-    const quiz = this.pickFromQueue(effectivePool, key);
+    const quiz = this.pickNonRepeating(effectivePool, key);
     return { type: 'quiz', prompt: `❓ <b>سؤال سريع</b>\n\n${quiz.question}`, answers: quiz.answers, reward: 1, timeoutSec: 30 };
   }
 
@@ -860,7 +860,7 @@ class GroupGamesHandler {
   }
 
   static buildWhoAmIRound() {
-    const q = this.pickRandom(WHO_AM_I_BANK);
+    const q = this.pickNonRepeating(WHO_AM_I_BANK, 'whoami:global');
     const clues = this.shuffleArray(q.clues).slice(0, 3).map((c, i) => `${i + 1}) ${c}`).join('\n');
     return {
       type: 'whoami',
@@ -872,7 +872,7 @@ class GroupGamesHandler {
   }
 
   static buildRiddleRound() {
-    const q = this.pickRandom(RIDDLE_BANK);
+    const q = this.pickNonRepeating(RIDDLE_BANK, 'riddle:global');
     return {
       type: 'riddle',
       prompt: `🧠 <b>لغز ذكي</b>\n\n${q.question}\n\nأول إجابة صحيحة = 1 نقطة.`,
@@ -883,7 +883,7 @@ class GroupGamesHandler {
   }
 
   static buildTypingRound() {
-    const word = this.pickRandom(TYPING_WORDS);
+    const word = this.pickNonRepeating(TYPING_WORDS.map((w) => ({ question: w, answers: [w] })), 'typing:global').question;
     return {
       type: 'typing',
       prompt: `⚡ <b>سرعة الكتابة</b>\n\nاكتب الكلمة التالية خلال 10 ثواني:\n<b>${word}</b>`,
@@ -1215,7 +1215,7 @@ class GroupGamesHandler {
     const pool = ALL_MCQ_QUESTIONS.filter((q) => this.questionMatchesDifficulty(q, opts.difficulty))
       .filter((q) => this.questionMatchesCategory(q, opts.category));
     const source = pool.length > 0 ? pool : ALL_MCQ_QUESTIONS;
-    const question = this.pickFromQueue(source, `quizpoll:${String(ctx.chat.id)}:${opts.difficulty || 'all'}:${opts.category || 'all'}`);
+    const question = this.pickNonRepeating(source, `quizpoll:${String(ctx.chat.id)}:${opts.difficulty || 'all'}:${opts.category || 'all'}`);
     const timeoutSec = Math.max(10, opts.timeoutSec || 25);
     await this.sendQuizPoll(ctx.chat.id, question, question.reward, timeoutSec);
   }
@@ -1283,7 +1283,7 @@ class GroupGamesHandler {
     const pool = ALL_MCQ_QUESTIONS.filter((q) => this.questionMatchesDifficulty(q, opts.difficulty))
       .filter((q) => this.questionMatchesCategory(q, opts.category));
     const source = pool.length > 0 ? pool : ALL_MCQ_QUESTIONS;
-    const question = this.pickFromQueue(source, `mcq:${String(ctx.chat.id)}:${opts.difficulty || 'all'}:${opts.category || 'all'}`);
+    const question = this.pickNonRepeating(source, `mcq:${String(ctx.chat.id)}:${opts.difficulty || 'all'}:${opts.category || 'all'}`);
     const timeoutSec = Math.max(10, opts.timeoutSec || 25);
     await this.sendQuizPoll(ctx.chat.id, question, question.reward, timeoutSec);
   }
@@ -1300,7 +1300,7 @@ class GroupGamesHandler {
     const pool = ALL_MCQ_QUESTIONS.filter((q) => this.questionMatchesDifficulty(q, session.difficulty))
       .filter((q) => this.questionMatchesCategory(q, session.category));
     const source = pool.length > 0 ? pool : ALL_MCQ_QUESTIONS;
-    const question = this.pickFromQueue(source, `series:${String(chatId)}:${session.difficulty || 'all'}:${session.category || 'all'}`);
+    const question = this.pickNonRepeating(source, `series:${String(chatId)}:${session.difficulty || 'all'}:${session.category || 'all'}`);
     await this.sendQuizPoll(chatId, question, question.reward, session.timeoutSec);
     session.remaining -= 1;
 
@@ -1807,7 +1807,11 @@ class GroupGamesHandler {
     return ctx.reply(
       `🎁 <b>الهدايا الفريدة (للجروب)</b>\n\n${list}\n\n` +
       `الإرسال: <code>/ggift مفتاح_الهدية @user [العدد]</code>\n` +
-      'مثال: <code>/ggift palace @user</code>',
+      'أمثلة عربية:\n' +
+      '• <code>ارسال وردة</code> (بالرد على العضو)\n' +
+      '• <code>ارسال وردة @user</code>\n' +
+      '• <code>اهداء قصر @user 2</code>\n\n' +
+      'مثال سلاش: <code>/ggift palace @user</code>',
       { parse_mode: 'HTML' }
     );
   }
@@ -1817,11 +1821,13 @@ class GroupGamesHandler {
     const args = this.parseCommandArgs(ctx);
     if (args.length === 0) return this.handleGiftCatalogCommand(ctx);
 
-    const gift = this.resolveGiftByInput(args[0]);
+    const noiseWords = new Set(['الى', 'إلى', 'ل', 'for', 'to', 'x', '×', 'هدية', 'هديه']);
+    const compact = args.filter((x) => !noiseWords.has(String(x)));
+    const gift = this.resolveGiftByInput(compact[0] || args[0]);
     if (!gift) return ctx.reply('❌ الهدية غير معروفة. استخدم /ggifts');
 
-    const targetArg = args.find((x) => String(x).startsWith('@') || /^\d+$/.test(String(x))) || null;
-    const qtyArg = args.find((x) => /^\d+$/.test(String(x))) || '1';
+    const targetArg = compact.find((x) => String(x).startsWith('@') || /^\d+$/.test(String(x))) || null;
+    const qtyArg = compact.find((x) => /^\d+$/.test(String(x))) || '1';
     const qty = Math.max(1, Math.min(20, parseInt(qtyArg, 10) || 1));
 
     const group = await this.ensureGroupRecord(ctx);
@@ -1848,6 +1854,21 @@ class GroupGamesHandler {
     this.awardXp(receiverRow, qty);
 
     await group.save();
+
+    // Notify recipient privately when possible.
+    if (this.bot && Number(target.id) > 0) {
+      const senderName = ctx.from.first_name || ctx.from.username || String(ctx.from.id);
+      this.bot.telegram.sendMessage(
+        Number(target.id),
+        `🎁 وصلك إهداء جديد من ${senderName}\n\n` +
+        `الهدية: ${gift.name} ×${qty}\n` +
+        `من جروب: ${ctx.chat?.title || 'جروب'}\n` +
+        `نقاطك زادت +${Math.max(1, Math.floor(gift.price / 3)) * qty}\n\n` +
+        'افتح البوت ثم ارجع للجروب إذا ما وصلك الإشعار.',
+        { parse_mode: 'HTML' }
+      ).catch(() => {});
+    }
+
     return ctx.reply(
       `🎁 ${ctx.from.first_name || 'عضو'} أرسل ${gift.name} ×${qty} إلى ${target.first_name || target.username || target.id}\n` +
       `💰 تكلفة الإرسال: ${totalPrice} نقطة`,
