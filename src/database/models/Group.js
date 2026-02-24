@@ -20,6 +20,14 @@ const groupSchema = new mongoose.Schema({
     },
     welcomeMessage: String,
     goodbyeMessage: String,
+    welcomeEnabled: {
+      type: Boolean,
+      default: false
+    },
+    welcomeTemplate: {
+      type: String,
+      default: '👋 أهلًا {name} في {group}\n🆔 {id}\nنتمنى لك وقتًا ممتعًا معنا.'
+    },
     filterBadWords: {
       type: Boolean,
       default: true
@@ -188,6 +196,38 @@ const groupSchema = new mongoose.Schema({
         type: Date,
         default: Date.now
       }
+    }
+  ],
+  suggestions: [
+    {
+      suggestionId: {
+        type: Number,
+        required: true
+      },
+      text: {
+        type: String,
+        default: ''
+      },
+      createdBy: {
+        type: Number,
+        default: null
+      },
+      createdByName: {
+        type: String,
+        default: ''
+      },
+      status: {
+        type: String,
+        enum: ['open', 'closed'],
+        default: 'open'
+      },
+      votesUp: [Number],
+      votesDown: [Number],
+      createdAt: {
+        type: Date,
+        default: Date.now
+      },
+      closedAt: Date
     }
   ],
   gameSystem: {

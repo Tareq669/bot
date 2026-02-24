@@ -116,7 +116,7 @@ const GROUP_ONLY_COMMANDS = new Set([
   'gpanel', 'ghelp', 'gsettings', 'gwarn', 'gwarns', 'gunwarn', 'gresetwarn',
   'gmute', 'gunmute', 'gban', 'gunban', 'gclear', 'glogs', 'gpolicy', 'gprotect',
   'gadminstats', 'gprint', 'greasons', 'gbasic', 'gexceptions', 'granks', 'gdetect', 'gonline', 'gadminleave',
-  'gtemplate_member', 'gtemplate_admin', 'gideal_member', 'gideal_admin', 'gshow_ideal_member', 'gshow_ideal_admin',
+  'gtemplate_member', 'gtemplate_admin', 'gideal_member', 'gideal_admin', 'gshow_ideal_member', 'gshow_ideal_admin', 'gwelcome', 'gsuggest',
   'gfaq', 'gquiz', 'gmath', 'gword', 'gdaily', 'gmcq', 'gvote', 'gquizset', 'gleader', 'gweekly', 'ggame', 'ggames',
   'g', 'gteam', 'gteams', 'gtour', 'gwho', 'griddle', 'gtype', 'chance', 'gduel', 'gstore', 'gbuy', 'ggifts', 'ggift', 'gprofile', 'gmonth', 'gmonthly', 'gbonus', 'glevels'
 ]);
@@ -225,6 +225,8 @@ Promise.all([
       { command: 'gdetect', description: 'تفعيل/تعطيل الكشف' },
       { command: 'gonline', description: 'قفل/فتح الانلاين' },
       { command: 'gadminleave', description: 'تنبيه مغادرة المشرفين' },
+      { command: 'gwelcome', description: 'إعداد رسالة الترحيب' },
+      { command: 'gsuggest', description: 'نظام الاقتراحات' },
       { command: 'gtemplate_member', description: 'إعداد كليشة عضو مثالي' },
       { command: 'gtemplate_admin', description: 'إعداد كليشة مشرف مثالي' },
       { command: 'gideal_member', description: 'رفع عضو مثالي' },
@@ -339,6 +341,8 @@ bot.command('granks', (ctx) => GroupAdminHandler.handleRanksCountCommand(ctx));
 bot.command('gdetect', (ctx) => GroupAdminHandler.handleDetectToggle(ctx));
 bot.command('gonline', (ctx) => GroupAdminHandler.handleOnlineToggle(ctx));
 bot.command('gadminleave', (ctx) => GroupAdminHandler.handleAdminLeaveToggle(ctx));
+bot.command('gwelcome', (ctx) => GroupAdminHandler.handleWelcomeCommand(ctx));
+bot.command('gsuggest', (ctx) => GroupAdminHandler.handleSuggestionCommand(ctx));
 bot.command('gtemplate_member', (ctx) => GroupAdminHandler.handleTemplateSetupRequest(ctx, 'member'));
 bot.command('gtemplate_admin', (ctx) => GroupAdminHandler.handleTemplateSetupRequest(ctx, 'admin'));
 bot.command('gideal_member', (ctx) => GroupAdminHandler.handleIdealAssignCommand(ctx, 'member'));

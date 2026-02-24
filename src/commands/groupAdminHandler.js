@@ -226,6 +226,10 @@ class GroupAdminHandler {
     if (typeof group.settings.requireReasonsForModeration !== 'boolean') group.settings.requireReasonsForModeration = false;
     if (typeof group.settings.disableGameEngagement !== 'boolean') group.settings.disableGameEngagement = false;
     if (typeof group.settings.notifyAdminLeave !== 'boolean') group.settings.notifyAdminLeave = false;
+    if (typeof group.settings.welcomeEnabled !== 'boolean') group.settings.welcomeEnabled = false;
+    if (typeof group.settings.welcomeTemplate !== 'string' || !group.settings.welcomeTemplate.trim()) {
+      group.settings.welcomeTemplate = '👋 أهلًا {name} في {group}\n🆔 {id}\nنتمنى لك وقتًا ممتعًا معنا.';
+    }
     if (typeof group.settings.detectForAdminsOnly !== 'boolean') group.settings.detectForAdminsOnly = false;
     if (typeof group.settings.onlineForOwnersOnly !== 'boolean') group.settings.onlineForOwnersOnly = false;
     if (!Number.isInteger(group.settings.primaryOwnerId)) group.settings.primaryOwnerId = null;
@@ -249,6 +253,21 @@ class GroupAdminHandler {
     if (!Array.isArray(group.warnings)) group.warnings = [];
     if (!Array.isArray(group.bannedUsers)) group.bannedUsers = [];
     if (!Array.isArray(group.moderationLogs)) group.moderationLogs = [];
+    if (!Array.isArray(group.suggestions)) group.suggestions = [];
+    group.suggestions = group.suggestions
+      .map((item) => ({
+        suggestionId: Number(item?.suggestionId || 0),
+        text: String(item?.text || '').trim(),
+        createdBy: Number.isInteger(item?.createdBy) ? Number(item.createdBy) : null,
+        createdByName: String(item?.createdByName || '').trim(),
+        status: item?.status === 'closed' ? 'closed' : 'open',
+        votesUp: Array.isArray(item?.votesUp) ? item.votesUp.map(Number).filter(Number.isInteger) : [],
+        votesDown: Array.isArray(item?.votesDown) ? item.votesDown.map(Number).filter(Number.isInteger) : [],
+        createdAt: item?.createdAt || new Date(),
+        closedAt: item?.closedAt || null
+      }))
+      .filter((item) => item.suggestionId > 0 && item.text);
+    if (group.suggestions.length > 200) group.suggestions = group.suggestions.slice(0, 200);
     if (!group.statistics) group.statistics = {};
     if (!Number.isInteger(group.statistics.messagesCount)) group.statistics.messagesCount = 0;
 
@@ -329,6 +348,9 @@ class GroupAdminHandler {
       '• رفع/تنزيل استثناء | المستثنئين\n' +
       '• عدد الرتب\n' +
       '• تفعيل/تعطيل مغادره المشرفين\n\n' +
+      '• /gwelcome إدارة الترحيب\n' +
+      '• /gsuggest نظام الاقتراحات\n' +
+      '• /gfaq الردود التلقائية\n\n' +
       '• ضع كليشه عضو\n' +
       '• ضع كليشه مشرف\n' +
       '• رفع عضو مثالي\n' +
@@ -411,6 +433,9 @@ class GroupAdminHandler {
       '• رفع/تنزيل استثناء | المستثنئين\n' +
       '• عدد الرتب\n' +
       '• تفعيل/تعطيل مغادره المشرفين\n\n' +
+      '• /gwelcome إدارة الترحيب\n' +
+      '• /gsuggest نظام الاقتراحات\n' +
+      '• /gfaq الردود التلقائية\n\n' +
       '• ضع كليشه عضو\n' +
       '• ضع كليشه مشرف\n' +
       '• رفع عضو مثالي\n' +
@@ -1385,6 +1410,219 @@ class GroupAdminHandler {
     return true;
   }
 
+  static renderWelcomeTemplate(template, user, chat) {
+    const safeTemplate = String(template || '').trim() || '👋 أهلًا {name} في {group}\n🆔 {id}';
+    const name = user?.first_name || user?.username || String(user?.id || 'عضو');
+    const username = user?.username ? `@${user.username}` : '';
+    const groupName = chat?.title || 'المجموعة';
+    const userId = String(user?.id || '');
+    return safeTemplate
+      .replace(/\{name\}/g, name)
+      .replace(/\{username\}/g, username)
+      .replace(/\{group\}/g, groupName)
+      .replace(/\{id\}/g, userId)
+      .slice(0, 4000);
+  }
+
+  static async handleWelcomeCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return false;
+    const isAdmin = await this.isGroupAdmin(ctx);
+    if (!isAdmin) {
+      await ctx.reply('❌ أوامر الترحيب للمشرفين فقط.');
+      return true;
+    }
+
+    const group = await this.ensureGroupRecord(ctx);
+    this.normalizeGroupState(group);
+    const rawText = String(ctx.message?.text || '').trim();
+    const slashMatch = rawText.match(/^\/gwelcome(?:@\w+)?(?:\s+(.+))?$/i);
+
+    if (/^تفعيل الترحيب$/i.test(rawText) || (slashMatch && /^on$/i.test(String(slashMatch[1] || '').trim()))) {
+      group.settings.welcomeEnabled = true;
+      await this.addModerationLog(group, 'welcome_toggle', ctx.from.id, null, 'on');
+      await group.save();
+      await ctx.reply('✅ تم تفعيل رسالة الترحيب.');
+      return true;
+    }
+
+    if (/^تعطيل الترحيب$/i.test(rawText) || (slashMatch && /^off$/i.test(String(slashMatch[1] || '').trim()))) {
+      group.settings.welcomeEnabled = false;
+      await this.addModerationLog(group, 'welcome_toggle', ctx.from.id, null, 'off');
+      await group.save();
+      await ctx.reply('✅ تم تعطيل رسالة الترحيب.');
+      return true;
+    }
+
+    const setArabic = rawText.match(/^رسالة الترحيب\s+([\s\S]+)$/i);
+    const setSlash = slashMatch && /^set\s+/i.test(String(slashMatch[1] || '').trim())
+      ? String(slashMatch[1] || '').trim().replace(/^set\s+/i, '')
+      : '';
+    if (setArabic || setSlash) {
+      const template = String(setArabic ? setArabic[1] : setSlash).trim();
+      if (!template) {
+        await ctx.reply('❌ اكتب نص رسالة الترحيب.');
+        return true;
+      }
+      group.settings.welcomeTemplate = template.slice(0, 2000);
+      await this.addModerationLog(group, 'welcome_template', ctx.from.id, null, 'updated');
+      await group.save();
+      await ctx.reply('✅ تم تحديث رسالة الترحيب.\nالمتغيرات المتاحة: {name} {username} {group} {id}');
+      return true;
+    }
+
+    if (/^(عرض الترحيب|معاينة الترحيب)$/i.test(rawText) || (slashMatch && /^(show|preview)$/i.test(String(slashMatch[1] || '').trim()))) {
+      const preview = this.renderWelcomeTemplate(group.settings.welcomeTemplate, ctx.from, ctx.chat);
+      await ctx.reply(
+        `🧩 حالة الترحيب: ${group.settings.welcomeEnabled ? '✅ مفعل' : '❌ معطل'}\n\n` +
+          `📄 القالب الحالي:\n${group.settings.welcomeTemplate}\n\n` +
+          `🔎 معاينة:\n${preview}`
+      );
+      return true;
+    }
+
+    if (/^\/gwelcome(?:@\w+)?$/i.test(rawText) || /^الترحيب$/i.test(rawText)) {
+      await ctx.reply(
+        '👋 إعدادات الترحيب\n\n' +
+          '• تفعيل الترحيب\n' +
+          '• تعطيل الترحيب\n' +
+          '• رسالة الترحيب أهلًا {name} في {group}\n' +
+          '• عرض الترحيب\n\n' +
+          '• /gwelcome on\n' +
+          '• /gwelcome off\n' +
+          '• /gwelcome set أهلًا {name} في {group}\n' +
+          '• /gwelcome show'
+      );
+      return true;
+    }
+
+    return false;
+  }
+
+  static suggestionKeyboard(item, canClose) {
+    const up = Array.isArray(item?.votesUp) ? item.votesUp.length : 0;
+    const down = Array.isArray(item?.votesDown) ? item.votesDown.length : 0;
+    const rows = [[
+      Markup.button.callback(`👍 ${up}`, `group:suggest:up:${item.suggestionId}`),
+      Markup.button.callback(`👎 ${down}`, `group:suggest:down:${item.suggestionId}`)
+    ]];
+    if (canClose && item?.status === 'open') {
+      rows.push([Markup.button.callback('🛑 إغلاق الاقتراح', `group:suggest:close:${item.suggestionId}`)]);
+    }
+    return Markup.inlineKeyboard(rows);
+  }
+
+  static formatSuggestionCard(item) {
+    const up = Array.isArray(item?.votesUp) ? item.votesUp.length : 0;
+    const down = Array.isArray(item?.votesDown) ? item.votesDown.length : 0;
+    const statusLabel = item?.status === 'closed' ? '🔒 مغلق' : '🟢 مفتوح';
+    return (
+      `💡 <b>اقتراح #${item.suggestionId}</b>\n\n` +
+      `${item.text}\n\n` +
+      `👤 بواسطة: ${item.createdByName || item.createdBy || 'عضو'}\n` +
+      `📌 الحالة: ${statusLabel}\n` +
+      `👍 ${up} | 👎 ${down}`
+    );
+  }
+
+  static nextSuggestionId(group) {
+    const max = (group.suggestions || []).reduce((m, item) => Math.max(m, Number(item?.suggestionId || 0)), 0);
+    return max + 1;
+  }
+
+  static async handleSuggestionCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return false;
+    const group = await this.ensureGroupRecord(ctx);
+    this.normalizeGroupState(group);
+    const rawText = String(ctx.message?.text || '').trim();
+    const slashMatch = rawText.match(/^\/gsuggest(?:@\w+)?(?:\s+([\s\S]+))?$/i);
+
+    if (/^(?:الاقتراحات|عرض الاقتراحات)$/i.test(rawText) || (slashMatch && /^(list|ls)$/i.test(String(slashMatch[1] || '').trim()))) {
+      const list = (group.suggestions || []).slice(0, 10);
+      if (list.length === 0) {
+        await ctx.reply('ℹ️ لا توجد اقتراحات بعد.');
+        return true;
+      }
+      const rows = list.map((item) => {
+        const up = Array.isArray(item.votesUp) ? item.votesUp.length : 0;
+        const down = Array.isArray(item.votesDown) ? item.votesDown.length : 0;
+        return `#${item.suggestionId} | ${item.status === 'open' ? 'مفتوح' : 'مغلق'} | 👍${up} 👎${down}\n${item.text}`;
+      });
+      await ctx.reply(`📋 آخر الاقتراحات\n\n${rows.join('\n\n')}`);
+      return true;
+    }
+
+    const closeArabic = rawText.match(/^اغلاق اقتراح\s+(\d+)$/i);
+    const closeSlash = slashMatch && /^close\s+(\d+)$/i.test(String(slashMatch[1] || '').trim())
+      ? parseInt(String(slashMatch[1] || '').trim().replace(/^close\s+/i, ''), 10)
+      : null;
+    if (closeArabic || closeSlash) {
+      const isAdmin = await this.isGroupAdmin(ctx);
+      if (!isAdmin) {
+        await ctx.reply('❌ إغلاق الاقتراحات للمشرفين فقط.');
+        return true;
+      }
+      const id = closeArabic ? parseInt(closeArabic[1], 10) : closeSlash;
+      const target = group.suggestions.find((x) => Number(x.suggestionId) === Number(id));
+      if (!target) {
+        await ctx.reply('❌ رقم الاقتراح غير موجود.');
+        return true;
+      }
+      target.status = 'closed';
+      target.closedAt = new Date();
+      await this.addModerationLog(group, 'suggestion_close', ctx.from.id, null, `suggestion#${id}`);
+      await group.save();
+      await ctx.reply(`✅ تم إغلاق الاقتراح #${id}.`);
+      return true;
+    }
+
+    const addArabic = rawText.match(/^اقتراح\s+([\s\S]+)$/i);
+    const addSlash = slashMatch && !/^(list|ls|close\s+\d+)$/i.test(String(slashMatch[1] || '').trim())
+      ? String(slashMatch[1] || '').trim()
+      : '';
+    if (addArabic || addSlash) {
+      const text = String(addArabic ? addArabic[1] : addSlash).trim();
+      if (!text) {
+        await ctx.reply('❌ اكتب نص الاقتراح بعد الأمر.');
+        return true;
+      }
+      const item = {
+        suggestionId: this.nextSuggestionId(group),
+        text: text.slice(0, 1000),
+        createdBy: Number(ctx.from?.id || 0) || null,
+        createdByName: ctx.from?.first_name || ctx.from?.username || String(ctx.from?.id || ''),
+        status: 'open',
+        votesUp: [],
+        votesDown: [],
+        createdAt: new Date()
+      };
+      group.suggestions.unshift(item);
+      if (group.suggestions.length > 200) group.suggestions = group.suggestions.slice(0, 200);
+      await this.addModerationLog(group, 'suggestion_add', ctx.from.id, null, `suggestion#${item.suggestionId}`);
+      await group.save();
+      const isAdmin = await this.isGroupAdmin(ctx);
+      await ctx.reply(this.formatSuggestionCard(item), {
+        parse_mode: 'HTML',
+        reply_markup: this.suggestionKeyboard(item, isAdmin).reply_markup
+      });
+      return true;
+    }
+
+    if (/^\/gsuggest(?:@\w+)?$/i.test(rawText) || /^اقتراحات$/i.test(rawText)) {
+      await ctx.reply(
+        '💡 نظام الاقتراحات\n\n' +
+          '• اقتراح نص الفكرة\n' +
+          '• الاقتراحات\n' +
+          '• اغلاق اقتراح 12 (للمشرف)\n\n' +
+          '• /gsuggest اكتب هنا فكرة\n' +
+          '• /gsuggest list\n' +
+          '• /gsuggest close 12'
+      );
+      return true;
+    }
+
+    return false;
+  }
+
   static async canManageGroupTemplates(ctx, groupId, userId) {
     const group = await Group.findOne({ groupId: String(groupId) });
     if (!group) return { ok: false, message: '❌ لم يتم العثور على بيانات الجروب.' };
@@ -1806,6 +2044,60 @@ class GroupAdminHandler {
       return this.handleAdminStatsReveal(ctx, token);
     }
 
+    if (data.startsWith('group:suggest:')) {
+      const [, , action, suggestionIdRaw] = data.split(':');
+      const suggestionId = parseInt(suggestionIdRaw || '', 10);
+      if (!Number.isInteger(suggestionId) || suggestionId <= 0) {
+        return ctx.answerCbQuery('رقم اقتراح غير صحيح', { show_alert: false }).catch(() => {});
+      }
+
+      const group = await this.ensureGroupRecord(ctx);
+      this.normalizeGroupState(group);
+      const item = (group.suggestions || []).find((x) => Number(x.suggestionId) === Number(suggestionId));
+      if (!item) {
+        return ctx.answerCbQuery('الاقتراح غير موجود', { show_alert: false }).catch(() => {});
+      }
+
+      if (action === 'close') {
+        const isAdmin = await this.isGroupAdmin(ctx);
+        if (!isAdmin) {
+          return ctx.answerCbQuery('إغلاق الاقتراح للمشرفين فقط', { show_alert: false }).catch(() => {});
+        }
+        item.status = 'closed';
+        item.closedAt = new Date();
+        await this.addModerationLog(group, 'suggestion_close', ctx.from.id, null, `suggestion#${suggestionId}`);
+        await group.save();
+      } else if (action === 'up' || action === 'down') {
+        if (item.status !== 'open') {
+          return ctx.answerCbQuery('هذا الاقتراح مغلق', { show_alert: false }).catch(() => {});
+        }
+        const userId = Number(ctx.from?.id || 0);
+        item.votesUp = Array.isArray(item.votesUp) ? item.votesUp : [];
+        item.votesDown = Array.isArray(item.votesDown) ? item.votesDown : [];
+        item.votesUp = item.votesUp.filter((id) => Number(id) !== userId);
+        item.votesDown = item.votesDown.filter((id) => Number(id) !== userId);
+        if (action === 'up') item.votesUp.push(userId);
+        if (action === 'down') item.votesDown.push(userId);
+        await group.save();
+      } else {
+        return ctx.answerCbQuery('إجراء غير معروف', { show_alert: false }).catch(() => {});
+      }
+
+      const canClose = await this.isGroupAdmin(ctx);
+      const card = this.formatSuggestionCard(item);
+      const keyboard = this.suggestionKeyboard(item, canClose);
+      try {
+        await ctx.editMessageText(card, {
+          parse_mode: 'HTML',
+          reply_markup: keyboard.reply_markup
+        });
+      } catch (_error) {
+        // ignore edit errors
+      }
+      await ctx.answerCbQuery('✅ تم التحديث', { show_alert: false }).catch(() => {});
+      return;
+    }
+
     await ctx.answerCbQuery('❌ إجراء غير معروف', { show_alert: false });
   }
 
@@ -1820,13 +2112,30 @@ class GroupAdminHandler {
       const user = update?.new_chat_member?.user || update?.old_chat_member?.user;
       if (!user?.id) return;
 
+      const group = await Group.findOneAndUpdate(
+        { groupId: String(chat.id) },
+        {
+          $set: {
+            groupTitle: chat.title || 'Unknown Group',
+            groupType: chat.type || 'group',
+            updatedAt: new Date()
+          },
+          $setOnInsert: { createdAt: new Date() }
+        },
+        { upsert: true, new: true }
+      );
+      if (!group) return;
+      this.normalizeGroupState(group);
+
+      const joinedNow = ['left', 'kicked'].includes(oldStatus) && ['member', 'administrator', 'creator'].includes(newStatus);
+      if (joinedNow && user.id !== ctx.botInfo?.id && group.settings?.welcomeEnabled) {
+        const welcome = this.renderWelcomeTemplate(group.settings?.welcomeTemplate, user, chat);
+        await ctx.telegram.sendMessage(chat.id, welcome).catch(() => null);
+      }
+
       const wasAdmin = ['administrator', 'creator'].includes(oldStatus);
       const leftNow = ['left', 'kicked'].includes(newStatus);
       if (!wasAdmin || !leftNow) return;
-
-      const group = await Group.findOne({ groupId: String(chat.id) });
-      if (!group) return;
-      this.normalizeGroupState(group);
       if (!group.settings.notifyAdminLeave) return;
 
       const owners = new Set();
@@ -1911,6 +2220,14 @@ class GroupAdminHandler {
     }
     if (/^(تفعيل مغادره المشرفين|تعطيل مغادره المشرفين|\/gadminleave\b)/i.test(rawText)) {
       await this.handleAdminLeaveToggle(ctx);
+      return true;
+    }
+    if (/^(تفعيل الترحيب|تعطيل الترحيب|رسالة الترحيب|عرض الترحيب|معاينة الترحيب|الترحيب|\/gwelcome\b)/i.test(rawText)) {
+      await this.handleWelcomeCommand(ctx);
+      return true;
+    }
+    if (/^(اقتراح\s+.+|الاقتراحات|عرض الاقتراحات|اغلاق اقتراح\s+\d+|اقتراحات|\/gsuggest\b)/i.test(rawText)) {
+      await this.handleSuggestionCommand(ctx);
       return true;
     }
     if (/^(?:اضف رد|أضف رد|حذف رد|الردود|عرض الردود|مسح الردود|\/gfaq\b)/i.test(rawText)) {
