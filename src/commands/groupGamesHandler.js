@@ -477,6 +477,65 @@ class GroupGamesHandler {
     };
   }
 
+  static buildLevelsKeyboard() {
+    return Markup.inlineKeyboard([
+      [
+        Markup.button.callback('🥉 البرونزي', 'group:levels:bronze'),
+        Markup.button.callback('🥈 الفضي', 'group:levels:silver')
+      ],
+      [
+        Markup.button.callback('🥇 الذهبي', 'group:levels:gold'),
+        Markup.button.callback('🏆 البلاتيني', 'group:levels:platinum')
+      ],
+      [
+        Markup.button.callback('💎 الماسي', 'group:levels:diamond')
+      ]
+    ]);
+  }
+
+  static async handleLevelsCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const group = await this.ensureGroupRecord(ctx);
+    const row = this.getOrCreateScoreRow(group, ctx.from);
+    const tier = this.resolveTierFromXp(row.xp || 0);
+    const next = this.nextTierFromXp(row.xp || 0);
+    const rewards = this.getTierUpRewards(group);
+    await group.save();
+
+    const text =
+      '🏅 <b>لوحة المستويات</b>\n\n' +
+      `مستواك الحالي: ${tier.icon} <b>${tier.name}</b>\n` +
+      `XP الحالي: ${row.xp || 0}\n` +
+      `${next ? `التالي: ${next.icon} ${next.name} (متبقي ${next.remainingXp} XP)\n` : 'وصلت أعلى مستوى (الماسي) 👑\n'}` +
+      '\n🎁 <b>مكافآت الترقية:</b>\n' +
+      `• فضي: +${rewards.silver}\n` +
+      `• ذهبي: +${rewards.gold}\n` +
+      `• بلاتيني: +${rewards.platinum}\n` +
+      `• ماسي: +${rewards.diamond}\n\n` +
+      'اضغط على أي مستوى لعرض التفاصيل.';
+
+    return ctx.reply(text, { parse_mode: 'HTML', reply_markup: this.buildLevelsKeyboard().reply_markup });
+  }
+
+  static async handleLevelsAction(ctx, levelKey) {
+    if (!this.isGroupChat(ctx)) return;
+    await ctx.answerCbQuery().catch(() => {});
+    const map = {
+      bronze: { icon: '🥉', name: 'البرونزي', min: 0, max: 99, perks: ['بداية التقدم', 'دخول كل ألعاب الجروب'] },
+      silver: { icon: '🥈', name: 'الفضي', min: 100, max: 249, perks: ['مكافأة ترقية تلقائية', 'فرص أسرع للصعود بالترتيب'] },
+      gold: { icon: '🥇', name: 'الذهبي', min: 250, max: 499, perks: ['مكافأة ترقية أعلى', 'ظهور أقوى في المتصدرين'] },
+      platinum: { icon: '🏆', name: 'البلاتيني', min: 500, max: 899, perks: ['مكافأة ترقية كبيرة', 'مكانة قوية في الجروب'] },
+      diamond: { icon: '💎', name: 'الماسي', min: 900, max: '∞', perks: ['أعلى مستوى', 'أقوى مكافأة ترقية'] }
+    };
+    const x = map[String(levelKey || '').toLowerCase()];
+    if (!x) return;
+    const text =
+      `${x.icon} <b>مستوى ${x.name}</b>\n\n` +
+      `نطاق XP: <b>${x.min} - ${x.max}</b>\n` +
+      `المزايا:\n• ${x.perks.join('\n• ')}`;
+    return ctx.reply(text, { parse_mode: 'HTML' });
+  }
+
   static getOrCreateScoreRow(group, user) {
     const userId = Number(user.id);
     let row = group.gameSystem.scores.find((s) => Number(s.userId) === userId);
@@ -1836,6 +1895,7 @@ class GroupGamesHandler {
     if (action === 'gleader') return this.handleLeaderCommand(ctx);
     if (action === 'gweekly') return this.handleWeeklyCommand(ctx);
     if (action === 'gmonth') return this.handleMonthlyBoardCommand(ctx);
+    if (action === 'glevels') return this.handleLevelsCommand(ctx);
     return null;
   }
 
@@ -1848,50 +1908,45 @@ class GroupGamesHandler {
       [Markup.button.callback('⚡ سرعة الكتابة', 'group:games:gtype'), Markup.button.callback('⚔️ تحدي عضوين', 'group:games:gduel')],
       [Markup.button.callback('🎲 روليت', 'group:games:gchance'), Markup.button.callback('📊 تصويت', 'group:games:gvote')],
       [Markup.button.callback('🧠 تحدي يومي', 'group:games:gdaily'), Markup.button.callback('🏁 المتصدرين', 'group:games:gleader')],
-      [Markup.button.callback('📅 سباق الأسبوع', 'group:games:gweekly'), Markup.button.callback('🗓️ سباق الشهر', 'group:games:gmonth')]
+      [Markup.button.callback('📅 سباق الأسبوع', 'group:games:gweekly'), Markup.button.callback('🗓️ سباق الشهر', 'group:games:gmonth')],
+      [Markup.button.callback('🏅 لوحة المستويات', 'group:games:glevels')]
     ]);
     return ctx.reply(
-      '🎮 <b>ألعاب الجروب التفاعلية</b>\n\n' +
-      '• /gquiz سؤال سريع\n' +
-      'مثال: <code>/gquiz دينية 30</code>\n' +
-      'مثال: <code>/gquiz علمية 25</code>\n' +
-      '• /gmath تحدي حساب ذهني\n' +
-      '• /gword ترتيب كلمة\n' +
-      '• /gwho لعبة مين أنا\n' +
-      '• /griddle ألغاز ذكية\n' +
-      '• /gtype سرعة كتابة (10 ث)\n' +
-      '• /chance روليت أوامر\n' +
-      '• /gduel @user تحدي عضوين\n' +
-      '• /gdaily تحدي يومي\n' +
-      '• /gmcq سؤال اختيارات بأزرار\n' +
-      'مثال: <code>/gmcq رياضية 25</code>\n' +
-      'مثال: <code>/gmcq علمية 20</code>\n' +
-      '• /gvote تصويت تفاعلي (مؤقت)\n' +
-      'صيغة مخصصة: <code>/gvote 120 | السؤال | خيار1 | خيار2 | خيار3</code>\n' +
-      '• /gquizset 5 سلسلة QuizBot\n' +
-      '• /gquizset 7 hard دينية 30\n' +
-      '• /gquizset stop إيقاف السلسلة\n' +
-      '• /gleader لوحة المتصدرين\n' +
-      '• /gweekly سباق الأسبوع\n' +
-      '• /gmonth سباق الشهر\n' +
-      '• /gprofile ملفك داخل الجروب\n' +
-      '• /gstore متجر الألقاب\n' +
-      '• /gbuy شراء لقب\n' +
-      '• /ggifts قائمة الهدايا\n' +
-      '• /ggift إرسال هدية لعضو\n' +
-      '• /gmonthly صرف المكافأة الشهرية (للمشرفين)\n' +
-      '• /gbonus ضبط مكافآت الترقية (للمشرفين)\n' +
-      '• /ggame إعدادات نظام الألعاب (للمشرفين)\n' +
-      '• /gteam إدارة فريقك\n' +
-      '• /gteams ترتيب الفرق\n' +
-      '• /gtour إدارة البطولة الأسبوعية (للمشرفين)\n\n' +
-      'الأنواع: <code>ثقافية</code> | <code>دينية</code> | <code>رياضية</code> | <code>علمية</code>\n' +
-      'الوقت: أضف الثواني مثل <code>30</code>\n' +
-      'مستويات الصعوبة: <code>easy</code> | <code>medium</code> | <code>hard</code>\n\n' +
-      'النقاط: كل إجابة صحيحة = <b>1 نقطة</b>\n' +
-      'يوجد نظام Level / XP / ألقاب / ترتيب أسبوعي + شهري + مكافأة شهرية.\n' +
-      'المستويات: برونزي (0-99) | فضي (100-249) | ذهبي (250-499) | بلاتيني (500-899) | ماسي (900+)\n' +
-      'نمط الكويز الآن يعمل بأسلوب Quiz Poll مثل QuizBot.',
+      '🎮 <b>مساعدة ألعاب الجروب (موحّدة)</b>\n\n' +
+      '<b>أولًا: الأوامر السريعة</b>\n' +
+      '• /gquiz | سؤال سريع\n' +
+      '• /gmcq | سؤال اختيارات\n' +
+      '• /gmath | حساب ذهني\n' +
+      '• /gword | ترتيب كلمة\n' +
+      '• /gwho | مين أنا\n' +
+      '• /griddle | ألغاز\n' +
+      '• /gtype | سرعة الكتابة\n' +
+      '• /chance | روليت\n' +
+      '• /gduel @user | تحدي عضوين\n' +
+      '• /gvote | تصويت\n' +
+      '• /gdaily | تحدي يومي\n\n' +
+      '<b>ثانيًا: النظام والترتيب</b>\n' +
+      '• /gleader | إجمالي المتصدرين\n' +
+      '• /gweekly | سباق الأسبوع\n' +
+      '• /gmonth | سباق الشهر\n' +
+      '• /glevels | لوحة المستويات\n' +
+      '• /gprofile | ملفك في الجروب\n' +
+      '• /gmonthly | صرف المكافأة الشهرية (مشرف)\n' +
+      '• /gbonus 10 20 35 60 | مكافآت الترقية (مشرف)\n\n' +
+      '<b>ثالثًا: المتجر والهدايا</b>\n' +
+      '• /gstore | متجر الجروب\n' +
+      '• /gbuy key | شراء عنصر\n' +
+      '• /ggifts | قائمة الهدايا\n' +
+      '• /ggift key @user [count] | إرسال هدية\n\n' +
+      '<b>رابعًا: إدارة متقدمة</b>\n' +
+      '• /ggame | إعدادات ألعاب الجروب\n' +
+      '• /gquizset 5 | سلسلة كويز\n' +
+      '• /gteam | فريقك\n' +
+      '• /gteams | ترتيب الفرق\n' +
+      '• /gtour | البطولة الأسبوعية (مشرف)\n\n' +
+      '<b>أوامر عربية بدون سلاش</b>\n' +
+      'العاب الجروب | مين انا | الغاز | سرعة الكتابة | روليت | متصدرين | اسبوعي | متصدرين الشهر | ملفي | متجر الجروب | الهدايا\n\n' +
+      'النقاط: كل إجابة صحيحة = <b>1 نقطة</b>.',
       { parse_mode: 'HTML', reply_markup: keyboard.reply_markup }
     );
   }
