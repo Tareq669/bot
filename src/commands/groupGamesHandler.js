@@ -200,16 +200,70 @@ const WHO_AM_I_BANK = [
   { clues: ['قائد مسلم', 'فتح القدس', 'اسمه صلاح'], answers: ['صلاح الدين', 'صلاح الدين الايوبي'] },
   { clues: ['اخترع المصباح العملي', 'مخترع أمريكي'], answers: ['توماس اديسون', 'اديسون'] },
   { clues: ['كوكب أحمر', 'رابع كوكب من الشمس'], answers: ['المريخ'] },
-  { clues: ['سورة هي أم الكتاب', 'أول سورة في المصحف'], answers: ['الفاتحة', 'سورة الفاتحة'] }
+  { clues: ['سورة هي أم الكتاب', 'أول سورة في المصحف'], answers: ['الفاتحة', 'سورة الفاتحة'] },
+  { clues: ['أول الخلفاء الراشدين', 'اسمه عبد الله بن أبي قحافة', 'صديق النبي'], answers: ['ابو بكر', 'أبو بكر', 'ابو بكر الصديق'] },
+  { clues: ['ثاني الخلفاء الراشدين', 'لقبه الفاروق', 'اشتهر بالعدل'], answers: ['عمر', 'عمر بن الخطاب'] },
+  { clues: ['مدينة فلسطينية ساحلية', 'تسمى عروس البحر', 'فيها ميناء مشهور'], answers: ['يافا'] },
+  { clues: ['كوكب ضخم غازي', 'أكبر كوكب', 'اسمه يبدأ بحرف الميم'], answers: ['المشتري'] },
+  { clues: ['نبي كلّمه الله مباشرة', 'تلقى الألواح', 'من أولي العزم'], answers: ['موسى', 'موسى عليه السلام'] },
+  { clues: ['العاصمة الأردنية', 'مدينة سبعة جبال', 'اسمها من 4 حروف'], answers: ['عمان'] },
+  { clues: ['عنصر كيميائي رمزه Au', 'فلز ثمين', 'يستخدم بالحُلي'], answers: ['الذهب'] },
+  { clues: ['شهر الصيام', 'تزاد فيه العبادة', 'يأتي قبل شوال'], answers: ['رمضان'] },
+  { clues: ['أكبر محيط', 'يقع بين آسيا وأمريكا', 'اسمه يدل على السكون'], answers: ['المحيط الهادي', 'الهادي'] },
+  { clues: ['لغة البرازيل', 'ليست إسبانية', 'لغة أوروبية'], answers: ['البرتغالية', 'برتغالية'] },
+  { clues: ['مدينة فيها المسجد الأقصى', 'أولى القبلتين', 'عاصمة تاريخية'], answers: ['القدس'] },
+  { clues: ['مخترع الهاتف', 'اسكتلندي الأصل', 'لقبه بيل'], answers: ['الكسندر جراهام بيل', 'غراهام بيل', 'بيل'] },
+  { clues: ['نبي بُعث في مصر', 'اشتهر بتأويل الرؤى', 'دخل السجن ظلمًا'], answers: ['يوسف', 'يوسف عليه السلام'] },
+  { clues: ['قارة تضم مصر', 'ثاني أكبر قارات العالم', 'اسمها يبدأ بألف'], answers: ['افريقيا', 'أفريقيا'] },
+  { clues: ['عدد أركان الإسلام', 'أكثر من أربعة', 'أقل من ستة'], answers: ['5', 'خمسة'] },
+  { clues: ['حيوان سفينة الصحراء', 'يصبر على العطش', 'له سنام'], answers: ['الجمل'] },
+  { clues: ['عاصمة فرنسا', 'مدينة النور', 'برج إيفل فيها'], answers: ['باريس'] },
+  { clues: ['أقرب كوكب للشمس', 'صغير الحجم', 'سريع الدوران'], answers: ['عطارد'] },
+  { clues: ['أول مسجد بُني في الإسلام', 'في المدينة', 'اسمه من 4 أحرف'], answers: ['قباء', 'مسجد قباء'] },
+  { clues: ['عنصر نتنفسه', 'رمزه O', 'ضروري للحياة'], answers: ['الاكسجين', 'الأكسجين'] },
+  { clues: ['دولة عاصمتها أنقرة', 'بين آسيا وأوروبا', 'لغة أهلها التركية'], answers: ['تركيا'] },
+  { clues: ['كاتب مسرحيات شهير', 'إنجليزي', 'من أعماله هاملت'], answers: ['شكسبير', 'ويليام شكسبير'] },
+  { clues: ['أكبر قارة', 'فيها الصين والهند', 'شرق العالم'], answers: ['اسيا', 'آسيا'] },
+  { clues: ['سورة قصيرة جدًا', 'تعدل ثلث القرآن', 'تبدأ بـ قل هو الله'], answers: ['الاخلاص', 'الإخلاص', 'سورة الإخلاص'] }
 ];
 const RIDDLE_BANK = [
   { question: 'شيء كلما أخذت منه كبر، ما هو؟', answers: ['الحفرة', 'حفره'] },
   { question: 'يرى كل شيء وليس له عيون، ما هو؟', answers: ['المرآة', 'المراه'] },
   { question: 'بيت بلا أبواب ولا نوافذ، ما هو؟', answers: ['البيضة', 'بيضه'] },
   { question: 'ما الكلمة التي تبطل معناها إذا نطقنا بها؟', answers: ['الصمت'] },
-  { question: 'يمشي بلا قدمين ويبكي بلا عينين، ما هو؟', answers: ['السحاب', 'الغيوم', 'الغيم'] }
+  { question: 'يمشي بلا قدمين ويبكي بلا عينين، ما هو؟', answers: ['السحاب', 'الغيوم', 'الغيم'] },
+  { question: 'له أوراق وليس نباتًا، ما هو؟', answers: ['الكتاب'] },
+  { question: 'شيء إذا دخل الماء لا يبتل، ما هو؟', answers: ['الضوء'] },
+  { question: 'ما الذي يُكسر دون أن يُمس؟', answers: ['الوعد'] },
+  { question: 'ما الذي يزيد كلما نقص؟', answers: ['العمر'] },
+  { question: 'ما الشيء الذي له أسنان ولا يعض؟', answers: ['المشط'] },
+  { question: 'شيء في السماء وإذا أضفت له حرفًا أصبح في الأرض، ما هو؟', answers: ['نجم', 'منجم'] },
+  { question: 'ما الشيء الذي يكتب ولا يقرأ؟', answers: ['القلم'] },
+  { question: 'ما الشيء الذي يقرصك ولا تراه؟', answers: ['الجوع'] },
+  { question: 'ما الشيء الذي كلما مشى فقد جزءًا من ذيله؟', answers: ['الابرة', 'الإبرة'] },
+  { question: 'شيء لا يدخل إلا إذا ضُرب على رأسه، ما هو؟', answers: ['المسمار'] },
+  { question: 'أين البحر الذي لا يوجد فيه ماء؟', answers: ['الخريطة', 'الخريطه'] },
+  { question: 'ما الذي يجري ولا يمشي؟', answers: ['الماء', 'النهر'] },
+  { question: 'ما الذي له رأس ولا عين له؟', answers: ['الدبوس'] },
+  { question: 'ما الشيء الذي إذا لمسته صاح؟', answers: ['الجرس'] },
+  { question: 'له عين واحدة ولا يرى، ما هو؟', answers: ['الابرة', 'الإبرة'] },
+  { question: 'أخضر في الأرض، أسود في السوق، أحمر في البيت، ما هو؟', answers: ['الشاي'] },
+  { question: 'ما الشيء الذي يحمل قنطارًا ولا يحمل مسمارًا؟', answers: ['البحر'] },
+  { question: 'ما هو الشيء الذي كل الناس يحتاجونه لكنه لا يأكل؟', answers: ['الملعقة'] },
+  { question: 'شيء موجود في كل بيت، إذا أكل لا يشبع، ما هو؟', answers: ['النار'] },
+  { question: 'شيء نأكله قبل أن يولد، ما هو؟', answers: ['البيض', 'البيضة', 'بيضه'] },
+  { question: 'شيء كلما زاد نقص، ما هو؟', answers: ['العمر'] },
+  { question: 'شيء من الزجاج يخترق الحديد ولا ينكسر، ما هو؟', answers: ['الضوء'] },
+  { question: 'حيوان إذا جاع أكل أولاده، ما هو؟', answers: ['الاسد', 'الأسد'] },
+  { question: 'ما الذي ينام ولا يقوم؟', answers: ['النار'] }
 ];
-const TYPING_WORDS = ['فلسطين', 'المتسابق', 'البرمجة', 'التحدي', 'الذكاء', 'الإنجاز', 'السرعة'];
+const TYPING_WORDS = [
+  'فلسطين', 'المتسابق', 'البرمجة', 'التحدي', 'الذكاء', 'الإنجاز', 'السرعة', 'التركيز', 'التعاون', 'الاستمرارية',
+  'المنافسة', 'النجاح', 'الإبداع', 'الاجتهاد', 'التفكير', 'المعلومة', 'المهارة', 'الخبرة', 'القراءة', 'المعرفة',
+  'الرياضيات', 'الفيزياء', 'الكيمياء', 'الأحياء', 'التاريخ', 'الجغرافيا', 'الابتكار', 'الهدف', 'المستوى', 'المتفوق',
+  'الامتحان', 'المنطق', 'الاستنتاج', 'المحاولة', 'المرونة', 'الالتزام', 'التخطيط', 'التطوير', 'التحفيز', 'المبادرة',
+  'الذكريات', 'النهضة', 'الازدهار', 'التوازن', 'الوضوح', 'الدقة', 'السرعة_العالية', 'التحديات', 'الاحتراف', 'المجد'
+];
 const CHANCE_CHALLENGES = [
   'اكتب نكتة قصيرة في سطر واحد',
   'أرسل 3 إيموجي تعبّر عن مزاجك الآن',
@@ -239,6 +293,7 @@ class GroupGamesHandler {
   static activeDuelByChat = new Map();
   static lastQuestionByGroup = new Map();
   static questionQueues = new Map();
+  static userCooldowns = new Map();
 
   static isGroupChat(ctx) {
     return GROUP_TYPES.has(ctx?.chat?.type);
@@ -264,6 +319,17 @@ class GroupGamesHandler {
 
   static token(prefix = 'x') {
     return `${prefix}${Math.random().toString(36).slice(2, 8)}`;
+  }
+
+  static checkCooldown(ctx, key = 'global', ms = 1200) {
+    const userId = Number(ctx?.from?.id || 0);
+    if (!userId) return false;
+    const k = `${userId}:${key}`;
+    const now = Date.now();
+    const until = this.userCooldowns.get(k) || 0;
+    if (until > now) return true;
+    this.userCooldowns.set(k, now + ms);
+    return false;
   }
 
   static normalizeText(value) {
@@ -491,6 +557,71 @@ class GroupGamesHandler {
         Markup.button.callback('💎 الماسي', 'group:levels:diamond')
       ]
     ]);
+  }
+
+  static buildQuickStartKeyboard() {
+    return Markup.inlineKeyboard([
+      [
+        Markup.button.callback('❓ سؤال سريع', 'group:quick:quiz'),
+        Markup.button.callback('🎯 مين أنا', 'group:quick:who')
+      ],
+      [
+        Markup.button.callback('🧠 ألغاز', 'group:quick:riddle'),
+        Markup.button.callback('⚡ سرعة', 'group:quick:typing')
+      ],
+      [
+        Markup.button.callback('⚔️ تحدي', 'group:quick:duel'),
+        Markup.button.callback('🎲 روليت', 'group:quick:chance')
+      ],
+      [
+        Markup.button.callback('👤 ملفي', 'group:quick:profile'),
+        Markup.button.callback('🏁 المتصدرين', 'group:quick:leader')
+      ],
+      [
+        Markup.button.callback('🏅 المستويات', 'group:quick:levels'),
+        Markup.button.callback('🛒 المتجر', 'group:quick:store')
+      ],
+      [
+        Markup.button.callback('🎁 الهدايا', 'group:quick:gifts'),
+        Markup.button.callback('📘 مساعدة', 'group:quick:help')
+      ]
+    ]);
+  }
+
+  static async handleQuickStart(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    return ctx.reply(
+      '🚀 <b>القائمة السريعة للجروب</b>\n\n' +
+      'اختر من الأزرار مباشرة.\n' +
+      'لأبسط تجربة: استخدم فقط\n' +
+      '• لعب\n' +
+      '• ملفي\n' +
+      '• متصدرين',
+      { parse_mode: 'HTML', reply_markup: this.buildQuickStartKeyboard().reply_markup }
+    );
+  }
+
+  static async handleQuickAction(ctx, action) {
+    if (!this.isGroupChat(ctx)) return;
+    if (this.checkCooldown(ctx, `quick:${action}`, 1500)) {
+      if (ctx.callbackQuery) await ctx.answerCbQuery('تمهّل ثانية...', { show_alert: false }).catch(() => {});
+      return;
+    }
+    if (ctx.callbackQuery) await ctx.answerCbQuery().catch(() => {});
+
+    if (action === 'quiz') return this.handleQuizCommand(ctx);
+    if (action === 'who') return this.handleWhoAmICommand(ctx);
+    if (action === 'riddle') return this.handleRiddleCommand(ctx);
+    if (action === 'typing') return this.handleTypingCommand(ctx);
+    if (action === 'duel') return ctx.reply('⚔️ للتحدي: اكتب\n/gduel @username\nأو: تحدي @username');
+    if (action === 'chance') return this.handleChanceCommand(ctx);
+    if (action === 'profile') return this.handleGroupProfileCommand(ctx);
+    if (action === 'leader') return this.handleLeaderCommand(ctx);
+    if (action === 'levels') return this.handleLevelsCommand(ctx);
+    if (action === 'store') return this.handleStoreCommand(ctx);
+    if (action === 'gifts') return this.handleGiftCatalogCommand(ctx);
+    if (action === 'help') return this.handleGamesHelp(ctx);
+    return null;
   }
 
   static async handleLevelsCommand(ctx) {
@@ -1879,6 +2010,10 @@ class GroupGamesHandler {
 
   static async handleGamesMenuAction(ctx, action) {
     if (!this.isGroupChat(ctx)) return;
+    if (this.checkCooldown(ctx, `menu:${action}`, 1200)) {
+      if (ctx.callbackQuery) await ctx.answerCbQuery('تمهّل ثانية...', { show_alert: false }).catch(() => {});
+      return;
+    }
     if (ctx.callbackQuery) await ctx.answerCbQuery().catch(() => {});
 
     if (action === 'gquiz') return this.handleQuizCommand(ctx);

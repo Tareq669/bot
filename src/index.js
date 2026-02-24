@@ -118,7 +118,7 @@ const GROUP_ONLY_COMMANDS = new Set([
   'gadminstats', 'gprint', 'greasons', 'gbasic', 'gexceptions', 'granks', 'gdetect', 'gonline', 'gadminleave',
   'gtemplate_member', 'gtemplate_admin', 'gideal_member', 'gideal_admin', 'gshow_ideal_member', 'gshow_ideal_admin',
   'gquiz', 'gmath', 'gword', 'gdaily', 'gmcq', 'gvote', 'gquizset', 'gleader', 'gweekly', 'ggame', 'ggames',
-  'gteam', 'gteams', 'gtour', 'gwho', 'griddle', 'gtype', 'chance', 'gduel', 'gstore', 'gbuy', 'ggifts', 'ggift', 'gprofile', 'gmonth', 'gmonthly', 'gbonus', 'glevels'
+  'g', 'gteam', 'gteams', 'gtour', 'gwho', 'griddle', 'gtype', 'chance', 'gduel', 'gstore', 'gbuy', 'ggifts', 'ggift', 'gprofile', 'gmonth', 'gmonthly', 'gbonus', 'glevels'
 ]);
 
 const PRIVATE_REPLY_BUTTONS = new Set([
@@ -230,6 +230,7 @@ Promise.all([
       { command: 'gideal_admin', description: 'رفع مشرف مثالي' },
       { command: 'gshow_ideal_member', description: 'عرض العضو المثالي' },
       { command: 'gshow_ideal_admin', description: 'عرض المشرف المثالي' },
+      { command: 'g', description: 'القائمة السريعة' },
       { command: 'gquiz', description: 'سؤال سريع للجروب' },
       { command: 'gmath', description: 'تحدي حساب ذهني' },
       { command: 'gword', description: 'ترتيب كلمة' },
@@ -370,6 +371,7 @@ bot.command('ggames', (ctx) => GroupGamesHandler.handleGamesHelp(ctx));
 bot.command('gteam', (ctx) => GroupGamesHandler.handleTeamCommand(ctx));
 bot.command('gteams', (ctx) => GroupGamesHandler.handleTeamsCommand(ctx));
 bot.command('gtour', (ctx) => GroupGamesHandler.handleTournamentCommand(ctx));
+bot.command('g', (ctx) => GroupGamesHandler.handleQuickStart(ctx));
 
 // --- COMMAND HANDLERS ---
 bot.command('profile', (ctx) => CommandHandler.handleProfile(ctx));
@@ -1413,6 +1415,7 @@ bot.action(/^group:mcq:([a-z0-9]+):(\d+)$/i, (ctx) => GroupGamesHandler.handleMc
 bot.action(/^group:vote:([a-z0-9]+):(\d+)$/i, (ctx) => GroupGamesHandler.handleVoteCallback(ctx, ctx.match[1], ctx.match[2]));
 bot.action(/^group:duel:(accept|decline):([a-z0-9]+)$/i, (ctx) => GroupGamesHandler.handleDuelAction(ctx, ctx.match[1], ctx.match[2]));
 bot.action(/^group:games:(gquiz|gmath|gword|gwho|griddle|gtype|gduel|gchance|gdaily|gmcq|gvote|gleader|gweekly|gmonth|glevels)$/i, (ctx) => GroupGamesHandler.handleGamesMenuAction(ctx, ctx.match[1].toLowerCase()));
+bot.action(/^group:quick:(quiz|who|riddle|typing|duel|chance|profile|leader|levels|store|gifts|help)$/i, (ctx) => GroupGamesHandler.handleQuickAction(ctx, ctx.match[1]));
 bot.action(/^group:levels:(bronze|silver|gold|platinum|diamond)$/i, (ctx) => GroupGamesHandler.handleLevelsAction(ctx, ctx.match[1]));
 bot.action(/^group:.+$/, (ctx) => GroupAdminHandler.handleGroupCallback(ctx));
 bot.on('poll_answer', (ctx) => GroupGamesHandler.handlePollAnswer(ctx));
@@ -2415,6 +2418,12 @@ bot.hears(/^(?:متصدرين\s*الشهر|سباق\s*الشهر)$/i, (ctx) => G
 bot.hears(/^(?:المستويات|لوحة\s*المستويات)$/i, (ctx) => GroupGamesHandler.handleLevelsCommand(ctx));
 bot.hears(/^مكافا(?:ة|ه)\s*شهرية$/i, (ctx) => GroupGamesHandler.handleMonthlyRewardCommand(ctx));
 bot.hears(/^مكافا(?:ت|ة)\s*المستوى(?:\s+\d+\s+\d+\s+\d+\s+\d+)?$/i, (ctx) => GroupGamesHandler.handleTierRewardsCommand(ctx));
+bot.hears(/^(?:لعب|ابدأ|ابدا|القائمة|قائمة|العاب)$/i, (ctx) => GroupGamesHandler.handleQuickStart(ctx));
+bot.hears(/^(?:مساعدة|ساعدني|الاوامر)$/i, (ctx) => GroupGamesHandler.handleGamesHelp(ctx));
+bot.hears(/^(?:متجر|المتجر)$/i, (ctx) => GroupGamesHandler.handleStoreCommand(ctx));
+bot.hears(/^(?:هدايا|هدية)$/i, (ctx) => GroupGamesHandler.handleGiftCatalogCommand(ctx));
+bot.hears(/^متصدرين$/i, (ctx) => GroupGamesHandler.handleLeaderCommand(ctx));
+bot.hears(/^ملفي$/i, (ctx) => GroupGamesHandler.handleGroupProfileCommand(ctx));
 bot.hears(/^(?:سؤال\s*سريع|كويز)$/i, (ctx) => GroupGamesHandler.handleQuizCommand(ctx));
 bot.hears(/^(?:حساب\s*ذهني|مسألة)$/i, (ctx) => GroupGamesHandler.handleMathCommand(ctx));
 bot.hears(/^(?:ترتيب\s*كلمة|رتب\s*كلمة)$/i, (ctx) => GroupGamesHandler.handleWordCommand(ctx));
@@ -2438,6 +2447,12 @@ bot.hears(/^\/(?:متصدرين_الشهر|سباق_الشهر)$/i, (ctx) => Gro
 bot.hears(/^\/(?:المستويات|لوحة_المستويات)$/i, (ctx) => GroupGamesHandler.handleLevelsCommand(ctx));
 bot.hears(/^\/(?:مكافاة_شهرية|مكافاه_شهرية)$/i, (ctx) => GroupGamesHandler.handleMonthlyRewardCommand(ctx));
 bot.hears(/^\/(?:مكافات_المستوى|مكافآت_المستوى)(?:\s+\d+\s+\d+\s+\d+\s+\d+)?$/i, (ctx) => GroupGamesHandler.handleTierRewardsCommand(ctx));
+bot.hears(/^\/(?:لعب|قائمة|ابدأ)$/i, (ctx) => GroupGamesHandler.handleQuickStart(ctx));
+bot.hears(/^\/(?:مساعدة|الاوامر)$/i, (ctx) => GroupGamesHandler.handleGamesHelp(ctx));
+bot.hears(/^\/(?:متجر|المتجر)$/i, (ctx) => GroupGamesHandler.handleStoreCommand(ctx));
+bot.hears(/^\/(?:هدايا|هدية)$/i, (ctx) => GroupGamesHandler.handleGiftCatalogCommand(ctx));
+bot.hears(/^\/(?:متصدرين)$/i, (ctx) => GroupGamesHandler.handleLeaderCommand(ctx));
+bot.hears(/^\/(?:ملفي)$/i, (ctx) => GroupGamesHandler.handleGroupProfileCommand(ctx));
 
 bot.action(/^xo:move:([a-z0-9]+):([0-8])$/i, (ctx) => ChatGamesUtilityHandler.handleXoAction(ctx));
 bot.action(/^xo:challenge:(accept|decline):([a-z0-9]+)$/i, (ctx) => ChatGamesUtilityHandler.handleXoChallengeAction(ctx));
