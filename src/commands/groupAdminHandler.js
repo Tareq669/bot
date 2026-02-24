@@ -353,7 +353,9 @@ class GroupAdminHandler {
       '• تفعيل/تعطيل مغادره المشرفين\n\n' +
       '• /gwelcome إدارة الترحيب\n' +
       '• /gsuggest نظام الاقتراحات\n' +
+      '• /gsuggestmenu لوحة الاقتراحات\n' +
       '• /gsuggeststats إحصائيات الاقتراحات\n' +
+      '• /gsuggesttop ترتيب الاقتراحات\n' +
       '• /gfaq الردود التلقائية\n\n' +
       '• ضع كليشه عضو\n' +
       '• ضع كليشه مشرف\n' +
@@ -439,7 +441,9 @@ class GroupAdminHandler {
       '• تفعيل/تعطيل مغادره المشرفين\n\n' +
       '• /gwelcome إدارة الترحيب\n' +
       '• /gsuggest نظام الاقتراحات\n' +
+      '• /gsuggestmenu لوحة الاقتراحات\n' +
       '• /gsuggeststats إحصائيات الاقتراحات\n' +
+      '• /gsuggesttop ترتيب الاقتراحات\n' +
       '• /gfaq الردود التلقائية\n\n' +
       '• ضع كليشه عضو\n' +
       '• ضع كليشه مشرف\n' +
@@ -1579,6 +1583,94 @@ class GroupAdminHandler {
     };
   }
 
+  static getSuggestionMonthStart() {
+    const now = new Date();
+    now.setDate(1);
+    now.setHours(0, 0, 0, 0);
+    return now;
+  }
+
+  static buildSuggestionMonthlyTop(group) {
+    const suggestions = Array.isArray(group?.suggestions) ? group.suggestions : [];
+    const monthStart = this.getSuggestionMonthStart();
+    const monthly = suggestions.filter((s) => new Date(s.createdAt || 0) >= monthStart);
+
+    const statsByUser = new Map();
+    const touch = (userId, nameHint = '') => {
+      const uid = Number(userId || 0);
+      if (!uid) return null;
+      if (!statsByUser.has(uid)) {
+        statsByUser.set(uid, {
+          userId: uid,
+          name: String(nameHint || ''),
+          suggestionsCount: 0,
+          votesCast: 0,
+          upReceived: 0,
+          downReceived: 0,
+          score: 0
+        });
+      }
+      const row = statsByUser.get(uid);
+      if (!row.name && nameHint) row.name = String(nameHint);
+      return row;
+    };
+
+    for (const s of monthly) {
+      const author = touch(s.createdBy, s.createdByName);
+      if (author) {
+        author.suggestionsCount += 1;
+        author.upReceived += Array.isArray(s.votesUp) ? s.votesUp.length : 0;
+        author.downReceived += Array.isArray(s.votesDown) ? s.votesDown.length : 0;
+      }
+      for (const voterId of (Array.isArray(s.votesUp) ? s.votesUp : [])) {
+        const voter = touch(voterId);
+        if (voter) voter.votesCast += 1;
+      }
+      for (const voterId of (Array.isArray(s.votesDown) ? s.votesDown : [])) {
+        const voter = touch(voterId);
+        if (voter) voter.votesCast += 1;
+      }
+    }
+
+    const rows = [...statsByUser.values()].map((row) => {
+      row.score = (row.suggestionsCount * 3) + row.votesCast + Math.max(0, row.upReceived - row.downReceived);
+      return row;
+    });
+    rows.sort((a, b) => b.score - a.score || b.suggestionsCount - a.suggestionsCount || b.votesCast - a.votesCast);
+
+    return {
+      monthlyCount: monthly.length,
+      top10: rows.slice(0, 10)
+    };
+  }
+
+  static suggestionMenuKeyboard() {
+    return Markup.inlineKeyboard([
+      [
+        Markup.button.callback('➕ إضافة اقتراح', 'group:suggestmenu:new'),
+        Markup.button.callback('📋 عرض الاقتراحات', 'group:suggestmenu:list')
+      ],
+      [
+        Markup.button.callback('📊 إحصائيات الأسبوع', 'group:suggestmenu:stats'),
+        Markup.button.callback('🏆 ترتيب الشهر', 'group:suggestmenu:top')
+      ]
+    ]);
+  }
+
+  static async handleSuggestionMenuCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return false;
+    await ctx.reply(
+      '💡 <b>لوحة الاقتراحات</b>\n\n' +
+        'اختر من الأزرار:\n' +
+        '• إضافة اقتراح جديد\n' +
+        '• عرض آخر الاقتراحات\n' +
+        '• إحصائيات هذا الأسبوع\n' +
+        '• ترتيب أفضل الأعضاء هذا الشهر',
+      { parse_mode: 'HTML', reply_markup: this.suggestionMenuKeyboard().reply_markup }
+    );
+    return true;
+  }
+
   static async handleSuggestionStatsCommand(ctx) {
     if (!this.isGroupChat(ctx)) return false;
     const group = await this.ensureGroupRecord(ctx);
@@ -1602,14 +1694,69 @@ class GroupAdminHandler {
     return true;
   }
 
+  static async handleSuggestionListCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return false;
+    const group = await this.ensureGroupRecord(ctx);
+    this.normalizeGroupState(group);
+    const list = (group.suggestions || []).slice(0, 10);
+    if (list.length === 0) {
+      await ctx.reply('ℹ️ لا توجد اقتراحات بعد.');
+      return true;
+    }
+    const rows = list.map((item) => {
+      const up = Array.isArray(item.votesUp) ? item.votesUp.length : 0;
+      const down = Array.isArray(item.votesDown) ? item.votesDown.length : 0;
+      return `#${item.suggestionId} | ${item.status === 'open' ? 'مفتوح' : 'مغلق'} | 👍${up} 👎${down}\n${item.text}`;
+    });
+    await ctx.reply(`📋 آخر الاقتراحات\n\n${rows.join('\n\n')}`);
+    return true;
+  }
+
+  static async handleSuggestionTopCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return false;
+    const group = await this.ensureGroupRecord(ctx);
+    this.normalizeGroupState(group);
+    const data = this.buildSuggestionMonthlyTop(group);
+
+    if (data.top10.length === 0) {
+      await ctx.reply('ℹ️ لا توجد بيانات اقتراحات لهذا الشهر بعد.');
+      return true;
+    }
+
+    const rows = data.top10.map((row, i) => {
+      const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
+      const display = row.name || `ID ${row.userId}`;
+      return (
+        `${medal} ${display}\n` +
+        `• اقتراحات: ${row.suggestionsCount} | تصويتات: ${row.votesCast}\n` +
+        `• دعم: +${row.upReceived} / -${row.downReceived}\n` +
+        `• النقاط: ${row.score}`
+      );
+    });
+
+    await ctx.reply(
+      `🏆 <b>أفضل 10 أعضاء - الاقتراحات والتصويت (شهري)</b>\n\n` +
+        `📦 إجمالي الاقتراحات هذا الشهر: ${data.monthlyCount}\n\n` +
+        `${rows.join('\n\n')}`,
+      { parse_mode: 'HTML' }
+    );
+    return true;
+  }
+
   static async handleSuggestionCommand(ctx) {
     if (!this.isGroupChat(ctx)) return false;
     const group = await this.ensureGroupRecord(ctx);
     this.normalizeGroupState(group);
     const rawText = String(ctx.message?.text || '').trim();
     const slashMatch = rawText.match(/^\/gsuggest(?:@\w+)?(?:\s+([\s\S]+))?$/i);
+    if (/^\/gsuggestmenu(?:@\w+)?$/i.test(rawText) || /^(?:قائمة الاقتراحات|لوحة الاقتراحات)$/i.test(rawText)) {
+      return this.handleSuggestionMenuCommand(ctx);
+    }
     if (/^\/gsuggeststats(?:@\w+)?$/i.test(rawText) || /^(?:احصائيات الاقتراحات|إحصائيات الاقتراحات|احصائيات الاقتراح|إحصائيات الاقتراح)$/i.test(rawText)) {
       return this.handleSuggestionStatsCommand(ctx);
+    }
+    if (/^\/gsuggesttop(?:@\w+)?$/i.test(rawText) || /^(?:ترتيب الاقتراحات|ترتيب الاقتراحات الشهري|ترتيب الشهر للاقتراحات)$/i.test(rawText)) {
+      return this.handleSuggestionTopCommand(ctx);
     }
 
     const setCooldownArabic = rawText.match(/^مهلة الاقتراح\s+(\d+)$/i);
@@ -1631,18 +1778,7 @@ class GroupAdminHandler {
     }
 
     if (/^(?:الاقتراحات|عرض الاقتراحات)$/i.test(rawText) || (slashMatch && /^(list|ls)$/i.test(String(slashMatch[1] || '').trim()))) {
-      const list = (group.suggestions || []).slice(0, 10);
-      if (list.length === 0) {
-        await ctx.reply('ℹ️ لا توجد اقتراحات بعد.');
-        return true;
-      }
-      const rows = list.map((item) => {
-        const up = Array.isArray(item.votesUp) ? item.votesUp.length : 0;
-        const down = Array.isArray(item.votesDown) ? item.votesDown.length : 0;
-        return `#${item.suggestionId} | ${item.status === 'open' ? 'مفتوح' : 'مغلق'} | 👍${up} 👎${down}\n${item.text}`;
-      });
-      await ctx.reply(`📋 آخر الاقتراحات\n\n${rows.join('\n\n')}`);
-      return true;
+      return this.handleSuggestionListCommand(ctx);
     }
 
     const closeArabic = rawText.match(/^اغلاق اقتراح\s+(\d+)$/i);
@@ -1737,12 +1873,16 @@ class GroupAdminHandler {
         '💡 نظام الاقتراحات\n\n' +
           '• اقتراح نص الفكرة\n' +
           '• الاقتراحات\n' +
+          '• قائمة الاقتراحات\n' +
           '• احصائيات الاقتراحات\n' +
+          '• ترتيب الاقتراحات\n' +
           '• مهلة الاقتراح 90 (للمشرف)\n' +
           '• اغلاق اقتراح 12 (للمشرف)\n\n' +
           '• /gsuggest اكتب هنا فكرة\n' +
+          '• /gsuggestmenu\n' +
           '• /gsuggest list\n' +
           '• /gsuggeststats\n' +
+          '• /gsuggesttop\n' +
           '• /gsuggest cooldown 90\n' +
           '• /gsuggest close 12'
       );
@@ -2227,6 +2367,24 @@ class GroupAdminHandler {
       return;
     }
 
+    if (data.startsWith('group:suggestmenu:')) {
+      const action = data.split(':')[2];
+      await ctx.answerCbQuery('✅', { show_alert: false }).catch(() => {});
+      if (action === 'new') {
+        return ctx.reply('✍️ أرسل اقتراحك هكذا:\nاقتراح نص الفكرة\nأو:\n/gsuggest نص الفكرة');
+      }
+      if (action === 'list') {
+        return this.handleSuggestionListCommand(ctx);
+      }
+      if (action === 'stats') {
+        return this.handleSuggestionStatsCommand(ctx);
+      }
+      if (action === 'top') {
+        return this.handleSuggestionTopCommand(ctx);
+      }
+      return;
+    }
+
     await ctx.answerCbQuery('❌ إجراء غير معروف', { show_alert: false });
   }
 
@@ -2355,7 +2513,7 @@ class GroupAdminHandler {
       await this.handleWelcomeCommand(ctx);
       return true;
     }
-    if (/^(اقتراح\s+.+|الاقتراحات|عرض الاقتراحات|اغلاق اقتراح\s+\d+|اقتراحات|احصائيات الاقتراحات|إحصائيات الاقتراحات|احصائيات الاقتراح|إحصائيات الاقتراح|مهلة الاقتراح\s+\d+|\/gsuggest\b|\/gsuggeststats\b)/i.test(rawText)) {
+    if (/^(اقتراح\s+.+|الاقتراحات|عرض الاقتراحات|اغلاق اقتراح\s+\d+|اقتراحات|احصائيات الاقتراحات|إحصائيات الاقتراحات|احصائيات الاقتراح|إحصائيات الاقتراح|ترتيب الاقتراحات|ترتيب الاقتراحات الشهري|ترتيب الشهر للاقتراحات|قائمة الاقتراحات|لوحة الاقتراحات|مهلة الاقتراح\s+\d+|\/gsuggest\b|\/gsuggeststats\b|\/gsuggesttop\b|\/gsuggestmenu\b)/i.test(rawText)) {
       await this.handleSuggestionCommand(ctx);
       return true;
     }

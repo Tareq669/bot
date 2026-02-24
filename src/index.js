@@ -117,7 +117,7 @@ const GROUP_ONLY_COMMANDS = new Set([
   'gmute', 'gunmute', 'gban', 'gunban', 'gclear', 'glogs', 'gpolicy', 'gprotect',
   'gadminstats', 'gprint', 'greasons', 'gbasic', 'gexceptions', 'granks', 'gdetect', 'gonline', 'gadminleave',
   'gtemplate_member', 'gtemplate_admin', 'gideal_member', 'gideal_admin', 'gshow_ideal_member', 'gshow_ideal_admin', 'gwelcome', 'gsuggest',
-  'gfaq', 'gsuggeststats', 'gquiz', 'gmath', 'gword', 'gdaily', 'gmcq', 'gvote', 'gquizset', 'gleader', 'gweekly', 'ggame', 'ggames',
+  'gfaq', 'gsuggestmenu', 'gsuggeststats', 'gsuggesttop', 'gquiz', 'gmath', 'gword', 'gdaily', 'gmcq', 'gvote', 'gquizset', 'gleader', 'gweekly', 'ggame', 'ggames',
   'g', 'gteam', 'gteams', 'gtour', 'gwho', 'griddle', 'gtype', 'chance', 'gduel', 'gstore', 'gbuy', 'ggifts', 'ggift', 'gprofile', 'gmonth', 'gmonthly', 'gbonus', 'glevels'
 ]);
 
@@ -227,7 +227,9 @@ Promise.all([
       { command: 'gadminleave', description: 'تنبيه مغادرة المشرفين' },
       { command: 'gwelcome', description: 'إعداد رسالة الترحيب' },
       { command: 'gsuggest', description: 'نظام الاقتراحات' },
+      { command: 'gsuggestmenu', description: 'لوحة الاقتراحات' },
       { command: 'gsuggeststats', description: 'إحصائيات الاقتراحات' },
+      { command: 'gsuggesttop', description: 'ترتيب الاقتراحات الشهري' },
       { command: 'gtemplate_member', description: 'إعداد كليشة عضو مثالي' },
       { command: 'gtemplate_admin', description: 'إعداد كليشة مشرف مثالي' },
       { command: 'gideal_member', description: 'رفع عضو مثالي' },
@@ -344,7 +346,9 @@ bot.command('gonline', (ctx) => GroupAdminHandler.handleOnlineToggle(ctx));
 bot.command('gadminleave', (ctx) => GroupAdminHandler.handleAdminLeaveToggle(ctx));
 bot.command('gwelcome', (ctx) => GroupAdminHandler.handleWelcomeCommand(ctx));
 bot.command('gsuggest', (ctx) => GroupAdminHandler.handleSuggestionCommand(ctx));
+bot.command('gsuggestmenu', (ctx) => GroupAdminHandler.handleSuggestionMenuCommand(ctx));
 bot.command('gsuggeststats', (ctx) => GroupAdminHandler.handleSuggestionStatsCommand(ctx));
+bot.command('gsuggesttop', (ctx) => GroupAdminHandler.handleSuggestionTopCommand(ctx));
 bot.command('gtemplate_member', (ctx) => GroupAdminHandler.handleTemplateSetupRequest(ctx, 'member'));
 bot.command('gtemplate_admin', (ctx) => GroupAdminHandler.handleTemplateSetupRequest(ctx, 'admin'));
 bot.command('gideal_member', (ctx) => GroupAdminHandler.handleIdealAssignCommand(ctx, 'member'));
