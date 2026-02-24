@@ -118,7 +118,7 @@ const GROUP_ONLY_COMMANDS = new Set([
   'gadminstats', 'gprint', 'greasons', 'gbasic', 'gexceptions', 'granks', 'gdetect', 'gonline', 'gadminleave',
   'gtemplate_member', 'gtemplate_admin', 'gideal_member', 'gideal_admin', 'gshow_ideal_member', 'gshow_ideal_admin',
   'gquiz', 'gmath', 'gword', 'gdaily', 'gmcq', 'gvote', 'gquizset', 'gleader', 'gweekly', 'ggame', 'ggames',
-  'gteam', 'gteams', 'gtour', 'gwho', 'griddle', 'gtype', 'chance', 'gduel', 'gstore', 'gbuy', 'ggifts', 'ggift', 'gprofile', 'gmonth', 'gmonthly'
+  'gteam', 'gteams', 'gtour', 'gwho', 'griddle', 'gtype', 'chance', 'gduel', 'gstore', 'gbuy', 'ggifts', 'ggift', 'gprofile', 'gmonth', 'gmonthly', 'gbonus'
 ]);
 
 const PRIVATE_REPLY_BUTTONS = new Set([
@@ -252,6 +252,7 @@ Promise.all([
       { command: 'gprofile', description: 'ملفك في الجروب' },
       { command: 'gmonth', description: 'متصدرين الشهر' },
       { command: 'gmonthly', description: 'صرف مكافأة شهرية' },
+      { command: 'gbonus', description: 'ضبط مكافآت الترقية' },
       { command: 'gteam', description: 'إدارة فريقك' },
       { command: 'gteams', description: 'ترتيب الفرق' },
       { command: 'gtour', description: 'إدارة البطولة الأسبوعية' }
@@ -356,6 +357,7 @@ bot.command('gleader', (ctx) => GroupGamesHandler.handleLeaderCommand(ctx));
 bot.command('gweekly', (ctx) => GroupGamesHandler.handleWeeklyCommand(ctx));
 bot.command('gmonth', (ctx) => GroupGamesHandler.handleMonthlyBoardCommand(ctx));
 bot.command('gmonthly', (ctx) => GroupGamesHandler.handleMonthlyRewardCommand(ctx));
+bot.command('gbonus', (ctx) => GroupGamesHandler.handleTierRewardsCommand(ctx));
 bot.command('gstore', (ctx) => GroupGamesHandler.handleStoreCommand(ctx));
 bot.command('gbuy', (ctx) => GroupGamesHandler.handleBuyCommand(ctx));
 bot.command('ggifts', (ctx) => GroupGamesHandler.handleGiftCatalogCommand(ctx));
@@ -2394,6 +2396,43 @@ bot.hears('🕌 الأذان', (ctx) => ChatGamesUtilityHandler.handleAdhanText(
 bot.hears(/^اكس\s*اوه$/i, (ctx) => ChatGamesUtilityHandler.handleXoStart(ctx));
 bot.hears(/^طقس(?:\s+(.+))?$/i, (ctx) => ChatGamesUtilityHandler.handleWeatherText(ctx, ctx.match[1]));
 bot.hears(/^(?:اذان|أذان)(?:\s+(.+))?$/i, (ctx) => ChatGamesUtilityHandler.handleAdhanText(ctx, ctx.match[1]));
+// Group Arabic aliases (without slash)
+bot.hears(/^العاب\s*الجروب$/i, (ctx) => GroupGamesHandler.handleGamesHelp(ctx));
+bot.hears(/^مين\s*انا$/i, (ctx) => GroupGamesHandler.handleWhoAmICommand(ctx));
+bot.hears(/^(?:الغاز|ألغاز|لغز)$/i, (ctx) => GroupGamesHandler.handleRiddleCommand(ctx));
+bot.hears(/^سرعة\s*الكتابة$/i, (ctx) => GroupGamesHandler.handleTypingCommand(ctx));
+bot.hears(/^روليت$/i, (ctx) => GroupGamesHandler.handleChanceCommand(ctx));
+bot.hears(/^تحدي(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleDuelCommand(ctx));
+bot.hears(/^متجر\s*الجروب$/i, (ctx) => GroupGamesHandler.handleStoreCommand(ctx));
+bot.hears(/^شراء(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleBuyCommand(ctx));
+bot.hears(/^(?:الهدايا|هدايا)$/i, (ctx) => GroupGamesHandler.handleGiftCatalogCommand(ctx));
+bot.hears(/^اهداء(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleGiftCommand(ctx));
+bot.hears(/^(?:ملفي|حسابي\s*بالجروب)$/i, (ctx) => GroupGamesHandler.handleGroupProfileCommand(ctx));
+bot.hears(/^(?:متصدرين\s*الشهر|سباق\s*الشهر)$/i, (ctx) => GroupGamesHandler.handleMonthlyBoardCommand(ctx));
+bot.hears(/^مكافا(?:ة|ه)\s*شهرية$/i, (ctx) => GroupGamesHandler.handleMonthlyRewardCommand(ctx));
+bot.hears(/^مكافا(?:ت|ة)\s*المستوى(?:\s+\d+\s+\d+\s+\d+\s+\d+)?$/i, (ctx) => GroupGamesHandler.handleTierRewardsCommand(ctx));
+bot.hears(/^(?:سؤال\s*سريع|كويز)$/i, (ctx) => GroupGamesHandler.handleQuizCommand(ctx));
+bot.hears(/^(?:حساب\s*ذهني|مسألة)$/i, (ctx) => GroupGamesHandler.handleMathCommand(ctx));
+bot.hears(/^(?:ترتيب\s*كلمة|رتب\s*كلمة)$/i, (ctx) => GroupGamesHandler.handleWordCommand(ctx));
+bot.hears(/^(?:تحدي\s*يومي|اليومي)$/i, (ctx) => GroupGamesHandler.handleDailyCommand(ctx));
+bot.hears(/^(?:اختيارات|اختبار)$/i, (ctx) => GroupGamesHandler.handleMcqCommand(ctx));
+bot.hears(/^(?:تصويت|صوت)$/i, (ctx) => GroupGamesHandler.handleVoteCommand(ctx));
+bot.hears(/^(?:متصدرين|الترتيب)$/i, (ctx) => GroupGamesHandler.handleLeaderCommand(ctx));
+bot.hears(/^(?:اسبوعي|سباق\s*الأسبوع|سباق\s*الاسبوع)$/i, (ctx) => GroupGamesHandler.handleWeeklyCommand(ctx));
+// Group Arabic slash aliases
+bot.hears(/^\/(?:مين_انا|مينانا)$/i, (ctx) => GroupGamesHandler.handleWhoAmICommand(ctx));
+bot.hears(/^\/(?:الغاز|الغاز_ذكية|لغز)$/i, (ctx) => GroupGamesHandler.handleRiddleCommand(ctx));
+bot.hears(/^\/(?:سرعة_الكتابة|سرعة)$/i, (ctx) => GroupGamesHandler.handleTypingCommand(ctx));
+bot.hears(/^\/(?:روليت|chance_ar)$/i, (ctx) => GroupGamesHandler.handleChanceCommand(ctx));
+bot.hears(/^\/(?:تحدي)(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleDuelCommand(ctx));
+bot.hears(/^\/(?:متجر_الجروب|المتجر)$/i, (ctx) => GroupGamesHandler.handleStoreCommand(ctx));
+bot.hears(/^\/(?:شراء)(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleBuyCommand(ctx));
+bot.hears(/^\/(?:هدايا|الهدايا)$/i, (ctx) => GroupGamesHandler.handleGiftCatalogCommand(ctx));
+bot.hears(/^\/(?:اهداء)(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleGiftCommand(ctx));
+bot.hears(/^\/(?:ملفي|ملفي_بالجروب)$/i, (ctx) => GroupGamesHandler.handleGroupProfileCommand(ctx));
+bot.hears(/^\/(?:متصدرين_الشهر|سباق_الشهر)$/i, (ctx) => GroupGamesHandler.handleMonthlyBoardCommand(ctx));
+bot.hears(/^\/(?:مكافاة_شهرية|مكافاه_شهرية)$/i, (ctx) => GroupGamesHandler.handleMonthlyRewardCommand(ctx));
+bot.hears(/^\/(?:مكافات_المستوى|مكافآت_المستوى)(?:\s+\d+\s+\d+\s+\d+\s+\d+)?$/i, (ctx) => GroupGamesHandler.handleTierRewardsCommand(ctx));
 
 bot.action(/^xo:move:([a-z0-9]+):([0-8])$/i, (ctx) => ChatGamesUtilityHandler.handleXoAction(ctx));
 bot.action(/^xo:challenge:(accept|decline):([a-z0-9]+)$/i, (ctx) => ChatGamesUtilityHandler.handleXoChallengeAction(ctx));

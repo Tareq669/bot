@@ -217,6 +217,13 @@ const CHANCE_CHALLENGES = [
   'اكتب دعاء قصير',
   'اذكر فائدة واحدة للقراءة'
 ];
+const LEVEL_TIERS = [
+  { index: 1, key: 'bronze', name: 'البرونزي', icon: '🥉', minXp: 0, maxXp: 99 },
+  { index: 2, key: 'silver', name: 'الفضي', icon: '🥈', minXp: 100, maxXp: 249 },
+  { index: 3, key: 'gold', name: 'الذهبي', icon: '🥇', minXp: 250, maxXp: 499 },
+  { index: 4, key: 'platinum', name: 'البلاتيني', icon: '🏆', minXp: 500, maxXp: 899 },
+  { index: 5, key: 'diamond', name: 'الماسي', icon: '💎', minXp: 900, maxXp: Number.MAX_SAFE_INTEGER }
+];
 
 class GroupGamesHandler {
   static bot = null;
@@ -401,6 +408,15 @@ class GroupGamesHandler {
     if (typeof group.gameSystem.settings.autoQuestions !== 'boolean') group.gameSystem.settings.autoQuestions = false;
     if (!Number.isInteger(group.gameSystem.settings.intervalMinutes)) group.gameSystem.settings.intervalMinutes = 15;
     if (!Number.isInteger(group.gameSystem.settings.questionTimeoutSec)) group.gameSystem.settings.questionTimeoutSec = 25;
+    if (!group.settings) group.settings = {};
+    if (!group.settings.tierUpRewards) {
+      group.settings.tierUpRewards = { silver: 10, gold: 20, platinum: 35, diamond: 60 };
+    } else {
+      if (!Number.isFinite(group.settings.tierUpRewards.silver)) group.settings.tierUpRewards.silver = 10;
+      if (!Number.isFinite(group.settings.tierUpRewards.gold)) group.settings.tierUpRewards.gold = 20;
+      if (!Number.isFinite(group.settings.tierUpRewards.platinum)) group.settings.tierUpRewards.platinum = 35;
+      if (!Number.isFinite(group.settings.tierUpRewards.diamond)) group.settings.tierUpRewards.diamond = 60;
+    }
 
     if (!group.gameSystem.state) group.gameSystem.state = {};
     if (!group.gameSystem.state.lastAutoAt) group.gameSystem.state.lastAutoAt = null;
@@ -415,8 +431,14 @@ class GroupGamesHandler {
       if (!Number.isFinite(row.weeklyPoints)) row.weeklyPoints = 0;
       if (!Number.isFinite(row.monthlyPoints)) row.monthlyPoints = 0;
       if (!Number.isFinite(row.xp)) row.xp = 0;
-      if (!Number.isFinite(row.level) || row.level < 1) row.level = 1;
-      if (!row.title) row.title = 'مبتدئ';
+      const tier = this.resolveTierFromXp(row.xp);
+      if (!Number.isFinite(row.level) || row.level < 1) row.level = tier.index;
+      if (!row.tier) row.tier = tier.name;
+      if (typeof row.customTitle !== 'boolean') row.customTitle = false;
+      const normalizedTitle = this.normalizeText(String(row.title || ''));
+      const isGenericTitle = !row.title || String(row.title || '') === 'مبتدئ' || normalizedTitle === this.normalizeText('مبتدئ');
+      if (!row.customTitle && isGenericTitle) row.title = `${tier.icon} ${tier.name}`;
+      if (!row.title) row.title = row.customTitle ? 'مبتدئ' : `${tier.icon} ${tier.name}`;
       if (!row.activeBoost) row.activeBoost = { multiplier: 1, expiresAt: null };
       if (!Number.isFinite(row.giftsSent)) row.giftsSent = 0;
       if (!Number.isFinite(row.giftsReceived)) row.giftsReceived = 0;
@@ -429,8 +451,30 @@ class GroupGamesHandler {
     return group;
   }
 
-  static levelFromXp(xp) {
-    return Math.max(1, Math.floor((Number(xp) || 0) / 25) + 1);
+  static getTierUpRewards(group) {
+    const defaults = { silver: 10, gold: 20, platinum: 35, diamond: 60 };
+    const cfg = group?.settings?.tierUpRewards || defaults;
+    return {
+      silver: Math.max(0, Number(cfg.silver) || defaults.silver),
+      gold: Math.max(0, Number(cfg.gold) || defaults.gold),
+      platinum: Math.max(0, Number(cfg.platinum) || defaults.platinum),
+      diamond: Math.max(0, Number(cfg.diamond) || defaults.diamond)
+    };
+  }
+
+  static resolveTierFromXp(xp) {
+    const value = Math.max(0, Number(xp) || 0);
+    return LEVEL_TIERS.find((t) => value >= t.minXp && value <= t.maxXp) || LEVEL_TIERS[0];
+  }
+
+  static nextTierFromXp(xp) {
+    const current = this.resolveTierFromXp(xp);
+    const next = LEVEL_TIERS.find((t) => t.index === current.index + 1) || null;
+    if (!next) return null;
+    return {
+      ...next,
+      remainingXp: Math.max(0, next.minXp - (Number(xp) || 0))
+    };
   }
 
   static getOrCreateScoreRow(group, user) {
@@ -445,7 +489,9 @@ class GroupGamesHandler {
         monthlyPoints: 0,
         xp: 0,
         level: 1,
-        title: 'مبتدئ',
+        tier: 'البرونزي',
+        title: '🥉 البرونزي',
+        customTitle: false,
         activeBoost: { multiplier: 1, expiresAt: null },
         giftsSent: 0,
         giftsReceived: 0,
@@ -465,12 +511,22 @@ class GroupGamesHandler {
 
   static awardXp(row, xpAmount) {
     const gain = Math.max(0, Number(xpAmount) || 0);
+    const oldTier = this.resolveTierFromXp(row.xp || 0);
     row.xp = (row.xp || 0) + gain;
-    const oldLevel = Number(row.level) || 1;
-    const newLevel = this.levelFromXp(row.xp);
-    row.level = newLevel;
-    if (newLevel >= 20 && (!row.title || row.title === 'مبتدئ')) row.title = '👑 أسطورة الجروب';
-    return { leveledUp: newLevel > oldLevel, oldLevel, newLevel };
+    const newTier = this.resolveTierFromXp(row.xp);
+    const oldLevel = Number(row.level) || oldTier.index;
+    row.level = newTier.index;
+    row.tier = newTier.name;
+    if (!row.customTitle) {
+      row.title = `${newTier.icon} ${newTier.name}`;
+    }
+    return {
+      leveledUp: newTier.index > oldTier.index,
+      oldLevel,
+      newLevel: newTier.index,
+      oldTier,
+      newTier
+    };
   }
 
   static resolveGiftByInput(input) {
@@ -704,9 +760,11 @@ class GroupGamesHandler {
 
     const rank = this.getUserRank(group, userId);
     const boostLine = scoreMeta.boostActive ? '\n🚀 تم تطبيق معزز النقاط' : '';
+    const tierLine = scoreMeta.tier ? `\n🏅 المستوى: ${scoreMeta.tier}` : '';
+    const tierBonusLine = scoreMeta.tierUpBonus > 0 ? `\n🎉 مكافأة ترقية +${scoreMeta.tierUpBonus}` : '';
     await this.bot.telegram.sendMessage(
       Number(state.chatId),
-      `✅ ${answer.user?.first_name || 'لاعب'} أجاب صحيحًا!\n💰 +${scoreMeta.finalReward} نقطة${boostLine}\n🏅 الترتيب: #${rank || '-'}`,
+      `✅ ${answer.user?.first_name || 'لاعب'} أجاب صحيحًا!\n💰 +${scoreMeta.finalReward} نقطة${boostLine}${tierBonusLine}${tierLine}\n🏅 الترتيب: #${rank || '-'}`,
       { parse_mode: 'HTML' }
     ).catch(() => {});
   }
@@ -738,7 +796,10 @@ class GroupGamesHandler {
         monthlyPoints: 0,
         xp: 0,
         level: 1,
-        title: 'مبتدئ',
+        tier: 'البرونزي',
+        title: '🥉 البرونزي',
+        customTitle: false,
+        activeBoost: { multiplier: 1, expiresAt: null },
         giftsSent: 0,
         giftsReceived: 0,
         giftInventory: [],
@@ -795,8 +856,21 @@ class GroupGamesHandler {
     row.lastWinDate = new Date();
 
     const streakBonus = 0;
+    const rewardsCfg = this.getTierUpRewards(group);
+    const tierBonusMap = {
+      2: rewardsCfg.silver,
+      3: rewardsCfg.gold,
+      4: rewardsCfg.platinum,
+      5: rewardsCfg.diamond
+    };
+    const tierUpBonus = progress.leveledUp ? (tierBonusMap[progress.newTier?.index] || 0) : 0;
+    if (tierUpBonus > 0) {
+      row.points = (row.points || 0) + tierUpBonus;
+      row.weeklyPoints = (row.weeklyPoints || 0) + tierUpBonus;
+      row.monthlyPoints = (row.monthlyPoints || 0) + tierUpBonus;
+    }
 
-    const finalReward = effectiveReward + streakBonus;
+    const finalReward = effectiveReward + streakBonus + tierUpBonus;
     if (group.gameSystem.tournament?.active) {
       const team = this.getUserTeam(group, userId);
       if (team) {
@@ -805,7 +879,16 @@ class GroupGamesHandler {
       }
     }
 
-    return { finalReward, streakBonus, streak: row.streak || 0, level: row.level || 1, leveledUp: progress.leveledUp, boostActive: multiplier > 1 };
+    return {
+      finalReward,
+      streakBonus,
+      tierUpBonus,
+      streak: row.streak || 0,
+      level: row.level || 1,
+      tier: row.tier || 'البرونزي',
+      leveledUp: progress.leveledUp,
+      boostActive: multiplier > 1
+    };
   }
 
   static async handleIncomingGroupText(ctx, text) {
@@ -845,12 +928,14 @@ class GroupGamesHandler {
     const team = this.getUserTeam(group, ctx.from.id);
     const hype = this.pickRandom(CELEBRATION_LINES);
     const bonusLine = scoreMeta.streakBonus > 0 ? `\n🔥 بونص ستريك +${scoreMeta.streakBonus}` : '';
+    const tierBonusLine = scoreMeta.tierUpBonus > 0 ? `\n🎉 مكافأة ترقية +${scoreMeta.tierUpBonus}` : '';
     const boostLine = scoreMeta.boostActive ? '\n🚀 معزز النقاط مفعل' : '';
+    const tierLine = scoreMeta.tier ? `\n🏅 المستوى: ${scoreMeta.tier}` : '';
     const teamLine = team ? `\n👥 فريقك: ${team.name} | نقاط الفريق: ${team.points || 0}` : '';
     const rankLine = rank ? `\n🏅 ترتيبك الحالي: #${rank}` : '';
 
     await ctx.reply(
-      `🏆 ${winner} فاز بالجولة!\n✅ الإجابة صحيحة: <b>${round.answers[0]}</b>\n💰 +${scoreMeta.finalReward} نقطة${bonusLine}${boostLine}\n🔥 الستريك: ${scoreMeta.streak}${rankLine}${teamLine}\n✨ ${hype}`,
+      `🏆 ${winner} فاز بالجولة!\n✅ الإجابة صحيحة: <b>${round.answers[0]}</b>\n💰 +${scoreMeta.finalReward} نقطة${bonusLine}${tierBonusLine}${boostLine}${tierLine}\n🔥 الستريك: ${scoreMeta.streak}${rankLine}${teamLine}\n✨ ${hype}`,
       { parse_mode: 'HTML' }
     );
     return true;
@@ -1112,7 +1197,9 @@ class GroupGamesHandler {
 
     const rank = this.getUserRank(group, ctx.from.id);
     const boostLine = scoreMeta.boostActive ? '\n🚀 معزز النقاط مفعل' : '';
-    await ctx.reply(`✅ <b>${ctx.from.first_name || 'عضو'}</b> أجاب صحيحًا!\n💰 +${scoreMeta.finalReward} نقطة${boostLine}\n🏅 ترتيبك: #${rank || '-'}`, { parse_mode: 'HTML' });
+    const tierLine = scoreMeta.tier ? `\n🏅 المستوى: ${scoreMeta.tier}` : '';
+    const tierBonusLine = scoreMeta.tierUpBonus > 0 ? `\n🎉 مكافأة ترقية +${scoreMeta.tierUpBonus}` : '';
+    await ctx.reply(`✅ <b>${ctx.from.first_name || 'عضو'}</b> أجاب صحيحًا!\n💰 +${scoreMeta.finalReward} نقطة${boostLine}${tierBonusLine}${tierLine}\n🏅 ترتيبك: #${rank || '-'}`, { parse_mode: 'HTML' });
   }
 
   static parseVoteCommand(text) {
@@ -1266,7 +1353,8 @@ class GroupGamesHandler {
     let text = '🏁 <b>متصدرين الجروب (إجمالي)</b>\n\n';
     rows.forEach((r, i) => {
       const name = r.username || r.userId;
-      text += `${i + 1}. ${name} — ${r.points || 0} نقطة | 🔥 ستريك ${r.streak || 0}\n`;
+      const tier = r.tier || this.resolveTierFromXp(r.xp || 0).name;
+      text += `${i + 1}. ${name} — ${r.points || 0} نقطة | ${tier} | 🔥 ${r.streak || 0}\n`;
     });
     return ctx.reply(text, { parse_mode: 'HTML' });
   }
@@ -1280,7 +1368,8 @@ class GroupGamesHandler {
     let text = '📅 <b>سباق الأسبوع</b>\n\n';
     rows.forEach((r, i) => {
       const name = r.username || r.userId;
-      text += `${i + 1}. ${name} — ${r.weeklyPoints || 0} نقطة\n`;
+      const tier = r.tier || this.resolveTierFromXp(r.xp || 0).name;
+      text += `${i + 1}. ${name} — ${r.weeklyPoints || 0} نقطة | ${tier}\n`;
     });
     return ctx.reply(text, { parse_mode: 'HTML' });
   }
@@ -1293,7 +1382,8 @@ class GroupGamesHandler {
     let text = '🗓️ <b>سباق الشهر</b>\n\n';
     rows.forEach((r, i) => {
       const name = r.username || r.userId;
-      text += `${i + 1}. ${name} — ${r.monthlyPoints || 0} نقطة\n`;
+      const tier = r.tier || this.resolveTierFromXp(r.xp || 0).name;
+      text += `${i + 1}. ${name} — ${r.monthlyPoints || 0} نقطة | ${tier}\n`;
     });
     return ctx.reply(text, { parse_mode: 'HTML' });
   }
@@ -1478,6 +1568,7 @@ class GroupGamesHandler {
     row.points -= item.price;
     if (item.type === 'title') {
       row.title = item.title;
+      row.customTitle = true;
     } else if (item.type === 'boost') {
       const mins = Math.max(5, Number(item.minutes) || 30);
       row.activeBoost = {
@@ -1498,6 +1589,8 @@ class GroupGamesHandler {
     const group = await this.ensureGroupRecord(ctx);
     const row = this.getOrCreateScoreRow(group, ctx.from);
     const rank = this.getUserRank(group, ctx.from.id) || '-';
+    const tier = row.tier || this.resolveTierFromXp(row.xp || 0).name;
+    const nextTier = this.nextTierFromXp(row.xp || 0);
     const gifts = (row.giftInventory || []).filter((g) => (g.count || 0) > 0)
       .slice(0, 6)
       .map((g) => `${g.name}×${g.count}`)
@@ -1509,7 +1602,8 @@ class GroupGamesHandler {
       `🏷️ اللقب: ${row.title || 'مبتدئ'}\n` +
       `💰 النقاط: ${row.points || 0}\n` +
       `⭐ XP: ${row.xp || 0}\n` +
-      `🎖️ المستوى: ${row.level || 1}\n` +
+      `🎖️ المستوى: ${tier}\n` +
+      `${nextTier ? `⏭️ القادم: ${nextTier.name} بعد ${nextTier.remainingXp} XP\n` : '👑 وصلت أعلى مستوى (الماسي)\n'}` +
       `🏁 ترتيبك: #${rank}\n` +
       `🎁 الهدايا: ${gifts}\n` +
       `📤 مرسل: ${row.giftsSent || 0} | 📥 مستلم: ${row.giftsReceived || 0}`,
@@ -1683,6 +1777,47 @@ class GroupGamesHandler {
     return ctx.reply(text, { parse_mode: 'HTML' });
   }
 
+  static async handleTierRewardsCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const isAdmin = await this.isGroupAdmin(ctx);
+    if (!isAdmin) return ctx.reply('❌ هذا الأمر للمشرفين فقط.');
+
+    const group = await this.ensureGroupRecord(ctx);
+    const args = this.parseCommandArgs(ctx);
+    const current = this.getTierUpRewards(group);
+    const numeric = args.map((x) => parseInt(String(x), 10)).filter((n) => Number.isInteger(n));
+
+    if (numeric.length < 4) {
+      return ctx.reply(
+        '🏅 <b>مكافآت الترقية الحالية</b>\n\n' +
+        `الفضي: +${current.silver}\n` +
+        `الذهبي: +${current.gold}\n` +
+        `البلاتيني: +${current.platinum}\n` +
+        `الماسي: +${current.diamond}\n\n` +
+        'للتعديل:\n' +
+        '<code>/gbonus 10 20 35 60</code>\n' +
+        'أو: <code>مكافآت المستوى 10 20 35 60</code>',
+        { parse_mode: 'HTML' }
+      );
+    }
+
+    const [silver, gold, platinum, diamond] = numeric.slice(0, 4);
+    const valid = [silver, gold, platinum, diamond].every((n) => Number.isInteger(n) && n >= 0);
+    if (!valid) return ctx.reply('❌ القيم يجب أن تكون أرقامًا صحيحة غير سالبة.');
+    if (!(silver <= gold && gold <= platinum && platinum <= diamond)) {
+      return ctx.reply('❌ يجب أن تكون القيم تصاعدية: فضي ≤ ذهبي ≤ بلاتيني ≤ ماسي.');
+    }
+
+    group.settings = group.settings || {};
+    group.settings.tierUpRewards = { silver, gold, platinum, diamond };
+    await group.save();
+
+    return ctx.reply(
+      '✅ تم تحديث مكافآت الترقية:\n' +
+      `الفضي +${silver} | الذهبي +${gold} | البلاتيني +${platinum} | الماسي +${diamond}`
+    );
+  }
+
   static async handleGamesMenuAction(ctx, action) {
     if (!this.isGroupChat(ctx)) return;
     if (ctx.callbackQuery) await ctx.answerCbQuery().catch(() => {});
@@ -1745,6 +1880,7 @@ class GroupGamesHandler {
       '• /ggifts قائمة الهدايا\n' +
       '• /ggift إرسال هدية لعضو\n' +
       '• /gmonthly صرف المكافأة الشهرية (للمشرفين)\n' +
+      '• /gbonus ضبط مكافآت الترقية (للمشرفين)\n' +
       '• /ggame إعدادات نظام الألعاب (للمشرفين)\n' +
       '• /gteam إدارة فريقك\n' +
       '• /gteams ترتيب الفرق\n' +
@@ -1754,6 +1890,7 @@ class GroupGamesHandler {
       'مستويات الصعوبة: <code>easy</code> | <code>medium</code> | <code>hard</code>\n\n' +
       'النقاط: كل إجابة صحيحة = <b>1 نقطة</b>\n' +
       'يوجد نظام Level / XP / ألقاب / ترتيب أسبوعي + شهري + مكافأة شهرية.\n' +
+      'المستويات: برونزي (0-99) | فضي (100-249) | ذهبي (250-499) | بلاتيني (500-899) | ماسي (900+)\n' +
       'نمط الكويز الآن يعمل بأسلوب Quiz Poll مثل QuizBot.',
       { parse_mode: 'HTML', reply_markup: keyboard.reply_markup }
     );

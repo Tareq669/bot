@@ -48,6 +48,24 @@ const groupSchema = new mongoose.Schema({
       type: Boolean,
       default: true
     },
+    tierUpRewards: {
+      silver: {
+        type: Number,
+        default: 10
+      },
+      gold: {
+        type: Number,
+        default: 20
+      },
+      platinum: {
+        type: Number,
+        default: 35
+      },
+      diamond: {
+        type: Number,
+        default: 60
+      }
+    },
     maxMessageLength: {
       type: Number,
       default: 700
@@ -214,9 +232,17 @@ const groupSchema = new mongoose.Schema({
           type: Number,
           default: 1
         },
+        tier: {
+          type: String,
+          default: '\u0628\u0631\u0648\u0646\u0632\u064a'
+        },
         title: {
           type: String,
-          default: 'مبتدئ'
+          default: '\u0645\u0628\u062a\u062f\u0626'
+        },
+        customTitle: {
+          type: Boolean,
+          default: false
         },
         activeBoost: {
           multiplier: {
