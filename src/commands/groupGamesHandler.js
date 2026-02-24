@@ -177,6 +177,46 @@ const DEFAULT_VOTE_TOPICS = [
 ];
 
 const CELEBRATION_LINES = ['إجابة ممتازة!', 'مستوى قوي!', 'رد سريع جدًا!', 'أداء احترافي!'];
+const GROUP_STORE = [
+  { key: 'warrior', title: '⚔️ المحارب', price: 40, type: 'title' },
+  { key: 'sage', title: '🧠 الحكيم', price: 60, type: 'title' },
+  { key: 'legend', title: '👑 الأسطورة', price: 120, type: 'title' },
+  { key: 'speedster', title: '⚡ السريع', price: 80, type: 'title' },
+  { key: 'boost2x', title: '🚀 معزز نقاط 2x (30 دقيقة)', price: 50, type: 'boost', multiplier: 2, minutes: 30 }
+];
+const MONTHLY_REWARDS = [120, 80, 50];
+const DUEL_STAKE = 3;
+const UNIQUE_GIFTS = [
+  { key: 'rose', name: '🌹 وردة', price: 2 },
+  { key: 'bouquet', name: '💐 باقة ورود', price: 6 },
+  { key: 'car', name: '🚗 سيارة', price: 35 },
+  { key: 'villa', name: '🏡 فيلا', price: 70 },
+  { key: 'house', name: '🏠 بيت', price: 45 },
+  { key: 'palace', name: '🏰 قصر', price: 120 },
+  { key: 'santa', name: '🎅 هدية بابا نويل', price: 18 }
+];
+const WHO_AM_I_BANK = [
+  { clues: ['نبي الله', 'ابتلعه الحوت', 'دعا في الظلمات'], answers: ['يونس', 'يونس عليه السلام'] },
+  { clues: ['قائد مسلم', 'فتح القدس', 'اسمه صلاح'], answers: ['صلاح الدين', 'صلاح الدين الايوبي'] },
+  { clues: ['اخترع المصباح العملي', 'مخترع أمريكي'], answers: ['توماس اديسون', 'اديسون'] },
+  { clues: ['كوكب أحمر', 'رابع كوكب من الشمس'], answers: ['المريخ'] },
+  { clues: ['سورة هي أم الكتاب', 'أول سورة في المصحف'], answers: ['الفاتحة', 'سورة الفاتحة'] }
+];
+const RIDDLE_BANK = [
+  { question: 'شيء كلما أخذت منه كبر، ما هو؟', answers: ['الحفرة', 'حفره'] },
+  { question: 'يرى كل شيء وليس له عيون، ما هو؟', answers: ['المرآة', 'المراه'] },
+  { question: 'بيت بلا أبواب ولا نوافذ، ما هو؟', answers: ['البيضة', 'بيضه'] },
+  { question: 'ما الكلمة التي تبطل معناها إذا نطقنا بها؟', answers: ['الصمت'] },
+  { question: 'يمشي بلا قدمين ويبكي بلا عينين، ما هو؟', answers: ['السحاب', 'الغيوم', 'الغيم'] }
+];
+const TYPING_WORDS = ['فلسطين', 'المتسابق', 'البرمجة', 'التحدي', 'الذكاء', 'الإنجاز', 'السرعة'];
+const CHANCE_CHALLENGES = [
+  'اكتب نكتة قصيرة في سطر واحد',
+  'أرسل 3 إيموجي تعبّر عن مزاجك الآن',
+  'جاوب: ما عاصمة الأردن؟',
+  'اكتب دعاء قصير',
+  'اذكر فائدة واحدة للقراءة'
+];
 
 class GroupGamesHandler {
   static bot = null;
@@ -188,6 +228,8 @@ class GroupGamesHandler {
   static activeQuizSeries = new Map();
   static activeVotes = new Map();
   static activeVoteByChat = new Map();
+  static activeDuels = new Map();
+  static activeDuelByChat = new Map();
   static lastQuestionByGroup = new Map();
   static questionQueues = new Map();
 
@@ -207,6 +249,10 @@ class GroupGamesHandler {
     const diff = Math.floor((date - start) / 86400000);
     const week = Math.ceil((diff + start.getUTCDay() + 1) / 7);
     return `${date.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
+  }
+
+  static getMonthKey(date = new Date()) {
+    return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
   }
 
   static token(prefix = 'x') {
@@ -360,13 +406,97 @@ class GroupGamesHandler {
     if (!group.gameSystem.state.lastAutoAt) group.gameSystem.state.lastAutoAt = null;
     if (!group.gameSystem.state.lastDailyKey) group.gameSystem.state.lastDailyKey = '';
     if (!group.gameSystem.state.weekKey) group.gameSystem.state.weekKey = this.getWeekKey();
+    if (!group.gameSystem.state.monthKey) group.gameSystem.state.monthKey = this.getMonthKey();
+    if (!group.gameSystem.state.lastMonthlyRewardKey) group.gameSystem.state.lastMonthlyRewardKey = '';
 
     if (!Array.isArray(group.gameSystem.scores)) group.gameSystem.scores = [];
+    group.gameSystem.scores.forEach((row) => {
+      if (!Number.isFinite(row.points)) row.points = 0;
+      if (!Number.isFinite(row.weeklyPoints)) row.weeklyPoints = 0;
+      if (!Number.isFinite(row.monthlyPoints)) row.monthlyPoints = 0;
+      if (!Number.isFinite(row.xp)) row.xp = 0;
+      if (!Number.isFinite(row.level) || row.level < 1) row.level = 1;
+      if (!row.title) row.title = 'مبتدئ';
+      if (!row.activeBoost) row.activeBoost = { multiplier: 1, expiresAt: null };
+      if (!Number.isFinite(row.giftsSent)) row.giftsSent = 0;
+      if (!Number.isFinite(row.giftsReceived)) row.giftsReceived = 0;
+      if (!Array.isArray(row.giftInventory)) row.giftInventory = [];
+    });
     if (!Array.isArray(group.gameSystem.teams)) group.gameSystem.teams = [];
     if (!group.gameSystem.tournament) group.gameSystem.tournament = { active: false, season: 1, startedAt: null, endedAt: null, rewards: { first: 100, second: 60, third: 40 } };
     if (!group.gameSystem.tournament.rewards) group.gameSystem.tournament.rewards = { first: 100, second: 60, third: 40 };
 
     return group;
+  }
+
+  static levelFromXp(xp) {
+    return Math.max(1, Math.floor((Number(xp) || 0) / 25) + 1);
+  }
+
+  static getOrCreateScoreRow(group, user) {
+    const userId = Number(user.id);
+    let row = group.gameSystem.scores.find((s) => Number(s.userId) === userId);
+    if (!row) {
+      row = {
+        userId,
+        username: user.username || user.first_name || String(userId),
+        points: 0,
+        weeklyPoints: 0,
+        monthlyPoints: 0,
+        xp: 0,
+        level: 1,
+        title: 'مبتدئ',
+        activeBoost: { multiplier: 1, expiresAt: null },
+        giftsSent: 0,
+        giftsReceived: 0,
+        giftInventory: [],
+        wins: 0,
+        streak: 0,
+        bestStreak: 0,
+        lastWinDate: null,
+        updatedAt: new Date()
+      };
+      group.gameSystem.scores.push(row);
+    }
+    row.username = user.username || user.first_name || String(userId);
+    if (!Array.isArray(row.giftInventory)) row.giftInventory = [];
+    return row;
+  }
+
+  static awardXp(row, xpAmount) {
+    const gain = Math.max(0, Number(xpAmount) || 0);
+    row.xp = (row.xp || 0) + gain;
+    const oldLevel = Number(row.level) || 1;
+    const newLevel = this.levelFromXp(row.xp);
+    row.level = newLevel;
+    if (newLevel >= 20 && (!row.title || row.title === 'مبتدئ')) row.title = '👑 أسطورة الجروب';
+    return { leveledUp: newLevel > oldLevel, oldLevel, newLevel };
+  }
+
+  static resolveGiftByInput(input) {
+    const raw = String(input || '').trim().toLowerCase();
+    if (!raw) return null;
+    return UNIQUE_GIFTS.find((g) => {
+      const aliases = [g.key, g.name, this.normalizeText(g.name)];
+      return aliases.some((x) => this.normalizeText(String(x)) === this.normalizeText(raw));
+    }) || null;
+  }
+
+  static resolveTargetUser(ctx, group, arg) {
+    const replyUser = ctx.message?.reply_to_message?.from;
+    if (replyUser && !replyUser.is_bot) return replyUser;
+
+    const raw = String(arg || '').trim();
+    if (!raw) return null;
+    if (/^\d+$/.test(raw)) {
+      const id = Number(raw);
+      const found = (group.gameSystem.scores || []).find((s) => Number(s.userId) === id);
+      return found ? { id, username: found.username, first_name: found.username } : { id, first_name: String(id) };
+    }
+    const clean = raw.replace(/^@/, '').toLowerCase();
+    const found = (group.gameSystem.scores || []).find((s) => String(s.username || '').replace(/^@/, '').toLowerCase() === clean);
+    if (!found) return null;
+    return { id: Number(found.userId), username: found.username, first_name: found.username };
   }
 
   static async isGroupAdmin(ctx, userId = null) {
@@ -431,7 +561,9 @@ class GroupGamesHandler {
       ...roundPayload,
       reward: 1,
       answersNorm: roundPayload.answers.map((a) => this.normalizeText(String(a))),
-      deadline
+      deadline,
+      allowedUserIds: Array.isArray(roundPayload.allowedUserIds) ? roundPayload.allowedUserIds.map((x) => Number(x)) : null,
+      onWin: typeof roundPayload.onWin === 'function' ? roundPayload.onWin : null
     });
 
     const sent = await this.bot.telegram.sendMessage(
@@ -479,6 +611,40 @@ class GroupGamesHandler {
     const word = this.pickRandom(WORDS);
     const shuffled = this.shuffleWord(word);
     return { type: 'word', prompt: `🔤 <b>ترتيب كلمة</b>\n\nرتّب هذه الأحرف: <b>${shuffled}</b>`, answers: [word], reward: 1, timeoutSec: 35 };
+  }
+
+  static buildWhoAmIRound() {
+    const q = this.pickRandom(WHO_AM_I_BANK);
+    const clues = this.shuffleArray(q.clues).slice(0, 3).map((c, i) => `${i + 1}) ${c}`).join('\n');
+    return {
+      type: 'whoami',
+      prompt: `🎯 <b>لعبة: مين أنا؟</b>\n\n${clues}\n\nأول شخص يكتب الإجابة الصحيحة يكسب 1 نقطة.`,
+      answers: q.answers,
+      reward: 1,
+      timeoutSec: 40
+    };
+  }
+
+  static buildRiddleRound() {
+    const q = this.pickRandom(RIDDLE_BANK);
+    return {
+      type: 'riddle',
+      prompt: `🧠 <b>لغز ذكي</b>\n\n${q.question}\n\nأول إجابة صحيحة = 1 نقطة.`,
+      answers: q.answers,
+      reward: 1,
+      timeoutSec: 45
+    };
+  }
+
+  static buildTypingRound() {
+    const word = this.pickRandom(TYPING_WORDS);
+    return {
+      type: 'typing',
+      prompt: `⚡ <b>سرعة الكتابة</b>\n\nاكتب الكلمة التالية خلال 10 ثواني:\n<b>${word}</b>`,
+      answers: [word],
+      reward: 1,
+      timeoutSec: 10
+    };
   }
 
   static async sendQuizPoll(chatId, question, reward, timeoutSec = 25) {
@@ -537,9 +703,10 @@ class GroupGamesHandler {
     await group.save();
 
     const rank = this.getUserRank(group, userId);
+    const boostLine = scoreMeta.boostActive ? '\n🚀 تم تطبيق معزز النقاط' : '';
     await this.bot.telegram.sendMessage(
       Number(state.chatId),
-      `✅ ${answer.user?.first_name || 'لاعب'} أجاب صحيحًا!\n💰 +${scoreMeta.finalReward} نقطة\n🏅 الترتيب: #${rank || '-'}`,
+      `✅ ${answer.user?.first_name || 'لاعب'} أجاب صحيحًا!\n💰 +${scoreMeta.finalReward} نقطة${boostLine}\n🏅 الترتيب: #${rank || '-'}`,
       { parse_mode: 'HTML' }
     ).catch(() => {});
   }
@@ -563,34 +730,59 @@ class GroupGamesHandler {
     if (!amount || amount <= 0) return;
     let row = group.gameSystem.scores.find((s) => Number(s.userId) === Number(userId));
     if (!row) {
-      row = { userId: Number(userId), username: String(userId), points: 0, weeklyPoints: 0, wins: 0, streak: 0, bestStreak: 0, lastWinDate: null, updatedAt: new Date() };
+      row = {
+        userId: Number(userId),
+        username: String(userId),
+        points: 0,
+        weeklyPoints: 0,
+        monthlyPoints: 0,
+        xp: 0,
+        level: 1,
+        title: 'مبتدئ',
+        giftsSent: 0,
+        giftsReceived: 0,
+        giftInventory: [],
+        wins: 0,
+        streak: 0,
+        bestStreak: 0,
+        lastWinDate: null,
+        updatedAt: new Date()
+      };
       group.gameSystem.scores.push(row);
     }
     row.points = (row.points || 0) + amount;
     row.weeklyPoints = (row.weeklyPoints || 0) + amount;
+    row.monthlyPoints = (row.monthlyPoints || 0) + amount;
+    this.awardXp(row, amount);
     row.updatedAt = new Date();
   }
 
   static async updateScore(group, user, reward) {
     this.normalizeGroupState(group);
     const weekKey = this.getWeekKey();
+    const monthKey = this.getMonthKey();
     if (group.gameSystem.state.weekKey !== weekKey) {
       group.gameSystem.state.weekKey = weekKey;
       group.gameSystem.scores.forEach((s) => { s.weeklyPoints = 0; });
     }
-
-    const userId = Number(user.id);
-    let row = group.gameSystem.scores.find((s) => Number(s.userId) === userId);
-    if (!row) {
-      row = { userId, username: user.username || user.first_name || String(user.id), points: 0, weeklyPoints: 0, wins: 0, streak: 0, bestStreak: 0, lastWinDate: null, updatedAt: new Date() };
-      group.gameSystem.scores.push(row);
+    if (group.gameSystem.state.monthKey !== monthKey) {
+      group.gameSystem.state.monthKey = monthKey;
+      group.gameSystem.scores.forEach((s) => { s.monthlyPoints = 0; });
     }
 
-    row.username = user.username || user.first_name || String(user.id);
-    row.points = (row.points || 0) + reward;
-    row.weeklyPoints = (row.weeklyPoints || 0) + reward;
+    const userId = Number(user.id);
+    const row = this.getOrCreateScoreRow(group, user);
+    const now = Date.now();
+    const boostActive = row.activeBoost?.expiresAt && new Date(row.activeBoost.expiresAt).getTime() > now;
+    const multiplier = boostActive ? Math.max(1, Number(row.activeBoost?.multiplier) || 1) : 1;
+    const effectiveReward = Math.max(1, Math.round(reward * multiplier));
+
+    row.points = (row.points || 0) + effectiveReward;
+    row.weeklyPoints = (row.weeklyPoints || 0) + effectiveReward;
+    row.monthlyPoints = (row.monthlyPoints || 0) + effectiveReward;
     row.wins = (row.wins || 0) + 1;
     row.updatedAt = new Date();
+    const progress = this.awardXp(row, effectiveReward);
 
     const todayKey = this.getDateKey();
     const yesterdayKey = this.getDateKey(new Date(Date.now() - 24 * 60 * 60 * 1000));
@@ -604,7 +796,7 @@ class GroupGamesHandler {
 
     const streakBonus = 0;
 
-    const finalReward = reward + streakBonus;
+    const finalReward = effectiveReward + streakBonus;
     if (group.gameSystem.tournament?.active) {
       const team = this.getUserTeam(group, userId);
       if (team) {
@@ -613,7 +805,7 @@ class GroupGamesHandler {
       }
     }
 
-    return { finalReward, streakBonus, streak: row.streak || 0 };
+    return { finalReward, streakBonus, streak: row.streak || 0, level: row.level || 1, leveledUp: progress.leveledUp, boostActive: multiplier > 1 };
   }
 
   static async handleIncomingGroupText(ctx, text) {
@@ -630,6 +822,11 @@ class GroupGamesHandler {
       return true;
     }
 
+    if (Array.isArray(round.allowedUserIds) && round.allowedUserIds.length > 0) {
+      const uid = Number(ctx.from?.id);
+      if (!round.allowedUserIds.includes(uid)) return false;
+    }
+
     const input = this.normalizeText(text);
     if (!round.answersNorm.includes(input)) return false;
 
@@ -638,6 +835,9 @@ class GroupGamesHandler {
     const scoreMeta = await this.updateScore(group, ctx.from, round.reward);
     if (round.type === 'daily') group.gameSystem.state.lastDailyKey = this.getDateKey();
     group.updatedAt = new Date();
+    if (typeof round.onWin === 'function') {
+      await round.onWin({ group, winnerId: Number(ctx.from.id), winnerUser: ctx.from });
+    }
     await group.save();
 
     const winner = ctx.from.first_name || ctx.from.username || String(ctx.from.id);
@@ -645,11 +845,12 @@ class GroupGamesHandler {
     const team = this.getUserTeam(group, ctx.from.id);
     const hype = this.pickRandom(CELEBRATION_LINES);
     const bonusLine = scoreMeta.streakBonus > 0 ? `\n🔥 بونص ستريك +${scoreMeta.streakBonus}` : '';
+    const boostLine = scoreMeta.boostActive ? '\n🚀 معزز النقاط مفعل' : '';
     const teamLine = team ? `\n👥 فريقك: ${team.name} | نقاط الفريق: ${team.points || 0}` : '';
     const rankLine = rank ? `\n🏅 ترتيبك الحالي: #${rank}` : '';
 
     await ctx.reply(
-      `🏆 ${winner} فاز بالجولة!\n✅ الإجابة صحيحة: <b>${round.answers[0]}</b>\n💰 +${scoreMeta.finalReward} نقطة${bonusLine}\n🔥 الستريك: ${scoreMeta.streak}${rankLine}${teamLine}\n✨ ${hype}`,
+      `🏆 ${winner} فاز بالجولة!\n✅ الإجابة صحيحة: <b>${round.answers[0]}</b>\n💰 +${scoreMeta.finalReward} نقطة${bonusLine}${boostLine}\n🔥 الستريك: ${scoreMeta.streak}${rankLine}${teamLine}\n✨ ${hype}`,
       { parse_mode: 'HTML' }
     );
     return true;
@@ -760,6 +961,31 @@ class GroupGamesHandler {
     const round = this.buildWordRound();
     round.timeoutSec = Math.max(10, status.group.gameSystem.settings.questionTimeoutSec || 25);
     await this.startRoundInternal(ctx.chat.id, round, false);
+  }
+
+  static async handleWhoAmICommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const status = await this.canStartRound(ctx);
+    if (!status.ok) return;
+    const round = this.buildWhoAmIRound();
+    round.timeoutSec = Math.max(12, status.group.gameSystem.settings.questionTimeoutSec || 25);
+    await this.startRoundInternal(ctx.chat.id, round, false);
+  }
+
+  static async handleRiddleCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const status = await this.canStartRound(ctx);
+    if (!status.ok) return;
+    const round = this.buildRiddleRound();
+    round.timeoutSec = Math.max(12, status.group.gameSystem.settings.questionTimeoutSec || 25);
+    await this.startRoundInternal(ctx.chat.id, round, false);
+  }
+
+  static async handleTypingCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const status = await this.canStartRound(ctx);
+    if (!status.ok) return;
+    await this.startRoundInternal(ctx.chat.id, this.buildTypingRound(), false);
   }
 
   static async handleDailyCommand(ctx) {
@@ -885,7 +1111,8 @@ class GroupGamesHandler {
     await group.save();
 
     const rank = this.getUserRank(group, ctx.from.id);
-    await ctx.reply(`✅ <b>${ctx.from.first_name || 'عضو'}</b> أجاب صحيحًا!\n💰 +${scoreMeta.finalReward} نقطة\n🏅 ترتيبك: #${rank || '-'}`, { parse_mode: 'HTML' });
+    const boostLine = scoreMeta.boostActive ? '\n🚀 معزز النقاط مفعل' : '';
+    await ctx.reply(`✅ <b>${ctx.from.first_name || 'عضو'}</b> أجاب صحيحًا!\n💰 +${scoreMeta.finalReward} نقطة${boostLine}\n🏅 ترتيبك: #${rank || '-'}`, { parse_mode: 'HTML' });
   }
 
   static parseVoteCommand(text) {
@@ -1058,6 +1285,19 @@ class GroupGamesHandler {
     return ctx.reply(text, { parse_mode: 'HTML' });
   }
 
+  static async handleMonthlyBoardCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const group = await this.ensureGroupRecord(ctx);
+    const rows = [...group.gameSystem.scores].sort((a, b) => (b.monthlyPoints || 0) - (a.monthlyPoints || 0)).slice(0, 10);
+    if (rows.length === 0) return ctx.reply('📊 لا يوجد نقاط شهرية بعد.');
+    let text = '🗓️ <b>سباق الشهر</b>\n\n';
+    rows.forEach((r, i) => {
+      const name = r.username || r.userId;
+      text += `${i + 1}. ${name} — ${r.monthlyPoints || 0} نقطة\n`;
+    });
+    return ctx.reply(text, { parse_mode: 'HTML' });
+  }
+
   static async handleTeamCommand(ctx) {
     if (!this.isGroupChat(ctx)) return;
     const group = await this.ensureGroupRecord(ctx);
@@ -1190,6 +1430,259 @@ class GroupGamesHandler {
     return ctx.reply('❌ صيغة غير صحيحة. استخدم /gtour status|start|end|rewards');
   }
 
+  static async handleChanceCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const group = await this.ensureGroupRecord(ctx);
+    const pool = (group.gameSystem.scores || []).slice(0, 40);
+    if (!pool.find((x) => Number(x.userId) === Number(ctx.from.id))) {
+      this.getOrCreateScoreRow(group, ctx.from);
+      await group.save();
+      pool.push({ userId: Number(ctx.from.id), username: ctx.from.username || ctx.from.first_name || String(ctx.from.id) });
+    }
+    const picked = this.pickRandom(pool);
+    const challenge = this.pickRandom(CHANCE_CHALLENGES);
+    return ctx.reply(
+      `🎲 <b>روليت الأوامر</b>\n\n` +
+      `👤 العضو المختار: <b>${picked.username || picked.userId}</b>\n` +
+      `⚡ التحدي: ${challenge}\n\n` +
+      'إذا نفّذ التحدي بنجاح، امنحوه نقطة تشجيعية عبر /ggift rose بالرد عليه.',
+      { parse_mode: 'HTML' }
+    );
+  }
+
+  static async handleStoreCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const group = await this.ensureGroupRecord(ctx);
+    const row = this.getOrCreateScoreRow(group, ctx.from);
+    await group.save();
+    const items = GROUP_STORE.map((x) => `• <code>${x.key}</code> → ${x.title} (${x.price} نقطة)`).join('\n');
+    return ctx.reply(
+      `🛒 <b>متجر الجروب</b>\n\n` +
+      `رصيدك: <b>${row.points || 0}</b> نقطة\n\n` +
+      `${items}\n\n` +
+      `للشراء: <code>/gbuy مفتاح_العنصر</code>`,
+      { parse_mode: 'HTML' }
+    );
+  }
+
+  static async handleBuyCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const args = this.parseCommandArgs(ctx);
+    const key = String(args[0] || '').toLowerCase();
+    const item = GROUP_STORE.find((x) => x.key === key);
+    if (!item) return ctx.reply('❌ عنصر غير موجود. استخدم /gstore');
+
+    const group = await this.ensureGroupRecord(ctx);
+    const row = this.getOrCreateScoreRow(group, ctx.from);
+    if ((row.points || 0) < item.price) return ctx.reply(`❌ رصيدك غير كافٍ. تحتاج ${item.price} نقطة.`);
+    row.points -= item.price;
+    if (item.type === 'title') {
+      row.title = item.title;
+    } else if (item.type === 'boost') {
+      const mins = Math.max(5, Number(item.minutes) || 30);
+      row.activeBoost = {
+        multiplier: Math.max(2, Number(item.multiplier) || 2),
+        expiresAt: new Date(Date.now() + mins * 60 * 1000)
+      };
+    }
+    row.updatedAt = new Date();
+    await group.save();
+    if (item.type === 'boost') {
+      return ctx.reply(`✅ تم تفعيل ${item.title}.`);
+    }
+    return ctx.reply(`✅ تم شراء اللقب وتفعيله: ${item.title}`);
+  }
+
+  static async handleGroupProfileCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const group = await this.ensureGroupRecord(ctx);
+    const row = this.getOrCreateScoreRow(group, ctx.from);
+    const rank = this.getUserRank(group, ctx.from.id) || '-';
+    const gifts = (row.giftInventory || []).filter((g) => (g.count || 0) > 0)
+      .slice(0, 6)
+      .map((g) => `${g.name}×${g.count}`)
+      .join(' | ') || 'لا يوجد';
+
+    await group.save();
+    return ctx.reply(
+      `👤 <b>ملفك في الجروب</b>\n\n` +
+      `🏷️ اللقب: ${row.title || 'مبتدئ'}\n` +
+      `💰 النقاط: ${row.points || 0}\n` +
+      `⭐ XP: ${row.xp || 0}\n` +
+      `🎖️ المستوى: ${row.level || 1}\n` +
+      `🏁 ترتيبك: #${rank}\n` +
+      `🎁 الهدايا: ${gifts}\n` +
+      `📤 مرسل: ${row.giftsSent || 0} | 📥 مستلم: ${row.giftsReceived || 0}`,
+      { parse_mode: 'HTML' }
+    );
+  }
+
+  static async handleGiftCatalogCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const list = UNIQUE_GIFTS.map((g) => `• <code>${g.key}</code> → ${g.name} (${g.price} نقطة)`).join('\n');
+    return ctx.reply(
+      `🎁 <b>الهدايا الفريدة (للجروب)</b>\n\n${list}\n\n` +
+      `الإرسال: <code>/ggift مفتاح_الهدية @user [العدد]</code>\n` +
+      'مثال: <code>/ggift palace @user</code>',
+      { parse_mode: 'HTML' }
+    );
+  }
+
+  static async handleGiftCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const args = this.parseCommandArgs(ctx);
+    if (args.length === 0) return this.handleGiftCatalogCommand(ctx);
+
+    const gift = this.resolveGiftByInput(args[0]);
+    if (!gift) return ctx.reply('❌ الهدية غير معروفة. استخدم /ggifts');
+
+    const targetArg = args.find((x) => String(x).startsWith('@') || /^\d+$/.test(String(x))) || null;
+    const qtyArg = args.find((x) => /^\d+$/.test(String(x))) || '1';
+    const qty = Math.max(1, Math.min(20, parseInt(qtyArg, 10) || 1));
+
+    const group = await this.ensureGroupRecord(ctx);
+    const target = this.resolveTargetUser(ctx, group, targetArg);
+    if (!target?.id) return ctx.reply('❌ حدد العضو بالرد أو @username.');
+    if (Number(target.id) === Number(ctx.from.id)) return ctx.reply('❌ لا يمكن إرسال هدية لنفسك.');
+
+    const senderRow = this.getOrCreateScoreRow(group, ctx.from);
+    const receiverRow = this.getOrCreateScoreRow(group, { id: target.id, username: target.username, first_name: target.first_name });
+    const totalPrice = gift.price * qty;
+    if ((senderRow.points || 0) < totalPrice) return ctx.reply(`❌ رصيدك غير كافٍ. المطلوب ${totalPrice} نقطة.`);
+
+    senderRow.points -= totalPrice;
+    senderRow.giftsSent = (senderRow.giftsSent || 0) + qty;
+    receiverRow.giftsReceived = (receiverRow.giftsReceived || 0) + qty;
+
+    let slot = (receiverRow.giftInventory || []).find((g) => g.key === gift.key);
+    if (!slot) {
+      slot = { key: gift.key, name: gift.name, count: 0 };
+      receiverRow.giftInventory.push(slot);
+    }
+    slot.count = (slot.count || 0) + qty;
+    receiverRow.points = (receiverRow.points || 0) + Math.max(1, Math.floor(gift.price / 3)) * qty;
+    this.awardXp(receiverRow, qty);
+
+    await group.save();
+    return ctx.reply(
+      `🎁 ${ctx.from.first_name || 'عضو'} أرسل ${gift.name} ×${qty} إلى ${target.first_name || target.username || target.id}\n` +
+      `💰 تكلفة الإرسال: ${totalPrice} نقطة`,
+      { parse_mode: 'HTML' }
+    );
+  }
+
+  static async handleDuelCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const status = await this.canStartRound(ctx);
+    if (!status.ok) return;
+
+    const group = status.group;
+    const args = this.parseCommandArgs(ctx);
+    const targetArg = args.find((x) => String(x).startsWith('@') || /^\d+$/.test(String(x))) || null;
+    const target = this.resolveTargetUser(ctx, group, targetArg);
+    if (!target?.id) return ctx.reply('❌ ابدأ التحدي بالرد على العضو أو بكتابة @username.');
+    if (Number(target.id) === Number(ctx.from.id)) return ctx.reply('❌ لا يمكنك تحدي نفسك.');
+
+    const key = String(ctx.chat.id);
+    const old = this.activeDuelByChat.get(key);
+    if (old) this.activeDuels.delete(old);
+
+    const token = this.token('duel');
+    this.activeDuelByChat.set(key, token);
+    this.activeDuels.set(token, {
+      token,
+      chatId: key,
+      challengerId: Number(ctx.from.id),
+      challengerName: ctx.from.first_name || ctx.from.username || String(ctx.from.id),
+      targetId: Number(target.id),
+      targetName: target.first_name || target.username || String(target.id),
+      createdAt: Date.now()
+    });
+
+    const kb = Markup.inlineKeyboard([[
+      Markup.button.callback('✅ قبول التحدي', `group:duel:accept:${token}`),
+      Markup.button.callback('❌ رفض', `group:duel:decline:${token}`)
+    ]]);
+    return ctx.reply(
+      `⚔️ <b>تحدي عضوين</b>\n\n${ctx.from.first_name || 'لاعب'} تحدّى ${target.first_name || 'لاعب'}\n` +
+      `الرابح يأخذ ${DUEL_STAKE} نقاط من الخاسر.\n` +
+      'بانتظار القبول...',
+      { parse_mode: 'HTML', reply_markup: kb.reply_markup }
+    );
+  }
+
+  static async handleDuelAction(ctx, action, token) {
+    if (!this.isGroupChat(ctx)) return;
+    const duel = this.activeDuels.get(token);
+    if (!duel) return ctx.answerCbQuery('انتهى التحدي.', { show_alert: false }).catch(() => {});
+    if (String(ctx.chat.id) !== String(duel.chatId)) return ctx.answerCbQuery('تحدي لجروب آخر.', { show_alert: false }).catch(() => {});
+    if (Number(ctx.from.id) !== Number(duel.targetId)) return ctx.answerCbQuery('فقط العضو المتحدّى يقدر يقرر.', { show_alert: false }).catch(() => {});
+
+    if (action === 'decline') {
+      this.activeDuels.delete(token);
+      if (this.activeDuelByChat.get(String(ctx.chat.id)) === token) this.activeDuelByChat.delete(String(ctx.chat.id));
+      await ctx.answerCbQuery('تم رفض التحدي', { show_alert: false }).catch(() => {});
+      return ctx.reply(`❌ ${duel.targetName} رفض التحدي.`);
+    }
+
+    await ctx.answerCbQuery('تم القبول', { show_alert: false }).catch(() => {});
+    this.activeDuels.delete(token);
+    if (this.activeDuelByChat.get(String(ctx.chat.id)) === token) this.activeDuelByChat.delete(String(ctx.chat.id));
+
+    const q = this.pickFromQueue(QUICK_QUESTIONS, `duel:${String(ctx.chat.id)}`);
+    return this.startRoundInternal(ctx.chat.id, {
+      type: 'duel',
+      prompt: `⚔️ <b>تحدي مباشر</b>\n\n${duel.challengerName} vs ${duel.targetName}\n\n${q.question}`,
+      answers: q.answers,
+      reward: 1,
+      timeoutSec: 20,
+      allowedUserIds: [duel.challengerId, duel.targetId],
+      onWin: async ({ group, winnerId }) => {
+        const loserId = Number(winnerId) === Number(duel.challengerId) ? Number(duel.targetId) : Number(duel.challengerId);
+        const loserRow = group.gameSystem.scores.find((s) => Number(s.userId) === loserId);
+        const winnerRow = group.gameSystem.scores.find((s) => Number(s.userId) === Number(winnerId));
+        const stolen = Math.max(0, Math.min(DUEL_STAKE, loserRow?.points || 0));
+        if (stolen > 0) {
+          loserRow.points = (loserRow.points || 0) - stolen;
+          winnerRow.points = (winnerRow.points || 0) + stolen;
+        }
+      }
+    }, false);
+  }
+
+  static async handleMonthlyRewardCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const isAdmin = await this.isGroupAdmin(ctx);
+    if (!isAdmin) return ctx.reply('❌ هذا الأمر للمشرفين فقط.');
+
+    const group = await this.ensureGroupRecord(ctx);
+    const currentMonth = this.getMonthKey();
+    if (group.gameSystem.state.lastMonthlyRewardKey === currentMonth) {
+      return ctx.reply('ℹ️ تم صرف مكافأة هذا الشهر بالفعل.');
+    }
+
+    const rows = [...(group.gameSystem.scores || [])]
+      .sort((a, b) => (b.monthlyPoints || 0) - (a.monthlyPoints || 0))
+      .slice(0, 3);
+    if (rows.length === 0) return ctx.reply('📊 لا توجد نتائج شهرية بعد.');
+
+    rows.forEach((r, i) => {
+      const bonus = MONTHLY_REWARDS[i] || 0;
+      r.points = (r.points || 0) + bonus;
+      r.monthlyPoints = 0;
+      this.awardXp(r, Math.floor(bonus / 2));
+      r.updatedAt = new Date();
+    });
+    group.gameSystem.state.lastMonthlyRewardKey = currentMonth;
+    await group.save();
+
+    let text = '🎁 <b>المكافأة الشهرية</b>\n\n';
+    rows.forEach((r, i) => {
+      text += `${i + 1}. ${r.username || r.userId} — +${MONTHLY_REWARDS[i] || 0} نقطة\n`;
+    });
+    return ctx.reply(text, { parse_mode: 'HTML' });
+  }
+
   static async handleGamesMenuAction(ctx, action) {
     if (!this.isGroupChat(ctx)) return;
     if (ctx.callbackQuery) await ctx.answerCbQuery().catch(() => {});
@@ -1197,11 +1690,17 @@ class GroupGamesHandler {
     if (action === 'gquiz') return this.handleQuizCommand(ctx);
     if (action === 'gmath') return this.handleMathCommand(ctx);
     if (action === 'gword') return this.handleWordCommand(ctx);
+    if (action === 'gwho') return this.handleWhoAmICommand(ctx);
+    if (action === 'griddle') return this.handleRiddleCommand(ctx);
+    if (action === 'gtype') return this.handleTypingCommand(ctx);
+    if (action === 'gduel') return this.handleDuelCommand(ctx);
+    if (action === 'gchance') return this.handleChanceCommand(ctx);
     if (action === 'gdaily') return this.handleDailyCommand(ctx);
     if (action === 'gmcq') return this.handleMcqCommand(ctx);
     if (action === 'gvote') return this.handleVoteCommand(ctx);
     if (action === 'gleader') return this.handleLeaderCommand(ctx);
     if (action === 'gweekly') return this.handleWeeklyCommand(ctx);
+    if (action === 'gmonth') return this.handleMonthlyBoardCommand(ctx);
     return null;
   }
 
@@ -1210,8 +1709,11 @@ class GroupGamesHandler {
     const keyboard = Markup.inlineKeyboard([
       [Markup.button.callback('❓ سؤال سريع', 'group:games:gquiz'), Markup.button.callback('🗳️ اختيارات', 'group:games:gmcq')],
       [Markup.button.callback('➗ حساب ذهني', 'group:games:gmath'), Markup.button.callback('🔤 ترتيب كلمة', 'group:games:gword')],
-      [Markup.button.callback('🧠 تحدي يومي', 'group:games:gdaily'), Markup.button.callback('📊 تصويت', 'group:games:gvote')],
-      [Markup.button.callback('🏁 المتصدرين', 'group:games:gleader'), Markup.button.callback('📅 سباق الأسبوع', 'group:games:gweekly')]
+      [Markup.button.callback('🎯 مين أنا', 'group:games:gwho'), Markup.button.callback('🧠 ألغاز', 'group:games:griddle')],
+      [Markup.button.callback('⚡ سرعة الكتابة', 'group:games:gtype'), Markup.button.callback('⚔️ تحدي عضوين', 'group:games:gduel')],
+      [Markup.button.callback('🎲 روليت', 'group:games:gchance'), Markup.button.callback('📊 تصويت', 'group:games:gvote')],
+      [Markup.button.callback('🧠 تحدي يومي', 'group:games:gdaily'), Markup.button.callback('🏁 المتصدرين', 'group:games:gleader')],
+      [Markup.button.callback('📅 سباق الأسبوع', 'group:games:gweekly'), Markup.button.callback('🗓️ سباق الشهر', 'group:games:gmonth')]
     ]);
     return ctx.reply(
       '🎮 <b>ألعاب الجروب التفاعلية</b>\n\n' +
@@ -1220,6 +1722,11 @@ class GroupGamesHandler {
       'مثال: <code>/gquiz علمية 25</code>\n' +
       '• /gmath تحدي حساب ذهني\n' +
       '• /gword ترتيب كلمة\n' +
+      '• /gwho لعبة مين أنا\n' +
+      '• /griddle ألغاز ذكية\n' +
+      '• /gtype سرعة كتابة (10 ث)\n' +
+      '• /chance روليت أوامر\n' +
+      '• /gduel @user تحدي عضوين\n' +
       '• /gdaily تحدي يومي\n' +
       '• /gmcq سؤال اختيارات بأزرار\n' +
       'مثال: <code>/gmcq رياضية 25</code>\n' +
@@ -1231,6 +1738,13 @@ class GroupGamesHandler {
       '• /gquizset stop إيقاف السلسلة\n' +
       '• /gleader لوحة المتصدرين\n' +
       '• /gweekly سباق الأسبوع\n' +
+      '• /gmonth سباق الشهر\n' +
+      '• /gprofile ملفك داخل الجروب\n' +
+      '• /gstore متجر الألقاب\n' +
+      '• /gbuy شراء لقب\n' +
+      '• /ggifts قائمة الهدايا\n' +
+      '• /ggift إرسال هدية لعضو\n' +
+      '• /gmonthly صرف المكافأة الشهرية (للمشرفين)\n' +
       '• /ggame إعدادات نظام الألعاب (للمشرفين)\n' +
       '• /gteam إدارة فريقك\n' +
       '• /gteams ترتيب الفرق\n' +
@@ -1239,6 +1753,7 @@ class GroupGamesHandler {
       'الوقت: أضف الثواني مثل <code>30</code>\n' +
       'مستويات الصعوبة: <code>easy</code> | <code>medium</code> | <code>hard</code>\n\n' +
       'النقاط: كل إجابة صحيحة = <b>1 نقطة</b>\n' +
+      'يوجد نظام Level / XP / ألقاب / ترتيب أسبوعي + شهري + مكافأة شهرية.\n' +
       'نمط الكويز الآن يعمل بأسلوب Quiz Poll مثل QuizBot.',
       { parse_mode: 'HTML', reply_markup: keyboard.reply_markup }
     );

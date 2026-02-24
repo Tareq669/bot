@@ -180,6 +180,14 @@ const groupSchema = new mongoose.Schema({
       weekKey: {
         type: String,
         default: ''
+      },
+      monthKey: {
+        type: String,
+        default: ''
+      },
+      lastMonthlyRewardKey: {
+        type: String,
+        default: ''
       }
     },
     scores: [
@@ -194,6 +202,47 @@ const groupSchema = new mongoose.Schema({
           type: Number,
           default: 0
         },
+        monthlyPoints: {
+          type: Number,
+          default: 0
+        },
+        xp: {
+          type: Number,
+          default: 0
+        },
+        level: {
+          type: Number,
+          default: 1
+        },
+        title: {
+          type: String,
+          default: 'مبتدئ'
+        },
+        activeBoost: {
+          multiplier: {
+            type: Number,
+            default: 1
+          },
+          expiresAt: Date
+        },
+        giftsSent: {
+          type: Number,
+          default: 0
+        },
+        giftsReceived: {
+          type: Number,
+          default: 0
+        },
+        giftInventory: [
+          {
+            key: String,
+            name: String,
+            count: {
+              type: Number,
+              default: 0
+            }
+          }
+        ],
         wins: {
           type: Number,
           default: 0

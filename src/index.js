@@ -118,7 +118,7 @@ const GROUP_ONLY_COMMANDS = new Set([
   'gadminstats', 'gprint', 'greasons', 'gbasic', 'gexceptions', 'granks', 'gdetect', 'gonline', 'gadminleave',
   'gtemplate_member', 'gtemplate_admin', 'gideal_member', 'gideal_admin', 'gshow_ideal_member', 'gshow_ideal_admin',
   'gquiz', 'gmath', 'gword', 'gdaily', 'gmcq', 'gvote', 'gquizset', 'gleader', 'gweekly', 'ggame', 'ggames',
-  'gteam', 'gteams', 'gtour'
+  'gteam', 'gteams', 'gtour', 'gwho', 'griddle', 'gtype', 'chance', 'gduel', 'gstore', 'gbuy', 'ggifts', 'ggift', 'gprofile', 'gmonth', 'gmonthly'
 ]);
 
 const PRIVATE_REPLY_BUTTONS = new Set([
@@ -240,6 +240,18 @@ Promise.all([
       { command: 'gleader', description: 'متصدرين الجروب' },
       { command: 'gweekly', description: 'متصدرين الأسبوع' },
       { command: 'ggame', description: 'إعدادات ألعاب الجروب' },
+      { command: 'gwho', description: 'لعبة مين أنا' },
+      { command: 'griddle', description: 'ألغاز ذكية' },
+      { command: 'gtype', description: 'سرعة الكتابة' },
+      { command: 'chance', description: 'روليت الأوامر' },
+      { command: 'gduel', description: 'تحدي عضوين' },
+      { command: 'gstore', description: 'متجر الجروب' },
+      { command: 'gbuy', description: 'شراء لقب' },
+      { command: 'ggifts', description: 'قائمة الهدايا' },
+      { command: 'ggift', description: 'إرسال هدية' },
+      { command: 'gprofile', description: 'ملفك في الجروب' },
+      { command: 'gmonth', description: 'متصدرين الشهر' },
+      { command: 'gmonthly', description: 'صرف مكافأة شهرية' },
       { command: 'gteam', description: 'إدارة فريقك' },
       { command: 'gteams', description: 'ترتيب الفرق' },
       { command: 'gtour', description: 'إدارة البطولة الأسبوعية' }
@@ -331,12 +343,24 @@ bot.command('gshow_ideal_admin', (ctx) => GroupAdminHandler.handleShowIdealCard(
 bot.command('gquiz', (ctx) => GroupGamesHandler.handleQuizCommand(ctx));
 bot.command('gmath', (ctx) => GroupGamesHandler.handleMathCommand(ctx));
 bot.command('gword', (ctx) => GroupGamesHandler.handleWordCommand(ctx));
+bot.command('gwho', (ctx) => GroupGamesHandler.handleWhoAmICommand(ctx));
+bot.command('griddle', (ctx) => GroupGamesHandler.handleRiddleCommand(ctx));
+bot.command('gtype', (ctx) => GroupGamesHandler.handleTypingCommand(ctx));
+bot.command('chance', (ctx) => GroupGamesHandler.handleChanceCommand(ctx));
+bot.command('gduel', (ctx) => GroupGamesHandler.handleDuelCommand(ctx));
 bot.command('gdaily', (ctx) => GroupGamesHandler.handleDailyCommand(ctx));
 bot.command('gmcq', (ctx) => GroupGamesHandler.handleMcqCommand(ctx));
 bot.command('gvote', (ctx) => GroupGamesHandler.handleVoteCommand(ctx));
 bot.command('gquizset', (ctx) => GroupGamesHandler.handleQuizSetCommand(ctx));
 bot.command('gleader', (ctx) => GroupGamesHandler.handleLeaderCommand(ctx));
 bot.command('gweekly', (ctx) => GroupGamesHandler.handleWeeklyCommand(ctx));
+bot.command('gmonth', (ctx) => GroupGamesHandler.handleMonthlyBoardCommand(ctx));
+bot.command('gmonthly', (ctx) => GroupGamesHandler.handleMonthlyRewardCommand(ctx));
+bot.command('gstore', (ctx) => GroupGamesHandler.handleStoreCommand(ctx));
+bot.command('gbuy', (ctx) => GroupGamesHandler.handleBuyCommand(ctx));
+bot.command('ggifts', (ctx) => GroupGamesHandler.handleGiftCatalogCommand(ctx));
+bot.command('ggift', (ctx) => GroupGamesHandler.handleGiftCommand(ctx));
+bot.command('gprofile', (ctx) => GroupGamesHandler.handleGroupProfileCommand(ctx));
 bot.command('ggame', (ctx) => GroupGamesHandler.handleGameToggleCommand(ctx));
 bot.command('ggames', (ctx) => GroupGamesHandler.handleGamesHelp(ctx));
 bot.command('gteam', (ctx) => GroupGamesHandler.handleTeamCommand(ctx));
@@ -1383,7 +1407,8 @@ bot.action('owner:cleanup:confirm', async (ctx) => {
 // --- MENU CALLBACKS ---
 bot.action(/^group:mcq:([a-z0-9]+):(\d+)$/i, (ctx) => GroupGamesHandler.handleMcqCallback(ctx, ctx.match[1], ctx.match[2]));
 bot.action(/^group:vote:([a-z0-9]+):(\d+)$/i, (ctx) => GroupGamesHandler.handleVoteCallback(ctx, ctx.match[1], ctx.match[2]));
-bot.action(/^group:games:(gquiz|gmath|gword|gdaily|gmcq|gvote|gleader|gweekly)$/i, (ctx) => GroupGamesHandler.handleGamesMenuAction(ctx, ctx.match[1].toLowerCase()));
+bot.action(/^group:duel:(accept|decline):([a-z0-9]+)$/i, (ctx) => GroupGamesHandler.handleDuelAction(ctx, ctx.match[1], ctx.match[2]));
+bot.action(/^group:games:(gquiz|gmath|gword|gwho|griddle|gtype|gduel|gchance|gdaily|gmcq|gvote|gleader|gweekly|gmonth)$/i, (ctx) => GroupGamesHandler.handleGamesMenuAction(ctx, ctx.match[1].toLowerCase()));
 bot.action(/^group:.+$/, (ctx) => GroupAdminHandler.handleGroupCallback(ctx));
 bot.on('poll_answer', (ctx) => GroupGamesHandler.handlePollAnswer(ctx));
 bot.on('chat_member', (ctx) => GroupAdminHandler.handleChatMemberUpdate(ctx));
