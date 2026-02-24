@@ -28,6 +28,14 @@ const groupSchema = new mongoose.Schema({
       type: String,
       default: '👋 أهلًا {name} في {group}\n🆔 {id}\nنتمنى لك وقتًا ممتعًا معنا.'
     },
+    suggestionCooldownSeconds: {
+      type: Number,
+      default: 90
+    },
+    blockDuplicateSuggestions: {
+      type: Boolean,
+      default: true
+    },
     filterBadWords: {
       type: Boolean,
       default: true

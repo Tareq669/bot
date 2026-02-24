@@ -230,6 +230,9 @@ class GroupAdminHandler {
     if (typeof group.settings.welcomeTemplate !== 'string' || !group.settings.welcomeTemplate.trim()) {
       group.settings.welcomeTemplate = '👋 أهلًا {name} في {group}\n🆔 {id}\nنتمنى لك وقتًا ممتعًا معنا.';
     }
+    if (!Number.isInteger(group.settings.suggestionCooldownSeconds)) group.settings.suggestionCooldownSeconds = 90;
+    group.settings.suggestionCooldownSeconds = Math.max(10, Math.min(3600, Number(group.settings.suggestionCooldownSeconds) || 90));
+    if (typeof group.settings.blockDuplicateSuggestions !== 'boolean') group.settings.blockDuplicateSuggestions = true;
     if (typeof group.settings.detectForAdminsOnly !== 'boolean') group.settings.detectForAdminsOnly = false;
     if (typeof group.settings.onlineForOwnersOnly !== 'boolean') group.settings.onlineForOwnersOnly = false;
     if (!Number.isInteger(group.settings.primaryOwnerId)) group.settings.primaryOwnerId = null;
@@ -350,6 +353,7 @@ class GroupAdminHandler {
       '• تفعيل/تعطيل مغادره المشرفين\n\n' +
       '• /gwelcome إدارة الترحيب\n' +
       '• /gsuggest نظام الاقتراحات\n' +
+      '• /gsuggeststats إحصائيات الاقتراحات\n' +
       '• /gfaq الردود التلقائية\n\n' +
       '• ضع كليشه عضو\n' +
       '• ضع كليشه مشرف\n' +
@@ -435,6 +439,7 @@ class GroupAdminHandler {
       '• تفعيل/تعطيل مغادره المشرفين\n\n' +
       '• /gwelcome إدارة الترحيب\n' +
       '• /gsuggest نظام الاقتراحات\n' +
+      '• /gsuggeststats إحصائيات الاقتراحات\n' +
       '• /gfaq الردود التلقائية\n\n' +
       '• ضع كليشه عضو\n' +
       '• ضع كليشه مشرف\n' +
@@ -1529,12 +1534,101 @@ class GroupAdminHandler {
     return max + 1;
   }
 
+  static normalizeSuggestionText(text) {
+    return this.normalizePlainText(text)
+      .replace(/[ًٌٍَُِّْـ]/g, '')
+      .replace(/[^\p{L}\p{N}\s]/gu, '')
+      .trim();
+  }
+
+  static getSuggestionWeekStart() {
+    const now = new Date();
+    const day = now.getDay();
+    const diff = (day + 6) % 7;
+    now.setHours(0, 0, 0, 0);
+    now.setDate(now.getDate() - diff);
+    return now;
+  }
+
+  static buildSuggestionStats(group) {
+    const suggestions = Array.isArray(group?.suggestions) ? group.suggestions : [];
+    const weekStart = this.getSuggestionWeekStart();
+    const weekly = suggestions.filter((s) => new Date(s.createdAt || 0) >= weekStart);
+    const openCount = weekly.filter((s) => s.status === 'open').length;
+    const closedCount = weekly.filter((s) => s.status === 'closed').length;
+    const totalVotes = weekly.reduce((sum, s) => sum + (Array.isArray(s.votesUp) ? s.votesUp.length : 0) + (Array.isArray(s.votesDown) ? s.votesDown.length : 0), 0);
+
+    const topSuggestion = [...weekly]
+      .sort((a, b) => ((b.votesUp?.length || 0) - (b.votesDown?.length || 0)) - ((a.votesUp?.length || 0) - (a.votesDown?.length || 0)))[0] || null;
+
+    const byUser = new Map();
+    for (const s of weekly) {
+      const uid = Number(s.createdBy || 0);
+      if (!uid) continue;
+      byUser.set(uid, (byUser.get(uid) || 0) + 1);
+    }
+    const topAuthorEntry = [...byUser.entries()].sort((a, b) => b[1] - a[1])[0] || null;
+
+    return {
+      weeklyCount: weekly.length,
+      openCount,
+      closedCount,
+      totalVotes,
+      topSuggestion,
+      topAuthorEntry
+    };
+  }
+
+  static async handleSuggestionStatsCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return false;
+    const group = await this.ensureGroupRecord(ctx);
+    this.normalizeGroupState(group);
+    const stats = this.buildSuggestionStats(group);
+    const topSuggestionLine = stats.topSuggestion
+      ? `#${stats.topSuggestion.suggestionId} (${(stats.topSuggestion.votesUp?.length || 0) - (stats.topSuggestion.votesDown?.length || 0)} صافي)\n${stats.topSuggestion.text.slice(0, 120)}`
+      : 'لا يوجد بعد';
+    const topAuthorLine = stats.topAuthorEntry ? `<code>${stats.topAuthorEntry[0]}</code> (${stats.topAuthorEntry[1]} اقتراح)` : 'لا يوجد بعد';
+
+    await ctx.reply(
+      '📊 <b>إحصائيات الاقتراحات (هذا الأسبوع)</b>\n\n' +
+        `• عدد الاقتراحات: ${stats.weeklyCount}\n` +
+        `• المفتوح: ${stats.openCount}\n` +
+        `• المغلق: ${stats.closedCount}\n` +
+        `• إجمالي التصويتات: ${stats.totalVotes}\n` +
+        `• أفضل اقتراح:\n${topSuggestionLine}\n\n` +
+        `• الأكثر اقتراحًا: ${topAuthorLine}`,
+      { parse_mode: 'HTML' }
+    );
+    return true;
+  }
+
   static async handleSuggestionCommand(ctx) {
     if (!this.isGroupChat(ctx)) return false;
     const group = await this.ensureGroupRecord(ctx);
     this.normalizeGroupState(group);
     const rawText = String(ctx.message?.text || '').trim();
     const slashMatch = rawText.match(/^\/gsuggest(?:@\w+)?(?:\s+([\s\S]+))?$/i);
+    if (/^\/gsuggeststats(?:@\w+)?$/i.test(rawText) || /^(?:احصائيات الاقتراحات|إحصائيات الاقتراحات|احصائيات الاقتراح|إحصائيات الاقتراح)$/i.test(rawText)) {
+      return this.handleSuggestionStatsCommand(ctx);
+    }
+
+    const setCooldownArabic = rawText.match(/^مهلة الاقتراح\s+(\d+)$/i);
+    const setCooldownSlash = slashMatch && /^cooldown\s+(\d+)$/i.test(String(slashMatch[1] || '').trim())
+      ? parseInt(String(slashMatch[1] || '').trim().replace(/^cooldown\s+/i, ''), 10)
+      : null;
+    if (setCooldownArabic || setCooldownSlash) {
+      const isAdmin = await this.isGroupAdmin(ctx);
+      if (!isAdmin) {
+        await ctx.reply('❌ تغيير المهلة للمشرفين فقط.');
+        return true;
+      }
+      const seconds = Math.max(10, Math.min(3600, Number(setCooldownArabic ? setCooldownArabic[1] : setCooldownSlash) || 90));
+      group.settings.suggestionCooldownSeconds = seconds;
+      await this.addModerationLog(group, 'suggestion_cooldown_update', ctx.from.id, null, `${seconds}s`);
+      await group.save();
+      await ctx.reply(`✅ تم ضبط مهلة الاقتراح على ${seconds} ثانية.`);
+      return true;
+    }
 
     if (/^(?:الاقتراحات|عرض الاقتراحات)$/i.test(rawText) || (slashMatch && /^(list|ls)$/i.test(String(slashMatch[1] || '').trim()))) {
       const list = (group.suggestions || []).slice(0, 10);
@@ -1585,10 +1679,41 @@ class GroupAdminHandler {
         await ctx.reply('❌ اكتب نص الاقتراح بعد الأمر.');
         return true;
       }
+      if (text.length < 4) {
+        await ctx.reply('❌ الاقتراح قصير جدًا. اكتب نصًا أوضح.');
+        return true;
+      }
+
+      const userId = Number(ctx.from?.id || 0);
+      const cooldownSeconds = Number(group.settings?.suggestionCooldownSeconds || 90);
+      const lastOwnSuggestion = (group.suggestions || [])
+        .filter((s) => Number(s.createdBy) === userId)
+        .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))[0];
+      if (lastOwnSuggestion) {
+        const elapsedMs = Date.now() - new Date(lastOwnSuggestion.createdAt || 0).getTime();
+        const remaining = Math.ceil((cooldownSeconds * 1000 - elapsedMs) / 1000);
+        if (remaining > 0) {
+          await ctx.reply(`⏳ انتظر ${remaining} ثانية قبل إرسال اقتراح جديد.`);
+          return true;
+        }
+      }
+
+      if (group.settings?.blockDuplicateSuggestions) {
+        const normalized = this.normalizeSuggestionText(text);
+        const dup = (group.suggestions || []).find((s) => {
+          const oldNorm = this.normalizeSuggestionText(s.text);
+          return oldNorm && normalized && oldNorm === normalized;
+        });
+        if (dup) {
+          await ctx.reply(`⚠️ هذا الاقتراح مكرر (رقم #${dup.suggestionId}). استخدم "الاقتراحات" لرؤيته.`);
+          return true;
+        }
+      }
+
       const item = {
         suggestionId: this.nextSuggestionId(group),
         text: text.slice(0, 1000),
-        createdBy: Number(ctx.from?.id || 0) || null,
+        createdBy: userId || null,
         createdByName: ctx.from?.first_name || ctx.from?.username || String(ctx.from?.id || ''),
         status: 'open',
         votesUp: [],
@@ -1612,9 +1737,13 @@ class GroupAdminHandler {
         '💡 نظام الاقتراحات\n\n' +
           '• اقتراح نص الفكرة\n' +
           '• الاقتراحات\n' +
+          '• احصائيات الاقتراحات\n' +
+          '• مهلة الاقتراح 90 (للمشرف)\n' +
           '• اغلاق اقتراح 12 (للمشرف)\n\n' +
           '• /gsuggest اكتب هنا فكرة\n' +
           '• /gsuggest list\n' +
+          '• /gsuggeststats\n' +
+          '• /gsuggest cooldown 90\n' +
           '• /gsuggest close 12'
       );
       return true;
@@ -2226,7 +2355,7 @@ class GroupAdminHandler {
       await this.handleWelcomeCommand(ctx);
       return true;
     }
-    if (/^(اقتراح\s+.+|الاقتراحات|عرض الاقتراحات|اغلاق اقتراح\s+\d+|اقتراحات|\/gsuggest\b)/i.test(rawText)) {
+    if (/^(اقتراح\s+.+|الاقتراحات|عرض الاقتراحات|اغلاق اقتراح\s+\d+|اقتراحات|احصائيات الاقتراحات|إحصائيات الاقتراحات|احصائيات الاقتراح|إحصائيات الاقتراح|مهلة الاقتراح\s+\d+|\/gsuggest\b|\/gsuggeststats\b)/i.test(rawText)) {
       await this.handleSuggestionCommand(ctx);
       return true;
     }
