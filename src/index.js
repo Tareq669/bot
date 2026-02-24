@@ -117,7 +117,7 @@ const GROUP_ONLY_COMMANDS = new Set([
   'gmute', 'gunmute', 'gban', 'gunban', 'gclear', 'glogs', 'gpolicy', 'gprotect',
   'gadminstats', 'gprint', 'greasons', 'gbasic', 'gexceptions', 'granks', 'gdetect', 'gonline', 'gadminleave',
   'gtemplate_member', 'gtemplate_admin', 'gideal_member', 'gideal_admin', 'gshow_ideal_member', 'gshow_ideal_admin',
-  'gquiz', 'gmath', 'gword', 'gdaily', 'gmcq', 'gvote', 'gquizset', 'gleader', 'gweekly', 'ggame', 'ggames',
+  'gfaq', 'gquiz', 'gmath', 'gword', 'gdaily', 'gmcq', 'gvote', 'gquizset', 'gleader', 'gweekly', 'ggame', 'ggames',
   'g', 'gteam', 'gteams', 'gtour', 'gwho', 'griddle', 'gtype', 'chance', 'gduel', 'gstore', 'gbuy', 'ggifts', 'ggift', 'gprofile', 'gmonth', 'gmonthly', 'gbonus', 'glevels'
 ]);
 
@@ -216,6 +216,7 @@ Promise.all([
       { command: 'glogs', description: 'عرض سجل الإدارة' },
       { command: 'gadminstats', description: 'تقرير تفاعل مشرف' },
       { command: 'gprotect', description: 'إعدادات الحماية السريعة' },
+      { command: 'gfaq', description: 'إدارة الردود التلقائية' },
       { command: 'gprint', description: 'برنت سجل عضو' },
       { command: 'greasons', description: 'تفعيل/تعطيل الأسباب' },
       { command: 'gbasic', description: 'إدارة رتبة الأساسي' },
@@ -328,6 +329,7 @@ bot.command('gunban', (ctx) => GroupAdminHandler.handleUnbanCommand(ctx));
 bot.command('gclear', (ctx) => GroupAdminHandler.handleClearCommand(ctx));
 bot.command('glogs', (ctx) => GroupAdminHandler.handleLogsCommand(ctx));
 bot.command('gprotect', (ctx) => GroupAdminHandler.handleProtectCommand(ctx));
+bot.command('gfaq', (ctx) => GroupAdminHandler.handleFaqCommand(ctx));
 bot.command('gadminstats', (ctx) => GroupAdminHandler.handleAdminInteractionCommand(ctx));
 bot.command('gprint', (ctx) => GroupAdminHandler.handlePrintCommand(ctx));
 bot.command('greasons', (ctx) => GroupAdminHandler.handleReasonsToggle(ctx));

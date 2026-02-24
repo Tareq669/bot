@@ -84,6 +84,13 @@ class GroupAdminHandler {
     return parts.slice(1);
   }
 
+  static normalizePlainText(value) {
+    return String(value || '')
+      .toLowerCase()
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
   static getWeekStart(date = new Date()) {
     const d = new Date(date);
     const day = d.getDay();
@@ -227,6 +234,15 @@ class GroupAdminHandler {
     if (!group.settings.templates) group.settings.templates = {};
     if (!group.settings.templates.member) group.settings.templates.member = {};
     if (!group.settings.templates.admin) group.settings.templates.admin = {};
+    if (!Array.isArray(group.settings.faqTriggers)) group.settings.faqTriggers = [];
+    group.settings.faqTriggers = group.settings.faqTriggers
+      .map((item) => ({
+        trigger: String(item?.trigger || '').trim(),
+        response: String(item?.response || '').trim(),
+        createdBy: Number.isInteger(item?.createdBy) ? Number(item.createdBy) : null,
+        createdAt: item?.createdAt || new Date()
+      }))
+      .filter((item) => item.trigger && item.response);
     if (!Number.isInteger(group.settings.idealMemberId)) group.settings.idealMemberId = null;
     if (!Number.isInteger(group.settings.idealAdminId)) group.settings.idealAdminId = null;
 
@@ -1232,6 +1248,143 @@ class GroupAdminHandler {
     }
   }
 
+  static buildFaqHelpText(group) {
+    const count = Array.isArray(group?.settings?.faqTriggers) ? group.settings.faqTriggers.length : 0;
+    return (
+      `🤖 الردود التلقائية (FAQ)\n\n` +
+      `• العدد الحالي: ${count}\n\n` +
+      `أوامر سريعة:\n` +
+      `• اضف رد مرحبا | أهلًا وسهلًا\n` +
+      `• حذف رد مرحبا\n` +
+      `• الردود\n` +
+      `• مسح الردود\n\n` +
+      `أوامر سلاش:\n` +
+      `• /gfaq add مرحبا | أهلًا وسهلًا\n` +
+      `• /gfaq remove مرحبا\n` +
+      `• /gfaq list\n` +
+      `• /gfaq clear`
+    );
+  }
+
+  static parseFaqPayload(payload = '') {
+    const raw = String(payload || '').trim();
+    const parts = raw.split('|');
+    if (parts.length < 2) return null;
+    const trigger = String(parts[0] || '').trim();
+    const response = String(parts.slice(1).join('|') || '').trim();
+    if (!trigger || !response) return null;
+    return { trigger, response };
+  }
+
+  static async handleFaqCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return false;
+    const isAdmin = await this.isGroupAdmin(ctx);
+    if (!isAdmin) {
+      await ctx.reply('❌ هذا الأمر للمشرفين فقط.');
+      return true;
+    }
+
+    const group = await this.ensureGroupRecord(ctx);
+    const rawText = String(ctx.message?.text || '').trim();
+    const slashMatch = rawText.match(/^\/gfaq(?:@\w+)?(?:\s+(.+))?$/i);
+    const lowered = rawText.toLowerCase();
+    const triggers = Array.isArray(group.settings?.faqTriggers) ? group.settings.faqTriggers : [];
+
+    if (/^(الردود|عرض الردود)$/i.test(rawText) || (slashMatch && /^(list|ls)$/i.test(String(slashMatch[1] || '').trim()))) {
+      if (triggers.length === 0) {
+        await ctx.reply('ℹ️ لا يوجد ردود تلقائية مضافة بعد.');
+        return true;
+      }
+      const rows = triggers.slice(0, 50).map((item, i) => `${i + 1}. <b>${item.trigger}</b>\n↳ ${item.response}`);
+      await ctx.reply(`📚 قائمة الردود (${triggers.length})\n\n${rows.join('\n\n')}`, { parse_mode: 'HTML' });
+      return true;
+    }
+
+    if (/^مسح الردود$/i.test(rawText) || (slashMatch && /^(clear|reset)$/i.test(String(slashMatch[1] || '').trim()))) {
+      group.settings.faqTriggers = [];
+      await this.addModerationLog(group, 'faq_clear', ctx.from.id, null, 'clear all FAQ triggers');
+      await group.save();
+      await ctx.reply('🧹 تم مسح جميع الردود التلقائية.');
+      return true;
+    }
+
+    const removeArabic = rawText.match(/^حذف رد\s+(.+)$/i);
+    if (removeArabic || (slashMatch && /^(remove|del|delete)\s+(.+)$/i.test(String(slashMatch[1] || '').trim()))) {
+      const triggerText = removeArabic
+        ? String(removeArabic[1] || '').trim()
+        : String(String(slashMatch[1] || '').trim().replace(/^(remove|del|delete)\s+/i, '')).trim();
+      const key = this.normalizePlainText(triggerText);
+      const before = group.settings.faqTriggers.length;
+      group.settings.faqTriggers = group.settings.faqTriggers.filter((item) => this.normalizePlainText(item.trigger) !== key);
+      if (group.settings.faqTriggers.length === before) {
+        await ctx.reply('❌ لم أجد هذا المفتاح في الردود التلقائية.');
+        return true;
+      }
+      await this.addModerationLog(group, 'faq_remove', ctx.from.id, null, triggerText);
+      await group.save();
+      await ctx.reply(`✅ تم حذف الرد التلقائي: ${triggerText}`);
+      return true;
+    }
+
+    const addArabic = rawText.match(/^(?:اضف|أضف) رد\s+(.+)$/i);
+    const addSlash = slashMatch && /^(add|set)\s+(.+)$/i.test(String(slashMatch[1] || '').trim())
+      ? String(slashMatch[1] || '').trim().replace(/^(add|set)\s+/i, '')
+      : '';
+    if (addArabic || addSlash) {
+      const payload = addArabic ? String(addArabic[1] || '').trim() : addSlash;
+      const parsed = this.parseFaqPayload(payload);
+      if (!parsed) {
+        await ctx.reply('❌ الصيغة غير صحيحة.\nاستخدم: اضف رد المفتاح | الرد');
+        return true;
+      }
+
+      const trigger = parsed.trigger.slice(0, 80);
+      const response = parsed.response.slice(0, 1500);
+      const key = this.normalizePlainText(trigger);
+      const existingIndex = group.settings.faqTriggers.findIndex((item) => this.normalizePlainText(item.trigger) === key);
+      const row = {
+        trigger,
+        response,
+        createdBy: Number(ctx.from?.id || 0) || null,
+        createdAt: new Date()
+      };
+      if (existingIndex >= 0) {
+        group.settings.faqTriggers[existingIndex] = row;
+      } else {
+        group.settings.faqTriggers.push(row);
+      }
+      await this.addModerationLog(group, existingIndex >= 0 ? 'faq_update' : 'faq_add', ctx.from.id, null, trigger);
+      await group.save();
+      await ctx.reply(`✅ تم حفظ الرد التلقائي.\nالمفتاح: ${trigger}`);
+      return true;
+    }
+
+    if (/^\/gfaq(?:@\w+)?$/i.test(rawText) || /^(الردود|ردود)$/i.test(lowered)) {
+      await ctx.reply(this.buildFaqHelpText(group));
+      return true;
+    }
+
+    return false;
+  }
+
+  static async maybeReplyFaqTrigger(ctx, group, rawText) {
+    if (!this.isGroupChat(ctx)) return false;
+    if (!group?.settings?.faqTriggers?.length) return false;
+    const text = String(rawText || '').trim();
+    if (!text || text.startsWith('/')) return false;
+
+    const normalizedText = this.normalizePlainText(text);
+    const sorted = [...group.settings.faqTriggers].sort((a, b) => b.trigger.length - a.trigger.length);
+    const matched = sorted.find((item) => {
+      const key = this.normalizePlainText(item.trigger);
+      return key && (normalizedText === key || normalizedText.includes(key));
+    });
+
+    if (!matched) return false;
+    await ctx.reply(String(matched.response || '').trim());
+    return true;
+  }
+
   static async canManageGroupTemplates(ctx, groupId, userId) {
     const group = await Group.findOne({ groupId: String(groupId) });
     if (!group) return { ok: false, message: '❌ لم يتم العثور على بيانات الجروب.' };
@@ -1760,6 +1913,10 @@ class GroupAdminHandler {
       await this.handleAdminLeaveToggle(ctx);
       return true;
     }
+    if (/^(?:اضف رد|أضف رد|حذف رد|الردود|عرض الردود|مسح الردود|\/gfaq\b)/i.test(rawText)) {
+      await this.handleFaqCommand(ctx);
+      return true;
+    }
     if (
       /^(قفل الروابط|فتح الروابط|تفعيل الكلمات|تعطيل الكلمات|تفعيل التكرار|تعطيل التكرار|تفعيل منع الاباحية|تعطيل منع الاباحية|تفعيل منع الرسائل الطويلة|تعطيل منع الرسائل الطويلة|استثناء المشرفين من الحماية|الغاء استثناء المشرفين من الحماية|إلغاء استثناء المشرفين من الحماية|الحماية|\/gprotect\b)/i.test(rawText)
     ) {
@@ -1941,6 +2098,9 @@ class GroupAdminHandler {
         return true;
       }
     }
+
+    const faqHandled = await this.maybeReplyFaqTrigger(ctx, group, rawText);
+    if (faqHandled) return true;
 
     return false;
   }

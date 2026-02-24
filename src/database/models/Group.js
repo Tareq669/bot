@@ -131,6 +131,26 @@ const groupSchema = new mongoose.Schema({
         buttonUrl: String
       }
     },
+    faqTriggers: [
+      {
+        trigger: {
+          type: String,
+          default: ''
+        },
+        response: {
+          type: String,
+          default: ''
+        },
+        createdBy: {
+          type: Number,
+          default: null
+        },
+        createdAt: {
+          type: Date,
+          default: Date.now
+        }
+      }
+    ],
     idealMemberId: Number,
     idealAdminId: Number
   },
