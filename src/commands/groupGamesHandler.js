@@ -178,18 +178,45 @@ const DEFAULT_VOTE_TOPICS = [
 
 const CELEBRATION_LINES = ['إجابة ممتازة!', 'مستوى قوي!', 'رد سريع جدًا!', 'أداء احترافي!'];
 const GROUP_STORE = [
-  // Royal and clean title catalog
-  { key: 'knight', title: '⚔️ الفارس', price: 45, type: 'title' },
-  { key: 'warrior', title: '🛡️ المحارب', price: 70, type: 'title' },
-  { key: 'captain', title: '🎖️ القائد', price: 95, type: 'title' },
-  { key: 'star', title: '🌟 نجم الجروب', price: 120, type: 'title' },
-  { key: 'queen', title: '👸 الملكة', price: 170, type: 'title' },
+  // Paired titles (male/female) with equal prices
+  { key: 'knight_m', title: '⚔️ الفارس', price: 45, type: 'title' },
+  { key: 'knight_f', title: '⚔️ الفارسة', price: 45, type: 'title' },
+
+  { key: 'warrior_m', title: '🛡️ المحارب', price: 70, type: 'title' },
+  { key: 'warrior_f', title: '🛡️ المحاربة', price: 70, type: 'title' },
+
+  { key: 'captain_m', title: '🎖️ القائد', price: 95, type: 'title' },
+  { key: 'captain_f', title: '🎖️ القائدة', price: 95, type: 'title' },
+
+  { key: 'sage_m', title: '🧠 الحكيم', price: 110, type: 'title' },
+  { key: 'sage_f', title: '🧠 الحكيمة', price: 110, type: 'title' },
+
+  { key: 'speed_m', title: '⚡ السريع', price: 120, type: 'title' },
+  { key: 'speed_f', title: '⚡ السريعة', price: 120, type: 'title' },
+
+  { key: 'star_m', title: '🌟 نجم الجروب', price: 130, type: 'title' },
+  { key: 'star_f', title: '🌟 نجمة الجروب', price: 130, type: 'title' },
+
+  { key: 'quiz_m', title: '🎓 سيد الكويز', price: 150, type: 'title' },
+  { key: 'quiz_f', title: '🎓 سيدة الكويز', price: 150, type: 'title' },
+
   { key: 'king', title: '🤴 الملك', price: 170, type: 'title' },
+  { key: 'queen', title: '👸 الملكة', price: 170, type: 'title' },
+
   { key: 'sultan', title: '🫅 السلطان', price: 220, type: 'title' },
-  { key: 'empress', title: '👑 الإمبراطورة', price: 300, type: 'title' },
+  { key: 'sultana', title: '🫅 السلطانة', price: 220, type: 'title' },
+
   { key: 'emperor', title: '👑 الإمبراطور', price: 300, type: 'title' },
-  { key: 'legend', title: '🏆 الأسطورة', price: 360, type: 'title' },
-  { key: 'diamond_lord', title: '💎 سيد الماس', price: 430, type: 'title' },
+  { key: 'empress', title: '👑 الإمبراطورة', price: 300, type: 'title' },
+
+  { key: 'legend_m', title: '🏆 الأسطورة', price: 360, type: 'title' },
+  { key: 'legend_f', title: '🏆 الأسطورة', price: 360, type: 'title' },
+
+  { key: 'diamond_m', title: '💎 سيد الماس', price: 430, type: 'title' },
+  { key: 'diamond_f', title: '💎 سيدة الماس', price: 430, type: 'title' },
+
+  { key: 'myth_m', title: '🔥 العنقاء الملك', price: 520, type: 'title' },
+  { key: 'myth_f', title: '🔥 العنقاء الملكة', price: 520, type: 'title' },
 
   // Single booster only
   { key: 'boost2x', title: '🚀 معزز دولار 2x (45 دقيقة)', price: 120, type: 'boost', multiplier: 2, minutes: 45 }
