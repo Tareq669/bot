@@ -178,34 +178,21 @@ const DEFAULT_VOTE_TOPICS = [
 
 const CELEBRATION_LINES = ['إجابة ممتازة!', 'مستوى قوي!', 'رد سريع جدًا!', 'أداء احترافي!'];
 const GROUP_STORE = [
-  // Titles
-  { key: 'warrior', title: '⚔️ المحارب', price: 40, type: 'title' },
-  { key: 'sage', title: '🧠 الحكيم', price: 60, type: 'title' },
-  { key: 'speedster', title: '⚡ السريع', price: 80, type: 'title' },
-  { key: 'legend', title: '👑 الأسطورة', price: 120, type: 'title' },
-  { key: 'night_owl', title: '🌙 ساهر الجروب', price: 90, type: 'title' },
-  { key: 'group_star', title: '🌟 نجم الجروب', price: 110, type: 'title' },
-  { key: 'sharp_mind', title: '🧩 العقل الحاد', price: 130, type: 'title' },
-  { key: 'quiz_master', title: '🎓 سيد الكويز', price: 150, type: 'title' },
-  { key: 'iron_hand', title: '🛡️ اليد الحديدية', price: 170, type: 'title' },
-  { key: 'gold_mentor', title: '🏆 المرشد الذهبي', price: 200, type: 'title' },
-  { key: 'royal_lord', title: '👑 لورد الجروب', price: 240, type: 'title' },
-  { key: 'storm_king', title: '🌪️ ملك العاصفة', price: 280, type: 'title' },
-  { key: 'shadow_ace', title: '🕶️ الآيس المظلل', price: 320, type: 'title' },
-  { key: 'diamond_sultan', title: '💎 سلطان الماس', price: 380, type: 'title' },
-  { key: 'phoenix', title: '🔥 العنقاء', price: 450, type: 'title' },
-  { key: 'xau_lord', title: '🪙 سيد الدولار', price: 520, type: 'title' },
+  // Royal and clean title catalog
+  { key: 'knight', title: '⚔️ الفارس', price: 45, type: 'title' },
+  { key: 'warrior', title: '🛡️ المحارب', price: 70, type: 'title' },
+  { key: 'captain', title: '🎖️ القائد', price: 95, type: 'title' },
+  { key: 'star', title: '🌟 نجم الجروب', price: 120, type: 'title' },
+  { key: 'queen', title: '👸 الملكة', price: 150, type: 'title' },
+  { key: 'king', title: '🤴 الملك', price: 170, type: 'title' },
+  { key: 'sultan', title: '🫅 السلطان', price: 220, type: 'title' },
+  { key: 'empress', title: '👑 الإمبراطورة', price: 260, type: 'title' },
+  { key: 'emperor', title: '👑 الإمبراطور', price: 300, type: 'title' },
+  { key: 'legend', title: '🏆 الأسطورة', price: 360, type: 'title' },
+  { key: 'diamond_lord', title: '💎 سيد الماس', price: 430, type: 'title' },
 
-  // Boosts
-  { key: 'boost2x_30', title: '🚀 معزز دولار 2x (30 دقيقة)', price: 50, type: 'boost', multiplier: 2, minutes: 30 },
-  { key: 'boost2x_60', title: '🚀 معزز دولار 2x (60 دقيقة)', price: 85, type: 'boost', multiplier: 2, minutes: 60 },
-  { key: 'boost2x_180', title: '🚀 معزز دولار 2x (3 ساعات)', price: 170, type: 'boost', multiplier: 2, minutes: 180 },
-  { key: 'boost3x_30', title: '⚡ معزز دولار 3x (30 دقيقة)', price: 120, type: 'boost', multiplier: 3, minutes: 30 },
-  { key: 'boost3x_60', title: '⚡ معزز دولار 3x (60 دقيقة)', price: 210, type: 'boost', multiplier: 3, minutes: 60 },
-  { key: 'boost4x_20', title: '💥 معزز دولار 4x (20 دقيقة)', price: 190, type: 'boost', multiplier: 4, minutes: 20 },
-  { key: 'boost4x_45', title: '💥 معزز دولار 4x (45 دقيقة)', price: 340, type: 'boost', multiplier: 4, minutes: 45 },
-  { key: 'boost5x_15', title: '🌋 معزز دولار 5x (15 دقيقة)', price: 250, type: 'boost', multiplier: 5, minutes: 15 },
-  { key: 'boost5x_30', title: '🌋 معزز دولار 5x (30 دقيقة)', price: 460, type: 'boost', multiplier: 5, minutes: 30 }
+  // Single booster only
+  { key: 'boost2x', title: '🚀 معزز دولار 2x (45 دقيقة)', price: 120, type: 'boost', multiplier: 2, minutes: 45 }
 ];
 const MONTHLY_REWARDS = [120, 80, 50];
 const DUEL_STAKE = 3;
