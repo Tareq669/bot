@@ -249,6 +249,16 @@ const GROUP_STORE = [
 ];
 const MONTHLY_REWARDS = [120, 80, 50];
 const DUEL_STAKE = 3;
+const SCRATCH_TICKET_PRICE = 5;
+const SCRATCH_MAX_DAILY_PLAYS = 10;
+const SCRATCH_COOLDOWN_SEC = 20;
+const SCRATCH_OUTCOMES = [
+  { label: '❌ لم تربح في هذه البطاقة', payout: 0, weight: 60 },
+  { label: '💵 ربح بسيط', payout: 3, weight: 25 },
+  { label: '💸 ربح ممتاز', payout: 10, weight: 10 },
+  { label: '🏆 ربح كبير', payout: 30, weight: 4 },
+  { label: '👑 جاكبوت', payout: 100, weight: 1 }
+];
 const UNIQUE_GIFTS = [
   { key: 'rose', name: '🌹 وردة', price: 2 },
   { key: 'bouquet', name: '💐 باقة ورود', price: 6 },
@@ -593,6 +603,11 @@ class GroupGamesHandler {
       if (!Number.isFinite(row.giftsSent)) row.giftsSent = 0;
       if (!Number.isFinite(row.giftsReceived)) row.giftsReceived = 0;
       if (!Array.isArray(row.giftInventory)) row.giftInventory = [];
+      if (!row.scratchDayKey) row.scratchDayKey = '';
+      if (!Number.isFinite(row.scratchPlaysToday)) row.scratchPlaysToday = 0;
+      if (!Number.isFinite(row.scratchTotalPlays)) row.scratchTotalPlays = 0;
+      if (!Number.isFinite(row.scratchTotalWins)) row.scratchTotalWins = 0;
+      if (!Number.isFinite(row.scratchTotalPayout)) row.scratchTotalPayout = 0;
     });
     if (!Array.isArray(group.gameSystem.teams)) group.gameSystem.teams = [];
     if (!group.gameSystem.tournament) group.gameSystem.tournament = { active: false, season: 1, startedAt: null, endedAt: null, rewards: { first: 100, second: 60, third: 40 } };
@@ -772,6 +787,12 @@ class GroupGamesHandler {
         giftsSent: 0,
         giftsReceived: 0,
         giftInventory: [],
+        scratchDayKey: '',
+        scratchPlaysToday: 0,
+        scratchLastPlayAt: null,
+        scratchTotalPlays: 0,
+        scratchTotalWins: 0,
+        scratchTotalPayout: 0,
         wins: 0,
         streak: 0,
         bestStreak: 0,
@@ -782,6 +803,11 @@ class GroupGamesHandler {
     }
     row.username = user.username || user.first_name || String(userId);
     if (!Array.isArray(row.giftInventory)) row.giftInventory = [];
+    if (!row.scratchDayKey) row.scratchDayKey = '';
+    if (!Number.isFinite(row.scratchPlaysToday)) row.scratchPlaysToday = 0;
+    if (!Number.isFinite(row.scratchTotalPlays)) row.scratchTotalPlays = 0;
+    if (!Number.isFinite(row.scratchTotalWins)) row.scratchTotalWins = 0;
+    if (!Number.isFinite(row.scratchTotalPayout)) row.scratchTotalPayout = 0;
     return row;
   }
 
@@ -812,6 +838,24 @@ class GroupGamesHandler {
       const aliases = [g.key, g.name, this.normalizeText(g.name)];
       return aliases.some((x) => this.normalizeText(String(x)) === this.normalizeText(raw));
     }) || null;
+  }
+
+  static rollScratchOutcome() {
+    const totalWeight = SCRATCH_OUTCOMES.reduce((sum, x) => sum + Number(x.weight || 0), 0);
+    let roll = Math.random() * totalWeight;
+    for (const item of SCRATCH_OUTCOMES) {
+      roll -= Number(item.weight || 0);
+      if (roll <= 0) return item;
+    }
+    return SCRATCH_OUTCOMES[0];
+  }
+
+  static resetScratchDailyIfNeeded(row) {
+    const today = this.getDateKey();
+    if (row.scratchDayKey !== today) {
+      row.scratchDayKey = today;
+      row.scratchPlaysToday = 0;
+    }
   }
 
   static resolveTargetUser(ctx, group, arg) {
@@ -1934,6 +1978,104 @@ class GroupGamesHandler {
     );
   }
 
+  static async handleScratchCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const args = this.parseCommandArgs(ctx);
+    let rounds = parseInt(args.find((x) => /^\d+$/.test(String(x))) || '1', 10);
+    if (!Number.isInteger(rounds) || rounds < 1) rounds = 1;
+    rounds = Math.min(rounds, 5);
+
+    const group = await this.ensureGroupRecord(ctx);
+    const row = this.getOrCreateScoreRow(group, ctx.from);
+    this.resetScratchDailyIfNeeded(row);
+
+    const now = Date.now();
+    const lastAt = row.scratchLastPlayAt ? new Date(row.scratchLastPlayAt).getTime() : 0;
+    const cooldownLeft = Math.ceil((SCRATCH_COOLDOWN_SEC * 1000 - (now - lastAt)) / 1000);
+    if (cooldownLeft > 0) {
+      return ctx.reply(`⏳ انتظر ${cooldownLeft} ثانية قبل الكشط مرة ثانية.`);
+    }
+
+    const leftToday = Math.max(0, SCRATCH_MAX_DAILY_PLAYS - Number(row.scratchPlaysToday || 0));
+    if (leftToday <= 0) {
+      return ctx.reply(`🧾 وصلت الحد اليومي للكشط (${SCRATCH_MAX_DAILY_PLAYS}). ارجع بكرة.`);
+    }
+    rounds = Math.min(rounds, leftToday);
+
+    const totalCost = rounds * SCRATCH_TICKET_PRICE;
+    if ((row.points || 0) < totalCost) {
+      return ctx.reply(
+        `❌ فلوسك غير كافية.\n` +
+        `• سعر البطاقة: ${this.formatCurrency(SCRATCH_TICKET_PRICE)}\n` +
+        `• المطلوب لـ ${rounds}: ${this.formatCurrency(totalCost)}`,
+        { reply_to_message_id: ctx.message?.message_id }
+      );
+    }
+
+    row.points -= totalCost;
+    row.scratchPlaysToday = Number(row.scratchPlaysToday || 0) + rounds;
+    row.scratchTotalPlays = Number(row.scratchTotalPlays || 0) + rounds;
+    row.scratchLastPlayAt = new Date();
+
+    const lines = [];
+    let wins = 0;
+    let totalPayout = 0;
+    for (let i = 0; i < rounds; i += 1) {
+      const outcome = this.rollScratchOutcome();
+      if (outcome.payout > 0) wins += 1;
+      totalPayout += Number(outcome.payout || 0);
+      lines.push(`${i + 1}) ${outcome.label}${outcome.payout > 0 ? ` +${this.formatCurrency(outcome.payout)}` : ''}`);
+    }
+
+    row.points += totalPayout;
+    row.scratchTotalWins = Number(row.scratchTotalWins || 0) + wins;
+    row.scratchTotalPayout = Number(row.scratchTotalPayout || 0) + totalPayout;
+    row.updatedAt = new Date();
+    await group.save();
+
+    const net = totalPayout - totalCost;
+    const mention = this.mentionUser(ctx.from?.id, ctx.from?.first_name || ctx.from?.username || 'عضو');
+    return ctx.reply(
+      `${mention}\n` +
+      `🧾 <b>نتيجة الكشط</b>\n` +
+      `• عدد البطاقات: ${rounds}\n` +
+      `• التكلفة: ${this.formatCurrency(totalCost)}\n` +
+      `• مجموع الربح: ${this.formatCurrency(totalPayout)}\n` +
+      `• الصافي: ${net >= 0 ? '+' : ''}${this.formatCurrency(net)}\n` +
+      `• فلوسك الآن: ${this.formatCurrency(row.points || 0)}\n` +
+      `• المتبقي اليوم: ${Math.max(0, SCRATCH_MAX_DAILY_PLAYS - Number(row.scratchPlaysToday || 0))}\n\n` +
+      `${lines.join('\n')}`,
+      { parse_mode: 'HTML', reply_to_message_id: ctx.message?.message_id }
+    );
+  }
+
+  static async handleScratchStatsCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const group = await this.ensureGroupRecord(ctx);
+    const row = this.getOrCreateScoreRow(group, ctx.from);
+    this.resetScratchDailyIfNeeded(row);
+    await group.save();
+
+    const totalPlays = Number(row.scratchTotalPlays || 0);
+    const totalWins = Number(row.scratchTotalWins || 0);
+    const totalPayout = Number(row.scratchTotalPayout || 0);
+    const winRate = totalPlays > 0 ? ((totalWins / totalPlays) * 100).toFixed(1) : '0.0';
+
+    return ctx.reply(
+      `📊 <b>إحصائيات الكشط</b>\n\n` +
+      `• سعر البطاقة: ${this.formatCurrency(SCRATCH_TICKET_PRICE)}\n` +
+      `• حد يومي: ${SCRATCH_MAX_DAILY_PLAYS}\n` +
+      `• مستخدم اليوم: ${Number(row.scratchPlaysToday || 0)}\n` +
+      `• متبقي اليوم: ${Math.max(0, SCRATCH_MAX_DAILY_PLAYS - Number(row.scratchPlaysToday || 0))}\n\n` +
+      `• إجمالي المحاولات: ${totalPlays}\n` +
+      `• مرات الربح: ${totalWins}\n` +
+      `• نسبة الفوز: ${winRate}%\n` +
+      `• إجمالي مبالغ الربح: ${this.formatCurrency(totalPayout)}\n\n` +
+      '💡 استخدم: /gscratch أو "كشط"',
+      { parse_mode: 'HTML', reply_to_message_id: ctx.message?.message_id }
+    );
+  }
+
   static async handleGiftCatalogCommand(ctx) {
     if (!this.isGroupChat(ctx)) return;
     const list = UNIQUE_GIFTS.map((g) => `• <code>${g.key}</code> → ${g.name} (${this.formatCurrency(g.price)})`).join('\n');
@@ -2431,17 +2573,20 @@ class GroupGamesHandler {
       '• /gbuygift key [count] | شراء هدية لنفسك\n' +
       '• /gsellgift key [count] | بيع هدية للبوت (70%)\n' +
       '• /gassets | ممتلكاتك في الجروب\n\n' +
-      '<b>رابعًا: الثروة</b>\n' +
+      '<b>رابعًا: الكشط والربح</b>\n' +
+      '• /gscratch [count] | كشط بطاقات (1-5)\n' +
+      '• /gscratchstats | إحصائيات الكشط\n\n' +
+      '<b>خامسًا: الثروة</b>\n' +
       '• /gwealth | لوحة أغنى ممتلكات\n' +
       '• استثمار فلوسي | استثمار مباشر\n\n' +
-      '<b>خامسًا: إدارة متقدمة</b>\n' +
+      '<b>سادسًا: إدارة متقدمة</b>\n' +
       '• /ggame | إعدادات ألعاب الجروب\n' +
       '• /gquizset 5 | سلسلة كويز\n' +
       '• /gteam | فريقك\n' +
       '• /gteams | ترتيب الفرق\n' +
       '• /gtour | البطولة الأسبوعية (مشرف)\n\n' +
       '<b>أوامر عربية بدون سلاش</b>\n' +
-      'العاب الجروب | مين انا | الغاز | سرعة الكتابة | روليت | متصدرين | اسبوعي | متصدرين الشهر | ملفي | متجر الجروب | الهدايا | ممتلكاتي | اغنى ممتلكات | استثمار فلوسي\n\n' +
+      'العاب الجروب | مين انا | الغاز | سرعة الكتابة | روليت | متصدرين | اسبوعي | متصدرين الشهر | ملفي | متجر الجروب | الهدايا | ممتلكاتي | اغنى ممتلكات | استثمار فلوسي | كشط | احصائيات الكشط\n\n' +
       `العملة: كل إجابة صحيحة = <b>${this.formatCurrency(1)}</b>.`,
       { parse_mode: 'HTML', reply_markup: keyboard.reply_markup }
     );

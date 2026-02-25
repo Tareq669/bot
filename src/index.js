@@ -119,7 +119,7 @@ const GROUP_ONLY_COMMANDS = new Set([
   'gtemplate_member', 'gtemplate_admin', 'gideal_member', 'gideal_admin', 'gshow_ideal_member', 'gshow_ideal_admin', 'gwelcome', 'gsuggest',
   'gfaq', 'gsuggestmenu', 'gsuggeststats', 'gsuggesttop', 'gquiz', 'gmath', 'gword', 'gdaily', 'gmcq', 'gvote', 'gquizset', 'gleader', 'gweekly', 'ggame', 'ggames',
   'g', 'gteam', 'gteams', 'gtour', 'gwho', 'griddle', 'gtype', 'chance', 'gduel', 'gstore', 'gbuy', 'ggifts', 'ggift', 'gassets', 'gwealth', 'gprofile', 'ginvest', 'gmonth', 'gmonthly', 'gbonus', 'glevels',
-  'gbuygift', 'gsellgift'
+  'gbuygift', 'gsellgift', 'gscratch', 'gscratchstats'
 ]);
 
 const PRIVATE_REPLY_BUTTONS = new Set([
@@ -259,6 +259,8 @@ Promise.all([
       { command: 'ggift', description: 'إهداء هدية' },
       { command: 'gbuygift', description: 'شراء هدية لنفسك' },
       { command: 'gsellgift', description: 'بيع هدية من ممتلكاتك' },
+      { command: 'gscratch', description: 'كشط بطاقات ربح' },
+      { command: 'gscratchstats', description: 'إحصائيات الكشط' },
       { command: 'gassets', description: 'ممتلكاتك في الجروب' },
       { command: 'gwealth', description: 'لوحة أغنى ممتلكات' },
       { command: 'gprofile', description: 'ملفك في الجروب' },
@@ -385,6 +387,8 @@ bot.command('ggifts', (ctx) => GroupGamesHandler.handleGiftCatalogCommand(ctx));
 bot.command('ggift', (ctx) => GroupGamesHandler.handleGiftCommand(ctx));
 bot.command('gbuygift', (ctx) => GroupGamesHandler.handleBuyGiftForSelfCommand(ctx));
 bot.command('gsellgift', (ctx) => GroupGamesHandler.handleSellGiftCommand(ctx));
+bot.command('gscratch', (ctx) => GroupGamesHandler.handleScratchCommand(ctx));
+bot.command('gscratchstats', (ctx) => GroupGamesHandler.handleScratchStatsCommand(ctx));
 bot.command('gassets', (ctx) => GroupGamesHandler.handleAssetsCommand(ctx));
 bot.command('gwealth', (ctx) => GroupGamesHandler.handleWealthCommand(ctx));
 bot.command('gprofile', (ctx) => GroupGamesHandler.handleGroupProfileCommand(ctx));
@@ -2435,6 +2439,8 @@ bot.hears(/^تحدي(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleDuelCommand(
 bot.hears(/^متجر\s*الجروب$/i, (ctx) => GroupGamesHandler.handleStoreCommand(ctx));
 bot.hears(/^شراء\s*هد(?:ي|ي)ة(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleBuyGiftForSelfCommand(ctx));
 bot.hears(/^بيع\s*هد(?:ي|ي)ة(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleSellGiftCommand(ctx));
+bot.hears(/^كشط(?:\s+\d+)?$/i, (ctx) => GroupGamesHandler.handleScratchCommand(ctx));
+bot.hears(/^(?:احصائيات|إحصائيات)\s*الكشط$/i, (ctx) => GroupGamesHandler.handleScratchStatsCommand(ctx));
 bot.hears(/^شراء(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleBuyCommand(ctx));
 bot.hears(/^(?:الهدايا|هدايا)$/i, (ctx) => GroupGamesHandler.handleGiftCatalogCommand(ctx));
 bot.hears(/^(?:ممتلكاتي|ممتلكاتي\s*بالجروب|املاكي|أملاكي)$/i, (ctx) => GroupGamesHandler.handleAssetsCommand(ctx));
@@ -2471,6 +2477,8 @@ bot.hears(/^\/(?:تحدي)(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleDuelCo
 bot.hears(/^\/(?:متجر_الجروب|المتجر)$/i, (ctx) => GroupGamesHandler.handleStoreCommand(ctx));
 bot.hears(/^\/(?:شراء_هدية|شراءهدية|شراء_هديه|شراءهديه)(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleBuyGiftForSelfCommand(ctx));
 bot.hears(/^\/(?:بيع_هدية|بيعهدية|بيع_هديه|بيعهديه)(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleSellGiftCommand(ctx));
+bot.hears(/^\/(?:كشط|كشط_اكواد|كشطاكواد)(?:\s+\d+)?$/i, (ctx) => GroupGamesHandler.handleScratchCommand(ctx));
+bot.hears(/^\/(?:احصائيات_الكشط|إحصائيات_الكشط|احصائياتالكشط|إحصائياتالكشط)$/i, (ctx) => GroupGamesHandler.handleScratchStatsCommand(ctx));
 bot.hears(/^\/(?:شراء)(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleBuyCommand(ctx));
 bot.hears(/^\/(?:هدايا|الهدايا)$/i, (ctx) => GroupGamesHandler.handleGiftCatalogCommand(ctx));
 bot.hears(/^\/(?:ممتلكاتي|املاكي|أملاكي)$/i, (ctx) => GroupGamesHandler.handleAssetsCommand(ctx));

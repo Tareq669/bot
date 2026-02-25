@@ -342,6 +342,27 @@ const groupSchema = new mongoose.Schema({
             }
           }
         ],
+        scratchDayKey: {
+          type: String,
+          default: ''
+        },
+        scratchPlaysToday: {
+          type: Number,
+          default: 0
+        },
+        scratchLastPlayAt: Date,
+        scratchTotalPlays: {
+          type: Number,
+          default: 0
+        },
+        scratchTotalWins: {
+          type: Number,
+          default: 0
+        },
+        scratchTotalPayout: {
+          type: Number,
+          default: 0
+        },
         wins: {
           type: Number,
           default: 0
