@@ -91,6 +91,22 @@ class GroupAdminHandler {
       .trim();
   }
 
+  static escapeRegex(value) {
+    return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  static hasBoundedPhrase(text, phrase) {
+    const normalizedText = this.normalizePlainText(text);
+    const normalizedPhrase = this.normalizePlainText(phrase);
+    if (!normalizedText || !normalizedPhrase) return false;
+    if (normalizedText === normalizedPhrase) return true;
+
+    const escaped = this.escapeRegex(normalizedPhrase);
+    // Match phrase as a standalone token/phrase, not as a substring inside another word.
+    const boundaryPattern = new RegExp(`(^|[^\\p{L}\\p{N}_])${escaped}($|[^\\p{L}\\p{N}_])`, 'u');
+    return boundaryPattern.test(normalizedText);
+  }
+
   static getWeekStart(date = new Date()) {
     const d = new Date(date);
     const day = d.getDay();
@@ -242,6 +258,7 @@ class GroupAdminHandler {
     if (!group.settings.templates.member) group.settings.templates.member = {};
     if (!group.settings.templates.admin) group.settings.templates.admin = {};
     if (!Array.isArray(group.settings.faqTriggers)) group.settings.faqTriggers = [];
+    if (!['bounded', 'exact'].includes(String(group.settings.faqMatchMode || ''))) group.settings.faqMatchMode = 'bounded';
     group.settings.faqTriggers = group.settings.faqTriggers
       .map((item) => ({
         trigger: String(item?.trigger || '').trim(),
@@ -1284,19 +1301,25 @@ class GroupAdminHandler {
 
   static buildFaqHelpText(group) {
     const count = Array.isArray(group?.settings?.faqTriggers) ? group.settings.faqTriggers.length : 0;
+    const mode = String(group?.settings?.faqMatchMode || 'bounded');
+    const modeLabel = mode === 'exact' ? 'حرفي' : 'مرن';
     return (
       `🤖 الردود التلقائية (FAQ)\n\n` +
       `• العدد الحالي: ${count}\n\n` +
+      `• وضع المطابقة: ${modeLabel}\n\n` +
       `أوامر سريعة:\n` +
       `• اضف رد مرحبا | أهلًا وسهلًا\n` +
       `• حذف رد مرحبا\n` +
       `• الردود\n` +
-      `• مسح الردود\n\n` +
+      `• مسح الردود\n` +
+      `• وضع الردود حرفي\n` +
+      `• وضع الردود مرن\n\n` +
       `أوامر سلاش:\n` +
       `• /gfaq add مرحبا | أهلًا وسهلًا\n` +
       `• /gfaq remove مرحبا\n` +
       `• /gfaq list\n` +
-      `• /gfaq clear`
+      `• /gfaq clear\n` +
+      `• /gfaq mode exact|bounded`
     );
   }
 
@@ -1323,6 +1346,27 @@ class GroupAdminHandler {
     const slashMatch = rawText.match(/^\/gfaq(?:@\w+)?(?:\s+(.+))?$/i);
     const lowered = rawText.toLowerCase();
     const triggers = Array.isArray(group.settings?.faqTriggers) ? group.settings.faqTriggers : [];
+
+    const modeArabic = rawText.match(/^وضع الردود\s+(حرفي|مرن)$/i);
+    const modeSlash = slashMatch && /^(mode|match)\s+(\S+)$/i.test(String(slashMatch[1] || '').trim())
+      ? String(slashMatch[1] || '').trim().replace(/^(mode|match)\s+/i, '').trim()
+      : '';
+    if (modeArabic || modeSlash) {
+      const candidate = modeArabic ? String(modeArabic[1] || '').trim() : modeSlash;
+      const normalized = String(candidate || '').toLowerCase();
+      let mode = null;
+      if (['حرفي', 'exact', 'strict'].includes(normalized)) mode = 'exact';
+      if (['مرن', 'bounded', 'flexible'].includes(normalized)) mode = 'bounded';
+      if (!mode) {
+        await ctx.reply('❌ وضع غير معروف. استخدم: حرفي أو مرن (أو exact / bounded).');
+        return true;
+      }
+      group.settings.faqMatchMode = mode;
+      await this.addModerationLog(group, 'faq_mode', ctx.from.id, null, mode);
+      await group.save();
+      await ctx.reply(`✅ تم تحديث وضع مطابقة الردود إلى: ${mode === 'exact' ? 'حرفي' : 'مرن'}.`);
+      return true;
+    }
 
     if (/^(الردود|عرض الردود)$/i.test(rawText) || (slashMatch && /^(list|ls)$/i.test(String(slashMatch[1] || '').trim()))) {
       if (triggers.length === 0) {
@@ -1408,10 +1452,13 @@ class GroupAdminHandler {
     if (!text || text.startsWith('/')) return false;
 
     const normalizedText = this.normalizePlainText(text);
+    const matchMode = String(group?.settings?.faqMatchMode || 'bounded');
     const sorted = [...group.settings.faqTriggers].sort((a, b) => b.trigger.length - a.trigger.length);
     const matched = sorted.find((item) => {
       const key = this.normalizePlainText(item.trigger);
-      return key && (normalizedText === key || normalizedText.includes(key));
+      if (!key) return false;
+      if (matchMode === 'exact') return normalizedText === key;
+      return this.hasBoundedPhrase(normalizedText, key);
     });
 
     if (!matched) return false;
@@ -2517,7 +2564,7 @@ class GroupAdminHandler {
       await this.handleSuggestionCommand(ctx);
       return true;
     }
-    if (/^(?:اضف رد|أضف رد|حذف رد|الردود|عرض الردود|مسح الردود|\/gfaq\b)/i.test(rawText)) {
+    if (/^(?:اضف رد|أضف رد|حذف رد|الردود|عرض الردود|مسح الردود|وضع الردود\s+(?:حرفي|مرن)|\/gfaq\b)/i.test(rawText)) {
       await this.handleFaqCommand(ctx);
       return true;
     }
@@ -2689,7 +2736,7 @@ class GroupAdminHandler {
 
     if (group.settings?.filterBadWords) {
       const blockedWords = ['سب', 'شتيمة', 'كلمة_ممنوعة'];
-      const found = blockedWords.some((w) => text.includes(w));
+      const found = blockedWords.some((w) => this.hasBoundedPhrase(text, w));
       if (found) {
         try {
           await ctx.telegram.deleteMessage(ctx.chat.id, ctx.message.message_id);

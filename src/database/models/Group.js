@@ -167,6 +167,11 @@ const groupSchema = new mongoose.Schema({
         }
       }
     ],
+    faqMatchMode: {
+      type: String,
+      enum: ['bounded', 'exact'],
+      default: 'bounded'
+    },
     idealMemberId: Number,
     idealAdminId: Number
   },
