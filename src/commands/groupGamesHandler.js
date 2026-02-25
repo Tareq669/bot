@@ -232,10 +232,8 @@ const GROUP_STORE = [
   { key: 'leader_f', title: '🎯 الزعيمة', price: 470, type: 'title' },
 
   { key: 'ninja_m', title: '🥷 نينجا', price: 490, type: 'title' },
-  { key: 'ninja_f', title: '🥷 نينجا', price: 490, type: 'title' },
 
   { key: 'phoenix_m', title: '🔥 العنقاء', price: 520, type: 'title' },
-  { key: 'phoenix_f', title: '🔥 العنقاء', price: 520, type: 'title' },
 
   { key: 'dollar_master_m', title: '💵 سيد الدولار', price: 560, type: 'title' },
   { key: 'dollar_master_f', title: '💵 سيدة الدولار', price: 560, type: 'title' },
