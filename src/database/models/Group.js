@@ -363,6 +363,27 @@ const groupSchema = new mongoose.Schema({
           type: Number,
           default: 0
         },
+        luckDayKey: {
+          type: String,
+          default: ''
+        },
+        luckPlaysToday: {
+          type: Number,
+          default: 0
+        },
+        luckLastPlayAt: Date,
+        luckTotalPlays: {
+          type: Number,
+          default: 0
+        },
+        luckTotalWins: {
+          type: Number,
+          default: 0
+        },
+        luckTotalPayout: {
+          type: Number,
+          default: 0
+        },
         wins: {
           type: Number,
           default: 0

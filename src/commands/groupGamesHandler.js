@@ -253,7 +253,16 @@ const SCRATCH_TICKET_PRICE = 5;
 const SCRATCH_MAX_DAILY_PLAYS = 10;
 const SCRATCH_COOLDOWN_SEC = 20;
 const LUCK_MIN_RANGE = 1;
-const LUCK_MAX_RANGE = 100000;
+const LUCK_MAX_RANGE = 1000;
+const LUCK_DAILY_LIMIT = 10;
+const LUCK_COOLDOWN_SEC = 6;
+const LUCK_JACKPOT_NUMBERS = new Set([7, 13, 77, 111, 222, 333, 444, 555, 777, 999]);
+const LUCK_GOOD_RANGES = [
+  [88, 99], [188, 199], [288, 299], [388, 399], [488, 499], [588, 599], [688, 699], [788, 799], [888, 899]
+];
+const LUCK_SMALL_RANGES = [
+  [20, 29], [120, 129], [220, 229], [320, 329], [420, 429], [520, 529], [620, 629], [720, 729], [820, 829], [920, 929]
+];
 const SCRATCH_OUTCOMES = [
   { label: '❌ لم تربح في هذه البطاقة', payout: 0, weight: 60 },
   { label: '💵 ربح بسيط', payout: 3, weight: 25 },
@@ -610,6 +619,11 @@ class GroupGamesHandler {
       if (!Number.isFinite(row.scratchTotalPlays)) row.scratchTotalPlays = 0;
       if (!Number.isFinite(row.scratchTotalWins)) row.scratchTotalWins = 0;
       if (!Number.isFinite(row.scratchTotalPayout)) row.scratchTotalPayout = 0;
+      if (!row.luckDayKey) row.luckDayKey = '';
+      if (!Number.isFinite(row.luckPlaysToday)) row.luckPlaysToday = 0;
+      if (!Number.isFinite(row.luckTotalPlays)) row.luckTotalPlays = 0;
+      if (!Number.isFinite(row.luckTotalWins)) row.luckTotalWins = 0;
+      if (!Number.isFinite(row.luckTotalPayout)) row.luckTotalPayout = 0;
     });
     if (!Array.isArray(group.gameSystem.teams)) group.gameSystem.teams = [];
     if (!group.gameSystem.tournament) group.gameSystem.tournament = { active: false, season: 1, startedAt: null, endedAt: null, rewards: { first: 100, second: 60, third: 40 } };
@@ -795,6 +809,12 @@ class GroupGamesHandler {
         scratchTotalPlays: 0,
         scratchTotalWins: 0,
         scratchTotalPayout: 0,
+        luckDayKey: '',
+        luckPlaysToday: 0,
+        luckLastPlayAt: null,
+        luckTotalPlays: 0,
+        luckTotalWins: 0,
+        luckTotalPayout: 0,
         wins: 0,
         streak: 0,
         bestStreak: 0,
@@ -810,6 +830,11 @@ class GroupGamesHandler {
     if (!Number.isFinite(row.scratchTotalPlays)) row.scratchTotalPlays = 0;
     if (!Number.isFinite(row.scratchTotalWins)) row.scratchTotalWins = 0;
     if (!Number.isFinite(row.scratchTotalPayout)) row.scratchTotalPayout = 0;
+    if (!row.luckDayKey) row.luckDayKey = '';
+    if (!Number.isFinite(row.luckPlaysToday)) row.luckPlaysToday = 0;
+    if (!Number.isFinite(row.luckTotalPlays)) row.luckTotalPlays = 0;
+    if (!Number.isFinite(row.luckTotalWins)) row.luckTotalWins = 0;
+    if (!Number.isFinite(row.luckTotalPayout)) row.luckTotalPayout = 0;
     return row;
   }
 
@@ -858,6 +883,31 @@ class GroupGamesHandler {
       row.scratchDayKey = today;
       row.scratchPlaysToday = 0;
     }
+  }
+
+  static resetLuckDailyIfNeeded(row) {
+    const today = this.getDateKey();
+    if (row.luckDayKey !== today) {
+      row.luckDayKey = today;
+      row.luckPlaysToday = 0;
+    }
+  }
+
+  static inAnyRange(number, ranges) {
+    return ranges.some(([a, b]) => number >= a && number <= b);
+  }
+
+  static evaluateLuckNumber(number) {
+    if (LUCK_JACKPOT_NUMBERS.has(number)) {
+      return { tier: 'اوفر', win: true, payout: 150 };
+    }
+    if (this.inAnyRange(number, LUCK_GOOD_RANGES)) {
+      return { tier: 'جيد', win: true, payout: 35 };
+    }
+    if (this.inAnyRange(number, LUCK_SMALL_RANGES)) {
+      return { tier: 'قليل', win: true, payout: 10 };
+    }
+    return { tier: 'خاسر', win: false, payout: 0 };
   }
 
   static resolveTargetUser(ctx, group, arg) {
@@ -1293,7 +1343,6 @@ class GroupGamesHandler {
     if (!isAdmin) return ctx.reply('❌ هذا الأمر للمشرفين فقط.');
 
     const group = await this.ensureGroupRecord(ctx);
-    const args = this.parseCommandArgs(ctx);
 
     if (args.length === 0) {
       const s = group.gameSystem.settings;
@@ -1982,52 +2031,51 @@ class GroupGamesHandler {
 
   static async handleLuckCommand(ctx) {
     if (!this.isGroupChat(ctx)) return;
-    if (this.checkCooldown(ctx, 'luck', 12000)) {
+    if (this.checkCooldown(ctx, 'luck', LUCK_COOLDOWN_SEC * 1000)) {
       return ctx.reply('⏳ تمهّل شوي قبل استخدام الحظ مرة ثانية.');
     }
 
     const text = String(ctx.message?.text || '').trim();
     const args = this.parseCommandArgs(ctx);
-
-    let min = 1;
-    let max = 1000;
-
-    const rangeMatch = text.match(/(\d+)\s*[-–]\s*(\d+)/);
-    if (rangeMatch) {
-      min = parseInt(rangeMatch[1], 10);
-      max = parseInt(rangeMatch[2], 10);
-    } else {
-      const nums = args.map((x) => parseInt(String(x), 10)).filter((n) => Number.isInteger(n));
-      if (nums.length >= 2) {
-        [min, max] = nums.slice(0, 2);
-      } else if (nums.length === 1) {
-        min = 1;
-        max = nums[0];
-      }
+    const nums = (text.match(/\d+/g) || []).map((n) => parseInt(n, 10)).filter((n) => Number.isInteger(n));
+    if (nums.length === 0) {
+      return ctx.reply('❌ اختر رقم أولًا.\nمثال: حظ 777 أو حظ من 1 - 1000 777');
+    }
+    const hasRangeHint = /من|الى|إلى|[-–]/.test(text);
+    const pickedNumber = nums[hasRangeHint && nums.length >= 3 ? nums.length - 1 : 0];
+    if (!Number.isInteger(pickedNumber) || pickedNumber < LUCK_MIN_RANGE || pickedNumber > LUCK_MAX_RANGE) {
+      return ctx.reply('❌ لازم تختار رقم بين 1 و 1000.');
     }
 
-    min = Math.max(LUCK_MIN_RANGE, min);
-    max = Math.min(LUCK_MAX_RANGE, max);
-    if (min > max) [min, max] = [max, min];
-    if (!Number.isInteger(min) || !Number.isInteger(max) || max < 1) {
-      return ctx.reply('❌ صيغة الحظ غير صحيحة. مثال: حظ من 1 - 1000');
-    }
-
-    const winAmount = Math.floor(Math.random() * (max - min + 1)) + min;
     const group = await this.ensureGroupRecord(ctx);
     const row = this.getOrCreateScoreRow(group, ctx.from);
+    this.resetLuckDailyIfNeeded(row);
+    if ((row.luckPlaysToday || 0) >= LUCK_DAILY_LIMIT) {
+      return ctx.reply(`🧾 وصلت الحد اليومي للمحاولات (${LUCK_DAILY_LIMIT}). ارجع بكرة.`);
+    }
+
+    const result = this.evaluateLuckNumber(pickedNumber);
     const before = Number(row.points || 0);
+    const winAmount = Number(result.payout || 0);
     row.points = before + winAmount;
+    row.luckPlaysToday = Number(row.luckPlaysToday || 0) + 1;
+    row.luckTotalPlays = Number(row.luckTotalPlays || 0) + 1;
+    if (result.win) row.luckTotalWins = Number(row.luckTotalWins || 0) + 1;
+    row.luckTotalPayout = Number(row.luckTotalPayout || 0) + winAmount;
+    row.luckLastPlayAt = new Date();
     row.updatedAt = new Date();
     await group.save();
 
     const mention = this.mentionUser(ctx.from?.id, ctx.from?.first_name || ctx.from?.username || 'عضو');
     return ctx.reply(
       `${mention}\n` +
-      `• مبروك فزت بالحظ\n` +
+      `• ${result.win ? 'مبروك فزت بالحظ' : 'حظ أوفر المرة الجاية'}\n` +
+      `• الرقم المختار ↢ ( ${pickedNumber} )\n` +
+      `• مستوى الحظ ↢ ( ${result.tier} )\n` +
       `• فلوسك قبل ↢ ( ${this.formatCurrency(before)} )\n` +
       `• فلوسك الآن ↢ ( ${this.formatCurrency(row.points || 0)} )\n` +
-      `• قيمة الحظ ↢ ( +${this.formatCurrency(winAmount)} )`,
+      `• قيمة الحظ ↢ ( ${result.win ? '+' : ''}${this.formatCurrency(winAmount)} )\n` +
+      `• محاولاتك اليوم ↢ ( ${row.luckPlaysToday}/${LUCK_DAILY_LIMIT} )`,
       { parse_mode: 'HTML', reply_to_message_id: ctx.message?.message_id }
     );
   }
@@ -2617,7 +2665,7 @@ class GroupGamesHandler {
       '• /glevels | لوحة المستويات\n' +
       '• /gprofile | ملفك في الجروب\n' +
       '• /ginvest | استثمار فلوسك\n' +
-      '• /gluck 1 1000 | الحظ (ربح عشوائي)\n' +
+      '• /gluck 777 | اختَر رقمك بالحظ (1-1000)\n' +
       '• /gmonthly | صرف المكافأة الشهرية (مشرف)\n' +
       '• /gbonus 10 20 35 60 | مكافآت الترقية (مشرف)\n\n' +
       '<b>ثالثًا: المتجر والهدايا</b>\n' +

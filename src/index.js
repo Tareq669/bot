@@ -265,7 +265,7 @@ Promise.all([
       { command: 'gwealth', description: 'لوحة أغنى ممتلكات' },
       { command: 'gprofile', description: 'ملفك في الجروب' },
       { command: 'ginvest', description: 'استثمار فلوس الجروب' },
-      { command: 'gluck', description: 'الحظ (ربح عشوائي)' },
+      { command: 'gluck', description: 'الحظ (اختر رقم 1-1000)' },
       { command: 'glevels', description: 'لوحة المستويات' },
       { command: 'gmonth', description: 'متصدرين الشهر' },
       { command: 'gmonthly', description: 'صرف مكافأة شهرية' },
