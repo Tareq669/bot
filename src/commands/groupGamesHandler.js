@@ -1940,12 +1940,115 @@ class GroupGamesHandler {
     return ctx.reply(
       `🎁 <b>الهدايا الفريدة (للجروب)</b>\n\n${list}\n\n` +
       `الإهداء: <code>/ggift مفتاح_الهدية @user [العدد]</code>\n` +
+      `شراء لنفسك: <code>/gbuygift مفتاح_الهدية [العدد]</code>\n` +
+      `بيع من ممتلكاتك: <code>/gsellgift مفتاح_الهدية [العدد]</code>\n` +
+      `سعر البيع للبوت: <b>70%</b> من سعر الهدية (خصم 30%)\n\n` +
       'أمثلة عربية:\n' +
       '• <code>اهداء وردة</code> (بالرد على العضو)\n' +
       '• <code>اهداء وردة @user</code>\n' +
-      '• <code>اهداء قصر @user 2</code>\n\n' +
+      '• <code>اهداء قصر @user 2</code>\n' +
+      '• <code>شراء هدية وردة 3</code>\n' +
+      '• <code>بيع هدية قصر 1</code>\n\n' +
       'مثال سلاش: <code>/ggift palace @user</code>',
       { parse_mode: 'HTML' }
+    );
+  }
+
+  static async handleBuyGiftForSelfCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const args = this.parseCommandArgs(ctx);
+    if (args.length === 0) {
+      return ctx.reply('❌ اكتب اسم الهدية أولاً.\nمثال: شراء هدية وردة 2');
+    }
+
+    const qtyArg = [...args].reverse().find((x) => /^\d+$/.test(String(x))) || '1';
+    const qty = Math.max(1, Math.min(20, parseInt(qtyArg, 10) || 1));
+
+    const noiseWords = new Set(['شراء', 'اشتري', 'هدية', 'هديه', 'من', 'المتجر', 'لي', 'لنفسي', 'نفسي', 'x', '×']);
+    const giftTokens = args.filter((x) => !noiseWords.has(this.normalizeText(String(x))) && !/^\d+$/.test(String(x)));
+    const rawInput = giftTokens.join(' ').trim();
+    const gift = this.resolveGiftByInput(rawInput) || this.resolveGiftByInput(giftTokens[0]) || this.resolveGiftByInput(args[0]);
+    if (!gift) return ctx.reply('❌ الهدية غير معروفة. استخدم /ggifts');
+
+    const group = await this.ensureGroupRecord(ctx);
+    const row = this.getOrCreateScoreRow(group, ctx.from);
+    const totalPrice = gift.price * qty;
+    if ((row.points || 0) < totalPrice) {
+      return ctx.reply(`❌ فلوسك غير كافية. المطلوب ${this.formatCurrency(totalPrice)}.`, {
+        reply_to_message_id: ctx.message?.message_id
+      });
+    }
+
+    row.points = (row.points || 0) - totalPrice;
+    let slot = (row.giftInventory || []).find((g) => g.key === gift.key);
+    if (!slot) {
+      slot = { key: gift.key, name: gift.name, count: 0 };
+      row.giftInventory.push(slot);
+    }
+    slot.count = (slot.count || 0) + qty;
+    row.updatedAt = new Date();
+    await group.save();
+
+    const mention = this.mentionUser(ctx.from?.id, ctx.from?.first_name || ctx.from?.username || 'عضو');
+    return ctx.reply(
+      `${mention}\n` +
+      `✅ <b>تم شراء الهدية لنفسك</b>\n` +
+      `• الهدية: ${gift.name}\n` +
+      `• العدد: ${qty}\n` +
+      `• التكلفة: ${this.formatCurrency(totalPrice)}\n` +
+      `• فلوسك الآن: ${this.formatCurrency(row.points || 0)}`,
+      { parse_mode: 'HTML', reply_to_message_id: ctx.message?.message_id }
+    );
+  }
+
+  static async handleSellGiftCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const args = this.parseCommandArgs(ctx);
+    if (args.length === 0) {
+      return ctx.reply('❌ اكتب اسم الهدية التي تريد بيعها.\nمثال: بيع هدية وردة 2');
+    }
+
+    const qtyArg = [...args].reverse().find((x) => /^\d+$/.test(String(x))) || '1';
+    const qty = Math.max(1, Math.min(20, parseInt(qtyArg, 10) || 1));
+
+    const noiseWords = new Set(['بيع', 'هدية', 'هديه', 'من', 'ممتلكاتي', 'x', '×']);
+    const giftTokens = args.filter((x) => !noiseWords.has(this.normalizeText(String(x))) && !/^\d+$/.test(String(x)));
+    const rawInput = giftTokens.join(' ').trim();
+    const gift = this.resolveGiftByInput(rawInput) || this.resolveGiftByInput(giftTokens[0]) || this.resolveGiftByInput(args[0]);
+    if (!gift) return ctx.reply('❌ الهدية غير معروفة. استخدم /ggifts');
+
+    const group = await this.ensureGroupRecord(ctx);
+    const row = this.getOrCreateScoreRow(group, ctx.from);
+    const inventory = Array.isArray(row.giftInventory) ? row.giftInventory : [];
+    const slot = inventory.find((g) => g.key === gift.key);
+    const currentCount = Number(slot?.count || 0);
+    if (currentCount < qty) {
+      return ctx.reply(`❌ ما عندك كمية كافية من ${gift.name}. الموجود عندك: ${currentCount}.`, {
+        reply_to_message_id: ctx.message?.message_id
+      });
+    }
+
+    const sellUnitPrice = Math.max(1, Math.floor(gift.price * 0.7));
+    const totalPayout = sellUnitPrice * qty;
+
+    slot.count = currentCount - qty;
+    if (slot.count <= 0) {
+      row.giftInventory = inventory.filter((g) => g !== slot);
+    }
+    row.points = (row.points || 0) + totalPayout;
+    row.updatedAt = new Date();
+    await group.save();
+
+    const mention = this.mentionUser(ctx.from?.id, ctx.from?.first_name || ctx.from?.username || 'عضو');
+    return ctx.reply(
+      `${mention}\n` +
+      `✅ <b>تم بيع الهدية للبوت</b>\n` +
+      `• الهدية: ${gift.name}\n` +
+      `• العدد المباع: ${qty}\n` +
+      `• سعر القطعة بعد الخصم: ${this.formatCurrency(sellUnitPrice)}\n` +
+      `• المبلغ المستلم: ${this.formatCurrency(totalPayout)}\n` +
+      `• فلوسك الآن: ${this.formatCurrency(row.points || 0)}`,
+      { parse_mode: 'HTML', reply_to_message_id: ctx.message?.message_id }
     );
   }
 
@@ -2001,7 +2104,7 @@ class GroupGamesHandler {
       `🚀 المعزز النشط: ${activeBoost}\n` +
       `🎁 إجمالي الهدايا: ${totalItems}\n` +
       `💎 القيمة التقديرية: ${this.formatCurrency(totalEstimatedValue)}\n\n` +
-      `💡 للزيادة: استخدم /ggift أو /gbuy أو /gstore`,
+      `💡 للزيادة: استخدم /ggift أو /gbuygift أو /gbuy أو /gstore`,
       { parse_mode: 'HTML' }
     );
   }
@@ -2325,6 +2428,8 @@ class GroupGamesHandler {
       '• /gbuy key | شراء عنصر\n' +
       '• /ggifts | قائمة الهدايا\n' +
       '• /ggift key @user [count] | إهداء هدية\n' +
+      '• /gbuygift key [count] | شراء هدية لنفسك\n' +
+      '• /gsellgift key [count] | بيع هدية للبوت (70%)\n' +
       '• /gassets | ممتلكاتك في الجروب\n\n' +
       '<b>رابعًا: الثروة</b>\n' +
       '• /gwealth | لوحة أغنى ممتلكات\n' +
