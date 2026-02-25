@@ -342,6 +342,22 @@ class GroupGamesHandler {
       .replace(/\s+/g, ' ');
   }
 
+  static escapeHtml(value) {
+    return String(value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  static mentionUser(userId, label) {
+    const id = Number(userId);
+    const safeLabel = this.escapeHtml(label || String(userId));
+    if (!Number.isFinite(id) || id <= 0) return safeLabel;
+    return `<a href="tg://user?id=${id}">${safeLabel}</a>`;
+  }
+
   static shuffleWord(word) {
     const chars = Array.from(word);
     for (let i = chars.length - 1; i > 0; i -= 1) {
@@ -1113,7 +1129,8 @@ class GroupGamesHandler {
     }
     await group.save();
 
-    const winner = ctx.from.first_name || ctx.from.username || String(ctx.from.id);
+    const winnerName = ctx.from.first_name || ctx.from.username || String(ctx.from.id);
+    const winner = this.mentionUser(ctx.from.id, winnerName);
     const rank = this.getUserRank(group, ctx.from.id);
     const team = this.getUserTeam(group, ctx.from.id);
     const hype = this.pickRandom(CELEBRATION_LINES);
@@ -1389,7 +1406,8 @@ class GroupGamesHandler {
     const boostLine = scoreMeta.boostActive ? '\n🚀 معزز النقاط مفعل' : '';
     const tierLine = scoreMeta.tier ? `\n🏅 المستوى: ${scoreMeta.tier}` : '';
     const tierBonusLine = scoreMeta.tierUpBonus > 0 ? `\n🎉 مكافأة ترقية +${scoreMeta.tierUpBonus}` : '';
-    await ctx.reply(`✅ <b>${ctx.from.first_name || 'عضو'}</b> أجاب صحيحًا!\n💰 +${scoreMeta.finalReward} نقطة${boostLine}${tierBonusLine}${tierLine}\n🏅 ترتيبك: #${rank || '-'}`, { parse_mode: 'HTML' });
+    const winnerMention = this.mentionUser(ctx.from?.id, ctx.from?.first_name || ctx.from?.username || 'عضو');
+    await ctx.reply(`✅ ${winnerMention} أجاب صحيحًا!\n💰 +${scoreMeta.finalReward} نقطة${boostLine}${tierBonusLine}${tierLine}\n🏅 ترتيبك: #${rank || '-'}`, { parse_mode: 'HTML' });
   }
 
   static parseVoteCommand(text) {
@@ -1869,8 +1887,10 @@ class GroupGamesHandler {
       ).catch(() => {});
     }
 
+    const senderMention = this.mentionUser(ctx.from?.id, ctx.from?.first_name || ctx.from?.username || 'عضو');
+    const receiverMention = this.mentionUser(target.id, target.first_name || target.username || String(target.id));
     return ctx.reply(
-      `🎁 ${ctx.from.first_name || 'عضو'} أرسل ${gift.name} ×${qty} إلى ${target.first_name || target.username || target.id}\n` +
+      `🎁 ${senderMention} أرسل ${gift.name} ×${qty} إلى ${receiverMention}\n` +
       `💰 تكلفة الإرسال: ${totalPrice} نقطة`,
       { parse_mode: 'HTML' }
     );
