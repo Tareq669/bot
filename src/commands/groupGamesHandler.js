@@ -421,6 +421,11 @@ class GroupGamesHandler {
     return `<a href="tg://user?id=${id}">${safeLabel}</a>`;
   }
 
+  static formatCurrency(amount) {
+    const value = Math.max(0, Math.floor(Number(amount) || 0));
+    return `${value.toLocaleString('en-US')} دولار 💸`;
+  }
+
   static shuffleWord(word) {
     const chars = Array.from(word);
     for (let i = chars.length - 1; i > 0; i -= 1) {
@@ -895,7 +900,7 @@ class GroupGamesHandler {
 
     const sent = await this.bot.telegram.sendMessage(
       Number(chatId),
-      `${roundPayload.prompt}\n\n⏱️ المدة: ${roundPayload.timeoutSec} ثانية\n💰 الجائزة: 1 دولار`,
+      `${roundPayload.prompt}\n\n⏱️ المدة: ${roundPayload.timeoutSec} ثانية\n💰 الجائزة: ${this.formatCurrency(1)}`,
       { parse_mode: 'HTML' }
     );
 
@@ -1035,7 +1040,7 @@ class GroupGamesHandler {
     const tierBonusLine = scoreMeta.tierUpBonus > 0 ? `\n🎉 مكافأة ترقية +${scoreMeta.tierUpBonus}` : '';
     await this.bot.telegram.sendMessage(
       Number(state.chatId),
-      `✅ ${answer.user?.first_name || 'لاعب'} أجاب صحيحًا!\n💰 +${scoreMeta.finalReward}$${boostLine}${tierBonusLine}${tierLine}\n🏅 الترتيب: #${rank || '-'}`,
+      `✅ ${answer.user?.first_name || 'لاعب'} أجاب صحيحًا!\n💰 +${this.formatCurrency(scoreMeta.finalReward)}${boostLine}${tierBonusLine}${tierLine}\n🏅 الترتيب: #${rank || '-'}`,
       { parse_mode: 'HTML' }
     ).catch(() => {});
   }
@@ -1203,11 +1208,11 @@ class GroupGamesHandler {
     const tierBonusLine = scoreMeta.tierUpBonus > 0 ? `\n🎉 مكافأة ترقية +${scoreMeta.tierUpBonus}` : '';
     const boostLine = scoreMeta.boostActive ? '\n🚀 معزز الدولار مفعل' : '';
     const tierLine = scoreMeta.tier ? `\n🏅 المستوى: ${scoreMeta.tier}` : '';
-    const teamLine = team ? `\n👥 فريقك: ${team.name} | رصيد الفريق: ${team.points || 0}$` : '';
+    const teamLine = team ? `\n👥 فريقك: ${team.name} | رصيد الفريق: ${this.formatCurrency(team.points || 0)}` : '';
     const rankLine = rank ? `\n🏅 ترتيبك الحالي: #${rank}` : '';
 
     await ctx.reply(
-      `🏆 ${winner} فاز بالجولة!\n✅ الإجابة صحيحة: <b>${round.answers[0]}</b>\n💰 +${scoreMeta.finalReward}$${bonusLine}${tierBonusLine}${boostLine}${tierLine}\n🔥 الستريك: ${scoreMeta.streak}${rankLine}${teamLine}\n✨ ${hype}`,
+      `🏆 ${winner} فاز بالجولة!\n✅ الإجابة صحيحة: <b>${round.answers[0]}</b>\n💰 +${this.formatCurrency(scoreMeta.finalReward)}${bonusLine}${tierBonusLine}${boostLine}${tierLine}\n🔥 الستريك: ${scoreMeta.streak}${rankLine}${teamLine}\n✨ ${hype}`,
       { parse_mode: 'HTML' }
     );
     return true;
@@ -1472,7 +1477,7 @@ class GroupGamesHandler {
     const tierLine = scoreMeta.tier ? `\n🏅 المستوى: ${scoreMeta.tier}` : '';
     const tierBonusLine = scoreMeta.tierUpBonus > 0 ? `\n🎉 مكافأة ترقية +${scoreMeta.tierUpBonus}` : '';
     const winnerMention = this.mentionUser(ctx.from?.id, ctx.from?.first_name || ctx.from?.username || 'عضو');
-    await ctx.reply(`✅ ${winnerMention} أجاب صحيحًا!\n💰 +${scoreMeta.finalReward}$${boostLine}${tierBonusLine}${tierLine}\n🏅 ترتيبك: #${rank || '-'}`, { parse_mode: 'HTML' });
+    await ctx.reply(`✅ ${winnerMention} أجاب صحيحًا!\n💰 +${this.formatCurrency(scoreMeta.finalReward)}${boostLine}${tierBonusLine}${tierLine}\n🏅 ترتيبك: #${rank || '-'}`, { parse_mode: 'HTML' });
   }
 
   static parseVoteCommand(text) {
@@ -1627,7 +1632,7 @@ class GroupGamesHandler {
     rows.forEach((r, i) => {
       const name = r.username || r.userId;
       const tier = r.tier || this.resolveTierFromXp(r.xp || 0).name;
-      text += `${i + 1}. ${name} — ${r.points || 0}$ | ${tier} | 🔥 ${r.streak || 0}\n`;
+      text += `${i + 1}. ${name} — ${this.formatCurrency(r.points || 0)} | ${tier} | 🔥 ${r.streak || 0}\n`;
     });
     return ctx.reply(text, { parse_mode: 'HTML' });
   }
@@ -1642,7 +1647,7 @@ class GroupGamesHandler {
     rows.forEach((r, i) => {
       const name = r.username || r.userId;
       const tier = r.tier || this.resolveTierFromXp(r.xp || 0).name;
-      text += `${i + 1}. ${name} — ${r.weeklyPoints || 0}$ | ${tier}\n`;
+      text += `${i + 1}. ${name} — ${this.formatCurrency(r.weeklyPoints || 0)} | ${tier}\n`;
     });
     return ctx.reply(text, { parse_mode: 'HTML' });
   }
@@ -1656,7 +1661,7 @@ class GroupGamesHandler {
     rows.forEach((r, i) => {
       const name = r.username || r.userId;
       const tier = r.tier || this.resolveTierFromXp(r.xp || 0).name;
-      text += `${i + 1}. ${name} — ${r.monthlyPoints || 0}$ | ${tier}\n`;
+      text += `${i + 1}. ${name} — ${this.formatCurrency(r.monthlyPoints || 0)} | ${tier}\n`;
     });
     return ctx.reply(text, { parse_mode: 'HTML' });
   }
@@ -1711,7 +1716,7 @@ class GroupGamesHandler {
     if (mode === 'info') {
       const team = this.getUserTeam(group, userId);
       if (!team) return ctx.reply('ℹ️ أنت لست ضمن أي فريق.');
-      return ctx.reply(`👥 <b>${team.name}</b>\n🧑‍✈️ القائد: <code>${team.captainId}</code>\n👤 الأعضاء: ${team.members.length}\n🏅 رصيد الفريق: ${team.points || 0}$\n🏆 مرات الفوز: ${team.wins || 0}`, { parse_mode: 'HTML' });
+      return ctx.reply(`👥 <b>${team.name}</b>\n🧑‍✈️ القائد: <code>${team.captainId}</code>\n👤 الأعضاء: ${team.members.length}\n🏅 رصيد الفريق: ${this.formatCurrency(team.points || 0)}\n🏆 مرات الفوز: ${team.wins || 0}`, { parse_mode: 'HTML' });
     }
 
     return ctx.reply('❌ صيغة غير صحيحة. استخدم /gteam');
@@ -1725,7 +1730,7 @@ class GroupGamesHandler {
 
     let text = '🏟️ <b>ترتيب الفرق</b>\n\n';
     teams.forEach((t, i) => {
-      text += `${i + 1}. ${t.name} — ${t.points || 0}$ | أعضاء: ${(t.members || []).length}\n`;
+      text += `${i + 1}. ${t.name} — ${this.formatCurrency(t.points || 0)} | أعضاء: ${(t.members || []).length}\n`;
     });
     return ctx.reply(text, { parse_mode: 'HTML' });
   }
@@ -1786,7 +1791,7 @@ class GroupGamesHandler {
 
       let text = '🏁 <b>انتهت البطولة</b>\n\n';
       if (top.length === 0) text += 'لا توجد فرق مشاركة.';
-      else top.forEach((team, idx) => { text += `${idx + 1}. ${team.name} — ${team.points || 0}$ | جائزة لكل عضو: ${rewards[idx] || 0}$\n`; });
+      else top.forEach((team, idx) => { text += `${idx + 1}. ${team.name} — ${this.formatCurrency(team.points || 0)} | جائزة لكل عضو: ${this.formatCurrency(rewards[idx] || 0)}\n`; });
       return ctx.reply(text, { parse_mode: 'HTML' });
     }
 
@@ -1818,10 +1823,10 @@ class GroupGamesHandler {
     const group = await this.ensureGroupRecord(ctx);
     const row = this.getOrCreateScoreRow(group, ctx.from);
     await group.save();
-    const items = GROUP_STORE.map((x) => `• <code>${x.key}</code> → ${x.title} (${x.price}$)`).join('\n');
+    const items = GROUP_STORE.map((x) => `• <code>${x.key}</code> → ${x.title} (${this.formatCurrency(x.price)})`).join('\n');
     return ctx.reply(
       `🛒 <b>متجر الجروب</b>\n\n` +
-      `رصيدك: <b>${row.points || 0}$</b>\n\n` +
+      `رصيدك: <b>${this.formatCurrency(row.points || 0)}</b>\n\n` +
       `${items}\n\n` +
       `للشراء: <code>/gbuy مفتاح_العنصر</code>`,
       { parse_mode: 'HTML' }
@@ -1837,7 +1842,7 @@ class GroupGamesHandler {
 
     const group = await this.ensureGroupRecord(ctx);
     const row = this.getOrCreateScoreRow(group, ctx.from);
-    if ((row.points || 0) < item.price) return ctx.reply(`❌ رصيدك غير كافٍ. تحتاج ${item.price}$.`);
+    if ((row.points || 0) < item.price) return ctx.reply(`❌ رصيدك غير كافٍ. تحتاج ${this.formatCurrency(item.price)}.`);
     row.points -= item.price;
     if (item.type === 'title') {
       row.title = item.title;
@@ -1873,7 +1878,7 @@ class GroupGamesHandler {
     return ctx.reply(
       `👤 <b>ملفك في الجروب</b>\n\n` +
       `🏷️ اللقب: ${row.title || 'مبتدئ'}\n` +
-      `💰 الرصيد: ${row.points || 0}$\n` +
+      `💰 الرصيد: ${this.formatCurrency(row.points || 0)}\n` +
       `⭐ XP: ${row.xp || 0}\n` +
       `🎖️ المستوى: ${tier}\n` +
       `${nextTier ? `⏭️ القادم: ${nextTier.name} بعد ${nextTier.remainingXp} XP\n` : '👑 وصلت أعلى مستوى (الماسي)\n'}` +
@@ -1896,14 +1901,42 @@ class GroupGamesHandler {
     );
     const balance = Number(row.points || 0);
     if (balance <= 0) {
-      return ctx.reply(`${userMention}\n• فلوسك 0`, { parse_mode: 'HTML' });
+      return ctx.reply(`${userMention}\n• فلوسك ${this.formatCurrency(0)}`, { parse_mode: 'HTML' });
     }
-    return ctx.reply(`${userMention}\n• عدد فلوسك التي ربحتها ↤︎ ${balance} دولار$`, { parse_mode: 'HTML' });
+    return ctx.reply(`${userMention}\n• عدد فلوسك التي ربحتها ↤︎ ${this.formatCurrency(balance)}`, { parse_mode: 'HTML' });
+  }
+
+  static async handleInvestAllCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const group = await this.ensureGroupRecord(ctx);
+    const row = this.getOrCreateScoreRow(group, ctx.from);
+    const current = Math.max(0, Math.floor(Number(row.points || 0)));
+    const mention = this.mentionUser(ctx.from?.id, ctx.from?.first_name || ctx.from?.username || 'عضو');
+
+    if (current <= 0) {
+      await group.save();
+      return ctx.reply(`${mention}\n❌ ما عندك فلوس للاستثمار.\n• فلوسك ${this.formatCurrency(0)}`, { parse_mode: 'HTML' });
+    }
+
+    const rate = 10;
+    const profit = Math.max(1, Math.floor(current * (rate / 100)));
+    row.points = current + profit;
+    row.updatedAt = new Date();
+    await group.save();
+
+    return ctx.reply(
+      `${mention}\n\n` +
+      `• استثمار ناجح\n` +
+      `• نسبة الربح ↢ ${rate}%\n` +
+      `• مبلغ الربح ↢ ( ${this.formatCurrency(profit)} )\n` +
+      `• فلوسك صارت ↢ ( ${this.formatCurrency(row.points || 0)} )`,
+      { parse_mode: 'HTML', reply_to_message_id: ctx.message?.message_id }
+    );
   }
 
   static async handleGiftCatalogCommand(ctx) {
     if (!this.isGroupChat(ctx)) return;
-    const list = UNIQUE_GIFTS.map((g) => `• <code>${g.key}</code> → ${g.name} (${g.price}$)`).join('\n');
+    const list = UNIQUE_GIFTS.map((g) => `• <code>${g.key}</code> → ${g.name} (${this.formatCurrency(g.price)})`).join('\n');
     return ctx.reply(
       `🎁 <b>الهدايا الفريدة (للجروب)</b>\n\n${list}\n\n` +
       `الإهداء: <code>/ggift مفتاح_الهدية @user [العدد]</code>\n` +
@@ -1967,7 +2000,7 @@ class GroupGamesHandler {
       `🏷️ اللقب الحالي: ${row.title || 'مبتدئ'}\n` +
       `🚀 المعزز النشط: ${activeBoost}\n` +
       `🎁 إجمالي الهدايا: ${totalItems}\n` +
-      `💎 القيمة التقديرية: ${totalEstimatedValue}$\n\n` +
+      `💎 القيمة التقديرية: ${this.formatCurrency(totalEstimatedValue)}\n\n` +
       `💡 للزيادة: استخدم /ggift أو /gbuy أو /gstore`,
       { parse_mode: 'HTML' }
     );
@@ -1995,7 +2028,7 @@ class GroupGamesHandler {
     const senderRow = this.getOrCreateScoreRow(group, ctx.from);
     const receiverRow = this.getOrCreateScoreRow(group, { id: target.id, username: target.username, first_name: target.first_name });
     const totalPrice = gift.price * qty;
-    if ((senderRow.points || 0) < totalPrice) return ctx.reply(`❌ رصيدك غير كافٍ. المطلوب ${totalPrice}$.`);
+    if ((senderRow.points || 0) < totalPrice) return ctx.reply(`❌ رصيدك غير كافٍ. المطلوب ${this.formatCurrency(totalPrice)}.`);
 
     senderRow.points -= totalPrice;
     senderRow.giftsSent = (senderRow.giftsSent || 0) + qty;
@@ -2020,7 +2053,7 @@ class GroupGamesHandler {
         `🎁 وصلك إهداء جديد من ${senderName}\n\n` +
         `الهدية: ${gift.name} ×${qty}\n` +
         `من جروب: ${ctx.chat?.title || 'جروب'}\n` +
-        `رصيدك زاد +${Math.max(1, Math.floor(gift.price / 3)) * qty}$\n\n` +
+        `رصيدك زاد +${this.formatCurrency(Math.max(1, Math.floor(gift.price / 3)) * qty)}\n\n` +
         'افتح البوت ثم ارجع للجروب إذا ما وصلك الإشعار.',
         { parse_mode: 'HTML' }
       ).catch(() => {});
@@ -2034,7 +2067,7 @@ class GroupGamesHandler {
       `• نوع الهدية : ${gift.name}\n` +
       `• عدد : ${qty}\n` +
       `• المستلم : ${receiverMention}\n` +
-      `• تكلفة الاهداء : ${totalPrice}$`,
+      `• تكلفة الاهداء : ${this.formatCurrency(totalPrice)}`,
       { parse_mode: 'HTML' }
     );
   }
@@ -2062,7 +2095,7 @@ class GroupGamesHandler {
       const u = x.row;
       const mention = this.mentionUser(u.userId, u.username || `عضو ${u.userId}`);
       const giftsCount = (u.giftInventory || []).reduce((sum, g) => sum + Number(g.count || 0), 0);
-      return `${i + 1}. ${mention} — ${x.value}$ (${giftsCount} هدية)`;
+      return `${i + 1}. ${mention} — ${this.formatCurrency(x.value)} (${giftsCount} هدية)`;
     });
 
     return ctx.reply(
@@ -2107,7 +2140,7 @@ class GroupGamesHandler {
     ]]);
     return ctx.reply(
       `⚔️ <b>تحدي عضوين</b>\n\n${ctx.from.first_name || 'لاعب'} تحدّى ${target.first_name || 'لاعب'}\n` +
-      `الرابح يأخذ ${DUEL_STAKE}$ من الخاسر.\n` +
+      `الرابح يأخذ ${this.formatCurrency(DUEL_STAKE)} من الخاسر.\n` +
       'بانتظار القبول...',
       { parse_mode: 'HTML', reply_markup: kb.reply_markup }
     );
@@ -2180,7 +2213,7 @@ class GroupGamesHandler {
 
     let text = '🎁 <b>المكافأة الشهرية</b>\n\n';
     rows.forEach((r, i) => {
-      text += `${i + 1}. ${r.username || r.userId} — +${MONTHLY_REWARDS[i] || 0}$\n`;
+      text += `${i + 1}. ${r.username || r.userId} — +${this.formatCurrency(MONTHLY_REWARDS[i] || 0)}\n`;
     });
     return ctx.reply(text, { parse_mode: 'HTML' });
   }
@@ -2284,6 +2317,7 @@ class GroupGamesHandler {
       '• /gmonth | سباق الشهر\n' +
       '• /glevels | لوحة المستويات\n' +
       '• /gprofile | ملفك في الجروب\n' +
+      '• /ginvest | استثمار فلوسك\n' +
       '• /gmonthly | صرف المكافأة الشهرية (مشرف)\n' +
       '• /gbonus 10 20 35 60 | مكافآت الترقية (مشرف)\n\n' +
       '<b>ثالثًا: المتجر والهدايا</b>\n' +
@@ -2293,7 +2327,8 @@ class GroupGamesHandler {
       '• /ggift key @user [count] | إهداء هدية\n' +
       '• /gassets | ممتلكاتك في الجروب\n\n' +
       '<b>رابعًا: الثروة</b>\n' +
-      '• /gwealth | لوحة أغنى ممتلكات\n\n' +
+      '• /gwealth | لوحة أغنى ممتلكات\n' +
+      '• استثمار فلوسي | استثمار مباشر\n\n' +
       '<b>خامسًا: إدارة متقدمة</b>\n' +
       '• /ggame | إعدادات ألعاب الجروب\n' +
       '• /gquizset 5 | سلسلة كويز\n' +
@@ -2301,8 +2336,8 @@ class GroupGamesHandler {
       '• /gteams | ترتيب الفرق\n' +
       '• /gtour | البطولة الأسبوعية (مشرف)\n\n' +
       '<b>أوامر عربية بدون سلاش</b>\n' +
-      'العاب الجروب | مين انا | الغاز | سرعة الكتابة | روليت | متصدرين | اسبوعي | متصدرين الشهر | ملفي | متجر الجروب | الهدايا | ممتلكاتي | اغنى ممتلكات\n\n' +
-      'العملة: كل إجابة صحيحة = <b>1$</b>.',
+      'العاب الجروب | مين انا | الغاز | سرعة الكتابة | روليت | متصدرين | اسبوعي | متصدرين الشهر | ملفي | متجر الجروب | الهدايا | ممتلكاتي | اغنى ممتلكات | استثمار فلوسي\n\n' +
+      `العملة: كل إجابة صحيحة = <b>${this.formatCurrency(1)}</b>.`,
       { parse_mode: 'HTML', reply_markup: keyboard.reply_markup }
     );
   }
