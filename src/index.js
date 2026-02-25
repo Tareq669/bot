@@ -2433,6 +2433,7 @@ bot.hears(/^(?:اغنى\s*ممتلكات|أغنى\s*ممتلكات|لوحة\s*ا
 bot.hears(/^اهداء(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleGiftCommand(ctx));
 bot.hears(/^ارسال(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleGiftCommand(ctx));
 bot.hears(/^(?:ملفي|حسابي\s*بالجروب)$/i, (ctx) => GroupGamesHandler.handleGroupProfileCommand(ctx));
+bot.hears(/^(?:نقاطي|فلوسي|رصيدي)$/i, (ctx) => GroupGamesHandler.handleMyMoneyCommand(ctx));
 bot.hears(/^(?:متصدرين\s*الشهر|سباق\s*الشهر)$/i, (ctx) => GroupGamesHandler.handleMonthlyBoardCommand(ctx));
 bot.hears(/^(?:المستويات|لوحة\s*المستويات)$/i, (ctx) => GroupGamesHandler.handleLevelsCommand(ctx));
 bot.hears(/^مكافا(?:ة|ه)\s*شهرية$/i, (ctx) => GroupGamesHandler.handleMonthlyRewardCommand(ctx));
@@ -2465,6 +2466,7 @@ bot.hears(/^\/(?:اغنى_ممتلكات|أغنى_ممتلكات|لوحة_الم
 bot.hears(/^\/(?:اهداء)(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleGiftCommand(ctx));
 bot.hears(/^\/(?:ارسال)(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleGiftCommand(ctx));
 bot.hears(/^\/(?:ملفي|ملفي_بالجروب)$/i, (ctx) => GroupGamesHandler.handleGroupProfileCommand(ctx));
+bot.hears(/^\/(?:نقاطي|فلوسي|رصيدي)$/i, (ctx) => GroupGamesHandler.handleMyMoneyCommand(ctx));
 bot.hears(/^\/(?:متصدرين_الشهر|سباق_الشهر)$/i, (ctx) => GroupGamesHandler.handleMonthlyBoardCommand(ctx));
 bot.hears(/^\/(?:المستويات|لوحة_المستويات)$/i, (ctx) => GroupGamesHandler.handleLevelsCommand(ctx));
 bot.hears(/^\/(?:مكافاة_شهرية|مكافاه_شهرية)$/i, (ctx) => GroupGamesHandler.handleMonthlyRewardCommand(ctx));

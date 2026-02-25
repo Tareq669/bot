@@ -182,7 +182,7 @@ const GROUP_STORE = [
   { key: 'sage', title: '🧠 الحكيم', price: 60, type: 'title' },
   { key: 'legend', title: '👑 الأسطورة', price: 120, type: 'title' },
   { key: 'speedster', title: '⚡ السريع', price: 80, type: 'title' },
-  { key: 'boost2x', title: '🚀 معزز نقاط 2x (30 دقيقة)', price: 50, type: 'boost', multiplier: 2, minutes: 30 }
+  { key: 'boost2x', title: '🚀 معزز دولار 2x (30 دقيقة)', price: 50, type: 'boost', multiplier: 2, minutes: 30 }
 ];
 const MONTHLY_REWARDS = [120, 80, 50];
 const DUEL_STAKE = 3;
@@ -832,7 +832,7 @@ class GroupGamesHandler {
 
     const sent = await this.bot.telegram.sendMessage(
       Number(chatId),
-      `${roundPayload.prompt}\n\n⏱️ المدة: ${roundPayload.timeoutSec} ثانية\n💰 الجائزة: 1 نقطة`,
+      `${roundPayload.prompt}\n\n⏱️ المدة: ${roundPayload.timeoutSec} ثانية\n💰 الجائزة: 1 دولار`,
       { parse_mode: 'HTML' }
     );
 
@@ -882,7 +882,7 @@ class GroupGamesHandler {
     const clues = this.shuffleArray(q.clues).slice(0, 3).map((c, i) => `${i + 1}) ${c}`).join('\n');
     return {
       type: 'whoami',
-      prompt: `🎯 <b>لعبة: مين أنا؟</b>\n\n${clues}\n\nأول شخص يكتب الإجابة الصحيحة يكسب 1 نقطة.`,
+      prompt: `🎯 <b>لعبة: مين أنا؟</b>\n\n${clues}\n\nأول شخص يكتب الإجابة الصحيحة يكسب 1 دولار.`,
       answers: q.answers,
       reward: 1,
       timeoutSec: 40
@@ -893,7 +893,7 @@ class GroupGamesHandler {
     const q = this.pickNonRepeating(RIDDLE_BANK, 'riddle:global');
     return {
       type: 'riddle',
-      prompt: `🧠 <b>لغز ذكي</b>\n\n${q.question}\n\nأول إجابة صحيحة = 1 نقطة.`,
+      prompt: `🧠 <b>لغز ذكي</b>\n\n${q.question}\n\nأول إجابة صحيحة = 1 دولار.`,
       answers: q.answers,
       reward: 1,
       timeoutSec: 45
@@ -967,12 +967,12 @@ class GroupGamesHandler {
     await group.save();
 
     const rank = this.getUserRank(group, userId);
-    const boostLine = scoreMeta.boostActive ? '\n🚀 تم تطبيق معزز النقاط' : '';
+    const boostLine = scoreMeta.boostActive ? '\n🚀 تم تطبيق معزز الدولار' : '';
     const tierLine = scoreMeta.tier ? `\n🏅 المستوى: ${scoreMeta.tier}` : '';
     const tierBonusLine = scoreMeta.tierUpBonus > 0 ? `\n🎉 مكافأة ترقية +${scoreMeta.tierUpBonus}` : '';
     await this.bot.telegram.sendMessage(
       Number(state.chatId),
-      `✅ ${answer.user?.first_name || 'لاعب'} أجاب صحيحًا!\n💰 +${scoreMeta.finalReward} نقطة${boostLine}${tierBonusLine}${tierLine}\n🏅 الترتيب: #${rank || '-'}`,
+      `✅ ${answer.user?.first_name || 'لاعب'} أجاب صحيحًا!\n💰 +${scoreMeta.finalReward}$${boostLine}${tierBonusLine}${tierLine}\n🏅 الترتيب: #${rank || '-'}`,
       { parse_mode: 'HTML' }
     ).catch(() => {});
   }
@@ -1138,13 +1138,13 @@ class GroupGamesHandler {
     const hype = this.pickRandom(CELEBRATION_LINES);
     const bonusLine = scoreMeta.streakBonus > 0 ? `\n🔥 بونص ستريك +${scoreMeta.streakBonus}` : '';
     const tierBonusLine = scoreMeta.tierUpBonus > 0 ? `\n🎉 مكافأة ترقية +${scoreMeta.tierUpBonus}` : '';
-    const boostLine = scoreMeta.boostActive ? '\n🚀 معزز النقاط مفعل' : '';
+    const boostLine = scoreMeta.boostActive ? '\n🚀 معزز الدولار مفعل' : '';
     const tierLine = scoreMeta.tier ? `\n🏅 المستوى: ${scoreMeta.tier}` : '';
-    const teamLine = team ? `\n👥 فريقك: ${team.name} | نقاط الفريق: ${team.points || 0}` : '';
+    const teamLine = team ? `\n👥 فريقك: ${team.name} | رصيد الفريق: ${team.points || 0}$` : '';
     const rankLine = rank ? `\n🏅 ترتيبك الحالي: #${rank}` : '';
 
     await ctx.reply(
-      `🏆 ${winner} فاز بالجولة!\n✅ الإجابة صحيحة: <b>${round.answers[0]}</b>\n💰 +${scoreMeta.finalReward} نقطة${bonusLine}${tierBonusLine}${boostLine}${tierLine}\n🔥 الستريك: ${scoreMeta.streak}${rankLine}${teamLine}\n✨ ${hype}`,
+      `🏆 ${winner} فاز بالجولة!\n✅ الإجابة صحيحة: <b>${round.answers[0]}</b>\n💰 +${scoreMeta.finalReward}$${bonusLine}${tierBonusLine}${boostLine}${tierLine}\n🔥 الستريك: ${scoreMeta.streak}${rankLine}${teamLine}\n✨ ${hype}`,
       { parse_mode: 'HTML' }
     );
     return true;
@@ -1405,11 +1405,11 @@ class GroupGamesHandler {
     await group.save();
 
     const rank = this.getUserRank(group, ctx.from.id);
-    const boostLine = scoreMeta.boostActive ? '\n🚀 معزز النقاط مفعل' : '';
+    const boostLine = scoreMeta.boostActive ? '\n🚀 معزز الدولار مفعل' : '';
     const tierLine = scoreMeta.tier ? `\n🏅 المستوى: ${scoreMeta.tier}` : '';
     const tierBonusLine = scoreMeta.tierUpBonus > 0 ? `\n🎉 مكافأة ترقية +${scoreMeta.tierUpBonus}` : '';
     const winnerMention = this.mentionUser(ctx.from?.id, ctx.from?.first_name || ctx.from?.username || 'عضو');
-    await ctx.reply(`✅ ${winnerMention} أجاب صحيحًا!\n💰 +${scoreMeta.finalReward} نقطة${boostLine}${tierBonusLine}${tierLine}\n🏅 ترتيبك: #${rank || '-'}`, { parse_mode: 'HTML' });
+    await ctx.reply(`✅ ${winnerMention} أجاب صحيحًا!\n💰 +${scoreMeta.finalReward}$${boostLine}${tierBonusLine}${tierLine}\n🏅 ترتيبك: #${rank || '-'}`, { parse_mode: 'HTML' });
   }
 
   static parseVoteCommand(text) {
@@ -1558,13 +1558,13 @@ class GroupGamesHandler {
     if (!this.isGroupChat(ctx)) return;
     const group = await this.ensureGroupRecord(ctx);
     const rows = [...group.gameSystem.scores].sort((a, b) => (b.points || 0) - (a.points || 0)).slice(0, 10);
-    if (rows.length === 0) return ctx.reply('📊 لا يوجد نقاط بعد. ابدأوا عبر /gquiz');
+    if (rows.length === 0) return ctx.reply('📊 لا يوجد دولار بعد. ابدأوا عبر /gquiz');
 
     let text = '🏁 <b>متصدرين الجروب (إجمالي)</b>\n\n';
     rows.forEach((r, i) => {
       const name = r.username || r.userId;
       const tier = r.tier || this.resolveTierFromXp(r.xp || 0).name;
-      text += `${i + 1}. ${name} — ${r.points || 0} نقطة | ${tier} | 🔥 ${r.streak || 0}\n`;
+      text += `${i + 1}. ${name} — ${r.points || 0}$ | ${tier} | 🔥 ${r.streak || 0}\n`;
     });
     return ctx.reply(text, { parse_mode: 'HTML' });
   }
@@ -1573,13 +1573,13 @@ class GroupGamesHandler {
     if (!this.isGroupChat(ctx)) return;
     const group = await this.ensureGroupRecord(ctx);
     const rows = [...group.gameSystem.scores].sort((a, b) => (b.weeklyPoints || 0) - (a.weeklyPoints || 0)).slice(0, 10);
-    if (rows.length === 0) return ctx.reply('📊 لا يوجد نقاط أسبوعية بعد.');
+    if (rows.length === 0) return ctx.reply('📊 لا يوجد دولار أسبوعي بعد.');
 
     let text = '📅 <b>سباق الأسبوع</b>\n\n';
     rows.forEach((r, i) => {
       const name = r.username || r.userId;
       const tier = r.tier || this.resolveTierFromXp(r.xp || 0).name;
-      text += `${i + 1}. ${name} — ${r.weeklyPoints || 0} نقطة | ${tier}\n`;
+      text += `${i + 1}. ${name} — ${r.weeklyPoints || 0}$ | ${tier}\n`;
     });
     return ctx.reply(text, { parse_mode: 'HTML' });
   }
@@ -1588,12 +1588,12 @@ class GroupGamesHandler {
     if (!this.isGroupChat(ctx)) return;
     const group = await this.ensureGroupRecord(ctx);
     const rows = [...group.gameSystem.scores].sort((a, b) => (b.monthlyPoints || 0) - (a.monthlyPoints || 0)).slice(0, 10);
-    if (rows.length === 0) return ctx.reply('📊 لا يوجد نقاط شهرية بعد.');
+    if (rows.length === 0) return ctx.reply('📊 لا يوجد دولار شهري بعد.');
     let text = '🗓️ <b>سباق الشهر</b>\n\n';
     rows.forEach((r, i) => {
       const name = r.username || r.userId;
       const tier = r.tier || this.resolveTierFromXp(r.xp || 0).name;
-      text += `${i + 1}. ${name} — ${r.monthlyPoints || 0} نقطة | ${tier}\n`;
+      text += `${i + 1}. ${name} — ${r.monthlyPoints || 0}$ | ${tier}\n`;
     });
     return ctx.reply(text, { parse_mode: 'HTML' });
   }
@@ -1648,7 +1648,7 @@ class GroupGamesHandler {
     if (mode === 'info') {
       const team = this.getUserTeam(group, userId);
       if (!team) return ctx.reply('ℹ️ أنت لست ضمن أي فريق.');
-      return ctx.reply(`👥 <b>${team.name}</b>\n🧑‍✈️ القائد: <code>${team.captainId}</code>\n👤 الأعضاء: ${team.members.length}\n🏅 نقاط الفريق: ${team.points || 0}\n🏆 مرات الفوز: ${team.wins || 0}`, { parse_mode: 'HTML' });
+      return ctx.reply(`👥 <b>${team.name}</b>\n🧑‍✈️ القائد: <code>${team.captainId}</code>\n👤 الأعضاء: ${team.members.length}\n🏅 رصيد الفريق: ${team.points || 0}$\n🏆 مرات الفوز: ${team.wins || 0}`, { parse_mode: 'HTML' });
     }
 
     return ctx.reply('❌ صيغة غير صحيحة. استخدم /gteam');
@@ -1662,7 +1662,7 @@ class GroupGamesHandler {
 
     let text = '🏟️ <b>ترتيب الفرق</b>\n\n';
     teams.forEach((t, i) => {
-      text += `${i + 1}. ${t.name} — ${t.points || 0} نقطة | أعضاء: ${(t.members || []).length}\n`;
+      text += `${i + 1}. ${t.name} — ${t.points || 0}$ | أعضاء: ${(t.members || []).length}\n`;
     });
     return ctx.reply(text, { parse_mode: 'HTML' });
   }
@@ -1691,7 +1691,7 @@ class GroupGamesHandler {
       t.startedAt = new Date();
       t.endedAt = null;
       await group.save();
-      return ctx.reply(`✅ تم بدء البطولة (الموسم ${t.season}). تم تصفير نقاط الفرق.`);
+      return ctx.reply(`✅ تم بدء البطولة (الموسم ${t.season}). تم تصفير رصيد الفرق.`);
     }
 
     if (mode === 'rewards') {
@@ -1723,7 +1723,7 @@ class GroupGamesHandler {
 
       let text = '🏁 <b>انتهت البطولة</b>\n\n';
       if (top.length === 0) text += 'لا توجد فرق مشاركة.';
-      else top.forEach((team, idx) => { text += `${idx + 1}. ${team.name} — ${team.points || 0} نقطة | جائزة لكل عضو: ${rewards[idx] || 0}\n`; });
+      else top.forEach((team, idx) => { text += `${idx + 1}. ${team.name} — ${team.points || 0}$ | جائزة لكل عضو: ${rewards[idx] || 0}$\n`; });
       return ctx.reply(text, { parse_mode: 'HTML' });
     }
 
@@ -1745,7 +1745,7 @@ class GroupGamesHandler {
       `🎲 <b>روليت الأوامر</b>\n\n` +
       `👤 العضو المختار: <b>${picked.username || picked.userId}</b>\n` +
       `⚡ التحدي: ${challenge}\n\n` +
-      'إذا نفّذ التحدي بنجاح، امنحوه نقطة تشجيعية عبر /ggift rose بالرد عليه.',
+      'إذا نفّذ التحدي بنجاح، امنحوه دولار تشجيعي عبر /ggift rose بالرد عليه.',
       { parse_mode: 'HTML' }
     );
   }
@@ -1755,10 +1755,10 @@ class GroupGamesHandler {
     const group = await this.ensureGroupRecord(ctx);
     const row = this.getOrCreateScoreRow(group, ctx.from);
     await group.save();
-    const items = GROUP_STORE.map((x) => `• <code>${x.key}</code> → ${x.title} (${x.price} نقطة)`).join('\n');
+    const items = GROUP_STORE.map((x) => `• <code>${x.key}</code> → ${x.title} (${x.price}$)`).join('\n');
     return ctx.reply(
       `🛒 <b>متجر الجروب</b>\n\n` +
-      `رصيدك: <b>${row.points || 0}</b> نقطة\n\n` +
+      `رصيدك: <b>${row.points || 0}$</b>\n\n` +
       `${items}\n\n` +
       `للشراء: <code>/gbuy مفتاح_العنصر</code>`,
       { parse_mode: 'HTML' }
@@ -1774,7 +1774,7 @@ class GroupGamesHandler {
 
     const group = await this.ensureGroupRecord(ctx);
     const row = this.getOrCreateScoreRow(group, ctx.from);
-    if ((row.points || 0) < item.price) return ctx.reply(`❌ رصيدك غير كافٍ. تحتاج ${item.price} نقطة.`);
+    if ((row.points || 0) < item.price) return ctx.reply(`❌ رصيدك غير كافٍ. تحتاج ${item.price}$.`);
     row.points -= item.price;
     if (item.type === 'title') {
       row.title = item.title;
@@ -1810,7 +1810,7 @@ class GroupGamesHandler {
     return ctx.reply(
       `👤 <b>ملفك في الجروب</b>\n\n` +
       `🏷️ اللقب: ${row.title || 'مبتدئ'}\n` +
-      `💰 النقاط: ${row.points || 0}\n` +
+      `💰 الرصيد: ${row.points || 0}$\n` +
       `⭐ XP: ${row.xp || 0}\n` +
       `🎖️ المستوى: ${tier}\n` +
       `${nextTier ? `⏭️ القادم: ${nextTier.name} بعد ${nextTier.remainingXp} XP\n` : '👑 وصلت أعلى مستوى (الماسي)\n'}` +
@@ -1821,9 +1821,26 @@ class GroupGamesHandler {
     );
   }
 
+  static async handleMyMoneyCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const group = await this.ensureGroupRecord(ctx);
+    const row = this.getOrCreateScoreRow(group, ctx.from);
+    await group.save();
+
+    const userMention = this.mentionUser(
+      ctx.from?.id,
+      ctx.from?.first_name || ctx.from?.username || 'عضو'
+    );
+    const balance = Number(row.points || 0);
+    if (balance <= 0) {
+      return ctx.reply(`${userMention}\n• فلوسك 0`, { parse_mode: 'HTML' });
+    }
+    return ctx.reply(`${userMention}\n• عدد فلوسك التي ربحتها ↤︎ ${balance} دولار$`, { parse_mode: 'HTML' });
+  }
+
   static async handleGiftCatalogCommand(ctx) {
     if (!this.isGroupChat(ctx)) return;
-    const list = UNIQUE_GIFTS.map((g) => `• <code>${g.key}</code> → ${g.name} (${g.price} نقطة)`).join('\n');
+    const list = UNIQUE_GIFTS.map((g) => `• <code>${g.key}</code> → ${g.name} (${g.price}$)`).join('\n');
     return ctx.reply(
       `🎁 <b>الهدايا الفريدة (للجروب)</b>\n\n${list}\n\n` +
       `الإهداء: <code>/ggift مفتاح_الهدية @user [العدد]</code>\n` +
@@ -1841,29 +1858,40 @@ class GroupGamesHandler {
     const group = await this.ensureGroupRecord(ctx);
     const row = this.getOrCreateScoreRow(group, ctx.from);
 
-    const giftInventory = (row.giftInventory || [])
-      .filter((g) => (g.count || 0) > 0)
-      .map((g) => {
-        const meta = UNIQUE_GIFTS.find((x) => x.key === g.key) || null;
-        const unitPrice = Number(meta?.price || 0);
-        const count = Number(g.count || 0);
-        const total = unitPrice * count;
-        return {
-          key: g.key,
-          name: g.name || meta?.name || g.key,
-          count,
-          unitPrice,
-          total
-        };
-      })
-      .sort((a, b) => b.total - a.total);
+    const inventory = Array.isArray(row.giftInventory) ? row.giftInventory : [];
+    const normalizeName = (value) => this.normalizeText(String(value || ''))
+      .replace(/[^\p{L}\p{N}\s]/gu, '')
+      .trim();
+    const countByName = {};
+    for (const item of inventory) {
+      const key = normalizeName(item?.name || item?.key || '');
+      if (!key) continue;
+      countByName[key] = (countByName[key] || 0) + Number(item?.count || 0);
+    }
+    const sumNames = (names) => names.reduce((sum, n) => sum + (countByName[normalizeName(n)] || 0), 0);
+    const assetsLines = [
+      { label: 'وجبة', names: ['وجبة', 'وجبه'] },
+      { label: 'سيارة', names: ['سيارة', 'سياره'] },
+      { label: 'جزيرة', names: ['جزيرة', 'جزيره'] },
+      { label: 'طيارة', names: ['طيارة', 'طياره'] },
+      { label: 'بيت', names: ['بيت', 'house'] },
+      { label: 'ماسة', names: ['ماسة', 'ماسه', 'diamond'] },
+      { label: 'قصر', names: ['قصر', 'palace'] },
+      { label: 'فيلا', names: ['فيلا', 'villa'] },
+      { label: 'وردة', names: ['وردة', 'ورده', 'rose'] },
+      { label: 'باقة ورود', names: ['باقة ورود', 'باقه ورود', 'bouquet'] },
+      { label: 'هدية بابا نويل', names: ['هدية بابا نويل', 'هديه بابا نويل', 'santa'] },
+      { label: 'برج', names: ['برج', 'tower'] }
+    ];
+    const rowsText = assetsLines
+      .map((x) => `( ${x.label} ↤︎ ${sumNames(x.names)} )`)
+      .join('\n');
 
-    const totalItems = giftInventory.reduce((sum, x) => sum + x.count, 0);
-    const totalEstimatedValue = giftInventory.reduce((sum, x) => sum + x.total, 0);
-    const topRows = giftInventory
-      .slice(0, 12)
-      .map((x) => `• ${x.name} ×${x.count}${x.unitPrice > 0 ? ` (≈ ${x.total} نقطة)` : ''}`)
-      .join('\n') || '• لا توجد ممتلكات بعد';
+    const totalItems = inventory.reduce((sum, x) => sum + Number(x?.count || 0), 0);
+    const totalEstimatedValue = inventory.reduce((sum, x) => {
+      const meta = UNIQUE_GIFTS.find((g) => g.key === x.key);
+      return sum + (Number(meta?.price || 0) * Number(x?.count || 0));
+    }, 0);
 
     const activeBoost = row.activeBoost?.expiresAt && new Date(row.activeBoost.expiresAt).getTime() > Date.now()
       ? `✅ ${row.activeBoost.multiplier || 1}x حتى ${new Date(row.activeBoost.expiresAt).toLocaleString('ar-EG')}`
@@ -1871,12 +1899,12 @@ class GroupGamesHandler {
 
     await group.save();
     return ctx.reply(
-      `📦 <b>ممتلكاتي في الجروب</b>\n\n` +
+      `📦 <b>أهلاً بك في قائمة ممتلكاتك</b>\n\n` +
+      `${rowsText}\n\n` +
       `🏷️ اللقب الحالي: ${row.title || 'مبتدئ'}\n` +
       `🚀 المعزز النشط: ${activeBoost}\n` +
-      `🎁 عدد الهدايا: ${totalItems}\n` +
-      `💎 القيمة التقديرية: ${totalEstimatedValue} نقطة\n\n` +
-      `<b>تفاصيل الممتلكات:</b>\n${topRows}\n\n` +
+      `🎁 إجمالي الهدايا: ${totalItems}\n` +
+      `💎 القيمة التقديرية: ${totalEstimatedValue}$\n\n` +
       `💡 للزيادة: استخدم /ggift أو /gbuy أو /gstore`,
       { parse_mode: 'HTML' }
     );
@@ -1904,7 +1932,7 @@ class GroupGamesHandler {
     const senderRow = this.getOrCreateScoreRow(group, ctx.from);
     const receiverRow = this.getOrCreateScoreRow(group, { id: target.id, username: target.username, first_name: target.first_name });
     const totalPrice = gift.price * qty;
-    if ((senderRow.points || 0) < totalPrice) return ctx.reply(`❌ رصيدك غير كافٍ. المطلوب ${totalPrice} نقطة.`);
+    if ((senderRow.points || 0) < totalPrice) return ctx.reply(`❌ رصيدك غير كافٍ. المطلوب ${totalPrice}$.`);
 
     senderRow.points -= totalPrice;
     senderRow.giftsSent = (senderRow.giftsSent || 0) + qty;
@@ -1929,7 +1957,7 @@ class GroupGamesHandler {
         `🎁 وصلك إهداء جديد من ${senderName}\n\n` +
         `الهدية: ${gift.name} ×${qty}\n` +
         `من جروب: ${ctx.chat?.title || 'جروب'}\n` +
-        `نقاطك زادت +${Math.max(1, Math.floor(gift.price / 3)) * qty}\n\n` +
+        `رصيدك زاد +${Math.max(1, Math.floor(gift.price / 3)) * qty}$\n\n` +
         'افتح البوت ثم ارجع للجروب إذا ما وصلك الإشعار.',
         { parse_mode: 'HTML' }
       ).catch(() => {});
@@ -1943,7 +1971,7 @@ class GroupGamesHandler {
       `• نوع الهدية : ${gift.name}\n` +
       `• عدد : ${qty}\n` +
       `• المستلم : ${receiverMention}\n` +
-      `• تكلفة الاهداء : ${totalPrice} نقطة`,
+      `• تكلفة الاهداء : ${totalPrice}$`,
       { parse_mode: 'HTML' }
     );
   }
@@ -1971,7 +1999,7 @@ class GroupGamesHandler {
       const u = x.row;
       const mention = this.mentionUser(u.userId, u.username || `عضو ${u.userId}`);
       const giftsCount = (u.giftInventory || []).reduce((sum, g) => sum + Number(g.count || 0), 0);
-      return `${i + 1}. ${mention} — ${x.value} نقطة (${giftsCount} هدية)`;
+      return `${i + 1}. ${mention} — ${x.value}$ (${giftsCount} هدية)`;
     });
 
     return ctx.reply(
@@ -2016,7 +2044,7 @@ class GroupGamesHandler {
     ]]);
     return ctx.reply(
       `⚔️ <b>تحدي عضوين</b>\n\n${ctx.from.first_name || 'لاعب'} تحدّى ${target.first_name || 'لاعب'}\n` +
-      `الرابح يأخذ ${DUEL_STAKE} نقاط من الخاسر.\n` +
+      `الرابح يأخذ ${DUEL_STAKE}$ من الخاسر.\n` +
       'بانتظار القبول...',
       { parse_mode: 'HTML', reply_markup: kb.reply_markup }
     );
@@ -2089,7 +2117,7 @@ class GroupGamesHandler {
 
     let text = '🎁 <b>المكافأة الشهرية</b>\n\n';
     rows.forEach((r, i) => {
-      text += `${i + 1}. ${r.username || r.userId} — +${MONTHLY_REWARDS[i] || 0} نقطة\n`;
+      text += `${i + 1}. ${r.username || r.userId} — +${MONTHLY_REWARDS[i] || 0}$\n`;
     });
     return ctx.reply(text, { parse_mode: 'HTML' });
   }
@@ -2211,7 +2239,7 @@ class GroupGamesHandler {
       '• /gtour | البطولة الأسبوعية (مشرف)\n\n' +
       '<b>أوامر عربية بدون سلاش</b>\n' +
       'العاب الجروب | مين انا | الغاز | سرعة الكتابة | روليت | متصدرين | اسبوعي | متصدرين الشهر | ملفي | متجر الجروب | الهدايا | ممتلكاتي | اغنى ممتلكات\n\n' +
-      'النقاط: كل إجابة صحيحة = <b>1 نقطة</b>.',
+      'العملة: كل إجابة صحيحة = <b>1$</b>.',
       { parse_mode: 'HTML', reply_markup: keyboard.reply_markup }
     );
   }
