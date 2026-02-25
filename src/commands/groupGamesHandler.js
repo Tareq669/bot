@@ -256,13 +256,10 @@ const LUCK_MIN_RANGE = 1;
 const LUCK_MAX_RANGE = 1000;
 const LUCK_DAILY_LIMIT = 10;
 const LUCK_COOLDOWN_SEC = 6;
-const LUCK_JACKPOT_NUMBERS = new Set([7, 13, 77, 111, 222, 333, 444, 555, 777, 999]);
-const LUCK_GOOD_RANGES = [
-  [88, 99], [188, 199], [288, 299], [388, 399], [488, 499], [588, 599], [688, 699], [788, 799], [888, 899]
-];
-const LUCK_SMALL_RANGES = [
-  [20, 29], [120, 129], [220, 229], [320, 329], [420, 429], [520, 529], [620, 629], [720, 729], [820, 829], [920, 929]
-];
+const LUCK_OVER_COUNT = 15;
+const LUCK_GOOD_COUNT = 60;
+const LUCK_SMALL_COUNT = 180;
+const LUCK_PAYOUTS = { small: 10, good: 35, over: 100 };
 const SCRATCH_OUTCOMES = [
   { label: '❌ لم تربح في هذه البطاقة', payout: 0, weight: 60 },
   { label: '💵 ربح بسيط', payout: 3, weight: 25 },
@@ -378,6 +375,8 @@ class GroupGamesHandler {
   static lastQuestionByGroup = new Map();
   static questionQueues = new Map();
   static userCooldowns = new Map();
+  static pendingLuckInputs = new Map();
+  static luckDailyNumbersCache = null;
 
   static isGroupChat(ctx) {
     return GROUP_TYPES.has(ctx?.chat?.type);
@@ -424,6 +423,12 @@ class GroupGamesHandler {
       .replace(/ة/g, 'ه')
       .replace(/[^\p{L}\p{N}\s]/gu, '')
       .replace(/\s+/g, ' ');
+  }
+
+  static normalizeArabicDigits(value) {
+    return String(value || '')
+      .replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
+      .replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)));
   }
 
   static escapeHtml(value) {
@@ -893,21 +898,83 @@ class GroupGamesHandler {
     }
   }
 
-  static inAnyRange(number, ranges) {
-    return ranges.some(([a, b]) => number >= a && number <= b);
+  static buildDailyLuckNumbers(dateKey = null) {
+    const key = dateKey || this.getDateKey();
+    if (this.luckDailyNumbersCache && this.luckDailyNumbersCache.key === key) {
+      return this.luckDailyNumbersCache;
+    }
+
+    // Deterministic per day: random changes daily, ثابت داخل نفس اليوم.
+    let seed = 0;
+    for (const ch of key) seed = ((seed * 31) + ch.charCodeAt(0)) >>> 0;
+    const rand = () => {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      return seed / 4294967296;
+    };
+
+    const numbers = Array.from({ length: LUCK_MAX_RANGE }, (_, i) => i + 1);
+    for (let i = numbers.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(rand() * (i + 1));
+      [numbers[i], numbers[j]] = [numbers[j], numbers[i]];
+    }
+
+    const over = new Set(numbers.slice(0, LUCK_OVER_COUNT));
+    const good = new Set(numbers.slice(LUCK_OVER_COUNT, LUCK_OVER_COUNT + LUCK_GOOD_COUNT));
+    const small = new Set(numbers.slice(LUCK_OVER_COUNT + LUCK_GOOD_COUNT, LUCK_OVER_COUNT + LUCK_GOOD_COUNT + LUCK_SMALL_COUNT));
+
+    this.luckDailyNumbersCache = { key, over, good, small };
+    return this.luckDailyNumbersCache;
   }
 
   static evaluateLuckNumber(number) {
-    if (LUCK_JACKPOT_NUMBERS.has(number)) {
-      return { tier: 'اوفر', win: true, payout: 150 };
-    }
-    if (this.inAnyRange(number, LUCK_GOOD_RANGES)) {
-      return { tier: 'جيد', win: true, payout: 35 };
-    }
-    if (this.inAnyRange(number, LUCK_SMALL_RANGES)) {
-      return { tier: 'قليل', win: true, payout: 10 };
-    }
+    const pool = this.buildDailyLuckNumbers();
+    if (pool.over.has(number)) return { tier: 'اوفر', win: true, payout: LUCK_PAYOUTS.over };
+    if (pool.good.has(number)) return { tier: 'جيد', win: true, payout: LUCK_PAYOUTS.good };
+    if (pool.small.has(number)) return { tier: 'قليل', win: true, payout: LUCK_PAYOUTS.small };
     return { tier: 'خاسر', win: false, payout: 0 };
+  }
+
+  static async processLuckPick(ctx, pickedNumber) {
+    if (!this.isGroupChat(ctx)) return false;
+    if (this.checkCooldown(ctx, 'luck', LUCK_COOLDOWN_SEC * 1000)) {
+      await ctx.reply('⏳ تمهّل شوي قبل استخدام الحظ مرة ثانية.');
+      return true;
+    }
+
+    const group = await this.ensureGroupRecord(ctx);
+    const row = this.getOrCreateScoreRow(group, ctx.from);
+    this.resetLuckDailyIfNeeded(row);
+    if ((row.luckPlaysToday || 0) >= LUCK_DAILY_LIMIT) {
+      await group.save();
+      await ctx.reply(`🧾 وصلت الحد اليومي للمحاولات (${LUCK_DAILY_LIMIT}). ارجع بكرة.`);
+      return true;
+    }
+
+    const result = this.evaluateLuckNumber(pickedNumber);
+    const before = Number(row.points || 0);
+    const winAmount = Number(result.payout || 0);
+    row.points = before + winAmount;
+    row.luckPlaysToday = Number(row.luckPlaysToday || 0) + 1;
+    row.luckTotalPlays = Number(row.luckTotalPlays || 0) + 1;
+    if (result.win) row.luckTotalWins = Number(row.luckTotalWins || 0) + 1;
+    row.luckTotalPayout = Number(row.luckTotalPayout || 0) + winAmount;
+    row.luckLastPlayAt = new Date();
+    row.updatedAt = new Date();
+    await group.save();
+
+    const mention = this.mentionUser(ctx.from?.id, ctx.from?.first_name || ctx.from?.username || 'عضو');
+    await ctx.reply(
+      `${mention}\n` +
+      `• ${result.win ? 'مبروك فزت بالحظ' : 'حظ أوفر المرة الجاية'}\n` +
+      `• الرقم المختار ↢ ( ${pickedNumber} )\n` +
+      `• مستوى الحظ ↢ ( ${result.tier} )\n` +
+      `• فلوسك قبل ↢ ( ${this.formatCurrency(before)} )\n` +
+      `• فلوسك الآن ↢ ( ${this.formatCurrency(row.points || 0)} )\n` +
+      `• قيمة الحظ ↢ ( ${result.win ? '+' : ''}${this.formatCurrency(winAmount)} )\n` +
+      `• محاولاتك اليوم ↢ ( ${row.luckPlaysToday}/${LUCK_DAILY_LIMIT} )`,
+      { parse_mode: 'HTML', reply_to_message_id: ctx.message?.message_id }
+    );
+    return true;
   }
 
   static resolveTargetUser(ctx, group, arg) {
@@ -1266,6 +1333,22 @@ class GroupGamesHandler {
   static async handleIncomingGroupText(ctx, text) {
     if (!this.isGroupChat(ctx)) return false;
     if (!text || text.startsWith('/')) return false;
+
+    const luckKey = `${String(ctx.chat.id)}:${Number(ctx.from?.id || 0)}`;
+    if (this.pendingLuckInputs.has(luckKey)) {
+      const normalized = this.normalizeArabicDigits(String(text || '').trim());
+      if (!/^\d+$/.test(normalized)) {
+        await ctx.reply('❌ اختَر رقم واحد فقط بين 1 و 1000.');
+        return true;
+      }
+      const picked = parseInt(normalized, 10);
+      if (!Number.isInteger(picked) || picked < LUCK_MIN_RANGE || picked > LUCK_MAX_RANGE) {
+        await ctx.reply('❌ الرقم لازم يكون بين 1 و 1000.');
+        return true;
+      }
+      this.pendingLuckInputs.delete(luckKey);
+      return this.processLuckPick(ctx, picked);
+    }
 
     const groupId = String(ctx.chat.id);
     const round = this.activeRounds.get(groupId);
@@ -2031,50 +2114,18 @@ class GroupGamesHandler {
 
   static async handleLuckCommand(ctx) {
     if (!this.isGroupChat(ctx)) return;
-    if (this.checkCooldown(ctx, 'luck', LUCK_COOLDOWN_SEC * 1000)) {
-      return ctx.reply('⏳ تمهّل شوي قبل استخدام الحظ مرة ثانية.');
-    }
-
-    const text = String(ctx.message?.text || '').trim();
-    const args = this.parseCommandArgs(ctx);
-    const nums = (text.match(/\d+/g) || []).map((n) => parseInt(n, 10)).filter((n) => Number.isInteger(n));
-    if (nums.length === 0) {
-      return ctx.reply('❌ اختر رقم أولًا.\nمثال: حظ 777 أو حظ من 1 - 1000 777');
-    }
-    const hasRangeHint = /من|الى|إلى|[-–]/.test(text);
-    const pickedNumber = nums[hasRangeHint && nums.length >= 3 ? nums.length - 1 : 0];
-    if (!Number.isInteger(pickedNumber) || pickedNumber < LUCK_MIN_RANGE || pickedNumber > LUCK_MAX_RANGE) {
-      return ctx.reply('❌ لازم تختار رقم بين 1 و 1000.');
-    }
-
     const group = await this.ensureGroupRecord(ctx);
     const row = this.getOrCreateScoreRow(group, ctx.from);
     this.resetLuckDailyIfNeeded(row);
     if ((row.luckPlaysToday || 0) >= LUCK_DAILY_LIMIT) {
       return ctx.reply(`🧾 وصلت الحد اليومي للمحاولات (${LUCK_DAILY_LIMIT}). ارجع بكرة.`);
     }
-
-    const result = this.evaluateLuckNumber(pickedNumber);
-    const before = Number(row.points || 0);
-    const winAmount = Number(result.payout || 0);
-    row.points = before + winAmount;
-    row.luckPlaysToday = Number(row.luckPlaysToday || 0) + 1;
-    row.luckTotalPlays = Number(row.luckTotalPlays || 0) + 1;
-    if (result.win) row.luckTotalWins = Number(row.luckTotalWins || 0) + 1;
-    row.luckTotalPayout = Number(row.luckTotalPayout || 0) + winAmount;
-    row.luckLastPlayAt = new Date();
-    row.updatedAt = new Date();
     await group.save();
-
-    const mention = this.mentionUser(ctx.from?.id, ctx.from?.first_name || ctx.from?.username || 'عضو');
+    const key = `${String(ctx.chat.id)}:${Number(ctx.from?.id || 0)}`;
+    this.pendingLuckInputs.set(key, { createdAt: Date.now() });
     return ctx.reply(
-      `${mention}\n` +
-      `• ${result.win ? 'مبروك فزت بالحظ' : 'حظ أوفر المرة الجاية'}\n` +
-      `• الرقم المختار ↢ ( ${pickedNumber} )\n` +
-      `• مستوى الحظ ↢ ( ${result.tier} )\n` +
-      `• فلوسك قبل ↢ ( ${this.formatCurrency(before)} )\n` +
-      `• فلوسك الآن ↢ ( ${this.formatCurrency(row.points || 0)} )\n` +
-      `• قيمة الحظ ↢ ( ${result.win ? '+' : ''}${this.formatCurrency(winAmount)} )\n` +
+      `🎯 <b>وضع الحظ</b>\n` +
+      `اختَر رقم واحد فقط بين <b>${LUCK_MIN_RANGE}</b> و <b>${LUCK_MAX_RANGE}</b>.\n` +
       `• محاولاتك اليوم ↢ ( ${row.luckPlaysToday}/${LUCK_DAILY_LIMIT} )`,
       { parse_mode: 'HTML', reply_to_message_id: ctx.message?.message_id }
     );
@@ -2665,7 +2716,7 @@ class GroupGamesHandler {
       '• /glevels | لوحة المستويات\n' +
       '• /gprofile | ملفك في الجروب\n' +
       '• /ginvest | استثمار فلوسك\n' +
-      '• /gluck 777 | اختَر رقمك بالحظ (1-1000)\n' +
+      '• /gluck | يبدأ اختيار رقم للحظ (1-1000)\n' +
       '• /gmonthly | صرف المكافأة الشهرية (مشرف)\n' +
       '• /gbonus 10 20 35 60 | مكافآت الترقية (مشرف)\n\n' +
       '<b>ثالثًا: المتجر والهدايا</b>\n' +
