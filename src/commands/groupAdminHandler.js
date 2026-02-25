@@ -1462,7 +1462,9 @@ class GroupAdminHandler {
     });
 
     if (!matched) return false;
-    await ctx.reply(String(matched.response || '').trim());
+    await ctx.reply(String(matched.response || '').trim(), {
+      reply_to_message_id: ctx.message?.message_id
+    });
     return true;
   }
 
