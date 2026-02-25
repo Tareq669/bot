@@ -291,6 +291,8 @@ class GroupGamesHandler {
   static activeVoteByChat = new Map();
   static activeDuels = new Map();
   static activeDuelByChat = new Map();
+  static activeTrades = new Map();
+  static activeTradeByChat = new Map();
   static lastQuestionByGroup = new Map();
   static questionQueues = new Map();
   static userCooldowns = new Map();
@@ -602,6 +604,7 @@ class GroupGamesHandler {
         Markup.button.callback('📦 ممتلكاتي', 'group:quick:assets')
       ],
       [
+        Markup.button.callback('💱 مقايضة', 'group:quick:trade'),
         Markup.button.callback('📘 مساعدة', 'group:quick:help')
       ]
     ]);
@@ -640,6 +643,7 @@ class GroupGamesHandler {
     if (action === 'store') return this.handleStoreCommand(ctx);
     if (action === 'gifts') return this.handleGiftCatalogCommand(ctx);
     if (action === 'assets') return this.handleAssetsCommand(ctx);
+    if (action === 'trade') return ctx.reply('💱 للمقايضة:\n/gtrade @user rose 2 car 1\nأو: مقايضة @user وردة 2 مقابل سيارة 1');
     if (action === 'help') return this.handleGamesHelp(ctx);
     return null;
   }
@@ -1828,10 +1832,10 @@ class GroupGamesHandler {
     const list = UNIQUE_GIFTS.map((g) => `• <code>${g.key}</code> → ${g.name} (${g.price} نقطة)`).join('\n');
     return ctx.reply(
       `🎁 <b>الهدايا الفريدة (للجروب)</b>\n\n${list}\n\n` +
-      `الإرسال: <code>/ggift مفتاح_الهدية @user [العدد]</code>\n` +
+      `الإهداء: <code>/ggift مفتاح_الهدية @user [العدد]</code>\n` +
       'أمثلة عربية:\n' +
-      '• <code>ارسال وردة</code> (بالرد على العضو)\n' +
-      '• <code>ارسال وردة @user</code>\n' +
+      '• <code>اهداء وردة</code> (بالرد على العضو)\n' +
+      '• <code>اهداء وردة @user</code>\n' +
       '• <code>اهداء قصر @user 2</code>\n\n' +
       'مثال سلاش: <code>/ggift palace @user</code>',
       { parse_mode: 'HTML' }
@@ -1901,7 +1905,7 @@ class GroupGamesHandler {
     const group = await this.ensureGroupRecord(ctx);
     const target = this.resolveTargetUser(ctx, group, targetArg);
     if (!target?.id) return ctx.reply('❌ حدد العضو بالرد أو @username.');
-    if (Number(target.id) === Number(ctx.from.id)) return ctx.reply('❌ لا يمكن إرسال هدية لنفسك.');
+    if (Number(target.id) === Number(ctx.from.id)) return ctx.reply('❌ لا يمكن إهداء هدية لنفسك.');
 
     const senderRow = this.getOrCreateScoreRow(group, ctx.from);
     const receiverRow = this.getOrCreateScoreRow(group, { id: target.id, username: target.username, first_name: target.first_name });
@@ -1940,8 +1944,218 @@ class GroupGamesHandler {
     const senderMention = this.mentionUser(ctx.from?.id, ctx.from?.first_name || ctx.from?.username || 'عضو');
     const receiverMention = this.mentionUser(target.id, target.first_name || target.username || String(target.id));
     return ctx.reply(
-      `🎁 ${senderMention} أرسل ${gift.name} ×${qty} إلى ${receiverMention}\n` +
-      `💰 تكلفة الإرسال: ${totalPrice} نقطة`,
+      `🎁 <b>عملية اهداء</b>\n\n` +
+      `• الاهداء من : ${senderMention}\n` +
+      `• نوع الهدية : ${gift.name}\n` +
+      `• عدد : ${qty}\n` +
+      `• المستلم : ${receiverMention}\n` +
+      `• تكلفة الاهداء : ${totalPrice} نقطة`,
+      { parse_mode: 'HTML' }
+    );
+  }
+
+  static getGiftCount(row, giftKey) {
+    if (!row || !Array.isArray(row.giftInventory)) return 0;
+    const slot = row.giftInventory.find((g) => String(g.key) === String(giftKey));
+    return Math.max(0, Number(slot?.count || 0));
+  }
+
+  static addGiftToRow(row, gift, qty) {
+    if (!Array.isArray(row.giftInventory)) row.giftInventory = [];
+    let slot = row.giftInventory.find((g) => String(g.key) === String(gift.key));
+    if (!slot) {
+      slot = { key: gift.key, name: gift.name, count: 0 };
+      row.giftInventory.push(slot);
+    }
+    slot.count = Math.max(0, Number(slot.count || 0) + Number(qty || 0));
+  }
+
+  static removeGiftFromRow(row, giftKey, qty) {
+    if (!Array.isArray(row.giftInventory)) row.giftInventory = [];
+    const slot = row.giftInventory.find((g) => String(g.key) === String(giftKey));
+    if (!slot) return;
+    slot.count = Math.max(0, Number(slot.count || 0) - Number(qty || 0));
+  }
+
+  static async handleWealthCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const group = await this.ensureGroupRecord(ctx);
+    const scores = Array.isArray(group.gameSystem?.scores) ? group.gameSystem.scores : [];
+    const top = scores
+      .map((row) => {
+        const value = (row.giftInventory || []).reduce((sum, g) => {
+          const meta = UNIQUE_GIFTS.find((x) => x.key === g.key);
+          return sum + (Number(meta?.price || 0) * Number(g.count || 0));
+        }, 0);
+        return { row, value };
+      })
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10);
+
+    if (top.length === 0 || top.every((x) => x.value <= 0)) {
+      return ctx.reply('📦 لا توجد ممتلكات كافية بعد. ابدأوا بالإهداء عبر /ggift');
+    }
+
+    const lines = top.map((x, i) => {
+      const u = x.row;
+      const mention = this.mentionUser(u.userId, u.username || `عضو ${u.userId}`);
+      const giftsCount = (u.giftInventory || []).reduce((sum, g) => sum + Number(g.count || 0), 0);
+      return `${i + 1}. ${mention} — ${x.value} نقطة (${giftsCount} هدية)`;
+    });
+
+    return ctx.reply(
+      `💎 <b>لوحة أغنى ممتلكات الجروب</b>\n\n${lines.join('\n')}\n\n` +
+      '💡 تعتمد اللوحة على قيمة مخزون الهدايا فقط.',
+      { parse_mode: 'HTML' }
+    );
+  }
+
+  static async handleTradeCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const text = String(ctx.message?.text || '').trim();
+    const args = this.parseCommandArgs(ctx);
+    if (!args.length) {
+      return ctx.reply(
+        '💱 <b>نظام المقايضة</b>\n\n' +
+        'الصيغة:\n' +
+        '<code>/gtrade @user rose 2 car 1</code>\n' +
+        'يعني: أنت تعطي 2 وردة مقابل 1 سيارة.\n\n' +
+        'صيغة عربية:\n' +
+        '<code>مقايضة @user وردة 2 مقابل سيارة 1</code>',
+        { parse_mode: 'HTML' }
+      );
+    }
+
+    let targetArg = args.find((x) => String(x).startsWith('@') || /^\d+$/.test(String(x))) || null;
+    let offerGiftInput;
+    let offerQty;
+    let wantGiftInput;
+    let wantQty;
+
+    if (text.startsWith('/gtrade')) {
+      const compact = args.filter((x) => String(x) !== targetArg);
+      [offerGiftInput, offerQty, wantGiftInput, wantQty] = compact;
+    } else {
+      // Arabic free-form: "مقايضة @user وردة 2 مقابل سيارة 1"
+      const m = text.match(/^مقايضة\s+(\S+)\s+(\S+)\s+(\d+)\s+مقابل\s+(\S+)\s+(\d+)$/i);
+      if (m) {
+        targetArg = m[1];
+        offerGiftInput = m[2];
+        offerQty = m[3];
+        wantGiftInput = m[4];
+        wantQty = m[5];
+      }
+    }
+
+    const offerGift = this.resolveGiftByInput(offerGiftInput);
+    const wantGift = this.resolveGiftByInput(wantGiftInput);
+    const giveCount = Math.max(1, Math.min(50, parseInt(String(offerQty || '1'), 10) || 1));
+    const takeCount = Math.max(1, Math.min(50, parseInt(String(wantQty || '1'), 10) || 1));
+
+    if (!offerGift || !wantGift) {
+      return ctx.reply('❌ صيغة المقايضة غير صحيحة. مثال: /gtrade @user rose 2 car 1');
+    }
+
+    const group = await this.ensureGroupRecord(ctx);
+    const target = this.resolveTargetUser(ctx, group, targetArg);
+    if (!target?.id) return ctx.reply('❌ حدد الطرف الآخر بالرد أو @username.');
+    if (Number(target.id) === Number(ctx.from.id)) return ctx.reply('❌ لا يمكن إنشاء مقايضة مع نفسك.');
+
+    const me = this.getOrCreateScoreRow(group, ctx.from);
+    const them = this.getOrCreateScoreRow(group, { id: target.id, username: target.username, first_name: target.first_name });
+    if (this.getGiftCount(me, offerGift.key) < giveCount) {
+      return ctx.reply(`❌ لا تملك كمية كافية من ${offerGift.name}.`);
+    }
+    if (this.getGiftCount(them, wantGift.key) < takeCount) {
+      return ctx.reply(`❌ العضو الآخر لا يملك كمية كافية من ${wantGift.name}.`);
+    }
+
+    const chatKey = String(ctx.chat.id);
+    const old = this.activeTradeByChat.get(chatKey);
+    if (old) this.activeTrades.delete(old);
+
+    const token = this.token('trade');
+    this.activeTradeByChat.set(chatKey, token);
+    this.activeTrades.set(token, {
+      token,
+      chatId: chatKey,
+      proposerId: Number(ctx.from.id),
+      proposerName: ctx.from.first_name || ctx.from.username || String(ctx.from.id),
+      targetId: Number(target.id),
+      targetName: target.first_name || target.username || String(target.id),
+      offerGiftKey: offerGift.key,
+      offerGiftName: offerGift.name,
+      offerCount: giveCount,
+      wantGiftKey: wantGift.key,
+      wantGiftName: wantGift.name,
+      wantCount: takeCount,
+      createdAt: Date.now()
+    });
+
+    const kb = Markup.inlineKeyboard([[
+      Markup.button.callback('✅ قبول المقايضة', `group:trade:accept:${token}`),
+      Markup.button.callback('❌ رفض', `group:trade:decline:${token}`)
+    ]]);
+    const proposerMention = this.mentionUser(ctx.from.id, ctx.from.first_name || ctx.from.username || String(ctx.from.id));
+    const targetMention = this.mentionUser(target.id, target.first_name || target.username || String(target.id));
+    return ctx.reply(
+      `💱 <b>طلب مقايضة جديد</b>\n\n` +
+      `• من: ${proposerMention}\n` +
+      `• إلى: ${targetMention}\n` +
+      `• يعطي: ${offerGift.name} ×${giveCount}\n` +
+      `• يأخذ: ${wantGift.name} ×${takeCount}\n\n` +
+      'بانتظار موافقة الطرف الآخر...',
+      { parse_mode: 'HTML', reply_markup: kb.reply_markup }
+    );
+  }
+
+  static async handleTradeAction(ctx, action, token) {
+    if (!this.isGroupChat(ctx)) return;
+    const trade = this.activeTrades.get(token);
+    if (!trade) return ctx.answerCbQuery('انتهت المقايضة.', { show_alert: false }).catch(() => {});
+    if (String(ctx.chat.id) !== String(trade.chatId)) return ctx.answerCbQuery('المقايضة لجروب آخر.', { show_alert: false }).catch(() => {});
+    if (Number(ctx.from.id) !== Number(trade.targetId)) return ctx.answerCbQuery('فقط الطرف الثاني يقرر.', { show_alert: false }).catch(() => {});
+
+    this.activeTrades.delete(token);
+    if (this.activeTradeByChat.get(String(ctx.chat.id)) === token) this.activeTradeByChat.delete(String(ctx.chat.id));
+
+    if (action === 'decline') {
+      await ctx.answerCbQuery('تم رفض المقايضة', { show_alert: false }).catch(() => {});
+      return ctx.reply('❌ تم رفض المقايضة.');
+    }
+
+    const group = await this.ensureGroupRecord(ctx);
+    const proposer = (group.gameSystem.scores || []).find((x) => Number(x.userId) === Number(trade.proposerId));
+    const target = (group.gameSystem.scores || []).find((x) => Number(x.userId) === Number(trade.targetId));
+    if (!proposer || !target) {
+      await ctx.answerCbQuery('تعذر إتمام المقايضة', { show_alert: false }).catch(() => {});
+      return ctx.reply('❌ تعذر إتمام المقايضة (بيانات غير مكتملة).');
+    }
+
+    if (this.getGiftCount(proposer, trade.offerGiftKey) < trade.offerCount) {
+      await ctx.answerCbQuery('فشل: الطرف الأول لا يملك الكمية', { show_alert: true }).catch(() => {});
+      return ctx.reply('❌ فشلت المقايضة: الطرف الأول لا يملك الكمية المطلوبة.');
+    }
+    if (this.getGiftCount(target, trade.wantGiftKey) < trade.wantCount) {
+      await ctx.answerCbQuery('فشل: الطرف الثاني لا يملك الكمية', { show_alert: true }).catch(() => {});
+      return ctx.reply('❌ فشلت المقايضة: الطرف الثاني لا يملك الكمية المطلوبة.');
+    }
+
+    this.removeGiftFromRow(proposer, trade.offerGiftKey, trade.offerCount);
+    this.addGiftToRow(target, { key: trade.offerGiftKey, name: trade.offerGiftName }, trade.offerCount);
+    this.removeGiftFromRow(target, trade.wantGiftKey, trade.wantCount);
+    this.addGiftToRow(proposer, { key: trade.wantGiftKey, name: trade.wantGiftName }, trade.wantCount);
+    proposer.updatedAt = new Date();
+    target.updatedAt = new Date();
+    await group.save();
+
+    await ctx.answerCbQuery('تمت المقايضة بنجاح', { show_alert: false }).catch(() => {});
+    const proposerMention = this.mentionUser(trade.proposerId, trade.proposerName || String(trade.proposerId));
+    const targetMention = this.mentionUser(trade.targetId, trade.targetName || String(trade.targetId));
+    return ctx.reply(
+      `✅ <b>تمت المقايضة بنجاح</b>\n\n` +
+      `• ${proposerMention} أعطى ${trade.offerGiftName} ×${trade.offerCount}\n` +
+      `• ${targetMention} أعطى ${trade.wantGiftName} ×${trade.wantCount}`,
       { parse_mode: 'HTML' }
     );
   }
@@ -2163,16 +2377,19 @@ class GroupGamesHandler {
       '• /gstore | متجر الجروب\n' +
       '• /gbuy key | شراء عنصر\n' +
       '• /ggifts | قائمة الهدايا\n' +
-      '• /ggift key @user [count] | إرسال هدية\n' +
+      '• /ggift key @user [count] | إهداء هدية\n' +
       '• /gassets | ممتلكاتك في الجروب\n\n' +
-      '<b>رابعًا: إدارة متقدمة</b>\n' +
+      '<b>رابعًا: الثروة والمقايضة</b>\n' +
+      '• /gwealth | لوحة أغنى ممتلكات\n' +
+      '• /gtrade @user rose 2 car 1 | طلب مقايضة\n\n' +
+      '<b>خامسًا: إدارة متقدمة</b>\n' +
       '• /ggame | إعدادات ألعاب الجروب\n' +
       '• /gquizset 5 | سلسلة كويز\n' +
       '• /gteam | فريقك\n' +
       '• /gteams | ترتيب الفرق\n' +
       '• /gtour | البطولة الأسبوعية (مشرف)\n\n' +
       '<b>أوامر عربية بدون سلاش</b>\n' +
-      'العاب الجروب | مين انا | الغاز | سرعة الكتابة | روليت | متصدرين | اسبوعي | متصدرين الشهر | ملفي | متجر الجروب | الهدايا | ممتلكاتي\n\n' +
+      'العاب الجروب | مين انا | الغاز | سرعة الكتابة | روليت | متصدرين | اسبوعي | متصدرين الشهر | ملفي | متجر الجروب | الهدايا | ممتلكاتي | اغنى ممتلكات | مقايضة\n\n' +
       'النقاط: كل إجابة صحيحة = <b>1 نقطة</b>.',
       { parse_mode: 'HTML', reply_markup: keyboard.reply_markup }
     );
