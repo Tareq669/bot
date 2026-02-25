@@ -252,6 +252,8 @@ const DUEL_STAKE = 3;
 const SCRATCH_TICKET_PRICE = 5;
 const SCRATCH_MAX_DAILY_PLAYS = 10;
 const SCRATCH_COOLDOWN_SEC = 20;
+const LUCK_MIN_RANGE = 1;
+const LUCK_MAX_RANGE = 100000;
 const SCRATCH_OUTCOMES = [
   { label: '❌ لم تربح في هذه البطاقة', payout: 0, weight: 60 },
   { label: '💵 ربح بسيط', payout: 3, weight: 25 },
@@ -1978,6 +1980,58 @@ class GroupGamesHandler {
     );
   }
 
+  static async handleLuckCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    if (this.checkCooldown(ctx, 'luck', 12000)) {
+      return ctx.reply('⏳ تمهّل شوي قبل استخدام الحظ مرة ثانية.');
+    }
+
+    const text = String(ctx.message?.text || '').trim();
+    const args = this.parseCommandArgs(ctx);
+
+    let min = 1;
+    let max = 1000;
+
+    const rangeMatch = text.match(/(\d+)\s*[-–]\s*(\d+)/);
+    if (rangeMatch) {
+      min = parseInt(rangeMatch[1], 10);
+      max = parseInt(rangeMatch[2], 10);
+    } else {
+      const nums = args.map((x) => parseInt(String(x), 10)).filter((n) => Number.isInteger(n));
+      if (nums.length >= 2) {
+        [min, max] = nums.slice(0, 2);
+      } else if (nums.length === 1) {
+        min = 1;
+        max = nums[0];
+      }
+    }
+
+    min = Math.max(LUCK_MIN_RANGE, min);
+    max = Math.min(LUCK_MAX_RANGE, max);
+    if (min > max) [min, max] = [max, min];
+    if (!Number.isInteger(min) || !Number.isInteger(max) || max < 1) {
+      return ctx.reply('❌ صيغة الحظ غير صحيحة. مثال: حظ من 1 - 1000');
+    }
+
+    const winAmount = Math.floor(Math.random() * (max - min + 1)) + min;
+    const group = await this.ensureGroupRecord(ctx);
+    const row = this.getOrCreateScoreRow(group, ctx.from);
+    const before = Number(row.points || 0);
+    row.points = before + winAmount;
+    row.updatedAt = new Date();
+    await group.save();
+
+    const mention = this.mentionUser(ctx.from?.id, ctx.from?.first_name || ctx.from?.username || 'عضو');
+    return ctx.reply(
+      `${mention}\n` +
+      `• مبروك فزت بالحظ\n` +
+      `• فلوسك قبل ↢ ( ${this.formatCurrency(before)} )\n` +
+      `• فلوسك الآن ↢ ( ${this.formatCurrency(row.points || 0)} )\n` +
+      `• قيمة الحظ ↢ ( +${this.formatCurrency(winAmount)} )`,
+      { parse_mode: 'HTML', reply_to_message_id: ctx.message?.message_id }
+    );
+  }
+
   static async handleScratchCommand(ctx) {
     if (!this.isGroupChat(ctx)) return;
     const args = this.parseCommandArgs(ctx);
@@ -2563,6 +2617,7 @@ class GroupGamesHandler {
       '• /glevels | لوحة المستويات\n' +
       '• /gprofile | ملفك في الجروب\n' +
       '• /ginvest | استثمار فلوسك\n' +
+      '• /gluck 1 1000 | الحظ (ربح عشوائي)\n' +
       '• /gmonthly | صرف المكافأة الشهرية (مشرف)\n' +
       '• /gbonus 10 20 35 60 | مكافآت الترقية (مشرف)\n\n' +
       '<b>ثالثًا: المتجر والهدايا</b>\n' +
@@ -2586,7 +2641,7 @@ class GroupGamesHandler {
       '• /gteams | ترتيب الفرق\n' +
       '• /gtour | البطولة الأسبوعية (مشرف)\n\n' +
       '<b>أوامر عربية بدون سلاش</b>\n' +
-      'العاب الجروب | مين انا | الغاز | سرعة الكتابة | روليت | متصدرين | اسبوعي | متصدرين الشهر | ملفي | متجر الجروب | الهدايا | ممتلكاتي | اغنى ممتلكات | استثمار فلوسي | كشط | احصائيات الكشط\n\n' +
+      'العاب الجروب | مين انا | الغاز | سرعة الكتابة | روليت | متصدرين | اسبوعي | متصدرين الشهر | ملفي | متجر الجروب | الهدايا | ممتلكاتي | اغنى ممتلكات | استثمار فلوسي | حظ من 1 - 1000 | كشط | احصائيات الكشط\n\n' +
       `العملة: كل إجابة صحيحة = <b>${this.formatCurrency(1)}</b>.`,
       { parse_mode: 'HTML', reply_markup: keyboard.reply_markup }
     );
