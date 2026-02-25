@@ -31,6 +31,7 @@ const ReconnectManager = require('./utils/reconnect');
 const connectionMonitor = require('./utils/connectionMonitor');
 const healthMonitor = require('./utils/healthMonitor');
 const Formatter = require('./utils/formatter');
+const JoeChatHandler = require('./handlers/joeChatHandler');
 
 const normalizeEnvValue = (value) => {
   if (typeof value !== 'string') {
@@ -118,7 +119,8 @@ const GROUP_ONLY_COMMANDS = new Set([
   'gadminstats', 'gprint', 'greasons', 'gbasic', 'gexceptions', 'granks', 'gdetect', 'gonline', 'gadminleave',
   'gtemplate_member', 'gtemplate_admin', 'gideal_member', 'gideal_admin', 'gshow_ideal_member', 'gshow_ideal_admin', 'gwelcome', 'gsuggest',
   'gfaq', 'gsuggestmenu', 'gsuggeststats', 'gsuggesttop', 'gquiz', 'gmath', 'gword', 'gdaily', 'gmcq', 'gvote', 'gquizset', 'gleader', 'gweekly', 'ggame', 'ggames',
-  'g', 'gteam', 'gteams', 'gtour', 'gwho', 'griddle', 'gtype', 'chance', 'gduel', 'gstore', 'gbuy', 'ggifts', 'ggift', 'gassets', 'gwealth', 'gprofile', 'gmonth', 'gmonthly', 'gbonus', 'glevels'
+  'g', 'gteam', 'gteams', 'gtour', 'gwho', 'griddle', 'gtype', 'chance', 'gduel', 'gstore', 'gbuy', 'ggifts', 'ggift', 'gassets', 'gwealth', 'gprofile', 'gmonth', 'gmonthly', 'gbonus', 'glevels',
+  'joe'
 ]);
 
 const PRIVATE_REPLY_BUTTONS = new Set([
@@ -253,7 +255,7 @@ Promise.all([
       { command: 'chance', description: 'روليت الأوامر' },
       { command: 'gduel', description: 'تحدي عضوين' },
       { command: 'gstore', description: 'متجر الجروب' },
-      { command: 'gbuy', description: 'شراء لقب' },
+      { command: 'gbuy', description: 'شراء عنصر من المتجر' },
       { command: 'ggifts', description: 'قائمة الهدايا' },
       { command: 'ggift', description: 'إهداء هدية' },
       { command: 'gassets', description: 'ممتلكاتك في الجروب' },
@@ -388,6 +390,10 @@ bot.command('gteam', (ctx) => GroupGamesHandler.handleTeamCommand(ctx));
 bot.command('gteams', (ctx) => GroupGamesHandler.handleTeamsCommand(ctx));
 bot.command('gtour', (ctx) => GroupGamesHandler.handleTournamentCommand(ctx));
 bot.command('g', (ctx) => GroupGamesHandler.handleQuickStart(ctx));
+bot.command('joe', async (ctx) => {
+  if (!GroupAdminHandler.isGroupChat(ctx)) return ctx.reply('ℹ️ أمر جو مخصص للجروبات.');
+  return JoeChatHandler.handleGroupText(ctx, 'جو');
+});
 
 // --- COMMAND HANDLERS ---
 bot.command('profile', (ctx) => CommandHandler.handleProfile(ctx));
@@ -1430,6 +1436,7 @@ bot.action('owner:cleanup:confirm', async (ctx) => {
 bot.action(/^group:mcq:([a-z0-9]+):(\d+)$/i, (ctx) => GroupGamesHandler.handleMcqCallback(ctx, ctx.match[1], ctx.match[2]));
 bot.action(/^group:vote:([a-z0-9]+):(\d+)$/i, (ctx) => GroupGamesHandler.handleVoteCallback(ctx, ctx.match[1], ctx.match[2]));
 bot.action(/^group:duel:(accept|decline):([a-z0-9]+)$/i, (ctx) => GroupGamesHandler.handleDuelAction(ctx, ctx.match[1], ctx.match[2]));
+bot.action(/^group:joe:/i, (ctx) => JoeChatHandler.handleAction(ctx));
 bot.action(/^group:games:(gquiz|gmath|gword|gwho|griddle|gtype|gduel|gchance|gdaily|gmcq|gvote|gleader|gweekly|gmonth|glevels)$/i, (ctx) => GroupGamesHandler.handleGamesMenuAction(ctx, ctx.match[1].toLowerCase()));
 bot.action(/^group:quick:(quiz|who|riddle|typing|duel|chance|profile|leader|levels|store|gifts|assets|help)$/i, (ctx) => GroupGamesHandler.handleQuickAction(ctx, ctx.match[1]));
 bot.action(/^group:levels:(bronze|silver|gold|platinum|diamond)$/i, (ctx) => GroupGamesHandler.handleLevelsAction(ctx, ctx.match[1]));
@@ -3263,6 +3270,8 @@ bot.on('text', async (ctx) => {
     if (GroupAdminHandler.isGroupChat(ctx)) {
       const handledGame = await GroupGamesHandler.handleIncomingGroupText(ctx, message);
       if (handledGame) return;
+      const handledJoe = await JoeChatHandler.handleGroupText(ctx, message);
+      if (handledJoe) return;
       const wasModerated = await GroupAdminHandler.processGroupMessage(ctx);
       if (wasModerated) return;
       // Keep group chats isolated from private feature flows.
