@@ -209,14 +209,42 @@ const GROUP_STORE = [
   { key: 'emperor', title: '👑 الإمبراطور', price: 300, type: 'title' },
   { key: 'empress', title: '👑 الإمبراطورة', price: 300, type: 'title' },
 
-  { key: 'legend_m', title: '🏆 الأسطورة', price: 360, type: 'title' },
-  { key: 'legend_f', title: '🏆 الأسطورة', price: 360, type: 'title' },
+  // Requested premium titles (male/female pairs with equal prices)
+  { key: 'sharp_mind_m', title: '🧩 العقل الحاد', price: 340, type: 'title' },
+  { key: 'sharp_mind_f', title: '🧩 العقل الحادة', price: 340, type: 'title' },
+
+  { key: 'iron_hand_m', title: '🛡️ اليد الحديدية', price: 360, type: 'title' },
+  { key: 'iron_hand_f', title: '🛡️ صاحبة اليد الحديدية', price: 360, type: 'title' },
+
+  { key: 'mental_guide_m', title: '🏆 المرشد الذهني', price: 380, type: 'title' },
+  { key: 'mental_guide_f', title: '🏆 المرشدة الذهنية', price: 380, type: 'title' },
+
+  { key: 'group_lord_m', title: '👑 لورد الجروب', price: 400, type: 'title' },
+  { key: 'group_lord_f', title: '👑 ليدي الجروب', price: 400, type: 'title' },
+
+  { key: 'storm_king_m', title: '🌪️ ملك العاصفة', price: 430, type: 'title' },
+  { key: 'storm_king_f', title: '🌪️ ملكة العاصفة', price: 430, type: 'title' },
+
+  { key: 'shadow_king_m', title: '🌑 ملك الظل', price: 450, type: 'title' },
+  { key: 'shadow_king_f', title: '🌑 ملكة الظل', price: 450, type: 'title' },
+
+  { key: 'leader_m', title: '🎯 الزعيم', price: 470, type: 'title' },
+  { key: 'leader_f', title: '🎯 الزعيمة', price: 470, type: 'title' },
+
+  { key: 'ninja_m', title: '🥷 نينجا', price: 490, type: 'title' },
+  { key: 'ninja_f', title: '🥷 نينجا', price: 490, type: 'title' },
+
+  { key: 'phoenix_m', title: '🔥 العنقاء', price: 520, type: 'title' },
+  { key: 'phoenix_f', title: '🔥 العنقاء', price: 520, type: 'title' },
+
+  { key: 'dollar_master_m', title: '💵 سيد الدولار', price: 560, type: 'title' },
+  { key: 'dollar_master_f', title: '💵 سيدة الدولار', price: 560, type: 'title' },
+
+  // Keep only one "الأسطورة" as requested
+  { key: 'legend', title: '🏆 الأسطورة', price: 360, type: 'title' },
 
   { key: 'diamond_m', title: '💎 سيد الماس', price: 430, type: 'title' },
   { key: 'diamond_f', title: '💎 سيدة الماس', price: 430, type: 'title' },
-
-  { key: 'myth_m', title: '🔥 العنقاء الملك', price: 520, type: 'title' },
-  { key: 'myth_f', title: '🔥 العنقاء الملكة', price: 520, type: 'title' },
 
   // Single booster only
   { key: 'boost2x', title: '🚀 معزز دولار 2x (45 دقيقة)', price: 120, type: 'boost', multiplier: 2, minutes: 45 }
