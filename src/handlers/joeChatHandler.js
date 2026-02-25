@@ -1,4 +1,4 @@
-const { GoogleGenAI } = require('@google/genai');
+﻿const { GoogleGenAI } = require('@google/genai');
 const fetch = require('node-fetch');
 const Markup = require('telegraf/markup');
 
@@ -33,6 +33,17 @@ const SMART_REPLIES = [
   { test: /(ما فهمت|مش فاهم)/i, reply: 'ولا يهمك. وضحلي بجملة واحدة بس وأنا أبسطها.' }
 ];
 
+const CANNED_REPLIES = [
+  { test: /^(كيفك|كيف حالك|شو اخبارك|شو أخبارك|اخبارك|أخبارك)$/i, replies: ['منيح والحمد لله 😄 وإنت كيفك؟', 'تمام يا زعيم 👌 إنت شو أخبارك؟', 'الحمد لله تمام، طمني عنك 🌟'] },
+  { test: /^(مرحبا|هلا|السلام عليكم|هاي|hello|hi)$/i, replies: ['هلا فيك 👋 شو بتحب نعمل؟', 'أهلين! احكيلي شو بدك 🙌', 'يا مرحب! جاهز أساعدك 💪'] },
+  { test: /^(شكرا|شكرًا|يسلمو|يعطيك العافية|ثانكس|thanks)$/i, replies: ['العفو يا غالي 🌹', 'ولا يهمك، بالخدمة 🙏', 'تسلم يا محترم ❤️'] },
+  { test: /^(مين انت|من انت|شو انت|شو اسمك)$/i, replies: ['أنا جو، مساعد الجروب 🤖', 'اسمي جو، صاحِبكم هون بالجروب 😎'] },
+  { test: /^(نكتة|نكته|ضحكني)$/i, replies: JOKES },
+  { test: /^(يومي|اليومي|نصيحة)$/i, replies: DAILY_PACK },
+  { test: /(احبك|بحبك|love you)/i, replies: ['حبيبي 😄 خلينا نضل أصحاب ونكمل إنجاز.', 'محبة واحترام يا غالي 🌹'] },
+  { test: /(باي|سلام|مع السلامة|مع السلامه|bye)/i, replies: ['مع السلامة 👋 إذا احتجتني أنا هون.', 'سلام يا بطل ✨'] }
+];
+
 class JoeChatHandler {
   static sessions = new Map();
   static ai = null;
@@ -58,6 +69,11 @@ class JoeChatHandler {
       });
     }
     return this.sessions.get(key);
+  }
+
+  static pickRandom(items) {
+    if (!Array.isArray(items) || items.length === 0) return '';
+    return items[Math.floor(Math.random() * items.length)];
   }
 
   static getKeyboard() {
@@ -119,8 +135,26 @@ class JoeChatHandler {
     let out = String(text || '');
     out = out.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
     out = out.replace(/^\s*```[\s\S]*?```/g, '').trim();
-    if (!out) out = 'حالياً مش قادر أرد بشكل مضبوط، جرب صياغة أقصر.';
+    if (!out) out = 'وضحلي أكثر شو بدك بالضبط؟';
     return out.slice(0, 2000);
+  }
+
+  static getLocalFallback(userText) {
+    const text = String(userText || '').trim();
+    if (!text) return 'وضحلي أكثر شو بدك بالضبط؟';
+    if (text.length <= 20) return 'تمام وصلتني 👍 كمللي سؤالك بكلمتين زيادة.';
+    return 'وصلت فكرتك. إذا بدك جواب أدق، حدد المطلوب أكثر شوي.';
+  }
+
+  static getCannedReply(userText) {
+    const text = String(userText || '').trim();
+    if (!text) return null;
+    for (const item of CANNED_REPLIES) {
+      if (item.test.test(text)) {
+        return this.pickRandom(item.replies);
+      }
+    }
+    return null;
   }
 
   static pushHistory(session, role, content) {
@@ -162,13 +196,7 @@ class JoeChatHandler {
 
   static buildPrompt(session, userText, firstName, userLang, title) {
     const textLang = this.detectLanguage(userText, userLang);
-    const system = this.buildSystemPrompt({
-      firstName,
-      userLang,
-      textLang,
-      mode: session.mode,
-      title
-    });
+    const system = this.buildSystemPrompt({ firstName, userLang, textLang, mode: session.mode, title });
     const context = session.history.map((h) => `${h.role === 'assistant' ? 'جو' : 'المستخدم'}: ${h.content}`).join('\n');
     return `${system}\n\nالسياق:\n${context}\n\nرسالة المستخدم:\n${userText}\n\nرد جو:`;
   }
@@ -189,6 +217,7 @@ class JoeChatHandler {
       }),
       new Promise((_, reject) => setTimeout(() => reject(new Error('JOE_TIMEOUT')), timeoutMs))
     ]);
+
     return this.cleanOutput(String(response?.text || ''));
   }
 
@@ -209,6 +238,7 @@ class JoeChatHandler {
       context ? `سياق:\n${context}` : '',
       `رسالة:\n${String(userText || '')}`
     ].join('\n');
+
     const url = `${endpoint}/${encodeURIComponent(prompt)}?model=${encodeURIComponent(model)}`;
     const res = await fetch(url, { method: 'GET', timeout: timeoutMs, headers: { 'User-Agent': 'JoeGroupBot/1.0' } });
     if (!res.ok) throw new Error(`FREE_CHAT_HTTP_${res.status}`);
@@ -216,22 +246,25 @@ class JoeChatHandler {
   }
 
   static async generate(session, userText, firstName, userLang, title) {
+    const canned = this.getCannedReply(userText);
+    if (canned) return canned;
+
     const freeFirst = ['1', 'true', 'yes', 'on'].includes(String(process.env.JOE_USE_FREE_FIRST || 'false').toLowerCase());
     if (freeFirst) {
       try { return await this.callFreeFallback(session, userText, firstName, userLang); } catch (_) {}
       try { return await this.callGeminiWithModel(session, userText, firstName, userLang, title, this.getModelName()); } catch (_) {}
-      return 'حالياً في ضغط، جرب بعد دقيقة.';
+      return this.getLocalFallback(userText);
     }
+
     try { return await this.callGeminiWithModel(session, userText, firstName, userLang, title, this.getModelName()); } catch (_) {}
     try { return await this.callGeminiWithModel(session, userText, firstName, userLang, title, this.getFallbackModelName()); } catch (_) {}
     try { return await this.callFreeFallback(session, userText, firstName, userLang); } catch (_) {}
-    return 'حالياً في ضغط، جرب بعد دقيقة.';
+    return this.getLocalFallback(userText);
   }
 
   static dailyMessage(session) {
-    const key = new Date().toISOString().slice(0, 10);
-    session.lastDailyKey = key;
-    return `📅 يومي:\n${DAILY_PACK[Math.floor(Math.random() * DAILY_PACK.length)]}`;
+    session.lastDailyKey = new Date().toISOString().slice(0, 10);
+    return `📅 يومي:\n${this.pickRandom(DAILY_PACK)}`;
   }
 
   static startMiniGame(session, userId) {
@@ -240,7 +273,7 @@ class JoeChatHandler {
       { q: 'كم ناتج 15 + 7 ؟', a: '22' },
       { q: 'إيموجي لغز: 🌊🏝️ (كلمة)', a: 'جزيرة' }
     ];
-    const pick = bank[Math.floor(Math.random() * bank.length)];
+    const pick = this.pickRandom(bank);
     session.miniGame = {
       answer: String(pick.a).toLowerCase().trim(),
       ownerId: Number(userId),
@@ -253,6 +286,7 @@ class JoeChatHandler {
     if (!this.isGroupChat(ctx)) return;
     const data = String(ctx.callbackQuery?.data || '');
     if (!data.startsWith('group:joe:')) return;
+
     const session = this.getSession(ctx.chat.id);
     const action = data.replace('group:joe:', '');
 
@@ -272,7 +306,7 @@ class JoeChatHandler {
     }
     if (action === 'joke') {
       await ctx.answerCbQuery('تم').catch(() => {});
-      await ctx.reply(`😂 ${JOKES[Math.floor(Math.random() * JOKES.length)]}`);
+      await ctx.reply(`😂 ${this.pickRandom(JOKES)}`);
       return;
     }
     if (action === 'game') {
@@ -320,7 +354,7 @@ class JoeChatHandler {
       return true;
     }
     if (/^جو\s*(ضحكني|نكتة|نكته)$/i.test(msg)) {
-      await ctx.reply(`😂 ${JOKES[Math.floor(Math.random() * JOKES.length)]}`);
+      await ctx.reply(`😂 ${this.pickRandom(JOKES)}`);
       return true;
     }
     if (/^جو\s*(لعبة|لعبه|تسلية|تسليه)$/i.test(msg)) {
@@ -349,6 +383,12 @@ class JoeChatHandler {
     if (!/^جو[\s,:،-]+/i.test(msg)) return false;
     const userText = msg.replace(/^جو[\s,:،-]+/i, '').trim();
     if (!userText) return false;
+
+    const cannedAfterPrefix = this.getCannedReply(userText);
+    if (cannedAfterPrefix) {
+      await ctx.reply(cannedAfterPrefix, { reply_to_message_id: ctx.message.message_id });
+      return true;
+    }
 
     const uid = String(ctx.from.id);
     session.statsByUser[uid] = session.statsByUser[uid] || { messages: 0, wins: 0 };
@@ -380,4 +420,3 @@ class JoeChatHandler {
 }
 
 module.exports = JoeChatHandler;
-
