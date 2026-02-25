@@ -270,7 +270,14 @@ const SCRATCH_OUTCOMES = [
 const UNIQUE_GIFTS = [
   { key: 'rose', name: '🌹 وردة', price: 2 },
   { key: 'bouquet', name: '💐 باقة ورود', price: 6 },
+  { key: 'meal', name: '🍽️ وجبة', price: 4 },
   { key: 'car', name: '🚗 سيارة', price: 35 },
+  { key: 'island', name: '🏝️ جزيرة', price: 90 },
+  { key: 'plane', name: '✈️ طيارة', price: 110 },
+  { key: 'diamond', name: '💎 ماسة', price: 75 },
+  { key: 'tower', name: '🗼 برج', price: 140 },
+  { key: 'city', name: '🏙️ مدينة', price: 260 },
+  { key: 'cruise', name: '🛳️ سفينة سياحة', price: 180 },
   { key: 'villa', name: '🏡 فيلا', price: 70 },
   { key: 'house', name: '🏠 بيت', price: 45 },
   { key: 'palace', name: '🏰 قصر', price: 120 },
@@ -867,9 +874,31 @@ class GroupGamesHandler {
     const raw = String(input || '').trim().toLowerCase();
     if (!raw) return null;
     return UNIQUE_GIFTS.find((g) => {
-      const aliases = [g.key, g.name, this.normalizeText(g.name)];
+      const extraAliases = {
+        meal: ['وجبة', 'وجبه', 'meal'],
+        island: ['جزيرة', 'جزيره', 'island'],
+        plane: ['طيارة', 'طياره', 'plane'],
+        diamond: ['ماسة', 'ماسه', 'diamond'],
+        tower: ['برج', 'tower'],
+        city: ['مدينة', 'مدينه', 'city'],
+        cruise: ['سفينة سياحة', 'سفينه سياحه', 'سفينة', 'سفينه', 'cruise'],
+        palace: ['قصر', 'palace'],
+        house: ['بيت', 'house'],
+        villa: ['فيلا', 'villa'],
+        rose: ['وردة', 'ورده', 'rose'],
+        bouquet: ['باقة ورود', 'باقه ورود', 'bouquet'],
+        santa: ['هدية بابا نويل', 'هديه بابا نويل', 'santa'],
+        car: ['سيارة', 'سياره', 'car']
+      };
+      const aliases = [g.key, g.name, this.normalizeText(g.name), ...(extraAliases[g.key] || [])];
       return aliases.some((x) => this.normalizeText(String(x)) === this.normalizeText(raw));
     }) || null;
+  }
+
+  static extractGiftInputFromArgs(args = []) {
+    const noiseWords = new Set(['شراء', 'اشتري', 'بيع', 'ببيع', 'اهداء', 'إهداء', 'ارسال', 'إرسال', 'هدية', 'هديه', 'من', 'المتجر', 'لي', 'لنفسي', 'نفسي', 'x', '×']);
+    const filtered = args.filter((x) => !noiseWords.has(this.normalizeText(String(x))) && !/^\d+$/.test(String(x)) && !String(x).startsWith('@'));
+    return filtered.join(' ').trim();
   }
 
   static rollScratchOutcome() {
@@ -2015,7 +2044,10 @@ class GroupGamesHandler {
     if (!this.isGroupChat(ctx)) return;
     const args = this.parseCommandArgs(ctx);
     const key = String(args[0] || '').toLowerCase();
-    const item = GROUP_STORE.find((x) => x.key === key);
+    const normalizedInput = this.normalizeText(args.join(' '));
+    const item = GROUP_STORE.find((x) => x.key === key)
+      || GROUP_STORE.find((x) => this.normalizeText(x.title) === normalizedInput)
+      || GROUP_STORE.find((x) => normalizedInput.length > 2 && this.normalizeText(x.title).includes(normalizedInput));
     if (!item) return ctx.reply('❌ عنصر غير موجود. استخدم /gstore');
 
     const group = await this.ensureGroupRecord(ctx);
@@ -2038,6 +2070,28 @@ class GroupGamesHandler {
       return ctx.reply(`✅ تم تفعيل ${item.title}.`);
     }
     return ctx.reply(`✅ تم شراء اللقب وتفعيله: ${item.title}`);
+  }
+
+  static async handleSimpleBuyCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const args = this.parseCommandArgs(ctx);
+    if (args.length === 0) return this.handleStoreCommand(ctx);
+
+    const giftInput = this.extractGiftInputFromArgs(args);
+    const gift = this.resolveGiftByInput(giftInput) || this.resolveGiftByInput(args[0]);
+    if (gift) return this.handleBuyGiftForSelfCommand(ctx);
+    return this.handleBuyCommand(ctx);
+  }
+
+  static async handleSimpleSellCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const args = this.parseCommandArgs(ctx);
+    if (args.length === 0) return ctx.reply('❌ اكتب اسم الهدية التي تريد بيعها.\nمثال: بيع قصر 1');
+
+    const giftInput = this.extractGiftInputFromArgs(args);
+    const gift = this.resolveGiftByInput(giftInput) || this.resolveGiftByInput(args[0]);
+    if (!gift) return ctx.reply('❌ البيع هنا للهدايا فقط. اكتب: بيع [اسم الهدية]');
+    return this.handleSellGiftCommand(ctx);
   }
 
   static async handleGroupProfileCommand(ctx) {
@@ -2242,8 +2296,9 @@ class GroupGamesHandler {
       '• <code>اهداء وردة</code> (بالرد على العضو)\n' +
       '• <code>اهداء وردة @user</code>\n' +
       '• <code>اهداء قصر @user 2</code>\n' +
-      '• <code>شراء هدية وردة 3</code>\n' +
-      '• <code>بيع هدية قصر 1</code>\n\n' +
+      '• <code>شراء وردة 3</code>\n' +
+      '• <code>شراء قصر</code>\n' +
+      '• <code>بيع قصر 1</code>\n\n' +
       'مثال سلاش: <code>/ggift palace @user</code>',
       { parse_mode: 'HTML' }
     );
@@ -2253,15 +2308,14 @@ class GroupGamesHandler {
     if (!this.isGroupChat(ctx)) return;
     const args = this.parseCommandArgs(ctx);
     if (args.length === 0) {
-      return ctx.reply('❌ اكتب اسم الهدية أولاً.\nمثال: شراء هدية وردة 2');
+      return ctx.reply('❌ اكتب اسم الهدية أولاً.\nمثال: شراء وردة 2');
     }
 
     const qtyArg = [...args].reverse().find((x) => /^\d+$/.test(String(x))) || '1';
     const qty = Math.max(1, Math.min(20, parseInt(qtyArg, 10) || 1));
 
-    const noiseWords = new Set(['شراء', 'اشتري', 'هدية', 'هديه', 'من', 'المتجر', 'لي', 'لنفسي', 'نفسي', 'x', '×']);
-    const giftTokens = args.filter((x) => !noiseWords.has(this.normalizeText(String(x))) && !/^\d+$/.test(String(x)));
-    const rawInput = giftTokens.join(' ').trim();
+    const rawInput = this.extractGiftInputFromArgs(args);
+    const giftTokens = rawInput ? rawInput.split(/\s+/) : [];
     const gift = this.resolveGiftByInput(rawInput) || this.resolveGiftByInput(giftTokens[0]) || this.resolveGiftByInput(args[0]);
     if (!gift) return ctx.reply('❌ الهدية غير معروفة. استخدم /ggifts');
 
@@ -2300,15 +2354,14 @@ class GroupGamesHandler {
     if (!this.isGroupChat(ctx)) return;
     const args = this.parseCommandArgs(ctx);
     if (args.length === 0) {
-      return ctx.reply('❌ اكتب اسم الهدية التي تريد بيعها.\nمثال: بيع هدية وردة 2');
+      return ctx.reply('❌ اكتب اسم الهدية التي تريد بيعها.\nمثال: بيع وردة 2');
     }
 
     const qtyArg = [...args].reverse().find((x) => /^\d+$/.test(String(x))) || '1';
     const qty = Math.max(1, Math.min(20, parseInt(qtyArg, 10) || 1));
 
-    const noiseWords = new Set(['بيع', 'هدية', 'هديه', 'من', 'ممتلكاتي', 'x', '×']);
-    const giftTokens = args.filter((x) => !noiseWords.has(this.normalizeText(String(x))) && !/^\d+$/.test(String(x)));
-    const rawInput = giftTokens.join(' ').trim();
+    const rawInput = this.extractGiftInputFromArgs(args);
+    const giftTokens = rawInput ? rawInput.split(/\s+/) : [];
     const gift = this.resolveGiftByInput(rawInput) || this.resolveGiftByInput(giftTokens[0]) || this.resolveGiftByInput(args[0]);
     if (!gift) return ctx.reply('❌ الهدية غير معروفة. استخدم /ggifts');
 
@@ -2364,18 +2417,20 @@ class GroupGamesHandler {
     }
     const sumNames = (names) => names.reduce((sum, n) => sum + (countByName[normalizeName(n)] || 0), 0);
     const assetsLines = [
-      { label: 'وجبة', names: ['وجبة', 'وجبه'] },
-      { label: 'سيارة', names: ['سيارة', 'سياره'] },
-      { label: 'جزيرة', names: ['جزيرة', 'جزيره'] },
-      { label: 'طيارة', names: ['طيارة', 'طياره'] },
-      { label: 'بيت', names: ['بيت', 'house'] },
-      { label: 'ماسة', names: ['ماسة', 'ماسه', 'diamond'] },
-      { label: 'قصر', names: ['قصر', 'palace'] },
-      { label: 'فيلا', names: ['فيلا', 'villa'] },
       { label: 'وردة', names: ['وردة', 'ورده', 'rose'] },
       { label: 'باقة ورود', names: ['باقة ورود', 'باقه ورود', 'bouquet'] },
-      { label: 'هدية بابا نويل', names: ['هدية بابا نويل', 'هديه بابا نويل', 'santa'] },
-      { label: 'برج', names: ['برج', 'tower'] }
+      { label: 'وجبة', names: ['وجبة', 'وجبه', 'meal'] },
+      { label: 'سيارة', names: ['سيارة', 'سياره', 'car'] },
+      { label: 'بيت', names: ['بيت', 'house'] },
+      { label: 'فيلا', names: ['فيلا', 'villa'] },
+      { label: 'قصر', names: ['قصر', 'palace'] },
+      { label: 'جزيرة', names: ['جزيرة', 'جزيره', 'island'] },
+      { label: 'طيارة', names: ['طيارة', 'طياره', 'plane'] },
+      { label: 'ماسة', names: ['ماسة', 'ماسه', 'diamond'] },
+      { label: 'برج', names: ['برج', 'tower'] },
+      { label: 'مدينة', names: ['مدينة', 'مدينه', 'city'] },
+      { label: 'سفينة سياحة', names: ['سفينة سياحة', 'سفينه سياحه', 'سفينة', 'سفينه', 'cruise'] },
+      { label: 'هدية بابا نويل', names: ['هدية بابا نويل', 'هديه بابا نويل', 'santa'] }
     ];
     const rowsText = assetsLines
       .map((x) => `( ${x.label} ↤︎ ${sumNames(x.names)} )`)
@@ -2399,7 +2454,7 @@ class GroupGamesHandler {
       `🚀 المعزز النشط: ${activeBoost}\n` +
       `🎁 إجمالي الهدايا: ${totalItems}\n` +
       `💎 القيمة التقديرية: ${this.formatCurrency(totalEstimatedValue)}\n\n` +
-      `💡 للزيادة: استخدم /ggift أو /gbuygift أو /gbuy أو /gstore`,
+      `💡 للزيادة: استخدم /ggift أو /gbuygift أو "شراء [اسم الهدية]" أو "بيع [اسم الهدية]"`,
       { parse_mode: 'HTML' }
     );
   }
@@ -2726,6 +2781,8 @@ class GroupGamesHandler {
       '• /ggift key @user [count] | إهداء هدية\n' +
       '• /gbuygift key [count] | شراء هدية لنفسك\n' +
       '• /gsellgift key [count] | بيع هدية للبوت (70%)\n' +
+      '• شراء [اسم الهدية] [عدد] | شراء عربي مبسط\n' +
+      '• بيع [اسم الهدية] [عدد] | بيع عربي مبسط\n' +
       '• /gassets | ممتلكاتك في الجروب\n\n' +
       '<b>رابعًا: الكشط والربح</b>\n' +
       '• /gscratch [count] | كشط بطاقات (1-5)\n' +
