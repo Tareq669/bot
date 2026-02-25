@@ -599,6 +599,9 @@ class GroupGamesHandler {
       ],
       [
         Markup.button.callback('🎁 الهدايا', 'group:quick:gifts'),
+        Markup.button.callback('📦 ممتلكاتي', 'group:quick:assets')
+      ],
+      [
         Markup.button.callback('📘 مساعدة', 'group:quick:help')
       ]
     ]);
@@ -636,6 +639,7 @@ class GroupGamesHandler {
     if (action === 'levels') return this.handleLevelsCommand(ctx);
     if (action === 'store') return this.handleStoreCommand(ctx);
     if (action === 'gifts') return this.handleGiftCatalogCommand(ctx);
+    if (action === 'assets') return this.handleAssetsCommand(ctx);
     if (action === 'help') return this.handleGamesHelp(ctx);
     return null;
   }
@@ -1834,6 +1838,52 @@ class GroupGamesHandler {
     );
   }
 
+  static async handleAssetsCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const group = await this.ensureGroupRecord(ctx);
+    const row = this.getOrCreateScoreRow(group, ctx.from);
+
+    const giftInventory = (row.giftInventory || [])
+      .filter((g) => (g.count || 0) > 0)
+      .map((g) => {
+        const meta = UNIQUE_GIFTS.find((x) => x.key === g.key) || null;
+        const unitPrice = Number(meta?.price || 0);
+        const count = Number(g.count || 0);
+        const total = unitPrice * count;
+        return {
+          key: g.key,
+          name: g.name || meta?.name || g.key,
+          count,
+          unitPrice,
+          total
+        };
+      })
+      .sort((a, b) => b.total - a.total);
+
+    const totalItems = giftInventory.reduce((sum, x) => sum + x.count, 0);
+    const totalEstimatedValue = giftInventory.reduce((sum, x) => sum + x.total, 0);
+    const topRows = giftInventory
+      .slice(0, 12)
+      .map((x) => `• ${x.name} ×${x.count}${x.unitPrice > 0 ? ` (≈ ${x.total} نقطة)` : ''}`)
+      .join('\n') || '• لا توجد ممتلكات بعد';
+
+    const activeBoost = row.activeBoost?.expiresAt && new Date(row.activeBoost.expiresAt).getTime() > Date.now()
+      ? `✅ ${row.activeBoost.multiplier || 1}x حتى ${new Date(row.activeBoost.expiresAt).toLocaleString('ar-EG')}`
+      : '❌ غير مفعل';
+
+    await group.save();
+    return ctx.reply(
+      `📦 <b>ممتلكاتي في الجروب</b>\n\n` +
+      `🏷️ اللقب الحالي: ${row.title || 'مبتدئ'}\n` +
+      `🚀 المعزز النشط: ${activeBoost}\n` +
+      `🎁 عدد الهدايا: ${totalItems}\n` +
+      `💎 القيمة التقديرية: ${totalEstimatedValue} نقطة\n\n` +
+      `<b>تفاصيل الممتلكات:</b>\n${topRows}\n\n` +
+      `💡 للزيادة: استخدم /ggift أو /gbuy أو /gstore`,
+      { parse_mode: 'HTML' }
+    );
+  }
+
   static async handleGiftCommand(ctx) {
     if (!this.isGroupChat(ctx)) return;
     const args = this.parseCommandArgs(ctx);
@@ -2113,7 +2163,8 @@ class GroupGamesHandler {
       '• /gstore | متجر الجروب\n' +
       '• /gbuy key | شراء عنصر\n' +
       '• /ggifts | قائمة الهدايا\n' +
-      '• /ggift key @user [count] | إرسال هدية\n\n' +
+      '• /ggift key @user [count] | إرسال هدية\n' +
+      '• /gassets | ممتلكاتك في الجروب\n\n' +
       '<b>رابعًا: إدارة متقدمة</b>\n' +
       '• /ggame | إعدادات ألعاب الجروب\n' +
       '• /gquizset 5 | سلسلة كويز\n' +
@@ -2121,7 +2172,7 @@ class GroupGamesHandler {
       '• /gteams | ترتيب الفرق\n' +
       '• /gtour | البطولة الأسبوعية (مشرف)\n\n' +
       '<b>أوامر عربية بدون سلاش</b>\n' +
-      'العاب الجروب | مين انا | الغاز | سرعة الكتابة | روليت | متصدرين | اسبوعي | متصدرين الشهر | ملفي | متجر الجروب | الهدايا\n\n' +
+      'العاب الجروب | مين انا | الغاز | سرعة الكتابة | روليت | متصدرين | اسبوعي | متصدرين الشهر | ملفي | متجر الجروب | الهدايا | ممتلكاتي\n\n' +
       'النقاط: كل إجابة صحيحة = <b>1 نقطة</b>.',
       { parse_mode: 'HTML', reply_markup: keyboard.reply_markup }
     );
