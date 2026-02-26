@@ -384,6 +384,56 @@ const groupSchema = new mongoose.Schema({
           type: Number,
           default: 0
         },
+        castleCreated: {
+          type: Boolean,
+          default: false
+        },
+        castleLevel: {
+          type: Number,
+          default: 1
+        },
+        castleLastUpgradeAt: Date,
+        castleResources: {
+          wood: { type: Number, default: 0 },
+          stone: { type: Number, default: 0 },
+          food: { type: Number, default: 0 },
+          iron: { type: Number, default: 0 },
+          gold: { type: Number, default: 0 }
+        },
+        barracksCreated: {
+          type: Boolean,
+          default: false
+        },
+        barracksLevel: {
+          type: Number,
+          default: 1
+        },
+        armyUnits: {
+          type: Number,
+          default: 0
+        },
+        armyPower: {
+          type: Number,
+          default: 0
+        },
+        shieldCards: {
+          type: Number,
+          default: 0
+        },
+        shieldUntil: Date,
+        treasureLastAt: Date,
+        duelWins: {
+          type: Number,
+          default: 0
+        },
+        duelLosses: {
+          type: Number,
+          default: 0
+        },
+        arenaJoined: {
+          type: Boolean,
+          default: false
+        },
         wins: {
           type: Number,
           default: 0

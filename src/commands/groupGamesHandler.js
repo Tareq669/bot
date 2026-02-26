@@ -260,6 +260,24 @@ const LUCK_OVER_COUNT = 15;
 const LUCK_GOOD_COUNT = 60;
 const LUCK_SMALL_COUNT = 180;
 const LUCK_PAYOUTS = { small: 10, good: 35, over: 100 };
+const CASTLE_UPGRADE_COOLDOWN_MIN = 10;
+const TREASURE_COOLDOWN_MIN = 30;
+const SHIELD_DURATION_MIN = 60;
+const NORMAL_RESOURCE_UNIT_COST = 1 / 3;
+const GOLD_RESOURCE_UNIT_COST = 1;
+const MAX_NORMAL_RESOURCE_BUY = 300;
+const MAX_GOLD_RESOURCE_BUY = 50;
+const MAX_ARMY_BUY = 2000;
+const ARMY_UNIT_PRICE = 1 / 10;
+const ARMY_POWER_UPGRADE_UNITS = 1000;
+const RESOURCE_KEYS = ['wood', 'stone', 'food', 'iron', 'gold'];
+const RESOURCE_AR = {
+  wood: 'خشب',
+  stone: 'حجر',
+  food: 'غذاء',
+  iron: 'حديد',
+  gold: 'ذهب'
+};
 const SCRATCH_OUTCOMES = [
   { label: '❌ لم تربح في هذه البطاقة', payout: 0, weight: 60 },
   { label: '💵 ربح بسيط', payout: 3, weight: 25 },
@@ -384,6 +402,7 @@ class GroupGamesHandler {
   static userCooldowns = new Map();
   static pendingLuckInputs = new Map();
   static luckDailyNumbersCache = null;
+  static pendingAlliances = new Map();
 
   static isGroupChat(ctx) {
     return GROUP_TYPES.has(ctx?.chat?.type);
@@ -636,6 +655,22 @@ class GroupGamesHandler {
       if (!Number.isFinite(row.luckTotalPlays)) row.luckTotalPlays = 0;
       if (!Number.isFinite(row.luckTotalWins)) row.luckTotalWins = 0;
       if (!Number.isFinite(row.luckTotalPayout)) row.luckTotalPayout = 0;
+      if (typeof row.castleCreated !== 'boolean') row.castleCreated = false;
+      if (!Number.isFinite(row.castleLevel)) row.castleLevel = 1;
+      if (!row.castleResources || typeof row.castleResources !== 'object') {
+        row.castleResources = { wood: 0, stone: 0, food: 0, iron: 0, gold: 0 };
+      }
+      RESOURCE_KEYS.forEach((k) => {
+        if (!Number.isFinite(row.castleResources[k])) row.castleResources[k] = 0;
+      });
+      if (typeof row.barracksCreated !== 'boolean') row.barracksCreated = false;
+      if (!Number.isFinite(row.barracksLevel)) row.barracksLevel = 1;
+      if (!Number.isFinite(row.armyUnits)) row.armyUnits = 0;
+      if (!Number.isFinite(row.armyPower)) row.armyPower = 0;
+      if (!Number.isFinite(row.shieldCards)) row.shieldCards = 0;
+      if (!Number.isFinite(row.duelWins)) row.duelWins = 0;
+      if (!Number.isFinite(row.duelLosses)) row.duelLosses = 0;
+      if (typeof row.arenaJoined !== 'boolean') row.arenaJoined = false;
     });
     if (!Array.isArray(group.gameSystem.teams)) group.gameSystem.teams = [];
     if (!group.gameSystem.tournament) group.gameSystem.tournament = { active: false, season: 1, startedAt: null, endedAt: null, rewards: { first: 100, second: 60, third: 40 } };
@@ -827,6 +862,20 @@ class GroupGamesHandler {
         luckTotalPlays: 0,
         luckTotalWins: 0,
         luckTotalPayout: 0,
+        castleCreated: false,
+        castleLevel: 1,
+        castleLastUpgradeAt: null,
+        castleResources: { wood: 0, stone: 0, food: 0, iron: 0, gold: 0 },
+        barracksCreated: false,
+        barracksLevel: 1,
+        armyUnits: 0,
+        armyPower: 0,
+        shieldCards: 0,
+        shieldUntil: null,
+        treasureLastAt: null,
+        duelWins: 0,
+        duelLosses: 0,
+        arenaJoined: false,
         wins: 0,
         streak: 0,
         bestStreak: 0,
@@ -847,6 +896,20 @@ class GroupGamesHandler {
     if (!Number.isFinite(row.luckTotalPlays)) row.luckTotalPlays = 0;
     if (!Number.isFinite(row.luckTotalWins)) row.luckTotalWins = 0;
     if (!Number.isFinite(row.luckTotalPayout)) row.luckTotalPayout = 0;
+    if (typeof row.castleCreated !== 'boolean') row.castleCreated = false;
+    if (!Number.isFinite(row.castleLevel)) row.castleLevel = 1;
+    if (!row.castleResources || typeof row.castleResources !== 'object') row.castleResources = { wood: 0, stone: 0, food: 0, iron: 0, gold: 0 };
+    RESOURCE_KEYS.forEach((k) => {
+      if (!Number.isFinite(row.castleResources[k])) row.castleResources[k] = 0;
+    });
+    if (typeof row.barracksCreated !== 'boolean') row.barracksCreated = false;
+    if (!Number.isFinite(row.barracksLevel)) row.barracksLevel = 1;
+    if (!Number.isFinite(row.armyUnits)) row.armyUnits = 0;
+    if (!Number.isFinite(row.armyPower)) row.armyPower = 0;
+    if (!Number.isFinite(row.shieldCards)) row.shieldCards = 0;
+    if (!Number.isFinite(row.duelWins)) row.duelWins = 0;
+    if (!Number.isFinite(row.duelLosses)) row.duelLosses = 0;
+    if (typeof row.arenaJoined !== 'boolean') row.arenaJoined = false;
     return row;
   }
 
@@ -2196,6 +2259,479 @@ class GroupGamesHandler {
     );
   }
 
+  static parseResourceKey(input) {
+    const x = this.normalizeText(String(input || ''));
+    const map = {
+      wood: ['wood', 'خشب'],
+      stone: ['stone', 'حجر'],
+      food: ['food', 'غذاء', 'طعام'],
+      iron: ['iron', 'حديد'],
+      gold: ['gold', 'ذهب']
+    };
+    return Object.keys(map).find((k) => map[k].some((a) => this.normalizeText(a) === x)) || null;
+  }
+
+  static getCastlePower(row) {
+    return Math.max(0, (Number(row.castleLevel || 1) * 20) + Number(row.armyPower || 0) + Math.floor(Number(row.armyUnits || 0) / 100));
+  }
+
+  static isShieldActive(row) {
+    return Boolean(row?.shieldUntil && new Date(row.shieldUntil).getTime() > Date.now());
+  }
+
+  static formatResources(resources = {}) {
+    const r = resources || {};
+    return `🪵 خشب: ${Number(r.wood || 0)} | 🪨 حجر: ${Number(r.stone || 0)} | 🍖 غذاء: ${Number(r.food || 0)} | ⛓️ حديد: ${Number(r.iron || 0)} | 🪙 ذهب: ${Number(r.gold || 0)}`;
+  }
+
+  static async handleCreateCastleCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const group = await this.ensureGroupRecord(ctx);
+    const row = this.getOrCreateScoreRow(group, ctx.from);
+    if (row.castleCreated) return ctx.reply('🏰 قلعتك موجودة بالفعل. استخدم: قلعتي');
+    row.castleCreated = true;
+    row.castleLevel = 1;
+    row.castleResources = row.castleResources || {};
+    RESOURCE_KEYS.forEach((k) => {
+      row.castleResources[k] = Number(row.castleResources[k] || 0) + (k === 'gold' ? 5 : 20);
+    });
+    row.updatedAt = new Date();
+    await group.save();
+    return ctx.reply(
+      '🏰 تم إنشاء قلعتك بنجاح!\n' +
+      '• المستوى: 1\n' +
+      `• موارد البداية:\n${this.formatResources(row.castleResources)}\n` +
+      '💡 استخدم: متجر الموارد | شراء موارد خشب 30 | تطوير قلعتي'
+    );
+  }
+
+  static async handleMyCastleCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const group = await this.ensureGroupRecord(ctx);
+    const row = this.getOrCreateScoreRow(group, ctx.from);
+    if (!row.castleCreated) return ctx.reply('❌ ما عندك قلعة بعد. اكتب: انشاء قلعه');
+    const shield = this.isShieldActive(row)
+      ? `✅ مفعلة حتى ${new Date(row.shieldUntil).toLocaleString('ar-EG')}`
+      : '❌ غير مفعلة';
+    return ctx.reply(
+      `🏰 <b>قلعتك</b>\n\n` +
+      `• المستوى: ${row.castleLevel || 1}\n` +
+      `• قوة القلعة: ${this.getCastlePower(row)}\n` +
+      `• المعسكر: ${row.barracksCreated ? `✅ مستوى ${row.barracksLevel || 1}` : '❌ غير منشأ'}\n` +
+      `• الجيش: ${Number(row.armyUnits || 0)} جندي\n` +
+      `• قوة الجيش: ${Number(row.armyPower || 0)}\n` +
+      `• الحصانة: ${shield}\n\n` +
+      `${this.formatResources(row.castleResources)}`,
+      { parse_mode: 'HTML' }
+    );
+  }
+
+  static async handleResourceStoreCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    return ctx.reply(
+      `🧱 <b>متجر الموارد</b>\n\n` +
+      `• كل 3 موارد عادية = ${this.formatCurrency(1)}\n` +
+      `• الذهب: كل 1 = ${this.formatCurrency(1)}\n` +
+      `• الحد لكل شراء: موارد عادية ${MAX_NORMAL_RESOURCE_BUY} | ذهب ${MAX_GOLD_RESOURCE_BUY}\n\n` +
+      'أمثلة:\n' +
+      '• شراء موارد خشب 30\n' +
+      '• شراء موارد حجر 60\n' +
+      '• شراء موارد ذهب 5',
+      { parse_mode: 'HTML' }
+    );
+  }
+
+  static async handleBuyResourcesCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const args = this.parseCommandArgs(ctx);
+    if (args.length < 2) return ctx.reply('❌ الصيغة: شراء موارد [الاسم] [العدد]');
+    const startIdx = this.normalizeText(String(args[0] || '')) === 'موارد' ? 1 : 0;
+    const resourceKey = this.parseResourceKey(args[startIdx]);
+    const qty = Math.max(1, parseInt(args[startIdx + 1], 10) || 0);
+    if (!resourceKey || !Number.isInteger(qty)) return ctx.reply('❌ مورد غير معروف. استخدم: خشب/حجر/غذاء/حديد/ذهب');
+
+    const maxQty = resourceKey === 'gold' ? MAX_GOLD_RESOURCE_BUY : MAX_NORMAL_RESOURCE_BUY;
+    if (qty > maxQty) return ctx.reply(`❌ الحد الأقصى لهذا الشراء هو ${maxQty}.`);
+
+    const group = await this.ensureGroupRecord(ctx);
+    const row = this.getOrCreateScoreRow(group, ctx.from);
+    if (!row.castleCreated) return ctx.reply('❌ أنشئ قلعتك أولاً: انشاء قلعه');
+
+    const cost = resourceKey === 'gold'
+      ? Math.ceil(qty * GOLD_RESOURCE_UNIT_COST)
+      : Math.ceil(qty * NORMAL_RESOURCE_UNIT_COST);
+    if ((row.points || 0) < cost) return ctx.reply(`❌ فلوسك غير كافية. التكلفة: ${this.formatCurrency(cost)}`);
+
+    row.points = Number(row.points || 0) - cost;
+    row.castleResources = row.castleResources || {};
+    row.castleResources[resourceKey] = Number(row.castleResources[resourceKey] || 0) + qty;
+    row.updatedAt = new Date();
+    await group.save();
+
+    return ctx.reply(
+      `✅ تم شراء ${qty} ${RESOURCE_AR[resourceKey]}.\n` +
+      `• التكلفة: ${this.formatCurrency(cost)}\n` +
+      `• رصيدك الآن: ${this.formatCurrency(row.points || 0)}\n` +
+      `${this.formatResources(row.castleResources)}`
+    );
+  }
+
+  static async handleMyResourcesCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const group = await this.ensureGroupRecord(ctx);
+    const row = this.getOrCreateScoreRow(group, ctx.from);
+    if (!row.castleCreated) return ctx.reply('❌ أنشئ قلعتك أولاً: انشاء قلعه');
+    return ctx.reply(`📦 <b>مواردك</b>\n\n${this.formatResources(row.castleResources)}`, { parse_mode: 'HTML' });
+  }
+
+  static async handleUpgradeCastleCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const group = await this.ensureGroupRecord(ctx);
+    const row = this.getOrCreateScoreRow(group, ctx.from);
+    if (!row.castleCreated) return ctx.reply('❌ أنشئ قلعتك أولاً: انشاء قلعه');
+
+    const now = Date.now();
+    const last = row.castleLastUpgradeAt ? new Date(row.castleLastUpgradeAt).getTime() : 0;
+    const cooldownMs = CASTLE_UPGRADE_COOLDOWN_MIN * 60 * 1000;
+    if (last && (now - last) < cooldownMs) {
+      const left = Math.ceil((cooldownMs - (now - last)) / 60000);
+      return ctx.reply(`⏳ تقدر تطور قلعتك بعد ${left} دقيقة.`);
+    }
+
+    const need = {
+      wood: 20 + (row.castleLevel * 10),
+      stone: 20 + (row.castleLevel * 10),
+      food: 15 + (row.castleLevel * 8),
+      iron: 10 + (row.castleLevel * 6),
+      gold: 2 + Math.floor(row.castleLevel / 2)
+    };
+    const hasAll = RESOURCE_KEYS.every((k) => Number(row.castleResources?.[k] || 0) >= Number(need[k] || 0));
+    if (!hasAll) {
+      return ctx.reply(
+        '❌ مواردك لا تكفي للتطوير.\n' +
+        `المطلوب: ${this.formatResources(need)}\n` +
+        `المتاح: ${this.formatResources(row.castleResources)}`
+      );
+    }
+
+    RESOURCE_KEYS.forEach((k) => {
+      row.castleResources[k] = Number(row.castleResources[k] || 0) - Number(need[k] || 0);
+    });
+    row.castleLevel = Number(row.castleLevel || 1) + 1;
+    row.castleLastUpgradeAt = new Date();
+    row.updatedAt = new Date();
+    await group.save();
+
+    return ctx.reply(`🏰 تم تطوير قلعتك إلى المستوى ${row.castleLevel}!`);
+  }
+
+  static async handleCreateBarracksCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const group = await this.ensureGroupRecord(ctx);
+    const row = this.getOrCreateScoreRow(group, ctx.from);
+    if (!row.castleCreated) return ctx.reply('❌ أنشئ قلعتك أولاً: انشاء قلعه');
+    if (row.barracksCreated) return ctx.reply('✅ معسكرك موجود بالفعل.');
+    row.barracksCreated = true;
+    row.barracksLevel = 1;
+    row.updatedAt = new Date();
+    await group.save();
+    return ctx.reply('🏕️ تم إنشاء المعسكر بنجاح. اكتب: شراء جيش 100');
+  }
+
+  static async handleBuyArmyCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const args = this.parseCommandArgs(ctx);
+    const startIdx = this.normalizeText(String(args[0] || '')) === 'جيش' ? 1 : 0;
+    const qty = Math.max(1, parseInt(args[startIdx], 10) || 0);
+    if (!Number.isInteger(qty)) return ctx.reply('❌ الصيغة: شراء جيش [العدد]');
+    if (qty > MAX_ARMY_BUY) return ctx.reply(`❌ الحد الأقصى للشراء مرة واحدة هو ${MAX_ARMY_BUY}.`);
+
+    const group = await this.ensureGroupRecord(ctx);
+    const row = this.getOrCreateScoreRow(group, ctx.from);
+    if (!row.barracksCreated) return ctx.reply('❌ أنشئ المعسكر أولًا: انشاء معكسر');
+
+    const cost = Math.ceil(qty * ARMY_UNIT_PRICE);
+    if ((row.points || 0) < cost) return ctx.reply(`❌ فلوسك غير كافية. تكلفة ${qty} جندي هي ${this.formatCurrency(cost)}.`);
+
+    row.points = Number(row.points || 0) - cost;
+    row.armyUnits = Number(row.armyUnits || 0) + qty;
+    row.updatedAt = new Date();
+    await group.save();
+    return ctx.reply(`✅ تم شراء ${qty} جندي.\n• التكلفة: ${this.formatCurrency(cost)}\n• جيشك الآن: ${row.armyUnits}`);
+  }
+
+  static async handleUpgradeArmyCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const group = await this.ensureGroupRecord(ctx);
+    const row = this.getOrCreateScoreRow(group, ctx.from);
+    if (!row.barracksCreated) return ctx.reply('❌ أنشئ المعسكر أولًا: انشاء معكسر');
+    if ((row.armyUnits || 0) < ARMY_POWER_UPGRADE_UNITS) {
+      return ctx.reply(`❌ تحتاج ${ARMY_POWER_UPGRADE_UNITS} جندي للتطوير. المتاح: ${row.armyUnits || 0}`);
+    }
+    row.armyUnits = Number(row.armyUnits || 0) - ARMY_POWER_UPGRADE_UNITS;
+    row.armyPower = Number(row.armyPower || 0) + 1;
+    row.updatedAt = new Date();
+    await group.save();
+    return ctx.reply(`⚔️ تم تطوير الجيش بنجاح.\n• قوة الجيش: ${row.armyPower}\n• الجنود المتبقين: ${row.armyUnits}`);
+  }
+
+  static async handleTreasureSearchCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const group = await this.ensureGroupRecord(ctx);
+    const row = this.getOrCreateScoreRow(group, ctx.from);
+    if (!row.castleCreated) return ctx.reply('❌ أنشئ قلعتك أولًا: انشاء قلعه');
+    const now = Date.now();
+    const last = row.treasureLastAt ? new Date(row.treasureLastAt).getTime() : 0;
+    const cooldownMs = TREASURE_COOLDOWN_MIN * 60 * 1000;
+    if (last && (now - last) < cooldownMs) {
+      const left = Math.ceil((cooldownMs - (now - last)) / 60000);
+      return ctx.reply(`⏳ تقدر تبحث عن الكنز بعد ${left} دقيقة.`);
+    }
+
+    const roll = Math.random();
+    let message = '';
+    if (roll < 0.4) {
+      const qty = 10 + Math.floor(Math.random() * 31);
+      const pool = ['wood', 'stone', 'food', 'iron'];
+      const picked = pool[Math.floor(Math.random() * pool.length)];
+      row.castleResources[picked] = Number(row.castleResources[picked] || 0) + qty;
+      message = `🧰 لقيت ${qty} ${RESOURCE_AR[picked]}!`;
+    } else if (roll < 0.75) {
+      const qty = 50 + Math.floor(Math.random() * 251);
+      row.armyUnits = Number(row.armyUnits || 0) + qty;
+      message = `🪖 لقيت ${qty} جندي إضافي لجيشك!`;
+    } else if (roll < 0.95) {
+      row.shieldCards = Number(row.shieldCards || 0) + 1;
+      message = '🛡️ حصلت على بطاقة حصانة واحدة!';
+    } else {
+      const gold = 2 + Math.floor(Math.random() * 4);
+      row.castleResources.gold = Number(row.castleResources.gold || 0) + gold;
+      message = `🏆 كنز نادر! حصلت على ${gold} ذهب.`;
+    }
+    row.treasureLastAt = new Date();
+    row.updatedAt = new Date();
+    await group.save();
+    return ctx.reply(`🔎 <b>بحث الكنز</b>\n\n${message}`, { parse_mode: 'HTML' });
+  }
+
+  static async handleShieldToggleCommand(ctx, force = null) {
+    if (!this.isGroupChat(ctx)) return;
+    const group = await this.ensureGroupRecord(ctx);
+    const row = this.getOrCreateScoreRow(group, ctx.from);
+    if (!row.castleCreated) return ctx.reply('❌ أنشئ قلعتك أولًا: انشاء قلعه');
+    const active = this.isShieldActive(row);
+
+    let action = force;
+    if (!action) {
+      const txt = this.normalizeText(String(ctx.message?.text || ''));
+      if (txt.includes('تعطيل')) action = 'off';
+      else if (txt.includes('تفعيل')) action = 'on';
+    }
+    if (!action) action = active ? 'off' : 'on';
+
+    if (action === 'on') {
+      if (active) return ctx.reply('✅ الحصانة مفعلة بالفعل.');
+      if ((row.shieldCards || 0) < 1) return ctx.reply('❌ ما عندك بطاقة حصانة. جرّب: بحث الكنز');
+      row.shieldCards = Number(row.shieldCards || 0) - 1;
+      row.shieldUntil = new Date(Date.now() + SHIELD_DURATION_MIN * 60 * 1000);
+      row.updatedAt = new Date();
+      await group.save();
+      return ctx.reply(`🛡️ تم تفعيل الحصانة لمدة ${SHIELD_DURATION_MIN} دقيقة.`);
+    }
+
+    row.shieldUntil = null;
+    row.updatedAt = new Date();
+    await group.save();
+    return ctx.reply('✅ تم تعطيل الحصانة.');
+  }
+
+  static async handleMyShieldCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const group = await this.ensureGroupRecord(ctx);
+    const row = this.getOrCreateScoreRow(group, ctx.from);
+    const active = this.isShieldActive(row);
+    if (!active) {
+      return ctx.reply(`🛡️ حصانتك: غير مفعلة\n• بطاقاتك: ${row.shieldCards || 0}`);
+    }
+    const leftMin = Math.max(0, Math.ceil((new Date(row.shieldUntil).getTime() - Date.now()) / 60000));
+    return ctx.reply(`🛡️ حصانتك مفعلة\n• المتبقي: ${leftMin} دقيقة\n• بطاقاتك: ${row.shieldCards || 0}`);
+  }
+
+  static async handleCastleDuelCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const group = await this.ensureGroupRecord(ctx);
+    const targetUser = ctx.message?.reply_to_message?.from;
+    if (!targetUser?.id) return ctx.reply('❌ هذه المبارزة بالرد فقط على العضو.');
+    if (Number(targetUser.id) === Number(ctx.from.id)) return ctx.reply('❌ لا يمكنك مبارزة نفسك.');
+
+    const me = this.getOrCreateScoreRow(group, ctx.from);
+    const other = this.getOrCreateScoreRow(group, targetUser);
+    if (!me.castleCreated || !other.castleCreated) return ctx.reply('❌ يجب أن يكون لدى الطرفين قلعة.');
+    if (this.isShieldActive(other)) return ctx.reply('🛡️ هذا العضو محمي بالحصانة حاليًا.');
+
+    const myPower = this.getCastlePower(me) + Math.floor(Math.random() * 31);
+    const hisPower = this.getCastlePower(other) + Math.floor(Math.random() * 31);
+    const iWin = myPower >= hisPower;
+    const winner = iWin ? me : other;
+    const loser = iWin ? other : me;
+    const winnerUser = iWin ? ctx.from : targetUser;
+    const loserUser = iWin ? targetUser : ctx.from;
+
+    const steal = Math.max(1, Math.min(10, Number(loser.points || 0)));
+    loser.points = Number(loser.points || 0) - steal;
+    winner.points = Number(winner.points || 0) + steal;
+    winner.duelWins = Number(winner.duelWins || 0) + 1;
+    loser.duelLosses = Number(loser.duelLosses || 0) + 1;
+
+    group.updatedAt = new Date();
+    await group.save();
+    return ctx.reply(
+      `⚔️ <b>نتيجة المبارزة</b>\n\n` +
+      `• قوة ${ctx.from.first_name || 'اللاعب'}: ${myPower}\n` +
+      `• قوة ${targetUser.first_name || 'الخصم'}: ${hisPower}\n` +
+      `• الفائز: ${this.mentionUser(winnerUser.id, winnerUser.first_name || winnerUser.username || winnerUser.id)}\n` +
+      `• خسارة الخاسر: ${this.formatCurrency(steal)}\n` +
+      `• الخاسر: ${this.mentionUser(loserUser.id, loserUser.first_name || loserUser.username || loserUser.id)}`,
+      { parse_mode: 'HTML', reply_to_message_id: ctx.message?.message_id }
+    );
+  }
+
+  static async handleArenaJoinCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const group = await this.ensureGroupRecord(ctx);
+    const row = this.getOrCreateScoreRow(group, ctx.from);
+    if (!row.castleCreated) return ctx.reply('❌ أنشئ قلعتك أولًا: انشاء قلعه');
+    row.arenaJoined = true;
+    row.updatedAt = new Date();
+    await group.save();
+    return ctx.reply('✅ تم انضمامك للمبارزة العالمية.');
+  }
+
+  static async handleArenaListCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const group = await this.ensureGroupRecord(ctx);
+    const joined = (group.gameSystem.scores || []).filter((x) => x.arenaJoined);
+    if (joined.length === 0) return ctx.reply('ℹ️ لا يوجد مشاركين بعد. اكتب: الانضمام للمبارزه');
+    const lines = joined
+      .sort((a, b) => this.getCastlePower(b) - this.getCastlePower(a))
+      .slice(0, 20)
+      .map((x, i) => `${i + 1}. ${x.username || x.userId} — قوة: ${this.getCastlePower(x)}`);
+    return ctx.reply(`🌍 <b>المبارزين</b>\n\n${lines.join('\n')}`, { parse_mode: 'HTML' });
+  }
+
+  static async handleTopRulersCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const group = await this.ensureGroupRecord(ctx);
+    const list = (group.gameSystem.scores || [])
+      .filter((x) => x.castleCreated)
+      .sort((a, b) => {
+        const byCastle = Number(b.castleLevel || 0) - Number(a.castleLevel || 0);
+        if (byCastle !== 0) return byCastle;
+        const byPower = this.getCastlePower(b) - this.getCastlePower(a);
+        if (byPower !== 0) return byPower;
+        return Number(b.points || 0) - Number(a.points || 0);
+      })
+      .slice(0, 10);
+    if (list.length === 0) return ctx.reply('ℹ️ لا يوجد حكام بعد. ابدأوا بـ انشاء قلعه');
+
+    (group.gameSystem.scores || []).forEach((r) => {
+      if (['🤴🏻 الحاكم', '🫅🏻 الحاكمة'].includes(String(r.title || ''))) {
+        r.customTitle = false;
+        const tier = this.resolveTierFromXp(r.xp || 0);
+        r.title = `${tier.icon} ${tier.name}`;
+      }
+    });
+    const top = list[0];
+    top.title = '🤴🏻 الحاكم';
+    top.customTitle = true;
+    await group.save();
+
+    const lines = list.map((x, i) => `${i + 1}. ${x.username || x.userId} — مستوى القلعة ${x.castleLevel} | قوة ${this.getCastlePower(x)}`);
+    return ctx.reply(`👑 <b>توب الحكام</b>\n\n${lines.join('\n')}`, { parse_mode: 'HTML' });
+  }
+
+  static async handleAllianceRequestCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const args = this.parseCommandArgs(ctx);
+    const targetArg = args.find((x) => String(x).startsWith('@') || /^\d+$/.test(String(x))) || null;
+    const group = await this.ensureGroupRecord(ctx);
+    const target = this.resolveTargetUser(ctx, group, targetArg);
+    if (!target?.id) return ctx.reply('❌ استخدم: تحالف @user');
+    if (Number(target.id) === Number(ctx.from.id)) return ctx.reply('❌ لا يمكنك طلب تحالف مع نفسك.');
+
+    const chatKey = String(ctx.chat.id);
+    const key = `${chatKey}:${ctx.from.id}:${target.id}`;
+    this.pendingAlliances.set(key, {
+      chatId: chatKey,
+      fromId: Number(ctx.from.id),
+      fromName: ctx.from.first_name || ctx.from.username || String(ctx.from.id),
+      toId: Number(target.id),
+      toName: target.first_name || target.username || String(target.id),
+      status: 'pending',
+      createdAt: Date.now()
+    });
+    return ctx.reply(
+      `🤝 تم إرسال طلب تحالف إلى ${this.mentionUser(target.id, target.first_name || target.username || target.id)}\n` +
+      'العضو يقدر يرد بـ: قبول تحالف أو رفض تحالف',
+      { parse_mode: 'HTML' }
+    );
+  }
+
+  static async handleAllianceRequestsCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const chatKey = String(ctx.chat.id);
+    const me = Number(ctx.from.id);
+    const incoming = Array.from(this.pendingAlliances.values()).filter((x) => x.chatId === chatKey && x.toId === me);
+    if (incoming.length === 0) return ctx.reply('ℹ️ لا توجد طلبات تحالف حالياً.');
+    const lines = incoming.map((x, i) => `${i + 1}. من: ${x.fromName} | الحالة: ${x.status}`);
+    return ctx.reply(`📨 <b>طلبات التحالف</b>\n\n${lines.join('\n')}`, { parse_mode: 'HTML' });
+  }
+
+  static async handleAllianceDecisionCommand(ctx, decision = 'accept') {
+    if (!this.isGroupChat(ctx)) return;
+    const chatKey = String(ctx.chat.id);
+    const me = Number(ctx.from.id);
+    const pending = Array.from(this.pendingAlliances.entries()).find(([, x]) => x.chatId === chatKey && x.toId === me && x.status === 'pending');
+    if (!pending) return ctx.reply('ℹ️ لا يوجد طلب تحالف معلّق.');
+
+    const [key, req] = pending;
+    if (decision === 'reject') {
+      req.status = 'rejected';
+      this.pendingAlliances.set(key, req);
+      return ctx.reply('❌ تم رفض طلب التحالف.');
+    }
+
+    req.status = 'accepted';
+    this.pendingAlliances.set(key, req);
+
+    const group = await this.ensureGroupRecord(ctx);
+    const fromRow = (group.gameSystem.scores || []).find((x) => Number(x.userId) === Number(req.fromId));
+    const toRow = (group.gameSystem.scores || []).find((x) => Number(x.userId) === Number(req.toId));
+    const target = (group.gameSystem.scores || [])
+      .filter((x) => Number(x.userId) !== Number(req.fromId) && Number(x.userId) !== Number(req.toId))
+      .sort((a, b) => this.getCastlePower(b) - this.getCastlePower(a))[0];
+    if (!fromRow || !toRow || !target) return ctx.reply('ℹ️ تم قبول التحالف، لكن لا يوجد هدف مناسب للغارة الآن.');
+
+    const alliancePower = this.getCastlePower(fromRow) + this.getCastlePower(toRow);
+    const targetPower = this.getCastlePower(target) + Math.floor(Math.random() * 31);
+    const success = alliancePower >= targetPower;
+    if (success) {
+      const loss = Math.max(5, Math.min(30, Number(target.points || 0)));
+      target.points = Number(target.points || 0) - loss;
+      fromRow.points = Number(fromRow.points || 0) + Math.floor(loss / 2);
+      toRow.points = Number(toRow.points || 0) + Math.ceil(loss / 2);
+    }
+    await group.save();
+    return ctx.reply(
+      `🤝 <b>نتيجة التحالف</b>\n\n` +
+      `• القوة المشتركة: ${alliancePower}\n` +
+      `• قوة الهدف: ${targetPower}\n` +
+      `• الهدف: ${target.username || target.userId}\n` +
+      `• النتيجة: ${success ? '✅ غارة ناجحة' : '❌ الغارة فشلت'}`,
+      { parse_mode: 'HTML' }
+    );
+  }
+
   static async handleScratchCommand(ctx) {
     if (!this.isGroupChat(ctx)) return;
     const args = this.parseCommandArgs(ctx);
@@ -2821,14 +3357,33 @@ class GroupGamesHandler {
       '<b>خامسًا: الثروة</b>\n' +
       '• /gwealth | لوحة أغنى ممتلكات\n' +
       '• استثمار فلوسي | استثمار مباشر\n\n' +
-      '<b>سادسًا: إدارة متقدمة</b>\n' +
+      '<b>سادسًا: القلاع والحكام</b>\n' +
+      '• انشاء قلعه | /gcastle\n' +
+      '• قلعتي | /gmycastle\n' +
+      '• متجر الموارد | /gresstore\n' +
+      '• شراء موارد خشب 30 | /gbuyres wood 30\n' +
+      '• مواردي | /gmyres\n' +
+      '• تطوير قلعتي | /gupcastle\n' +
+      '• انشاء معكسر | /gbarracks\n' +
+      '• شراء جيش 500 | /gbuyarmy 500\n' +
+      '• تطوير الجيش | /guparmy\n' +
+      '• بحث الكنز | /gtreasure\n' +
+      '• تفعيل/تعطيل الحصانه | /gshield\n' +
+      '• حصانتي | /gmyshield\n' +
+      '• مبارزه (بالرد) | /gwar\n' +
+      '• الانضمام للمبارزه | /garena\n' +
+      '• المبارزين | /gfighters\n' +
+      '• توب الحكام | /grulers\n' +
+      '• تحالف @user | /gally @user\n' +
+      '• طلبات التحالف | /gallyreq\n\n' +
+      '<b>سابعًا: إدارة متقدمة</b>\n' +
       '• /ggame | إعدادات ألعاب الجروب\n' +
       '• /gquizset 5 | سلسلة كويز\n' +
       '• /gteam | فريقك\n' +
       '• /gteams | ترتيب الفرق\n' +
       '• /gtour | البطولة الأسبوعية (مشرف)\n\n' +
       '<b>أوامر عربية بدون سلاش</b>\n' +
-      'العاب الجروب | مين انا | الغاز | سرعة الكتابة | روليت | متصدرين | اسبوعي | متصدرين الشهر | ملفي | متجر الجروب | الهدايا | ممتلكاتي | اغنى ممتلكات | استثمار فلوسي | حظ من 1 - 1000 | كشط | احصائيات الكشط\n\n' +
+      'العاب الجروب | مين انا | الغاز | سرعة الكتابة | روليت | متصدرين | اسبوعي | متصدرين الشهر | ملفي | متجر الجروب | الهدايا | ممتلكاتي | اغنى ممتلكات | استثمار فلوسي | حظ | كشط | احصائيات الكشط | انشاء قلعه | قلعتي | متجر الموارد | شراء موارد | مواردي | تطوير قلعتي | انشاء معكسر | شراء جيش | تطوير الجيش | بحث الكنز | تفعيل الحصانه | تعطيل الحصانه | حصانتي | مبارزه | الانضمام للمبارزه | المبارزين | توب الحكام | تحالف | طلبات التحالف\n\n' +
       `العملة: كل إجابة صحيحة = <b>${this.formatCurrency(1)}</b>.`,
       { parse_mode: 'HTML', reply_markup: keyboard.reply_markup }
     );

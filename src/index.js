@@ -119,6 +119,7 @@ const GROUP_ONLY_COMMANDS = new Set([
   'gtemplate_member', 'gtemplate_admin', 'gideal_member', 'gideal_admin', 'gshow_ideal_member', 'gshow_ideal_admin', 'gwelcome', 'gsuggest',
   'gfaq', 'gsuggestmenu', 'gsuggeststats', 'gsuggesttop', 'gquiz', 'gmath', 'gword', 'gdaily', 'gmcq', 'gvote', 'gquizset', 'gleader', 'gweekly', 'ggame', 'ggames',
   'g', 'gteam', 'gteams', 'gtour', 'gwho', 'griddle', 'gtype', 'chance', 'gduel', 'gstore', 'gbuy', 'ggifts', 'ggift', 'gassets', 'gwealth', 'gprofile', 'ginvest', 'gluck', 'gmonth', 'gmonthly', 'gbonus', 'glevels',
+  'gcastle', 'gmycastle', 'gresstore', 'gbuyres', 'gmyres', 'gupcastle', 'gbarracks', 'gbuyarmy', 'guparmy', 'gtreasure', 'gshield', 'gmyshield', 'gwar', 'garena', 'gfighters', 'grulers', 'gally', 'gallyreq',
   'gbuygift', 'gsellgift', 'gscratch', 'gscratchstats'
 ]);
 
@@ -270,6 +271,24 @@ Promise.all([
       { command: 'gmonth', description: 'متصدرين الشهر' },
       { command: 'gmonthly', description: 'صرف مكافأة شهرية' },
       { command: 'gbonus', description: 'ضبط مكافآت الترقية' },
+      { command: 'gcastle', description: 'إنشاء قلعة' },
+      { command: 'gmycastle', description: 'تفاصيل قلعتي' },
+      { command: 'gresstore', description: 'متجر الموارد' },
+      { command: 'gbuyres', description: 'شراء موارد القلعة' },
+      { command: 'gmyres', description: 'مواردي' },
+      { command: 'gupcastle', description: 'تطوير قلعتي' },
+      { command: 'gbarracks', description: 'إنشاء معسكر' },
+      { command: 'gbuyarmy', description: 'شراء جيش' },
+      { command: 'guparmy', description: 'تطوير الجيش' },
+      { command: 'gtreasure', description: 'بحث الكنز' },
+      { command: 'gshield', description: 'تفعيل/تعطيل الحصانة' },
+      { command: 'gmyshield', description: 'حصانتي' },
+      { command: 'gwar', description: 'مبارزة بالرد' },
+      { command: 'garena', description: 'الانضمام للمبارزة' },
+      { command: 'gfighters', description: 'المبارزين' },
+      { command: 'grulers', description: 'توب الحكام' },
+      { command: 'gally', description: 'طلب تحالف' },
+      { command: 'gallyreq', description: 'طلبات التحالف' },
       { command: 'gteam', description: 'إدارة فريقك' },
       { command: 'gteams', description: 'ترتيب الفرق' },
       { command: 'gtour', description: 'إدارة البطولة الأسبوعية' }
@@ -381,6 +400,24 @@ bot.command('gweekly', (ctx) => GroupGamesHandler.handleWeeklyCommand(ctx));
 bot.command('gmonth', (ctx) => GroupGamesHandler.handleMonthlyBoardCommand(ctx));
 bot.command('gmonthly', (ctx) => GroupGamesHandler.handleMonthlyRewardCommand(ctx));
 bot.command('gbonus', (ctx) => GroupGamesHandler.handleTierRewardsCommand(ctx));
+bot.command('gcastle', (ctx) => GroupGamesHandler.handleCreateCastleCommand(ctx));
+bot.command('gmycastle', (ctx) => GroupGamesHandler.handleMyCastleCommand(ctx));
+bot.command('gresstore', (ctx) => GroupGamesHandler.handleResourceStoreCommand(ctx));
+bot.command('gbuyres', (ctx) => GroupGamesHandler.handleBuyResourcesCommand(ctx));
+bot.command('gmyres', (ctx) => GroupGamesHandler.handleMyResourcesCommand(ctx));
+bot.command('gupcastle', (ctx) => GroupGamesHandler.handleUpgradeCastleCommand(ctx));
+bot.command('gbarracks', (ctx) => GroupGamesHandler.handleCreateBarracksCommand(ctx));
+bot.command('gbuyarmy', (ctx) => GroupGamesHandler.handleBuyArmyCommand(ctx));
+bot.command('guparmy', (ctx) => GroupGamesHandler.handleUpgradeArmyCommand(ctx));
+bot.command('gtreasure', (ctx) => GroupGamesHandler.handleTreasureSearchCommand(ctx));
+bot.command('gshield', (ctx) => GroupGamesHandler.handleShieldToggleCommand(ctx));
+bot.command('gmyshield', (ctx) => GroupGamesHandler.handleMyShieldCommand(ctx));
+bot.command('gwar', (ctx) => GroupGamesHandler.handleCastleDuelCommand(ctx));
+bot.command('garena', (ctx) => GroupGamesHandler.handleArenaJoinCommand(ctx));
+bot.command('gfighters', (ctx) => GroupGamesHandler.handleArenaListCommand(ctx));
+bot.command('grulers', (ctx) => GroupGamesHandler.handleTopRulersCommand(ctx));
+bot.command('gally', (ctx) => GroupGamesHandler.handleAllianceRequestCommand(ctx));
+bot.command('gallyreq', (ctx) => GroupGamesHandler.handleAllianceRequestsCommand(ctx));
 bot.command('glevels', (ctx) => GroupGamesHandler.handleLevelsCommand(ctx));
 bot.command('gstore', (ctx) => GroupGamesHandler.handleStoreCommand(ctx));
 bot.command('gbuy', (ctx) => GroupGamesHandler.handleBuyCommand(ctx));
@@ -2455,6 +2492,26 @@ bot.hears(/^(?:نقاطي|فلوسي|رصيدي)$/i, (ctx) => GroupGamesHandler.
 bot.hears(/^استثمار\s*فلوسي$/i, (ctx) => GroupGamesHandler.handleInvestAllCommand(ctx));
 bot.hears(/^حظ(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleLuckCommand(ctx));
 bot.hears(/^حظر(?:\s+.+)?$/i, (ctx) => GroupAdminHandler.handleBanCommand(ctx));
+bot.hears(/^انشاء\s*قلع[هة]$/i, (ctx) => GroupGamesHandler.handleCreateCastleCommand(ctx));
+bot.hears(/^قلعتي$/i, (ctx) => GroupGamesHandler.handleMyCastleCommand(ctx));
+bot.hears(/^متجر\s*الموارد$/i, (ctx) => GroupGamesHandler.handleResourceStoreCommand(ctx));
+bot.hears(/^شراء\s*موارد(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleBuyResourcesCommand(ctx));
+bot.hears(/^مواردي$/i, (ctx) => GroupGamesHandler.handleMyResourcesCommand(ctx));
+bot.hears(/^تطوير\s*قلعتي$/i, (ctx) => GroupGamesHandler.handleUpgradeCastleCommand(ctx));
+bot.hears(/^انشاء\s*مع(?:ك|س)كر$/i, (ctx) => GroupGamesHandler.handleCreateBarracksCommand(ctx));
+bot.hears(/^شراء\s*جيش(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleBuyArmyCommand(ctx));
+bot.hears(/^تطوير\s*الجيش$/i, (ctx) => GroupGamesHandler.handleUpgradeArmyCommand(ctx));
+bot.hears(/^بحث\s*الكنز$/i, (ctx) => GroupGamesHandler.handleTreasureSearchCommand(ctx));
+bot.hears(/^(?:تفعيل|تعطيل)\s*الحصانه$/i, (ctx) => GroupGamesHandler.handleShieldToggleCommand(ctx));
+bot.hears(/^حصانتي$/i, (ctx) => GroupGamesHandler.handleMyShieldCommand(ctx));
+bot.hears(/^مبارزه$/i, (ctx) => GroupGamesHandler.handleCastleDuelCommand(ctx));
+bot.hears(/^الانضمام\s*للمبارزه$/i, (ctx) => GroupGamesHandler.handleArenaJoinCommand(ctx));
+bot.hears(/^المبارزين$/i, (ctx) => GroupGamesHandler.handleArenaListCommand(ctx));
+bot.hears(/^توب\s*الحكام$/i, (ctx) => GroupGamesHandler.handleTopRulersCommand(ctx));
+bot.hears(/^تحالف(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleAllianceRequestCommand(ctx));
+bot.hears(/^طلبات\s*التحالف$/i, (ctx) => GroupGamesHandler.handleAllianceRequestsCommand(ctx));
+bot.hears(/^قبول\s*تحالف$/i, (ctx) => GroupGamesHandler.handleAllianceDecisionCommand(ctx, 'accept'));
+bot.hears(/^رفض\s*تحالف$/i, (ctx) => GroupGamesHandler.handleAllianceDecisionCommand(ctx, 'reject'));
 bot.hears(/^(?:متصدرين\s*الشهر|سباق\s*الشهر)$/i, (ctx) => GroupGamesHandler.handleMonthlyBoardCommand(ctx));
 bot.hears(/^(?:المستويات|لوحة\s*المستويات)$/i, (ctx) => GroupGamesHandler.handleLevelsCommand(ctx));
 bot.hears(/^مكافا(?:ة|ه)\s*شهرية$/i, (ctx) => GroupGamesHandler.handleMonthlyRewardCommand(ctx));
