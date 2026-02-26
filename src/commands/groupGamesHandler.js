@@ -3545,6 +3545,18 @@ class GroupGamesHandler {
         if (stolen > 0) {
           loserRow.points = (loserRow.points || 0) - stolen;
           winnerRow.points = (winnerRow.points || 0) + stolen;
+          if (loserRow && winnerRow) {
+            const loserDoc = await this.ensureGlobalProfileAndSyncRow(
+              loserRow,
+              { id: loserId, username: loserRow.username, first_name: loserRow.username }
+            );
+            const winnerDoc = await this.ensureGlobalProfileAndSyncRow(
+              winnerRow,
+              { id: Number(winnerId), username: winnerRow.username, first_name: winnerRow.username }
+            );
+            await this.syncRowToGlobal(loserDoc, loserRow);
+            await this.syncRowToGlobal(winnerDoc, winnerRow);
+          }
         }
       }
     }, false);
@@ -3573,6 +3585,13 @@ class GroupGamesHandler {
       this.awardXp(r, Math.floor(bonus / 2));
       r.updatedAt = new Date();
     });
+    await Promise.all(rows.map(async (r) => {
+      const userDoc = await this.ensureGlobalProfileAndSyncRow(
+        r,
+        { id: Number(r.userId), username: r.username, first_name: r.username }
+      );
+      await this.syncRowToGlobal(userDoc, r);
+    }));
     group.gameSystem.state.lastMonthlyRewardKey = currentMonth;
     await group.save();
 
