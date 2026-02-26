@@ -838,7 +838,7 @@ class GroupGamesHandler {
     const userId = Number(user.id);
     let row = group.gameSystem.scores.find((s) => Number(s.userId) === userId);
     if (!row) {
-      row = {
+      const freshRow = {
         userId,
         username: user.username || user.first_name || String(userId),
         points: 0,
@@ -889,7 +889,8 @@ class GroupGamesHandler {
         lastWinDate: null,
         updatedAt: new Date()
       };
-      group.gameSystem.scores.push(row);
+      group.gameSystem.scores.push(freshRow);
+      row = group.gameSystem.scores[group.gameSystem.scores.length - 1];
     }
     row.username = user.username || user.first_name || String(userId);
     if (!Array.isArray(row.giftInventory)) row.giftInventory = [];
@@ -1191,6 +1192,43 @@ class GroupGamesHandler {
     const noiseWords = new Set(['شراء', 'اشتري', 'بيع', 'ببيع', 'اهداء', 'إهداء', 'ارسال', 'إرسال', 'هدية', 'هديه', 'من', 'المتجر', 'لي', 'لنفسي', 'نفسي', 'x', '×']);
     const filtered = args.filter((x) => !noiseWords.has(this.normalizeText(String(x))) && !/^\d+$/.test(String(x)) && !String(x).startsWith('@'));
     return filtered.join(' ').trim();
+  }
+
+  static normalizeGiftInventoryList(list) {
+    if (!Array.isArray(list)) return [];
+    return list
+      .map((x) => ({
+        key: String(x?.key || '').trim(),
+        name: String(x?.name || x?.key || '').trim(),
+        count: Math.max(0, Number(x?.count || 0))
+      }))
+      .filter((x) => x.key && x.count > 0);
+  }
+
+  static upsertGiftInventory(row, gift, qtyDelta) {
+    const delta = Number(qtyDelta || 0);
+    if (!row || !gift || !Number.isFinite(delta) || delta === 0) return;
+
+    const inventory = this.normalizeGiftInventoryList(row.giftInventory);
+    const idx = inventory.findIndex((g) => g.key === gift.key);
+    if (idx === -1) {
+      if (delta > 0) {
+        inventory.push({ key: gift.key, name: gift.name, count: delta });
+      }
+    } else {
+      inventory[idx].count = Math.max(0, Number(inventory[idx].count || 0) + delta);
+      if (inventory[idx].count <= 0) {
+        inventory.splice(idx, 1);
+      }
+    }
+    if (typeof row?.set === 'function') {
+      row.set('giftInventory', inventory);
+    } else {
+      row.giftInventory = inventory;
+    }
+    if (typeof row?.markModified === 'function') {
+      row.markModified('giftInventory');
+    }
   }
 
   static rollScratchOutcome() {
@@ -1700,7 +1738,7 @@ class GroupGamesHandler {
     if (!amount || amount <= 0) return;
     let row = group.gameSystem.scores.find((s) => Number(s.userId) === Number(userId));
     if (!row) {
-      row = {
+      const freshRow = {
         userId: Number(userId),
         username: String(userId),
         points: 0,
@@ -1721,7 +1759,8 @@ class GroupGamesHandler {
         lastWinDate: null,
         updatedAt: new Date()
       };
-      group.gameSystem.scores.push(row);
+      group.gameSystem.scores.push(freshRow);
+      row = group.gameSystem.scores[group.gameSystem.scores.length - 1];
     }
     const userDoc = await this.ensureGlobalProfileAndSyncRow(row, { id: Number(userId), username: row.username, first_name: row.username });
     row.points = (row.points || 0) + amount;
@@ -3356,12 +3395,7 @@ class GroupGamesHandler {
     }
 
     row.points = (row.points || 0) - totalPrice;
-    let slot = (row.giftInventory || []).find((g) => g.key === gift.key);
-    if (!slot) {
-      slot = { key: gift.key, name: gift.name, count: 0 };
-      row.giftInventory.push(slot);
-    }
-    slot.count = (slot.count || 0) + qty;
+    this.upsertGiftInventory(row, gift, qty);
     row.updatedAt = new Date();
     await group.save();
     await this.syncRowToGlobal(userDoc, row);
@@ -3396,7 +3430,7 @@ class GroupGamesHandler {
     const group = await this.ensureGroupRecord(ctx);
     const row = this.getOrCreateScoreRow(group, ctx.from);
     const userDoc = await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
-    const inventory = Array.isArray(row.giftInventory) ? row.giftInventory : [];
+    const inventory = this.normalizeGiftInventoryList(row.giftInventory);
     const slot = inventory.find((g) => g.key === gift.key);
     const currentCount = Number(slot?.count || 0);
     if (currentCount < qty) {
@@ -3408,14 +3442,7 @@ class GroupGamesHandler {
     const sellUnitPrice = Math.max(1, Math.floor(gift.price * 0.7));
     const totalPayout = sellUnitPrice * qty;
 
-    slot.count = Math.max(0, currentCount - qty);
-    row.giftInventory = inventory
-      .map((g) => ({
-        key: g.key,
-        name: g.name,
-        count: Number(g.count || 0)
-      }))
-      .filter((g) => Number(g.count || 0) > 0);
+    this.upsertGiftInventory(row, gift, -qty);
     row.points = (row.points || 0) + totalPayout;
     row.updatedAt = new Date();
     await group.save();
@@ -3440,7 +3467,8 @@ class GroupGamesHandler {
     const row = this.getOrCreateScoreRow(group, ctx.from);
     await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
 
-    const inventory = Array.isArray(row.giftInventory) ? row.giftInventory : [];
+    const inventory = this.normalizeGiftInventoryList(row.giftInventory);
+    row.giftInventory = inventory;
     const normalizeName = (value) => this.normalizeText(String(value || '')).trim();
     const countByName = {};
     const countByKey = {};
@@ -3534,12 +3562,7 @@ class GroupGamesHandler {
     senderRow.giftsSent = (senderRow.giftsSent || 0) + qty;
     receiverRow.giftsReceived = (receiverRow.giftsReceived || 0) + qty;
 
-    let slot = (receiverRow.giftInventory || []).find((g) => g.key === gift.key);
-    if (!slot) {
-      slot = { key: gift.key, name: gift.name, count: 0 };
-      receiverRow.giftInventory.push(slot);
-    }
-    slot.count = (slot.count || 0) + qty;
+    this.upsertGiftInventory(receiverRow, gift, qty);
     receiverRow.points = (receiverRow.points || 0) + Math.max(1, Math.floor(gift.price / 3)) * qty;
     this.awardXp(receiverRow, qty);
 
