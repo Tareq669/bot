@@ -1560,7 +1560,7 @@ class GroupGamesHandler {
     return (group.gameSystem.teams || []).find((t) => this.normalizeText(t.name || '') === normalized) || null;
   }
 
-  static addRewardPointsToMember(group, userId, amount) {
+  static async addRewardPointsToMember(group, userId, amount) {
     if (!amount || amount <= 0) return;
     let row = group.gameSystem.scores.find((s) => Number(s.userId) === Number(userId));
     if (!row) {
@@ -1587,11 +1587,13 @@ class GroupGamesHandler {
       };
       group.gameSystem.scores.push(row);
     }
+    const userDoc = await this.ensureGlobalProfileAndSyncRow(row, { id: Number(userId), username: row.username, first_name: row.username });
     row.points = (row.points || 0) + amount;
     row.weeklyPoints = (row.weeklyPoints || 0) + amount;
     row.monthlyPoints = (row.monthlyPoints || 0) + amount;
     this.awardXp(row, amount);
     row.updatedAt = new Date();
+    await this.syncRowToGlobal(userDoc, row);
   }
 
   static async updateScore(group, user, reward) {
@@ -2302,11 +2304,11 @@ class GroupGamesHandler {
 
       const top = [...(group.gameSystem.teams || [])].sort((a, b) => (b.points || 0) - (a.points || 0)).slice(0, 3);
       const rewards = [t.rewards.first, t.rewards.second, t.rewards.third];
-      top.forEach((team, idx) => {
+      for (const [idx, team] of top.entries()) {
         const bonus = rewards[idx] || 0;
         team.wins = (team.wins || 0) + 1;
-        (team.members || []).forEach((memberId) => this.addRewardPointsToMember(group, memberId, bonus));
-      });
+        await Promise.all((team.members || []).map((memberId) => this.addRewardPointsToMember(group, memberId, bonus)));
+      }
 
       t.active = false;
       t.endedAt = new Date();
