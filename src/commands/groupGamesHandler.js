@@ -1,5 +1,5 @@
 ﻿const Markup = require('telegraf/markup');
-const { Group } = require('../database/models');
+const { Group, User } = require('../database/models');
 
 const GROUP_TYPES = new Set(['group', 'supergroup']);
 
@@ -922,6 +922,220 @@ class GroupGamesHandler {
     return row;
   }
 
+  static defaultGlobalGameProfile() {
+    return {
+      migrated: false,
+      points: 0,
+      giftsSent: 0,
+      giftsReceived: 0,
+      giftInventory: [],
+      scratchDayKey: '',
+      scratchPlaysToday: 0,
+      scratchLastPlayAt: null,
+      scratchTotalPlays: 0,
+      scratchTotalWins: 0,
+      scratchTotalPayout: 0,
+      luckDayKey: '',
+      luckPlaysToday: 0,
+      luckLastPlayAt: null,
+      luckTotalPlays: 0,
+      luckTotalWins: 0,
+      luckTotalPayout: 0,
+      luckUsedDayKey: '',
+      luckUsedNumbers: [],
+      investDayKey: '',
+      investLastAt: null,
+      castleCreated: false,
+      castleLevel: 1,
+      castleLastUpgradeAt: null,
+      castleResources: { wood: 0, stone: 0, food: 0, iron: 0, gold: 0 },
+      barracksCreated: false,
+      barracksLevel: 1,
+      armyUnits: 0,
+      armyPower: 0,
+      shieldCards: 0,
+      shieldUntil: null,
+      treasureLastAt: null,
+      duelWins: 0,
+      duelLosses: 0,
+      arenaJoined: false
+    };
+  }
+
+  static normalizeGlobalGameProfile(profile = {}) {
+    const p = { ...this.defaultGlobalGameProfile(), ...(profile || {}) };
+    p.points = Number(p.points || 0);
+    p.giftsSent = Number(p.giftsSent || 0);
+    p.giftsReceived = Number(p.giftsReceived || 0);
+    p.giftInventory = Array.isArray(p.giftInventory) ? p.giftInventory.map((x) => ({
+      key: String(x?.key || ''),
+      name: String(x?.name || x?.key || ''),
+      count: Math.max(0, Number(x?.count || 0))
+    })).filter((x) => x.key && x.count > 0) : [];
+    p.scratchPlaysToday = Number(p.scratchPlaysToday || 0);
+    p.scratchTotalPlays = Number(p.scratchTotalPlays || 0);
+    p.scratchTotalWins = Number(p.scratchTotalWins || 0);
+    p.scratchTotalPayout = Number(p.scratchTotalPayout || 0);
+    p.luckPlaysToday = Number(p.luckPlaysToday || 0);
+    p.luckTotalPlays = Number(p.luckTotalPlays || 0);
+    p.luckTotalWins = Number(p.luckTotalWins || 0);
+    p.luckTotalPayout = Number(p.luckTotalPayout || 0);
+    p.luckUsedNumbers = Array.isArray(p.luckUsedNumbers) ? p.luckUsedNumbers.map((n) => Number(n)).filter((n) => Number.isInteger(n) && n >= 1 && n <= LUCK_MAX_RANGE) : [];
+    p.castleCreated = Boolean(p.castleCreated);
+    p.castleLevel = Math.max(1, Number(p.castleLevel || 1));
+    p.castleResources = p.castleResources && typeof p.castleResources === 'object' ? p.castleResources : { wood: 0, stone: 0, food: 0, iron: 0, gold: 0 };
+    RESOURCE_KEYS.forEach((k) => { p.castleResources[k] = Number(p.castleResources[k] || 0); });
+    p.barracksCreated = Boolean(p.barracksCreated);
+    p.barracksLevel = Math.max(1, Number(p.barracksLevel || 1));
+    p.armyUnits = Number(p.armyUnits || 0);
+    p.armyPower = Number(p.armyPower || 0);
+    p.shieldCards = Number(p.shieldCards || 0);
+    p.duelWins = Number(p.duelWins || 0);
+    p.duelLosses = Number(p.duelLosses || 0);
+    p.arenaJoined = Boolean(p.arenaJoined);
+    p.migrated = Boolean(p.migrated);
+    return p;
+  }
+
+  static rowHasEconomyData(row) {
+    return Boolean(
+      Number(row?.points || 0) > 0
+      || Number(row?.giftsSent || 0) > 0
+      || Number(row?.giftsReceived || 0) > 0
+      || (Array.isArray(row?.giftInventory) && row.giftInventory.some((x) => Number(x?.count || 0) > 0))
+      || Boolean(row?.castleCreated)
+      || Number(row?.armyUnits || 0) > 0
+      || Number(row?.armyPower || 0) > 0
+      || Number(row?.scratchTotalPlays || 0) > 0
+      || Number(row?.luckTotalPlays || 0) > 0
+    );
+  }
+
+  static applyProfileToRow(profile, row) {
+    const p = this.normalizeGlobalGameProfile(profile);
+    row.points = p.points;
+    row.giftsSent = p.giftsSent;
+    row.giftsReceived = p.giftsReceived;
+    row.giftInventory = p.giftInventory.map((x) => ({ key: x.key, name: x.name, count: x.count }));
+
+    row.scratchDayKey = p.scratchDayKey || '';
+    row.scratchPlaysToday = p.scratchPlaysToday;
+    row.scratchLastPlayAt = p.scratchLastPlayAt || null;
+    row.scratchTotalPlays = p.scratchTotalPlays;
+    row.scratchTotalWins = p.scratchTotalWins;
+    row.scratchTotalPayout = p.scratchTotalPayout;
+
+    row.luckDayKey = p.luckDayKey || '';
+    row.luckPlaysToday = p.luckPlaysToday;
+    row.luckLastPlayAt = p.luckLastPlayAt || null;
+    row.luckTotalPlays = p.luckTotalPlays;
+    row.luckTotalWins = p.luckTotalWins;
+    row.luckTotalPayout = p.luckTotalPayout;
+    row.luckUsedDayKey = p.luckUsedDayKey || '';
+    row.luckUsedNumbers = [...(p.luckUsedNumbers || [])];
+
+    row.investDayKey = p.investDayKey || '';
+    row.investLastAt = p.investLastAt || null;
+
+    row.castleCreated = p.castleCreated;
+    row.castleLevel = p.castleLevel;
+    row.castleLastUpgradeAt = p.castleLastUpgradeAt || null;
+    row.castleResources = { ...p.castleResources };
+    row.barracksCreated = p.barracksCreated;
+    row.barracksLevel = p.barracksLevel;
+    row.armyUnits = p.armyUnits;
+    row.armyPower = p.armyPower;
+    row.shieldCards = p.shieldCards;
+    row.shieldUntil = p.shieldUntil || null;
+    row.treasureLastAt = p.treasureLastAt || null;
+    row.duelWins = p.duelWins;
+    row.duelLosses = p.duelLosses;
+    row.arenaJoined = p.arenaJoined;
+  }
+
+  static applyRowToProfile(row, profile) {
+    const p = this.normalizeGlobalGameProfile(profile);
+    p.points = Number(row.points || 0);
+    p.giftsSent = Number(row.giftsSent || 0);
+    p.giftsReceived = Number(row.giftsReceived || 0);
+    p.giftInventory = Array.isArray(row.giftInventory) ? row.giftInventory.map((x) => ({
+      key: String(x?.key || ''),
+      name: String(x?.name || x?.key || ''),
+      count: Math.max(0, Number(x?.count || 0))
+    })).filter((x) => x.key && x.count > 0) : [];
+
+    p.scratchDayKey = row.scratchDayKey || '';
+    p.scratchPlaysToday = Number(row.scratchPlaysToday || 0);
+    p.scratchLastPlayAt = row.scratchLastPlayAt || null;
+    p.scratchTotalPlays = Number(row.scratchTotalPlays || 0);
+    p.scratchTotalWins = Number(row.scratchTotalWins || 0);
+    p.scratchTotalPayout = Number(row.scratchTotalPayout || 0);
+
+    p.luckDayKey = row.luckDayKey || '';
+    p.luckPlaysToday = Number(row.luckPlaysToday || 0);
+    p.luckLastPlayAt = row.luckLastPlayAt || null;
+    p.luckTotalPlays = Number(row.luckTotalPlays || 0);
+    p.luckTotalWins = Number(row.luckTotalWins || 0);
+    p.luckTotalPayout = Number(row.luckTotalPayout || 0);
+    p.luckUsedDayKey = row.luckUsedDayKey || '';
+    p.luckUsedNumbers = Array.isArray(row.luckUsedNumbers) ? row.luckUsedNumbers.map((n) => Number(n)).filter(Number.isInteger) : [];
+
+    p.investDayKey = row.investDayKey || '';
+    p.investLastAt = row.investLastAt || null;
+
+    p.castleCreated = Boolean(row.castleCreated);
+    p.castleLevel = Math.max(1, Number(row.castleLevel || 1));
+    p.castleLastUpgradeAt = row.castleLastUpgradeAt || null;
+    p.castleResources = p.castleResources || { wood: 0, stone: 0, food: 0, iron: 0, gold: 0 };
+    RESOURCE_KEYS.forEach((k) => { p.castleResources[k] = Number(row.castleResources?.[k] || 0); });
+    p.barracksCreated = Boolean(row.barracksCreated);
+    p.barracksLevel = Math.max(1, Number(row.barracksLevel || 1));
+    p.armyUnits = Number(row.armyUnits || 0);
+    p.armyPower = Number(row.armyPower || 0);
+    p.shieldCards = Number(row.shieldCards || 0);
+    p.shieldUntil = row.shieldUntil || null;
+    p.treasureLastAt = row.treasureLastAt || null;
+    p.duelWins = Number(row.duelWins || 0);
+    p.duelLosses = Number(row.duelLosses || 0);
+    p.arenaJoined = Boolean(row.arenaJoined);
+    p.migrated = true;
+    return p;
+  }
+
+  static async ensureGlobalProfileAndSyncRow(row, userRef = {}) {
+    const userId = Number(userRef.id || userRef.userId);
+    if (!userId) return null;
+    const update = {
+      $setOnInsert: {
+        userId,
+        firstName: userRef.first_name || userRef.firstName || userRef.username || `user_${userId}`,
+        username: userRef.username || '',
+        joinDate: new Date()
+      }
+    };
+    const userDoc = await User.findOneAndUpdate({ userId }, update, { upsert: true, new: true });
+    userDoc.globalGameProfile = this.normalizeGlobalGameProfile(userDoc.globalGameProfile || {});
+
+    if (!userDoc.globalGameProfile.migrated) {
+      if (this.rowHasEconomyData(row)) {
+        userDoc.globalGameProfile = this.applyRowToProfile(row, userDoc.globalGameProfile);
+      } else {
+        this.applyProfileToRow(userDoc.globalGameProfile, row);
+        userDoc.globalGameProfile.migrated = true;
+      }
+      await userDoc.save();
+    } else {
+      this.applyProfileToRow(userDoc.globalGameProfile, row);
+    }
+    return userDoc;
+  }
+
+  static async syncRowToGlobal(userDoc, row) {
+    if (!userDoc) return;
+    userDoc.globalGameProfile = this.applyRowToProfile(row, userDoc.globalGameProfile || {});
+    await userDoc.save();
+  }
+
   static awardXp(row, xpAmount) {
     const gain = Math.max(0, Number(xpAmount) || 0);
     const oldTier = this.resolveTierFromXp(row.xp || 0);
@@ -1055,6 +1269,7 @@ class GroupGamesHandler {
 
     const group = await this.ensureGroupRecord(ctx);
     const row = this.getOrCreateScoreRow(group, ctx.from);
+    const userDoc = await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
     this.resetLuckDailyIfNeeded(row);
     const used = new Set((row.luckUsedNumbers || []).map((n) => Number(n)));
     if (used.has(Number(pickedNumber))) {
@@ -1081,6 +1296,7 @@ class GroupGamesHandler {
     row.luckLastPlayAt = new Date();
     row.updatedAt = new Date();
     await group.save();
+    await this.syncRowToGlobal(userDoc, row);
 
     const mention = this.mentionUser(ctx.from?.id, ctx.from?.first_name || ctx.from?.username || 'عضو');
     await ctx.reply(
@@ -1393,6 +1609,7 @@ class GroupGamesHandler {
 
     const userId = Number(user.id);
     const row = this.getOrCreateScoreRow(group, user);
+    const userDoc = await this.ensureGlobalProfileAndSyncRow(row, user);
     const now = Date.now();
     const boostActive = row.activeBoost?.expiresAt && new Date(row.activeBoost.expiresAt).getTime() > now;
     const multiplier = boostActive ? Math.max(1, Number(row.activeBoost?.multiplier) || 1) : 1;
@@ -1438,6 +1655,8 @@ class GroupGamesHandler {
         team.updatedAt = new Date();
       }
     }
+
+    await this.syncRowToGlobal(userDoc, row);
 
     return {
       finalReward,
@@ -2127,6 +2346,7 @@ class GroupGamesHandler {
     if (!this.isGroupChat(ctx)) return;
     const group = await this.ensureGroupRecord(ctx);
     const row = this.getOrCreateScoreRow(group, ctx.from);
+    await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
     await group.save();
     const items = GROUP_STORE.map((x) => `• <code>${x.key}</code> → ${x.title} (${this.formatCurrency(x.price)})`).join('\n');
     return ctx.reply(
@@ -2150,6 +2370,7 @@ class GroupGamesHandler {
 
     const group = await this.ensureGroupRecord(ctx);
     const row = this.getOrCreateScoreRow(group, ctx.from);
+    const userDoc = await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
     if ((row.points || 0) < item.price) return ctx.reply(`❌ رصيدك غير كافٍ. تحتاج ${this.formatCurrency(item.price)}.`);
     row.points -= item.price;
     if (item.type === 'title') {
@@ -2164,6 +2385,7 @@ class GroupGamesHandler {
     }
     row.updatedAt = new Date();
     await group.save();
+    await this.syncRowToGlobal(userDoc, row);
     if (item.type === 'boost') {
       return ctx.reply(`✅ تم تفعيل ${item.title}.`);
     }
@@ -2201,6 +2423,7 @@ class GroupGamesHandler {
     if (!this.isGroupChat(ctx)) return;
     const group = await this.ensureGroupRecord(ctx);
     const row = this.getOrCreateScoreRow(group, ctx.from);
+    await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
     const rank = this.getUserRank(group, ctx.from.id) || '-';
     const tier = row.tier || this.resolveTierFromXp(row.xp || 0).name;
     const nextTier = this.nextTierFromXp(row.xp || 0);
@@ -2228,6 +2451,7 @@ class GroupGamesHandler {
     if (!this.isGroupChat(ctx)) return;
     const group = await this.ensureGroupRecord(ctx);
     const row = this.getOrCreateScoreRow(group, ctx.from);
+    await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
     await group.save();
 
     const userMention = this.mentionUser(
@@ -2245,6 +2469,7 @@ class GroupGamesHandler {
     if (!this.isGroupChat(ctx)) return;
     const group = await this.ensureGroupRecord(ctx);
     const row = this.getOrCreateScoreRow(group, ctx.from);
+    const userDoc = await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
     const todayKey = this.getDateKey();
     if (String(row.investDayKey || '') === todayKey) {
       return ctx.reply('⏳ استثمرت اليوم بالفعل. تقدر تستثمر مرة واحدة فقط كل يوم.');
@@ -2264,6 +2489,7 @@ class GroupGamesHandler {
     row.investLastAt = new Date();
     row.updatedAt = new Date();
     await group.save();
+    await this.syncRowToGlobal(userDoc, row);
 
     return ctx.reply(
       `${mention}\n\n` +
@@ -2279,6 +2505,7 @@ class GroupGamesHandler {
     if (!this.isGroupChat(ctx)) return;
     const group = await this.ensureGroupRecord(ctx);
     const row = this.getOrCreateScoreRow(group, ctx.from);
+    await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
     this.resetLuckDailyIfNeeded(row);
     if ((row.luckPlaysToday || 0) >= LUCK_DAILY_LIMIT) {
       return ctx.reply(`🧾 وصلت الحد اليومي للمحاولات (${LUCK_DAILY_LIMIT}). ارجع بكرة.`);
@@ -2299,6 +2526,7 @@ class GroupGamesHandler {
     if (!this.isGroupChat(ctx)) return;
     const group = await this.ensureGroupRecord(ctx);
     const row = this.getOrCreateScoreRow(group, ctx.from);
+    await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
     this.resetLuckDailyIfNeeded(row);
     await group.save();
 
@@ -2351,6 +2579,7 @@ class GroupGamesHandler {
     if (!this.isGroupChat(ctx)) return;
     const group = await this.ensureGroupRecord(ctx);
     const row = this.getOrCreateScoreRow(group, ctx.from);
+    const userDoc = await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
     if (row.castleCreated) return ctx.reply('🏰 قلعتك موجودة بالفعل. استخدم: قلعتي');
     row.castleCreated = true;
     row.castleLevel = 1;
@@ -2360,6 +2589,7 @@ class GroupGamesHandler {
     });
     row.updatedAt = new Date();
     await group.save();
+    await this.syncRowToGlobal(userDoc, row);
     return ctx.reply(
       '🏰 تم إنشاء قلعتك بنجاح!\n' +
       '• المستوى: 1\n' +
@@ -2372,6 +2602,7 @@ class GroupGamesHandler {
     if (!this.isGroupChat(ctx)) return;
     const group = await this.ensureGroupRecord(ctx);
     const row = this.getOrCreateScoreRow(group, ctx.from);
+    await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
     if (!row.castleCreated) return ctx.reply('❌ ما عندك قلعة بعد. اكتب: انشاء قلعه');
     const shield = this.isShieldActive(row)
       ? `✅ مفعلة حتى ${new Date(row.shieldUntil).toLocaleString('ar-EG')}`
@@ -2422,6 +2653,7 @@ class GroupGamesHandler {
 
     const group = await this.ensureGroupRecord(ctx);
     const row = this.getOrCreateScoreRow(group, ctx.from);
+    const userDoc = await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
     if (!row.castleCreated) return ctx.reply('❌ أنشئ قلعتك أولاً: انشاء قلعه');
 
     const cost = resourceKey === 'gold'
@@ -2434,6 +2666,7 @@ class GroupGamesHandler {
     row.castleResources[resourceKey] = Number(row.castleResources[resourceKey] || 0) + qty;
     row.updatedAt = new Date();
     await group.save();
+    await this.syncRowToGlobal(userDoc, row);
 
     return ctx.reply(
       `✅ تم شراء ${qty} ${RESOURCE_AR[resourceKey]}.\n` +
@@ -2447,6 +2680,7 @@ class GroupGamesHandler {
     if (!this.isGroupChat(ctx)) return;
     const group = await this.ensureGroupRecord(ctx);
     const row = this.getOrCreateScoreRow(group, ctx.from);
+    await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
     if (!row.castleCreated) return ctx.reply('❌ أنشئ قلعتك أولاً: انشاء قلعه');
     return ctx.reply(`📦 <b>مواردك</b>\n\n${this.formatResources(row.castleResources)}`, { parse_mode: 'HTML' });
   }
@@ -2455,6 +2689,7 @@ class GroupGamesHandler {
     if (!this.isGroupChat(ctx)) return;
     const group = await this.ensureGroupRecord(ctx);
     const row = this.getOrCreateScoreRow(group, ctx.from);
+    const userDoc = await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
     if (!row.castleCreated) return ctx.reply('❌ أنشئ قلعتك أولاً: انشاء قلعه');
 
     const now = Date.now();
@@ -2488,6 +2723,7 @@ class GroupGamesHandler {
     row.castleLastUpgradeAt = new Date();
     row.updatedAt = new Date();
     await group.save();
+    await this.syncRowToGlobal(userDoc, row);
 
     return ctx.reply(`🏰 تم تطوير قلعتك إلى المستوى ${row.castleLevel}!`);
   }
@@ -2496,12 +2732,14 @@ class GroupGamesHandler {
     if (!this.isGroupChat(ctx)) return;
     const group = await this.ensureGroupRecord(ctx);
     const row = this.getOrCreateScoreRow(group, ctx.from);
+    const userDoc = await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
     if (!row.castleCreated) return ctx.reply('❌ أنشئ قلعتك أولاً: انشاء قلعه');
     if (row.barracksCreated) return ctx.reply('✅ معسكرك موجود بالفعل.');
     row.barracksCreated = true;
     row.barracksLevel = 1;
     row.updatedAt = new Date();
     await group.save();
+    await this.syncRowToGlobal(userDoc, row);
     return ctx.reply('🏕️ تم إنشاء المعسكر بنجاح. اكتب: شراء جيش 100');
   }
 
@@ -2519,6 +2757,7 @@ class GroupGamesHandler {
 
     const group = await this.ensureGroupRecord(ctx);
     const row = this.getOrCreateScoreRow(group, ctx.from);
+    const userDoc = await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
     if (!row.barracksCreated) return ctx.reply('❌ أنشئ المعسكر أولًا: انشاء معكسر');
 
     const cost = Math.ceil(qty * ARMY_UNIT_PRICE);
@@ -2528,6 +2767,7 @@ class GroupGamesHandler {
     row.armyUnits = Number(row.armyUnits || 0) + qty;
     row.updatedAt = new Date();
     await group.save();
+    await this.syncRowToGlobal(userDoc, row);
     return ctx.reply(`✅ تم شراء ${qty} جندي.\n• التكلفة: ${this.formatCurrency(cost)}\n• جيشك الآن: ${row.armyUnits}`);
   }
 
@@ -2535,6 +2775,7 @@ class GroupGamesHandler {
     if (!this.isGroupChat(ctx)) return;
     const group = await this.ensureGroupRecord(ctx);
     const row = this.getOrCreateScoreRow(group, ctx.from);
+    const userDoc = await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
     if (!row.barracksCreated) return ctx.reply('❌ أنشئ المعسكر أولًا: انشاء معكسر');
     if ((row.armyUnits || 0) < ARMY_POWER_UPGRADE_UNITS) {
       return ctx.reply(`❌ تحتاج ${ARMY_POWER_UPGRADE_UNITS} جندي للتطوير. المتاح: ${row.armyUnits || 0}`);
@@ -2543,6 +2784,7 @@ class GroupGamesHandler {
     row.armyPower = Number(row.armyPower || 0) + 1;
     row.updatedAt = new Date();
     await group.save();
+    await this.syncRowToGlobal(userDoc, row);
     return ctx.reply(`⚔️ تم تطوير الجيش بنجاح.\n• قوة الجيش: ${row.armyPower}\n• الجنود المتبقين: ${row.armyUnits}`);
   }
 
@@ -2550,6 +2792,7 @@ class GroupGamesHandler {
     if (!this.isGroupChat(ctx)) return;
     const group = await this.ensureGroupRecord(ctx);
     const row = this.getOrCreateScoreRow(group, ctx.from);
+    const userDoc = await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
     if (!row.castleCreated) return ctx.reply('❌ أنشئ قلعتك أولًا: انشاء قلعه');
     const now = Date.now();
     const last = row.treasureLastAt ? new Date(row.treasureLastAt).getTime() : 0;
@@ -2582,6 +2825,7 @@ class GroupGamesHandler {
     row.treasureLastAt = new Date();
     row.updatedAt = new Date();
     await group.save();
+    await this.syncRowToGlobal(userDoc, row);
     return ctx.reply(`🔎 <b>بحث الكنز</b>\n\n${message}`, { parse_mode: 'HTML' });
   }
 
@@ -2589,6 +2833,7 @@ class GroupGamesHandler {
     if (!this.isGroupChat(ctx)) return;
     const group = await this.ensureGroupRecord(ctx);
     const row = this.getOrCreateScoreRow(group, ctx.from);
+    const userDoc = await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
     if (!row.castleCreated) return ctx.reply('❌ أنشئ قلعتك أولًا: انشاء قلعه');
     const active = this.isShieldActive(row);
 
@@ -2607,12 +2852,14 @@ class GroupGamesHandler {
       row.shieldUntil = new Date(Date.now() + SHIELD_DURATION_MIN * 60 * 1000);
       row.updatedAt = new Date();
       await group.save();
+      await this.syncRowToGlobal(userDoc, row);
       return ctx.reply(`🛡️ تم تفعيل الحصانة لمدة ${SHIELD_DURATION_MIN} دقيقة.`);
     }
 
     row.shieldUntil = null;
     row.updatedAt = new Date();
     await group.save();
+    await this.syncRowToGlobal(userDoc, row);
     return ctx.reply('✅ تم تعطيل الحصانة.');
   }
 
@@ -2620,6 +2867,7 @@ class GroupGamesHandler {
     if (!this.isGroupChat(ctx)) return;
     const group = await this.ensureGroupRecord(ctx);
     const row = this.getOrCreateScoreRow(group, ctx.from);
+    await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
     const active = this.isShieldActive(row);
     if (!active) {
       return ctx.reply(`🛡️ حصانتك: غير مفعلة\n• بطاقاتك: ${row.shieldCards || 0}`);
@@ -2637,6 +2885,8 @@ class GroupGamesHandler {
 
     const me = this.getOrCreateScoreRow(group, ctx.from);
     const other = this.getOrCreateScoreRow(group, targetUser);
+    const meDoc = await this.ensureGlobalProfileAndSyncRow(me, ctx.from);
+    const otherDoc = await this.ensureGlobalProfileAndSyncRow(other, targetUser);
     if (!me.castleCreated || !other.castleCreated) return ctx.reply('❌ يجب أن يكون لدى الطرفين قلعة.');
     if (this.isShieldActive(other)) return ctx.reply('🛡️ هذا العضو محمي بالحصانة حاليًا.');
 
@@ -2656,6 +2906,8 @@ class GroupGamesHandler {
 
     group.updatedAt = new Date();
     await group.save();
+    await this.syncRowToGlobal(meDoc, me);
+    await this.syncRowToGlobal(otherDoc, other);
     return ctx.reply(
       `⚔️ <b>نتيجة المبارزة</b>\n\n` +
       `• قوة ${ctx.from.first_name || 'اللاعب'}: ${myPower}\n` +
@@ -2671,10 +2923,12 @@ class GroupGamesHandler {
     if (!this.isGroupChat(ctx)) return;
     const group = await this.ensureGroupRecord(ctx);
     const row = this.getOrCreateScoreRow(group, ctx.from);
+    const userDoc = await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
     if (!row.castleCreated) return ctx.reply('❌ أنشئ قلعتك أولًا: انشاء قلعه');
     row.arenaJoined = true;
     row.updatedAt = new Date();
     await group.save();
+    await this.syncRowToGlobal(userDoc, row);
     return ctx.reply('✅ تم انضمامك للمبارزة العالمية.');
   }
 
@@ -2782,6 +3036,9 @@ class GroupGamesHandler {
       .filter((x) => Number(x.userId) !== Number(req.fromId) && Number(x.userId) !== Number(req.toId))
       .sort((a, b) => this.getCastlePower(b) - this.getCastlePower(a))[0];
     if (!fromRow || !toRow || !target) return ctx.reply('ℹ️ تم قبول التحالف، لكن لا يوجد هدف مناسب للغارة الآن.');
+    const fromDoc = await this.ensureGlobalProfileAndSyncRow(fromRow, { id: req.fromId, username: fromRow.username, first_name: fromRow.username });
+    const toDoc = await this.ensureGlobalProfileAndSyncRow(toRow, { id: req.toId, username: toRow.username, first_name: toRow.username });
+    const targetDoc = await this.ensureGlobalProfileAndSyncRow(target, { id: target.userId, username: target.username, first_name: target.username });
 
     const alliancePower = this.getCastlePower(fromRow) + this.getCastlePower(toRow);
     const targetPower = this.getCastlePower(target) + Math.floor(Math.random() * 31);
@@ -2793,6 +3050,9 @@ class GroupGamesHandler {
       toRow.points = Number(toRow.points || 0) + Math.ceil(loss / 2);
     }
     await group.save();
+    await this.syncRowToGlobal(fromDoc, fromRow);
+    await this.syncRowToGlobal(toDoc, toRow);
+    await this.syncRowToGlobal(targetDoc, target);
     return ctx.reply(
       `🤝 <b>نتيجة التحالف</b>\n\n` +
       `• القوة المشتركة: ${alliancePower}\n` +
@@ -2812,6 +3072,7 @@ class GroupGamesHandler {
 
     const group = await this.ensureGroupRecord(ctx);
     const row = this.getOrCreateScoreRow(group, ctx.from);
+    const userDoc = await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
     this.resetScratchDailyIfNeeded(row);
 
     const now = Date.now();
@@ -2857,6 +3118,7 @@ class GroupGamesHandler {
     row.scratchTotalPayout = Number(row.scratchTotalPayout || 0) + totalPayout;
     row.updatedAt = new Date();
     await group.save();
+    await this.syncRowToGlobal(userDoc, row);
 
     const net = totalPayout - totalCost;
     const mention = this.mentionUser(ctx.from?.id, ctx.from?.first_name || ctx.from?.username || 'عضو');
@@ -2878,6 +3140,7 @@ class GroupGamesHandler {
     if (!this.isGroupChat(ctx)) return;
     const group = await this.ensureGroupRecord(ctx);
     const row = this.getOrCreateScoreRow(group, ctx.from);
+    await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
     this.resetScratchDailyIfNeeded(row);
     await group.save();
 
@@ -2939,6 +3202,7 @@ class GroupGamesHandler {
 
     const group = await this.ensureGroupRecord(ctx);
     const row = this.getOrCreateScoreRow(group, ctx.from);
+    const userDoc = await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
     const totalPrice = gift.price * qty;
     if ((row.points || 0) < totalPrice) {
       return ctx.reply(
@@ -2961,6 +3225,7 @@ class GroupGamesHandler {
     slot.count = (slot.count || 0) + qty;
     row.updatedAt = new Date();
     await group.save();
+    await this.syncRowToGlobal(userDoc, row);
 
     const mention = this.mentionUser(ctx.from?.id, ctx.from?.first_name || ctx.from?.username || 'عضو');
     return ctx.reply(
@@ -2991,6 +3256,7 @@ class GroupGamesHandler {
 
     const group = await this.ensureGroupRecord(ctx);
     const row = this.getOrCreateScoreRow(group, ctx.from);
+    const userDoc = await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
     const inventory = Array.isArray(row.giftInventory) ? row.giftInventory : [];
     const slot = inventory.find((g) => g.key === gift.key);
     const currentCount = Number(slot?.count || 0);
@@ -3014,6 +3280,7 @@ class GroupGamesHandler {
     row.points = (row.points || 0) + totalPayout;
     row.updatedAt = new Date();
     await group.save();
+    await this.syncRowToGlobal(userDoc, row);
 
     const mention = this.mentionUser(ctx.from?.id, ctx.from?.first_name || ctx.from?.username || 'عضو');
     return ctx.reply(
@@ -3032,6 +3299,7 @@ class GroupGamesHandler {
     if (!this.isGroupChat(ctx)) return;
     const group = await this.ensureGroupRecord(ctx);
     const row = this.getOrCreateScoreRow(group, ctx.from);
+    await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
 
     const inventory = Array.isArray(row.giftInventory) ? row.giftInventory : [];
     const normalizeName = (value) => this.normalizeText(String(value || '')).trim();
@@ -3118,6 +3386,8 @@ class GroupGamesHandler {
 
     const senderRow = this.getOrCreateScoreRow(group, ctx.from);
     const receiverRow = this.getOrCreateScoreRow(group, { id: target.id, username: target.username, first_name: target.first_name });
+    const senderDoc = await this.ensureGlobalProfileAndSyncRow(senderRow, ctx.from);
+    const receiverDoc = await this.ensureGlobalProfileAndSyncRow(receiverRow, { id: target.id, username: target.username, first_name: target.first_name });
     const totalPrice = gift.price * qty;
     if ((senderRow.points || 0) < totalPrice) return ctx.reply(`❌ رصيدك غير كافٍ. المطلوب ${this.formatCurrency(totalPrice)}.`);
 
@@ -3135,6 +3405,8 @@ class GroupGamesHandler {
     this.awardXp(receiverRow, qty);
 
     await group.save();
+    await this.syncRowToGlobal(senderDoc, senderRow);
+    await this.syncRowToGlobal(receiverDoc, receiverRow);
 
     // Notify recipient privately when possible.
     if (this.bot && Number(target.id) > 0) {

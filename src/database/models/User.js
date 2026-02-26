@@ -297,6 +297,9 @@ const userSchema = new mongoose.Schema({
     default: 0
   },
 
+  // Global group-game economy/profile (shared across all groups)
+  globalGameProfile: mongoose.Schema.Types.Mixed,
+
   createdAt: {
     type: Date,
     default: Date.now
