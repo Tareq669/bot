@@ -76,7 +76,6 @@ class WhisperHandler {
   static parseTargetOnly(ctx) {
     const text = String(ctx?.message?.text || '').trim();
     const parts = text.split(/\s+/);
-    if (parts.length < 2) return null;
 
     const byReply = ctx?.message?.reply_to_message?.from;
     if (byReply && !byReply.is_bot) {
@@ -86,6 +85,8 @@ class WhisperHandler {
         label: byReply.first_name || byReply.username || String(byReply.id)
       };
     }
+
+    if (parts.length < 2) return null;
 
     const mentionTarget = this.extractMentionTarget(ctx);
     if (mentionTarget) return mentionTarget;
