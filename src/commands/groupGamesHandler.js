@@ -671,6 +671,7 @@ class GroupGamesHandler {
       if (!Number.isFinite(row.duelWins)) row.duelWins = 0;
       if (!Number.isFinite(row.duelLosses)) row.duelLosses = 0;
       if (typeof row.arenaJoined !== 'boolean') row.arenaJoined = false;
+      if (!row.investDayKey) row.investDayKey = '';
     });
     if (!Array.isArray(group.gameSystem.teams)) group.gameSystem.teams = [];
     if (!group.gameSystem.tournament) group.gameSystem.tournament = { active: false, season: 1, startedAt: null, endedAt: null, rewards: { first: 100, second: 60, third: 40 } };
@@ -876,6 +877,8 @@ class GroupGamesHandler {
         duelWins: 0,
         duelLosses: 0,
         arenaJoined: false,
+        investDayKey: '',
+        investLastAt: null,
         wins: 0,
         streak: 0,
         bestStreak: 0,
@@ -910,6 +913,7 @@ class GroupGamesHandler {
     if (!Number.isFinite(row.duelWins)) row.duelWins = 0;
     if (!Number.isFinite(row.duelLosses)) row.duelLosses = 0;
     if (typeof row.arenaJoined !== 'boolean') row.arenaJoined = false;
+    if (!row.investDayKey) row.investDayKey = '';
     return row;
   }
 
@@ -2216,6 +2220,10 @@ class GroupGamesHandler {
     if (!this.isGroupChat(ctx)) return;
     const group = await this.ensureGroupRecord(ctx);
     const row = this.getOrCreateScoreRow(group, ctx.from);
+    const todayKey = this.getDateKey();
+    if (String(row.investDayKey || '') === todayKey) {
+      return ctx.reply('⏳ استثمرت اليوم بالفعل. تقدر تستثمر مرة واحدة فقط كل يوم.');
+    }
     const current = Math.max(0, Math.floor(Number(row.points || 0)));
     const mention = this.mentionUser(ctx.from?.id, ctx.from?.first_name || ctx.from?.username || 'عضو');
 
@@ -2227,6 +2235,8 @@ class GroupGamesHandler {
     const rate = 10;
     const profit = Math.max(1, Math.floor(current * (rate / 100)));
     row.points = current + profit;
+    row.investDayKey = todayKey;
+    row.investLastAt = new Date();
     row.updatedAt = new Date();
     await group.save();
 

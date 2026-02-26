@@ -434,6 +434,11 @@ const groupSchema = new mongoose.Schema({
           type: Boolean,
           default: false
         },
+        investDayKey: {
+          type: String,
+          default: ''
+        },
+        investLastAt: Date,
         wins: {
           type: Number,
           default: 0
