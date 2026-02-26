@@ -617,7 +617,14 @@ class GroupAdminHandler {
       return;
     }
 
-    const allowedKeys = new Set(['lockLinks', 'filterBadWords', 'floodProtection', 'exemptAdminsFromProtection']);
+    const allowedKeys = new Set([
+      'lockLinks',
+      'filterBadWords',
+      'floodProtection',
+      'blockExplicitContent',
+      'blockLongMessages',
+      'exemptAdminsFromProtection'
+    ]);
     if (!allowedKeys.has(key)) {
       await ctx.answerCbQuery('❌ إعداد غير معروف', { show_alert: false });
       return;
