@@ -336,10 +336,14 @@ bot.start((ctx) => {
   const text = String(ctx.message?.text || '');
   const payload = text.replace(/^\/start(?:@\w+)?\s*/i, '').trim();
   if (payload) {
-    return GroupAdminHandler.handlePrivateTemplateStart(ctx, payload)
-      .then((handled) => {
-        if (handled) return;
-        return CommandHandler.handleStart(ctx);
+    return WhisperHandler.handlePrivateStart(ctx, payload)
+      .then((handledWhisper) => {
+        if (handledWhisper) return;
+        return GroupAdminHandler.handlePrivateTemplateStart(ctx, payload)
+          .then((handled) => {
+            if (handled) return;
+            return CommandHandler.handleStart(ctx);
+          });
       });
   }
   return CommandHandler.handleStart(ctx);
@@ -2583,7 +2587,6 @@ bot.hears(/^\/(?:ملفي)$/i, (ctx) => GroupGamesHandler.handleGroupProfileComm
 
 bot.action(/^xo:move:([a-z0-9]+):([0-8])$/i, (ctx) => ChatGamesUtilityHandler.handleXoAction(ctx));
 bot.action(/^xo:challenge:(accept|decline):([a-z0-9]+)$/i, (ctx) => ChatGamesUtilityHandler.handleXoChallengeAction(ctx));
-bot.action(/^group:whisper:compose:([a-z0-9]+)$/i, (ctx) => WhisperHandler.handleWhisperCompose(ctx, ctx.match[1]));
 bot.action(/^group:whisper:open:([a-z0-9]+)$/i, (ctx) => WhisperHandler.handleWhisperOpen(ctx, ctx.match[1]));
 
 bot.on('location', (ctx) => ChatGamesUtilityHandler.handleLocationMessage(ctx));
@@ -2596,8 +2599,8 @@ bot.on('text', async (ctx, next) => {
     if (handled) return;
   }
 
-  // Handle whisper compose flow (after pressing "كتابة الهمسة").
-  if (await WhisperHandler.handlePotentialComposeText(ctx)) {
+  // Handle whisper compose in private only.
+  if (await WhisperHandler.handlePrivateText(ctx)) {
     return;
   }
 

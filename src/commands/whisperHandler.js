@@ -1,4 +1,4 @@
-﻿const Markup = require('telegraf/markup');
+const Markup = require('telegraf/markup');
 
 const GROUP_TYPES = new Set(['group', 'supergroup']);
 const WHISPER_TTL_MS = 60 * 60 * 1000;
@@ -7,14 +7,27 @@ const WHISPER_MAX_LENGTH = 180;
 class WhisperHandler {
   static whispers = new Map();
 
-  static pendingCompose = new Map();
+  static pendingPrivateCompose = new Map();
 
   static isGroupChat(ctx) {
     return GROUP_TYPES.has(ctx?.chat?.type);
   }
 
+  static isPrivateChat(ctx) {
+    return ctx?.chat?.type === 'private';
+  }
+
   static normalizeUsername(value) {
     return String(value || '').replace(/^@/, '').trim().toLowerCase();
+  }
+
+  static escapeHtml(value) {
+    return String(value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 
   static mentionText(target) {
@@ -27,15 +40,6 @@ class WhisperHandler {
     return uname ? `<b>@${this.escapeHtml(uname)}</b>` : 'غير معروف';
   }
 
-  static escapeHtml(value) {
-    return String(value || '')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-  }
-
   static cleanupExpired() {
     const now = Date.now();
     for (const [id, item] of this.whispers.entries()) {
@@ -43,9 +47,10 @@ class WhisperHandler {
         this.whispers.delete(id);
       }
     }
-    for (const [k, item] of this.pendingCompose.entries()) {
-      if (!item || (now - Number(item.createdAt || 0)) > WHISPER_TTL_MS) {
-        this.pendingCompose.delete(k);
+    for (const [uid, pending] of this.pendingPrivateCompose.entries()) {
+      const whisper = this.whispers.get(String(pending?.whisperId || ''));
+      if (!pending || !whisper || (now - Number(pending.createdAt || 0)) > WHISPER_TTL_MS) {
+        this.pendingPrivateCompose.delete(uid);
       }
     }
   }
@@ -65,9 +70,7 @@ class WhisperHandler {
       if (entity?.type === 'mention') {
         const raw = text.slice(entity.offset, entity.offset + entity.length);
         const username = this.normalizeUsername(raw);
-        if (username) {
-          return { id: null, username, label: `@${username}` };
-        }
+        if (username) return { id: null, username, label: `@${username}` };
       }
     }
     return null;
@@ -112,8 +115,8 @@ class WhisperHandler {
     return false;
   }
 
-  static composeKey(chatId, userId) {
-    return `${Number(chatId || 0)}:${Number(userId || 0)}`;
+  static buildPrivateLink(botUsername, whisperId) {
+    return `https://t.me/${botUsername}?start=whisper_${encodeURIComponent(whisperId)}`;
   }
 
   static async handleWhisperCommand(ctx) {
@@ -134,6 +137,11 @@ class WhisperHandler {
       return ctx.reply('❌ لا يمكنك إرسال همسة لنفسك.');
     }
 
+    const botUsername = String(ctx.botInfo?.username || '').trim();
+    if (!botUsername) {
+      return ctx.reply('❌ تعذر معرفة معرف البوت، حاول مرة ثانية.');
+    }
+
     const id = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
     this.whispers.set(id, {
       id,
@@ -149,6 +157,7 @@ class WhisperHandler {
     });
 
     const targetText = this.mentionText(target);
+    const privateLink = this.buildPrivateLink(botUsername, id);
 
     return ctx.reply(
       `• تم تحديد الهمسه لـ ↤︎ ${targetText}\n` +
@@ -158,95 +167,91 @@ class WhisperHandler {
         parse_mode: 'HTML',
         reply_to_message_id: ctx.message?.message_id,
         reply_markup: Markup.inlineKeyboard([
-          [Markup.button.callback('✍️ اهمس هنا', `group:whisper:compose:${id}`)]
+          [Markup.button.url('✍️ اهمس هنا', privateLink)]
         ]).reply_markup
       }
     );
   }
 
-  static async handleWhisperCompose(ctx, whisperId) {
-    if (!this.isGroupChat(ctx)) return;
+  static async handlePrivateStart(ctx, payload) {
+    if (!this.isPrivateChat(ctx)) return false;
     this.cleanupExpired();
 
-    const whisper = this.whispers.get(String(whisperId || ''));
+    const p = String(payload || '').trim();
+    const match = /^whisper_([a-z0-9]+)$/i.exec(p);
+    if (!match) return false;
+
+    const whisperId = match[1];
+    const whisper = this.whispers.get(whisperId);
     if (!whisper) {
-      return ctx.answerCbQuery('❌ الهمسة منتهية أو غير موجودة.', { show_alert: true }).catch(() => {});
+      await ctx.reply('❌ الهمسة منتهية أو غير موجودة.');
+      return true;
     }
 
-    if (Number(whisper.chatId || 0) !== Number(ctx.chat?.id || 0)) {
-      return ctx.answerCbQuery('❌ هذه الهمسة ليست لهذا الجروب.', { show_alert: true }).catch(() => {});
+    if (Number(whisper.senderId || 0) !== Number(ctx.from?.id || 0)) {
+      await ctx.reply('❌ هذه الهمسة ليست خاصة بك.');
+      return true;
     }
 
-    if (Number(ctx.from?.id || 0) !== Number(whisper.senderId || 0)) {
-      return ctx.answerCbQuery('❌ فقط المرسل يكتب نص الهمسة.', { show_alert: true }).catch(() => {});
-    }
-
-    const key = this.composeKey(ctx.chat?.id, ctx.from?.id);
-    this.pendingCompose.set(key, {
-      whisperId: whisper.id,
+    this.pendingPrivateCompose.set(Number(ctx.from.id), {
+      whisperId,
       createdAt: Date.now()
     });
 
-    await ctx.answerCbQuery('✅ اكتب نص الهمسة الآن برسالة واحدة.').catch(() => {});
-    return ctx.reply('📝 اكتب الآن نص الهمسة في رسالة واحدة.', {
-      reply_to_message_id: ctx.callbackQuery?.message?.message_id
-    });
+    await ctx.reply(
+      '📝 اكتب الآن نص الهمسة هنا في الخاص.\n' +
+      `• الحد الأقصى: ${WHISPER_MAX_LENGTH} حرف`
+    );
+    return true;
   }
 
-  static async handlePotentialComposeText(ctx) {
-    if (!this.isGroupChat(ctx)) return false;
+  static async handlePrivateText(ctx) {
+    if (!this.isPrivateChat(ctx)) return false;
     this.cleanupExpired();
-    const composedMessageId = ctx?.message?.message_id;
 
-    const key = this.composeKey(ctx.chat?.id, ctx.from?.id);
-    const pending = this.pendingCompose.get(key);
+    const pending = this.pendingPrivateCompose.get(Number(ctx.from?.id || 0));
     if (!pending) return false;
 
     const whisper = this.whispers.get(String(pending.whisperId || ''));
     if (!whisper || Number(whisper.senderId || 0) !== Number(ctx.from?.id || 0)) {
-      this.pendingCompose.delete(key);
+      this.pendingPrivateCompose.delete(Number(ctx.from?.id || 0));
       return false;
     }
 
     const body = String(ctx.message?.text || '').trim();
     if (!body) {
-      if (composedMessageId) {
-        await ctx.deleteMessage(composedMessageId).catch(() => {});
-      }
-      return ctx.reply('❌ اكتب نص واضح للهمسة.');
+      await ctx.reply('❌ اكتب نص واضح للهمسة.');
+      return true;
     }
     if (body.length > WHISPER_MAX_LENGTH) {
-      if (composedMessageId) {
-        await ctx.deleteMessage(composedMessageId).catch(() => {});
-      }
-      return ctx.reply(`❌ نص الهمسة طويل. الحد الأقصى ${WHISPER_MAX_LENGTH} حرف.`);
+      await ctx.reply(`❌ نص الهمسة طويل. الحد الأقصى ${WHISPER_MAX_LENGTH} حرف.`);
+      return true;
     }
 
     whisper.body = body;
     whisper.status = 'ready';
     this.whispers.set(whisper.id, whisper);
-    this.pendingCompose.delete(key);
+    this.pendingPrivateCompose.delete(Number(ctx.from.id));
 
     const targetText = whisper.targetId
       ? `<a href="tg://user?id=${Number(whisper.targetId)}">${this.escapeHtml(whisper.targetLabel)}</a>`
       : `<b>@${this.escapeHtml(whisper.targetUsername || '')}</b>`;
     const senderText = `<a href="tg://user?id=${Number(whisper.senderId)}">${this.escapeHtml(whisper.senderName || 'عضو')}</a>`;
 
-    await ctx.reply(
+    await ctx.telegram.sendMessage(
+      Number(whisper.chatId),
       `• الهمسه لـ ↤︎ ${targetText}\n` +
       `• من ↤︎ ${senderText}\n` +
       '-',
       {
         parse_mode: 'HTML',
-        reply_to_message_id: ctx.message?.message_id,
         reply_markup: Markup.inlineKeyboard([
           [Markup.button.callback('🔐 فتح الهمسة', `group:whisper:open:${whisper.id}`)]
         ]).reply_markup
       }
-    );
-    if (composedMessageId) {
-      await ctx.deleteMessage(composedMessageId).catch(() => {});
-    }
+    ).catch(() => {});
+
+    await ctx.reply('✅ تم إرسال الهمسة إلى الجروب.');
     return true;
   }
 
