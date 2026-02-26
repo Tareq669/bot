@@ -1412,6 +1412,73 @@ class GroupGamesHandler {
     );
   }
 
+  static async handleOwnerTakeMoneyCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const group = await this.ensureGroupRecord(ctx);
+
+    const isAllowed = await this.isGroupOwnerManager(ctx, group);
+    if (!isAllowed) {
+      return ctx.reply('❌ هذا الأمر متاح فقط للمالك @JOAmeer.');
+    }
+
+    const args = this.parseCommandArgs(ctx);
+    const amountToken = args.find((x) => /^-?\d+$/.test(String(x || '').trim()));
+    if (!amountToken) {
+      return ctx.reply('❌ الصيغة:\n/gtakemoney 1000 @user\nأو بالرد: /gtakemoney 1000\nأو عربي: سحب فلوس 1000 @user');
+    }
+
+    const amount = Number.parseInt(String(amountToken), 10);
+    if (!Number.isInteger(amount) || amount <= 0) {
+      return ctx.reply('❌ المبلغ لازم يكون رقم صحيح أكبر من 0.');
+    }
+
+    const targetArg = args.find((x) => {
+      const t = String(x || '').trim();
+      if (!t) return false;
+      if (t === amountToken) return false;
+      return t.startsWith('@') || /^\d+$/.test(t);
+    });
+    const targetUser = this.resolveTargetUser(ctx, group, targetArg) || ctx.from;
+
+    const row = this.getOrCreateScoreRow(group, targetUser);
+    const userDoc = await this.ensureGlobalProfileAndSyncRow(row, {
+      id: Number(targetUser.id),
+      username: targetUser.username || targetUser.first_name || String(targetUser.id),
+      first_name: targetUser.first_name || targetUser.username || String(targetUser.id)
+    });
+
+    const before = Number(row.points || 0);
+    if (before <= 0) {
+      return ctx.reply('❌ رصيد المستخدم بالفعل 0.');
+    }
+
+    const deducted = Math.min(amount, before);
+    row.points = before - deducted;
+    row.updatedAt = new Date();
+
+    await group.save();
+    await this.syncRowToGlobal(userDoc, row);
+
+    const actorMention = this.mentionUser(
+      ctx.from?.id,
+      ctx.from?.first_name || ctx.from?.username || 'المالك'
+    );
+    const targetMention = this.mentionUser(
+      targetUser.id,
+      targetUser.first_name || targetUser.username || String(targetUser.id)
+    );
+
+    return ctx.reply(
+      `✅ <b>تم سحب الفلوس بنجاح</b>\n\n` +
+      `• بواسطة: ${actorMention}\n` +
+      `• من المستخدم: ${targetMention}\n` +
+      `• المبلغ المسحوب: -${this.formatCurrency(deducted)}\n` +
+      `• الرصيد قبل: ${this.formatCurrency(before)}\n` +
+      `• الرصيد بعد: ${this.formatCurrency(row.points || 0)}`,
+      { parse_mode: 'HTML', reply_to_message_id: ctx.message?.message_id }
+    );
+  }
+
   static setup(bot) {
     this.bot = bot;
     if (this.autoLoop) return;
@@ -3773,6 +3840,7 @@ class GroupGamesHandler {
       '• /gprofile | ملفك في الجروب\n' +
       '• /ginvest | استثمار فلوسك\n' +
       '• /ggrantmoney 1000 @user | منح فلوس (للمالك)\n' +
+      '• /gtakemoney 1000 @user | سحب فلوس (للمالك)\n' +
       '• /gluck | يبدأ اختيار رقم للحظ (1-1000)\n' +
       '• /gluckstats | إحصائيات الحظ\n' +
       '• /gmonthly | صرف المكافأة الشهرية (مشرف)\n' +

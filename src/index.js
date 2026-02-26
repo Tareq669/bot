@@ -120,7 +120,7 @@ const GROUP_ONLY_COMMANDS = new Set([
   'gfaq', 'gsuggestmenu', 'gsuggeststats', 'gsuggesttop', 'gquiz', 'gmath', 'gword', 'gdaily', 'gmcq', 'gvote', 'gquizset', 'gleader', 'gweekly', 'ggame', 'ggames',
   'g', 'gteam', 'gteams', 'gtour', 'gwho', 'griddle', 'gtype', 'chance', 'gduel', 'gstore', 'gbuy', 'ggifts', 'ggift', 'gassets', 'gwealth', 'gprofile', 'ginvest', 'gluck', 'gluckstats', 'gmonth', 'gmonthly', 'gbonus', 'glevels',
   'gcastle', 'gmycastle', 'gresstore', 'gbuyres', 'gmyres', 'gupcastle', 'gbarracks', 'gbuyarmy', 'guparmy', 'gtreasure', 'gshield', 'gmyshield', 'gwar', 'garena', 'gfighters', 'grulers', 'gally', 'gallyreq',
-  'gbuygift', 'gsellgift', 'gscratch', 'gscratchstats', 'ggrantmoney'
+  'gbuygift', 'gsellgift', 'gscratch', 'gscratchstats', 'ggrantmoney', 'gtakemoney'
 ]);
 
 const PRIVATE_REPLY_BUTTONS = new Set([
@@ -266,6 +266,7 @@ Promise.all([
       { command: 'gwealth', description: 'لوحة أغنى ممتلكات' },
       { command: 'gprofile', description: 'ملفك في الجروب' },
       { command: 'ggrantmoney', description: 'منح فلوس (للمالك)' },
+      { command: 'gtakemoney', description: 'سحب فلوس (للمالك)' },
       { command: 'ginvest', description: 'استثمار فلوس الجروب' },
       { command: 'gluck', description: 'الحظ (اختر رقم 1-1000)' },
       { command: 'gluckstats', description: 'إحصائيات الحظ' },
@@ -433,6 +434,7 @@ bot.command('gassets', (ctx) => GroupGamesHandler.handleAssetsCommand(ctx));
 bot.command('gwealth', (ctx) => GroupGamesHandler.handleWealthCommand(ctx));
 bot.command('gprofile', (ctx) => GroupGamesHandler.handleGroupProfileCommand(ctx));
 bot.command('ggrantmoney', (ctx) => GroupGamesHandler.handleOwnerGrantMoneyCommand(ctx));
+bot.command('gtakemoney', (ctx) => GroupGamesHandler.handleOwnerTakeMoneyCommand(ctx));
 bot.command('ginvest', (ctx) => GroupGamesHandler.handleInvestAllCommand(ctx));
 bot.command('gluck', (ctx) => GroupGamesHandler.handleLuckCommand(ctx));
 bot.command('gluckstats', (ctx) => GroupGamesHandler.handleLuckStatsCommand(ctx));
@@ -2494,6 +2496,7 @@ bot.hears(/^ارسال(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleGiftComman
 bot.hears(/^(?:ملفي|حسابي\s*بالجروب)$/i, (ctx) => GroupGamesHandler.handleGroupProfileCommand(ctx));
 bot.hears(/^(?:نقاطي|فلوسي|رصيدي)$/i, (ctx) => GroupGamesHandler.handleMyMoneyCommand(ctx));
 bot.hears(/^(?:منح|اعطاء|إعطاء)\s*فلوس(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleOwnerGrantMoneyCommand(ctx));
+bot.hears(/^(?:سحب|خصم)\s*فلوس(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleOwnerTakeMoneyCommand(ctx));
 bot.hears(/^استثمار\s*فلوسي$/i, (ctx) => GroupGamesHandler.handleInvestAllCommand(ctx));
 bot.hears(/^حظ(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleLuckCommand(ctx));
 bot.hears(/^(?:احصائيات|إحصائيات)\s*الحظ$/i, (ctx) => GroupGamesHandler.handleLuckStatsCommand(ctx));
@@ -2557,6 +2560,7 @@ bot.hears(/^\/(?:ارسال)(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleGift
 bot.hears(/^\/(?:ملفي|ملفي_بالجروب)$/i, (ctx) => GroupGamesHandler.handleGroupProfileCommand(ctx));
 bot.hears(/^\/(?:نقاطي|فلوسي|رصيدي)$/i, (ctx) => GroupGamesHandler.handleMyMoneyCommand(ctx));
 bot.hears(/^\/(?:منح_فلوس|اعطاء_فلوس|إعطاء_فلوس|ggrantmoney)(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleOwnerGrantMoneyCommand(ctx));
+bot.hears(/^\/(?:سحب_فلوس|خصم_فلوس|gtakemoney)(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleOwnerTakeMoneyCommand(ctx));
 bot.hears(/^\/(?:استثمار_فلوسي|استثمار)$/i, (ctx) => GroupGamesHandler.handleInvestAllCommand(ctx));
 bot.hears(/^\/(?:حظ|gluck)(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleLuckCommand(ctx));
 bot.hears(/^\/(?:احصائيات_الحظ|إحصائيات_الحظ|احصائياتالحظ|إحصائياتالحظ|gluckstats)$/i, (ctx) => GroupGamesHandler.handleLuckStatsCommand(ctx));
