@@ -2481,7 +2481,7 @@ bot.hears(/^بيع\s*هد(?:ي|ي)ة(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.ha
 bot.hears(/^كشط(?:\s+\d+)?$/i, (ctx) => GroupGamesHandler.handleScratchCommand(ctx));
 bot.hears(/^(?:احصائيات|إحصائيات)\s*الكشط$/i, (ctx) => GroupGamesHandler.handleScratchStatsCommand(ctx));
 bot.hears(/^بيع(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleSimpleSellCommand(ctx));
-bot.hears(/^شراء(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleSimpleBuyCommand(ctx));
+bot.hears(/^شراء(?!\s*موارد)(?!\s*جيش)(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleSimpleBuyCommand(ctx));
 bot.hears(/^(?:الهدايا|هدايا)$/i, (ctx) => GroupGamesHandler.handleGiftCatalogCommand(ctx));
 bot.hears(/^(?:ممتلكاتي|ممتلكاتي\s*بالجروب|املاكي|أملاكي)$/i, (ctx) => GroupGamesHandler.handleAssetsCommand(ctx));
 bot.hears(/^(?:اغنى\s*ممتلكات|أغنى\s*ممتلكات|لوحة\s*الممتلكات)$/i, (ctx) => GroupGamesHandler.handleWealthCommand(ctx));
@@ -2542,7 +2542,7 @@ bot.hears(/^\/(?:بيع_هدية|بيعهدية|بيع_هديه|بيعهديه)(
 bot.hears(/^\/(?:كشط|كشط_اكواد|كشطاكواد)(?:\s+\d+)?$/i, (ctx) => GroupGamesHandler.handleScratchCommand(ctx));
 bot.hears(/^\/(?:احصائيات_الكشط|إحصائيات_الكشط|احصائياتالكشط|إحصائياتالكشط)$/i, (ctx) => GroupGamesHandler.handleScratchStatsCommand(ctx));
 bot.hears(/^\/(?:بيع)(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleSimpleSellCommand(ctx));
-bot.hears(/^\/(?:شراء)(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleSimpleBuyCommand(ctx));
+bot.hears(/^\/(?:شراء)(?!\s*موارد)(?!\s*جيش)(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleSimpleBuyCommand(ctx));
 bot.hears(/^\/(?:هدايا|الهدايا)$/i, (ctx) => GroupGamesHandler.handleGiftCatalogCommand(ctx));
 bot.hears(/^\/(?:ممتلكاتي|املاكي|أملاكي)$/i, (ctx) => GroupGamesHandler.handleAssetsCommand(ctx));
 bot.hears(/^\/(?:اغنى_ممتلكات|أغنى_ممتلكات|لوحة_الممتلكات)$/i, (ctx) => GroupGamesHandler.handleWealthCommand(ctx));

@@ -2155,6 +2155,11 @@ class GroupGamesHandler {
     const args = this.parseCommandArgs(ctx);
     if (args.length === 0) return this.handleStoreCommand(ctx);
 
+    const first = this.normalizeText(String(args[0] || ''));
+    if (first === 'موارد') return this.handleBuyResourcesCommand(ctx);
+    if (first === 'جيش') return this.handleBuyArmyCommand(ctx);
+    if (this.parseResourceKey(args[0]) && Number.isInteger(parseInt(args[1], 10))) return this.handleBuyResourcesCommand(ctx);
+
     const giftInput = this.extractGiftInputFromArgs(args);
     const gift = this.resolveGiftByInput(giftInput) || this.resolveGiftByInput(args[0]);
     if (gift) return this.handleBuyGiftForSelfCommand(ctx);
@@ -2355,7 +2360,11 @@ class GroupGamesHandler {
     if (!this.isGroupChat(ctx)) return;
     const args = this.parseCommandArgs(ctx);
     if (args.length < 2) return ctx.reply('❌ الصيغة: شراء موارد [الاسم] [العدد]');
-    const startIdx = this.normalizeText(String(args[0] || '')) === 'موارد' ? 1 : 0;
+    const n0 = this.normalizeText(String(args[0] || ''));
+    const n1 = this.normalizeText(String(args[1] || ''));
+    let startIdx = 0;
+    if (n0 === 'موارد') startIdx = 1;
+    else if (n0 === 'شراء' && n1 === 'موارد') startIdx = 2;
     const resourceKey = this.parseResourceKey(args[startIdx]);
     const qty = Math.max(1, parseInt(args[startIdx + 1], 10) || 0);
     if (!resourceKey || !Number.isInteger(qty)) return ctx.reply('❌ مورد غير معروف. استخدم: خشب/حجر/غذاء/حديد/ذهب');
@@ -2451,7 +2460,11 @@ class GroupGamesHandler {
   static async handleBuyArmyCommand(ctx) {
     if (!this.isGroupChat(ctx)) return;
     const args = this.parseCommandArgs(ctx);
-    const startIdx = this.normalizeText(String(args[0] || '')) === 'جيش' ? 1 : 0;
+    const n0 = this.normalizeText(String(args[0] || ''));
+    const n1 = this.normalizeText(String(args[1] || ''));
+    let startIdx = 0;
+    if (n0 === 'جيش') startIdx = 1;
+    else if (n0 === 'شراء' && n1 === 'جيش') startIdx = 2;
     const qty = Math.max(1, parseInt(args[startIdx], 10) || 0);
     if (!Number.isInteger(qty)) return ctx.reply('❌ الصيغة: شراء جيش [العدد]');
     if (qty > MAX_ARMY_BUY) return ctx.reply(`❌ الحد الأقصى للشراء مرة واحدة هو ${MAX_ARMY_BUY}.`);
