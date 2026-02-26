@@ -256,10 +256,9 @@ const LUCK_MIN_RANGE = 1;
 const LUCK_MAX_RANGE = 1000;
 const LUCK_DAILY_LIMIT = 10;
 const LUCK_COOLDOWN_SEC = 6;
-const LUCK_OVER_COUNT = 15;
-const LUCK_GOOD_COUNT = 60;
-const LUCK_SMALL_COUNT = 180;
-const LUCK_PAYOUTS = { small: 10, good: 35, over: 100 };
+const LUCK_WIN_COUNT = 260;
+const LUCK_WIN_MIN_PAYOUT = 5;
+const LUCK_WIN_MAX_PAYOUT = 1000;
 const CASTLE_UPGRADE_COOLDOWN_MIN = 10;
 const TREASURE_COOLDOWN_MIN = 30;
 const SHIELD_DURATION_MIN = 60;
@@ -655,6 +654,8 @@ class GroupGamesHandler {
       if (!Number.isFinite(row.luckTotalPlays)) row.luckTotalPlays = 0;
       if (!Number.isFinite(row.luckTotalWins)) row.luckTotalWins = 0;
       if (!Number.isFinite(row.luckTotalPayout)) row.luckTotalPayout = 0;
+      if (!row.luckUsedDayKey) row.luckUsedDayKey = '';
+      if (!Array.isArray(row.luckUsedNumbers)) row.luckUsedNumbers = [];
       if (typeof row.castleCreated !== 'boolean') row.castleCreated = false;
       if (!Number.isFinite(row.castleLevel)) row.castleLevel = 1;
       if (!row.castleResources || typeof row.castleResources !== 'object') {
@@ -863,6 +864,8 @@ class GroupGamesHandler {
         luckTotalPlays: 0,
         luckTotalWins: 0,
         luckTotalPayout: 0,
+        luckUsedDayKey: '',
+        luckUsedNumbers: [],
         castleCreated: false,
         castleLevel: 1,
         castleLastUpgradeAt: null,
@@ -899,6 +902,8 @@ class GroupGamesHandler {
     if (!Number.isFinite(row.luckTotalPlays)) row.luckTotalPlays = 0;
     if (!Number.isFinite(row.luckTotalWins)) row.luckTotalWins = 0;
     if (!Number.isFinite(row.luckTotalPayout)) row.luckTotalPayout = 0;
+    if (!row.luckUsedDayKey) row.luckUsedDayKey = '';
+    if (!Array.isArray(row.luckUsedNumbers)) row.luckUsedNumbers = [];
     if (typeof row.castleCreated !== 'boolean') row.castleCreated = false;
     if (!Number.isFinite(row.castleLevel)) row.castleLevel = 1;
     if (!row.castleResources || typeof row.castleResources !== 'object') row.castleResources = { wood: 0, stone: 0, food: 0, iron: 0, gold: 0 };
@@ -997,6 +1002,10 @@ class GroupGamesHandler {
       row.luckDayKey = today;
       row.luckPlaysToday = 0;
     }
+    if (row.luckUsedDayKey !== today) {
+      row.luckUsedDayKey = today;
+      row.luckUsedNumbers = [];
+    }
   }
 
   static buildDailyLuckNumbers(dateKey = null) {
@@ -1019,19 +1028,21 @@ class GroupGamesHandler {
       [numbers[i], numbers[j]] = [numbers[j], numbers[i]];
     }
 
-    const over = new Set(numbers.slice(0, LUCK_OVER_COUNT));
-    const good = new Set(numbers.slice(LUCK_OVER_COUNT, LUCK_OVER_COUNT + LUCK_GOOD_COUNT));
-    const small = new Set(numbers.slice(LUCK_OVER_COUNT + LUCK_GOOD_COUNT, LUCK_OVER_COUNT + LUCK_GOOD_COUNT + LUCK_SMALL_COUNT));
+    const winners = new Set(numbers.slice(0, LUCK_WIN_COUNT));
+    const payouts = {};
+    winners.forEach((n) => {
+      payouts[n] = Math.floor(rand() * (LUCK_WIN_MAX_PAYOUT - LUCK_WIN_MIN_PAYOUT + 1)) + LUCK_WIN_MIN_PAYOUT;
+    });
 
-    this.luckDailyNumbersCache = { key, over, good, small };
+    this.luckDailyNumbersCache = { key, winners, payouts };
     return this.luckDailyNumbersCache;
   }
 
   static evaluateLuckNumber(number) {
     const pool = this.buildDailyLuckNumbers();
-    if (pool.over.has(number)) return { tier: 'اوفر', win: true, payout: LUCK_PAYOUTS.over };
-    if (pool.good.has(number)) return { tier: 'جيد', win: true, payout: LUCK_PAYOUTS.good };
-    if (pool.small.has(number)) return { tier: 'قليل', win: true, payout: LUCK_PAYOUTS.small };
+    if (pool.winners.has(number)) {
+      return { tier: 'رابح', win: true, payout: Number(pool.payouts[number] || LUCK_WIN_MIN_PAYOUT) };
+    }
     return { tier: 'خاسر', win: false, payout: 0 };
   }
 
@@ -1045,6 +1056,12 @@ class GroupGamesHandler {
     const group = await this.ensureGroupRecord(ctx);
     const row = this.getOrCreateScoreRow(group, ctx.from);
     this.resetLuckDailyIfNeeded(row);
+    const used = new Set((row.luckUsedNumbers || []).map((n) => Number(n)));
+    if (used.has(Number(pickedNumber))) {
+      await group.save();
+      await ctx.reply('♻️ هذا الرقم استخدمته اليوم بالفعل. اختَر رقم ثاني.');
+      return true;
+    }
     if ((row.luckPlaysToday || 0) >= LUCK_DAILY_LIMIT) {
       await group.save();
       await ctx.reply(`🧾 وصلت الحد اليومي للمحاولات (${LUCK_DAILY_LIMIT}). ارجع بكرة.`);
@@ -1056,6 +1073,8 @@ class GroupGamesHandler {
     const winAmount = Number(result.payout || 0);
     row.points = before + winAmount;
     row.luckPlaysToday = Number(row.luckPlaysToday || 0) + 1;
+    row.luckUsedNumbers = Array.isArray(row.luckUsedNumbers) ? row.luckUsedNumbers : [];
+    row.luckUsedNumbers.push(Number(pickedNumber));
     row.luckTotalPlays = Number(row.luckTotalPlays || 0) + 1;
     if (result.win) row.luckTotalWins = Number(row.luckTotalWins || 0) + 1;
     row.luckTotalPayout = Number(row.luckTotalPayout || 0) + winAmount;
@@ -1072,7 +1091,8 @@ class GroupGamesHandler {
       `• فلوسك قبل ↢ ( ${this.formatCurrency(before)} )\n` +
       `• فلوسك الآن ↢ ( ${this.formatCurrency(row.points || 0)} )\n` +
       `• قيمة الحظ ↢ ( ${result.win ? '+' : ''}${this.formatCurrency(winAmount)} )\n` +
-      `• محاولاتك اليوم ↢ ( ${row.luckPlaysToday}/${LUCK_DAILY_LIMIT} )`,
+      `• محاولاتك اليوم ↢ ( ${row.luckPlaysToday}/${LUCK_DAILY_LIMIT} )\n` +
+      `• أرقام مستخدمة اليوم ↢ ( ${(row.luckUsedNumbers || []).length} )`,
       { parse_mode: 'HTML', reply_to_message_id: ctx.message?.message_id }
     );
     return true;
@@ -2269,7 +2289,8 @@ class GroupGamesHandler {
     return ctx.reply(
       `🎯 <b>وضع الحظ</b>\n` +
       `اختَر رقم واحد فقط بين <b>${LUCK_MIN_RANGE}</b> و <b>${LUCK_MAX_RANGE}</b>.\n` +
-      `• محاولاتك اليوم ↢ ( ${row.luckPlaysToday}/${LUCK_DAILY_LIMIT} )`,
+      `• محاولاتك اليوم ↢ ( ${row.luckPlaysToday}/${LUCK_DAILY_LIMIT} )\n` +
+      '• لا يمكنك استخدام نفس الرقم مرتين في نفس اليوم.',
       { parse_mode: 'HTML', reply_to_message_id: ctx.message?.message_id }
     );
   }

@@ -384,6 +384,11 @@ const groupSchema = new mongoose.Schema({
           type: Number,
           default: 0
         },
+        luckUsedDayKey: {
+          type: String,
+          default: ''
+        },
+        luckUsedNumbers: [Number],
         castleCreated: {
           type: Boolean,
           default: false
