@@ -196,6 +196,7 @@ class WhisperHandler {
   static async handlePotentialComposeText(ctx) {
     if (!this.isGroupChat(ctx)) return false;
     this.cleanupExpired();
+    const composedMessageId = ctx?.message?.message_id;
 
     const key = this.composeKey(ctx.chat?.id, ctx.from?.id);
     const pending = this.pendingCompose.get(key);
@@ -209,9 +210,15 @@ class WhisperHandler {
 
     const body = String(ctx.message?.text || '').trim();
     if (!body) {
+      if (composedMessageId) {
+        await ctx.deleteMessage(composedMessageId).catch(() => {});
+      }
       return ctx.reply('❌ اكتب نص واضح للهمسة.');
     }
     if (body.length > WHISPER_MAX_LENGTH) {
+      if (composedMessageId) {
+        await ctx.deleteMessage(composedMessageId).catch(() => {});
+      }
       return ctx.reply(`❌ نص الهمسة طويل. الحد الأقصى ${WHISPER_MAX_LENGTH} حرف.`);
     }
 
@@ -237,6 +244,9 @@ class WhisperHandler {
         ]).reply_markup
       }
     );
+    if (composedMessageId) {
+      await ctx.deleteMessage(composedMessageId).catch(() => {});
+    }
     return true;
   }
 
