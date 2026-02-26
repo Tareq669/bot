@@ -158,7 +158,7 @@ class WhisperHandler {
         parse_mode: 'HTML',
         reply_to_message_id: ctx.message?.message_id,
         reply_markup: Markup.inlineKeyboard([
-          [Markup.button.callback('✍️ كتابة الهمسة', `group:whisper:compose:${id}`)]
+          [Markup.button.callback('✍️ اهمس هنا', `group:whisper:compose:${id}`)]
         ]).reply_markup
       }
     );
