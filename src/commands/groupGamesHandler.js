@@ -873,25 +873,30 @@ class GroupGamesHandler {
   static resolveGiftByInput(input) {
     const raw = String(input || '').trim().toLowerCase();
     if (!raw) return null;
+    const normalizedRaw = this.normalizeText(raw);
+    const rawNoAl = normalizedRaw.replace(/^ال/, '');
     return UNIQUE_GIFTS.find((g) => {
       const extraAliases = {
-        meal: ['وجبة', 'وجبه', 'meal'],
-        island: ['جزيرة', 'جزيره', 'island'],
-        plane: ['طيارة', 'طياره', 'plane'],
-        diamond: ['ماسة', 'ماسه', 'diamond'],
-        tower: ['برج', 'tower'],
-        city: ['مدينة', 'مدينه', 'city'],
-        cruise: ['سفينة سياحة', 'سفينه سياحه', 'سفينة', 'سفينه', 'cruise'],
-        palace: ['قصر', 'palace'],
-        house: ['بيت', 'house'],
-        villa: ['فيلا', 'villa'],
-        rose: ['وردة', 'ورده', 'rose'],
-        bouquet: ['باقة ورود', 'باقه ورود', 'bouquet'],
-        santa: ['هدية بابا نويل', 'هديه بابا نويل', 'santa'],
-        car: ['سيارة', 'سياره', 'car']
+        meal: ['وجبة', 'وجبه', 'الوجبة', 'الوجبه', 'meal'],
+        island: ['جزيرة', 'جزيره', 'الجزيرة', 'الجزيره', 'island'],
+        plane: ['طيارة', 'طياره', 'الطيارة', 'الطياره', 'plane'],
+        diamond: ['ماسة', 'ماسه', 'الماسة', 'الماسه', 'diamond'],
+        tower: ['برج', 'البرج', 'tower'],
+        city: ['مدينة', 'مدينه', 'المدينة', 'المدينه', 'city'],
+        cruise: ['سفينة سياحة', 'سفينه سياحه', 'سفينة', 'سفينه', 'السفينة', 'السفينه', 'cruise'],
+        palace: ['قصر', 'القصر', 'palace'],
+        house: ['بيت', 'البيت', 'house'],
+        villa: ['فيلا', 'الفيلا', 'villa'],
+        rose: ['وردة', 'ورده', 'ورد', 'الوردة', 'الورده', 'الورد', 'ورود', 'الورود', 'rose'],
+        bouquet: ['باقة ورود', 'باقه ورود', 'باقة', 'باقه', 'bouquet'],
+        santa: ['هدية بابا نويل', 'هديه بابا نويل', 'هدية', 'هديه', 'santa'],
+        car: ['سيارة', 'سياره', 'السيارة', 'السياره', 'car']
       };
       const aliases = [g.key, g.name, this.normalizeText(g.name), ...(extraAliases[g.key] || [])];
-      return aliases.some((x) => this.normalizeText(String(x)) === this.normalizeText(raw));
+      return aliases.some((x) => {
+        const nx = this.normalizeText(String(x));
+        return nx === normalizedRaw || nx === rawNoAl;
+      });
     }) || null;
   }
 
@@ -2453,9 +2458,14 @@ class GroupGamesHandler {
       { label: 'سفينة سياحة', keys: ['cruise'], names: ['سفينة سياحة', 'سفينه سياحه', 'سفينة', 'سفينه', 'cruise'] },
       { label: 'هدية بابا نويل', keys: ['santa'], names: ['هدية بابا نويل', 'هديه بابا نويل', 'santa'] }
     ];
-    const rowsText = assetsLines
-      .map((x) => `( ${x.label} ↤︎ ${sumBy(x.keys, x.names)} )`)
-      .join('\n');
+    const knownKeys = new Set(assetsLines.flatMap((x) => x.keys || []).map((k) => normalizeName(k)));
+    const dynamicExtraLines = inventory
+      .filter((x) => Number(x?.count || 0) > 0 && !knownKeys.has(normalizeName(x?.key || '')))
+      .map((x) => `( ${x?.name || x?.key} ↤︎ ${Number(x?.count || 0)} )`);
+    const rowsText = [
+      ...assetsLines.map((x) => `( ${x.label} ↤︎ ${sumBy(x.keys, x.names)} )`),
+      ...dynamicExtraLines
+    ].join('\n');
 
     const totalItems = inventory.reduce((sum, x) => sum + Number(x?.count || 0), 0);
     const totalEstimatedValue = inventory.reduce((sum, x) => {
