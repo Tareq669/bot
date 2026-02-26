@@ -2391,10 +2391,14 @@ class GroupGamesHandler {
     const sellUnitPrice = Math.max(1, Math.floor(gift.price * 0.7));
     const totalPayout = sellUnitPrice * qty;
 
-    slot.count = currentCount - qty;
-    if (slot.count <= 0) {
-      row.giftInventory = inventory.filter((g) => g !== slot);
-    }
+    slot.count = Math.max(0, currentCount - qty);
+    row.giftInventory = inventory
+      .map((g) => ({
+        key: g.key,
+        name: g.name,
+        count: Number(g.count || 0)
+      }))
+      .filter((g) => Number(g.count || 0) > 0);
     row.points = (row.points || 0) + totalPayout;
     row.updatedAt = new Date();
     await group.save();
@@ -2418,34 +2422,39 @@ class GroupGamesHandler {
     const row = this.getOrCreateScoreRow(group, ctx.from);
 
     const inventory = Array.isArray(row.giftInventory) ? row.giftInventory : [];
-    const normalizeName = (value) => this.normalizeText(String(value || ''))
-      .replace(/[^\p{L}\p{N}\s]/gu, '')
-      .trim();
+    const normalizeName = (value) => this.normalizeText(String(value || '')).trim();
     const countByName = {};
+    const countByKey = {};
     for (const item of inventory) {
-      const key = normalizeName(item?.name || item?.key || '');
-      if (!key) continue;
-      countByName[key] = (countByName[key] || 0) + Number(item?.count || 0);
+      const key = normalizeName(item?.key || '');
+      const nameKey = normalizeName(item?.name || '');
+      const count = Number(item?.count || 0);
+      if (key) countByKey[key] = (countByKey[key] || 0) + count;
+      if (nameKey) countByName[nameKey] = (countByName[nameKey] || 0) + count;
     }
-    const sumNames = (names) => names.reduce((sum, n) => sum + (countByName[normalizeName(n)] || 0), 0);
+    const sumBy = (keys = [], names = []) => {
+      const byKey = keys.reduce((sum, k) => sum + (countByKey[normalizeName(k)] || 0), 0);
+      if (byKey > 0) return byKey;
+      return names.reduce((sum, n) => sum + (countByName[normalizeName(n)] || 0), 0);
+    };
     const assetsLines = [
-      { label: 'وردة', names: ['وردة', 'ورده', 'rose'] },
-      { label: 'باقة ورود', names: ['باقة ورود', 'باقه ورود', 'bouquet'] },
-      { label: 'وجبة', names: ['وجبة', 'وجبه', 'meal'] },
-      { label: 'سيارة', names: ['سيارة', 'سياره', 'car'] },
-      { label: 'بيت', names: ['بيت', 'house'] },
-      { label: 'فيلا', names: ['فيلا', 'villa'] },
-      { label: 'قصر', names: ['قصر', 'palace'] },
-      { label: 'جزيرة', names: ['جزيرة', 'جزيره', 'island'] },
-      { label: 'طيارة', names: ['طيارة', 'طياره', 'plane'] },
-      { label: 'ماسة', names: ['ماسة', 'ماسه', 'diamond'] },
-      { label: 'برج', names: ['برج', 'tower'] },
-      { label: 'مدينة', names: ['مدينة', 'مدينه', 'city'] },
-      { label: 'سفينة سياحة', names: ['سفينة سياحة', 'سفينه سياحه', 'سفينة', 'سفينه', 'cruise'] },
-      { label: 'هدية بابا نويل', names: ['هدية بابا نويل', 'هديه بابا نويل', 'santa'] }
+      { label: 'وردة', keys: ['rose'], names: ['وردة', 'ورده', 'rose'] },
+      { label: 'باقة ورود', keys: ['bouquet'], names: ['باقة ورود', 'باقه ورود', 'bouquet'] },
+      { label: 'وجبة', keys: ['meal'], names: ['وجبة', 'وجبه', 'meal'] },
+      { label: 'سيارة', keys: ['car'], names: ['سيارة', 'سياره', 'car'] },
+      { label: 'بيت', keys: ['house'], names: ['بيت', 'house'] },
+      { label: 'فيلا', keys: ['villa'], names: ['فيلا', 'villa'] },
+      { label: 'قصر', keys: ['palace'], names: ['قصر', 'palace'] },
+      { label: 'جزيرة', keys: ['island'], names: ['جزيرة', 'جزيره', 'island'] },
+      { label: 'طيارة', keys: ['plane'], names: ['طيارة', 'طياره', 'plane'] },
+      { label: 'ماسة', keys: ['diamond'], names: ['ماسة', 'ماسه', 'diamond'] },
+      { label: 'برج', keys: ['tower'], names: ['برج', 'tower'] },
+      { label: 'مدينة', keys: ['city'], names: ['مدينة', 'مدينه', 'city'] },
+      { label: 'سفينة سياحة', keys: ['cruise'], names: ['سفينة سياحة', 'سفينه سياحه', 'سفينة', 'سفينه', 'cruise'] },
+      { label: 'هدية بابا نويل', keys: ['santa'], names: ['هدية بابا نويل', 'هديه بابا نويل', 'santa'] }
     ];
     const rowsText = assetsLines
-      .map((x) => `( ${x.label} ↤︎ ${sumNames(x.names)} )`)
+      .map((x) => `( ${x.label} ↤︎ ${sumBy(x.keys, x.names)} )`)
       .join('\n');
 
     const totalItems = inventory.reduce((sum, x) => sum + Number(x?.count || 0), 0);
