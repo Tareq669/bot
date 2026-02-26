@@ -20,6 +20,7 @@ const GameHandler = require('./commands/gameHandler');
 const NewGamesHandler = require('./commands/newGamesHandler');
 const GroupAdminHandler = require('./commands/groupAdminHandler');
 const GroupGamesHandler = require('./commands/groupGamesHandler');
+const WhisperHandler = require('./commands/whisperHandler');
 const QuranicGamesHandler = require('./commands/quranicGamesHandler');
 const EconomyHandler = require('./commands/economyHandler');
 const ContentHandler = require('./commands/contentHandler');
@@ -120,7 +121,7 @@ const GROUP_ONLY_COMMANDS = new Set([
   'gfaq', 'gsuggestmenu', 'gsuggeststats', 'gsuggesttop', 'gquiz', 'gmath', 'gword', 'gdaily', 'gmcq', 'gvote', 'gquizset', 'gleader', 'gweekly', 'ggame', 'ggames',
   'g', 'gteam', 'gteams', 'gtour', 'gwho', 'griddle', 'gtype', 'chance', 'gduel', 'gstore', 'gbuy', 'ggifts', 'ggift', 'gassets', 'gwealth', 'gprofile', 'ginvest', 'gluck', 'gluckstats', 'gmonth', 'gmonthly', 'gbonus', 'glevels',
   'gcastle', 'gmycastle', 'gresstore', 'gbuyres', 'gmyres', 'gupcastle', 'gbarracks', 'gbuyarmy', 'guparmy', 'gtreasure', 'gshield', 'gmyshield', 'gwar', 'garena', 'gfighters', 'grulers', 'gally', 'gallyreq',
-  'gbuygift', 'gsellgift', 'gscratch', 'gscratchstats', 'ggrantmoney', 'gtakemoney'
+  'gbuygift', 'gsellgift', 'gscratch', 'gscratchstats', 'ggrantmoney', 'gtakemoney', 'whisper'
 ]);
 
 const PRIVATE_REPLY_BUTTONS = new Set([
@@ -265,6 +266,7 @@ Promise.all([
       { command: 'gassets', description: 'ممتلكاتك في الجروب' },
       { command: 'gwealth', description: 'لوحة أغنى ممتلكات' },
       { command: 'gprofile', description: 'ملفك في الجروب' },
+      { command: 'whisper', description: 'همسة خاصة بعضو' },
       { command: 'ggrantmoney', description: 'منح فلوس (للمالك)' },
       { command: 'gtakemoney', description: 'سحب فلوس (للمالك)' },
       { command: 'ginvest', description: 'استثمار فلوس الجروب' },
@@ -433,6 +435,7 @@ bot.command('gscratchstats', (ctx) => GroupGamesHandler.handleScratchStatsComman
 bot.command('gassets', (ctx) => GroupGamesHandler.handleAssetsCommand(ctx));
 bot.command('gwealth', (ctx) => GroupGamesHandler.handleWealthCommand(ctx));
 bot.command('gprofile', (ctx) => GroupGamesHandler.handleGroupProfileCommand(ctx));
+bot.command('whisper', (ctx) => WhisperHandler.handleWhisperCommand(ctx));
 bot.command('ggrantmoney', (ctx) => GroupGamesHandler.handleOwnerGrantMoneyCommand(ctx));
 bot.command('gtakemoney', (ctx) => GroupGamesHandler.handleOwnerTakeMoneyCommand(ctx));
 bot.command('ginvest', (ctx) => GroupGamesHandler.handleInvestAllCommand(ctx));
@@ -2495,6 +2498,7 @@ bot.hears(/^اهداء(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleGiftComman
 bot.hears(/^ارسال(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleGiftCommand(ctx));
 bot.hears(/^(?:ملفي|حسابي\s*بالجروب)$/i, (ctx) => GroupGamesHandler.handleGroupProfileCommand(ctx));
 bot.hears(/^(?:نقاطي|فلوسي|رصيدي)$/i, (ctx) => GroupGamesHandler.handleMyMoneyCommand(ctx));
+bot.hears(/^(?:همس[هة])(?:\s+.+)?$/i, (ctx) => WhisperHandler.handleWhisperCommand(ctx));
 bot.hears(/^(?:منح|اعطاء|إعطاء)\s*فلوس(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleOwnerGrantMoneyCommand(ctx));
 bot.hears(/^(?:سحب|خصم)\s*فلوس(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleOwnerTakeMoneyCommand(ctx));
 bot.hears(/^استثمار\s*فلوسي$/i, (ctx) => GroupGamesHandler.handleInvestAllCommand(ctx));
@@ -2559,6 +2563,7 @@ bot.hears(/^\/(?:اهداء)(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleGift
 bot.hears(/^\/(?:ارسال)(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleGiftCommand(ctx));
 bot.hears(/^\/(?:ملفي|ملفي_بالجروب)$/i, (ctx) => GroupGamesHandler.handleGroupProfileCommand(ctx));
 bot.hears(/^\/(?:نقاطي|فلوسي|رصيدي)$/i, (ctx) => GroupGamesHandler.handleMyMoneyCommand(ctx));
+bot.hears(/^\/(?:همسه|همسة|whisper)(?:\s+.+)?$/i, (ctx) => WhisperHandler.handleWhisperCommand(ctx));
 bot.hears(/^\/(?:منح_فلوس|اعطاء_فلوس|إعطاء_فلوس|ggrantmoney)(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleOwnerGrantMoneyCommand(ctx));
 bot.hears(/^\/(?:سحب_فلوس|خصم_فلوس|gtakemoney)(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleOwnerTakeMoneyCommand(ctx));
 bot.hears(/^\/(?:استثمار_فلوسي|استثمار)$/i, (ctx) => GroupGamesHandler.handleInvestAllCommand(ctx));
@@ -2578,6 +2583,7 @@ bot.hears(/^\/(?:ملفي)$/i, (ctx) => GroupGamesHandler.handleGroupProfileComm
 
 bot.action(/^xo:move:([a-z0-9]+):([0-8])$/i, (ctx) => ChatGamesUtilityHandler.handleXoAction(ctx));
 bot.action(/^xo:challenge:(accept|decline):([a-z0-9]+)$/i, (ctx) => ChatGamesUtilityHandler.handleXoChallengeAction(ctx));
+bot.action(/^group:whisper:open:([a-z0-9]+)$/i, (ctx) => WhisperHandler.handleWhisperOpen(ctx, ctx.match[1]));
 
 bot.on('location', (ctx) => ChatGamesUtilityHandler.handleLocationMessage(ctx));
 
