@@ -2583,6 +2583,7 @@ bot.hears(/^\/(?:ملفي)$/i, (ctx) => GroupGamesHandler.handleGroupProfileComm
 
 bot.action(/^xo:move:([a-z0-9]+):([0-8])$/i, (ctx) => ChatGamesUtilityHandler.handleXoAction(ctx));
 bot.action(/^xo:challenge:(accept|decline):([a-z0-9]+)$/i, (ctx) => ChatGamesUtilityHandler.handleXoChallengeAction(ctx));
+bot.action(/^group:whisper:compose:([a-z0-9]+)$/i, (ctx) => WhisperHandler.handleWhisperCompose(ctx, ctx.match[1]));
 bot.action(/^group:whisper:open:([a-z0-9]+)$/i, (ctx) => WhisperHandler.handleWhisperOpen(ctx, ctx.match[1]));
 
 bot.on('location', (ctx) => ChatGamesUtilityHandler.handleLocationMessage(ctx));
@@ -2593,6 +2594,11 @@ bot.on('text', async (ctx, next) => {
   if (ctx.from && imageHandler.isWaitingForImagePrompt(ctx.from.id)) {
     const handled = await imageHandler.handleTextMessage(ctx);
     if (handled) return;
+  }
+
+  // Handle whisper compose flow (after pressing "كتابة الهمسة").
+  if (await WhisperHandler.handlePotentialComposeText(ctx)) {
+    return;
   }
 
   // معالجة إجابات الألعاب القرآنية
