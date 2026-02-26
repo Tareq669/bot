@@ -794,6 +794,7 @@ class GroupGamesHandler {
     if (!this.isGroupChat(ctx)) return;
     const group = await this.ensureGroupRecord(ctx);
     const row = this.getOrCreateScoreRow(group, ctx.from);
+    await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
     const tier = this.resolveTierFromXp(row.xp || 0);
     const next = this.nextTierFromXp(row.xp || 0);
     const rewards = this.getTierUpRewards(group);
@@ -2327,10 +2328,11 @@ class GroupGamesHandler {
   static async handleChanceCommand(ctx) {
     if (!this.isGroupChat(ctx)) return;
     const group = await this.ensureGroupRecord(ctx);
+    const currentUserRow = this.getOrCreateScoreRow(group, ctx.from);
+    await this.ensureGlobalProfileAndSyncRow(currentUserRow, ctx.from);
+    await group.save();
     const pool = (group.gameSystem.scores || []).slice(0, 40);
     if (!pool.find((x) => Number(x.userId) === Number(ctx.from.id))) {
-      this.getOrCreateScoreRow(group, ctx.from);
-      await group.save();
       pool.push({ userId: Number(ctx.from.id), username: ctx.from.username || ctx.from.first_name || String(ctx.from.id) });
     }
     const picked = this.pickRandom(pool);
