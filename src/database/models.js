@@ -6,6 +6,7 @@ const userSchema = new mongoose.Schema({
   userId: { type: Number, required: true, unique: true },
   firstName: String,
   username: String,
+  joinDate: { type: Date, default: Date.now },
   coins: { type: Number, default: 0 },
   xp: { type: Number, default: 0 },
   level: { type: Number, default: 1 },
@@ -27,6 +28,8 @@ const userSchema = new mongoose.Schema({
     adhkar: { type: Boolean, default: false },
     interact: { type: Boolean, default: false }
   },
+  // Shared cross-group profile for group games economy
+  globalGameProfile: mongoose.Schema.Types.Mixed,
   lastDailyReward: { type: Date, default: null },
   lastActivity: { type: Date, default: Date.now },
   createdAt: { type: Date, default: Date.now }
