@@ -118,7 +118,7 @@ const GROUP_ONLY_COMMANDS = new Set([
   'gadminstats', 'gprint', 'greasons', 'gbasic', 'gexceptions', 'granks', 'gdetect', 'gonline', 'gadminleave',
   'gtemplate_member', 'gtemplate_admin', 'gideal_member', 'gideal_admin', 'gshow_ideal_member', 'gshow_ideal_admin', 'gwelcome', 'gsuggest',
   'gfaq', 'gsuggestmenu', 'gsuggeststats', 'gsuggesttop', 'gquiz', 'gmath', 'gword', 'gdaily', 'gmcq', 'gvote', 'gquizset', 'gleader', 'gweekly', 'ggame', 'ggames',
-  'g', 'gteam', 'gteams', 'gtour', 'gwho', 'griddle', 'gtype', 'chance', 'gduel', 'gstore', 'gbuy', 'ggifts', 'ggift', 'gassets', 'gwealth', 'gprofile', 'ginvest', 'gluck', 'gmonth', 'gmonthly', 'gbonus', 'glevels',
+  'g', 'gteam', 'gteams', 'gtour', 'gwho', 'griddle', 'gtype', 'chance', 'gduel', 'gstore', 'gbuy', 'ggifts', 'ggift', 'gassets', 'gwealth', 'gprofile', 'ginvest', 'gluck', 'gluckstats', 'gmonth', 'gmonthly', 'gbonus', 'glevels',
   'gcastle', 'gmycastle', 'gresstore', 'gbuyres', 'gmyres', 'gupcastle', 'gbarracks', 'gbuyarmy', 'guparmy', 'gtreasure', 'gshield', 'gmyshield', 'gwar', 'garena', 'gfighters', 'grulers', 'gally', 'gallyreq',
   'gbuygift', 'gsellgift', 'gscratch', 'gscratchstats'
 ]);
@@ -267,6 +267,7 @@ Promise.all([
       { command: 'gprofile', description: 'ملفك في الجروب' },
       { command: 'ginvest', description: 'استثمار فلوس الجروب' },
       { command: 'gluck', description: 'الحظ (اختر رقم 1-1000)' },
+      { command: 'gluckstats', description: 'إحصائيات الحظ' },
       { command: 'glevels', description: 'لوحة المستويات' },
       { command: 'gmonth', description: 'متصدرين الشهر' },
       { command: 'gmonthly', description: 'صرف مكافأة شهرية' },
@@ -432,6 +433,7 @@ bot.command('gwealth', (ctx) => GroupGamesHandler.handleWealthCommand(ctx));
 bot.command('gprofile', (ctx) => GroupGamesHandler.handleGroupProfileCommand(ctx));
 bot.command('ginvest', (ctx) => GroupGamesHandler.handleInvestAllCommand(ctx));
 bot.command('gluck', (ctx) => GroupGamesHandler.handleLuckCommand(ctx));
+bot.command('gluckstats', (ctx) => GroupGamesHandler.handleLuckStatsCommand(ctx));
 bot.command('ggame', (ctx) => GroupGamesHandler.handleGameToggleCommand(ctx));
 bot.command('ggames', (ctx) => GroupGamesHandler.handleGamesHelp(ctx));
 bot.command('gteam', (ctx) => GroupGamesHandler.handleTeamCommand(ctx));
@@ -2491,6 +2493,7 @@ bot.hears(/^(?:ملفي|حسابي\s*بالجروب)$/i, (ctx) => GroupGamesHand
 bot.hears(/^(?:نقاطي|فلوسي|رصيدي)$/i, (ctx) => GroupGamesHandler.handleMyMoneyCommand(ctx));
 bot.hears(/^استثمار\s*فلوسي$/i, (ctx) => GroupGamesHandler.handleInvestAllCommand(ctx));
 bot.hears(/^حظ(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleLuckCommand(ctx));
+bot.hears(/^(?:احصائيات|إحصائيات)\s*الحظ$/i, (ctx) => GroupGamesHandler.handleLuckStatsCommand(ctx));
 bot.hears(/^حظر(?:\s+.+)?$/i, (ctx) => GroupAdminHandler.handleBanCommand(ctx));
 bot.hears(/^انشاء\s*قلع[هة]$/i, (ctx) => GroupGamesHandler.handleCreateCastleCommand(ctx));
 bot.hears(/^قلعتي$/i, (ctx) => GroupGamesHandler.handleMyCastleCommand(ctx));
@@ -2552,6 +2555,7 @@ bot.hears(/^\/(?:ملفي|ملفي_بالجروب)$/i, (ctx) => GroupGamesHandle
 bot.hears(/^\/(?:نقاطي|فلوسي|رصيدي)$/i, (ctx) => GroupGamesHandler.handleMyMoneyCommand(ctx));
 bot.hears(/^\/(?:استثمار_فلوسي|استثمار)$/i, (ctx) => GroupGamesHandler.handleInvestAllCommand(ctx));
 bot.hears(/^\/(?:حظ|gluck)(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleLuckCommand(ctx));
+bot.hears(/^\/(?:احصائيات_الحظ|إحصائيات_الحظ|احصائياتالحظ|إحصائياتالحظ|gluckstats)$/i, (ctx) => GroupGamesHandler.handleLuckStatsCommand(ctx));
 bot.hears(/^\/(?:حظر)(?:\s+.+)?$/i, (ctx) => GroupAdminHandler.handleBanCommand(ctx));
 bot.hears(/^\/(?:متصدرين_الشهر|سباق_الشهر)$/i, (ctx) => GroupGamesHandler.handleMonthlyBoardCommand(ctx));
 bot.hears(/^\/(?:المستويات|لوحة_المستويات)$/i, (ctx) => GroupGamesHandler.handleLevelsCommand(ctx));

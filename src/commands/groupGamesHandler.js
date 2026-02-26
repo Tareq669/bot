@@ -2295,6 +2295,33 @@ class GroupGamesHandler {
     );
   }
 
+  static async handleLuckStatsCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const group = await this.ensureGroupRecord(ctx);
+    const row = this.getOrCreateScoreRow(group, ctx.from);
+    this.resetLuckDailyIfNeeded(row);
+    await group.save();
+
+    const usedToday = (row.luckUsedNumbers || []).length;
+    const remaining = Math.max(0, LUCK_DAILY_LIMIT - Number(row.luckPlaysToday || 0));
+    const winRate = Number(row.luckTotalPlays || 0) > 0
+      ? ((Number(row.luckTotalWins || 0) / Number(row.luckTotalPlays || 0)) * 100).toFixed(1)
+      : '0.0';
+
+    return ctx.reply(
+      `📊 <b>إحصائيات الحظ</b>\n\n` +
+      `• محاولاتك اليوم: ${row.luckPlaysToday || 0}/${LUCK_DAILY_LIMIT}\n` +
+      `• المتبقي اليوم: ${remaining}\n` +
+      `• الأرقام المستخدمة اليوم: ${usedToday}\n\n` +
+      `• إجمالي المحاولات: ${row.luckTotalPlays || 0}\n` +
+      `• إجمالي مرات الربح: ${row.luckTotalWins || 0}\n` +
+      `• نسبة الفوز: ${winRate}%\n` +
+      `• إجمالي أرباح الحظ: ${this.formatCurrency(row.luckTotalPayout || 0)}\n\n` +
+      '💡 استخدم: حظ',
+      { parse_mode: 'HTML', reply_to_message_id: ctx.message?.message_id }
+    );
+  }
+
   static parseResourceKey(input) {
     const x = this.normalizeText(String(input || ''));
     const map = {
@@ -3383,6 +3410,7 @@ class GroupGamesHandler {
       '• /gprofile | ملفك في الجروب\n' +
       '• /ginvest | استثمار فلوسك\n' +
       '• /gluck | يبدأ اختيار رقم للحظ (1-1000)\n' +
+      '• /gluckstats | إحصائيات الحظ\n' +
       '• /gmonthly | صرف المكافأة الشهرية (مشرف)\n' +
       '• /gbonus 10 20 35 60 | مكافآت الترقية (مشرف)\n\n' +
       '<b>ثالثًا: المتجر والهدايا</b>\n' +
@@ -3427,7 +3455,7 @@ class GroupGamesHandler {
       '• /gteams | ترتيب الفرق\n' +
       '• /gtour | البطولة الأسبوعية (مشرف)\n\n' +
       '<b>أوامر عربية بدون سلاش</b>\n' +
-      'العاب الجروب | مين انا | الغاز | سرعة الكتابة | روليت | متصدرين | اسبوعي | متصدرين الشهر | ملفي | متجر الجروب | الهدايا | ممتلكاتي | اغنى ممتلكات | استثمار فلوسي | حظ | كشط | احصائيات الكشط | انشاء قلعه | قلعتي | متجر الموارد | شراء موارد | مواردي | تطوير قلعتي | انشاء معكسر | شراء جيش | تطوير الجيش | بحث الكنز | تفعيل الحصانه | تعطيل الحصانه | حصانتي | مبارزه | الانضمام للمبارزه | المبارزين | توب الحكام | تحالف | طلبات التحالف\n\n' +
+      'العاب الجروب | مين انا | الغاز | سرعة الكتابة | روليت | متصدرين | اسبوعي | متصدرين الشهر | ملفي | متجر الجروب | الهدايا | ممتلكاتي | اغنى ممتلكات | استثمار فلوسي | حظ | احصائيات الحظ | كشط | احصائيات الكشط | انشاء قلعه | قلعتي | متجر الموارد | شراء موارد | مواردي | تطوير قلعتي | انشاء معكسر | شراء جيش | تطوير الجيش | بحث الكنز | تفعيل الحصانه | تعطيل الحصانه | حصانتي | مبارزه | الانضمام للمبارزه | المبارزين | توب الحكام | تحالف | طلبات التحالف\n\n' +
       `العملة: كل إجابة صحيحة = <b>${this.formatCurrency(1)}</b>.`,
       { parse_mode: 'HTML', reply_markup: keyboard.reply_markup }
     );
