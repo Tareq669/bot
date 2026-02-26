@@ -1366,6 +1366,12 @@ class GroupGamesHandler {
     const luckKey = `${String(ctx.chat.id)}:${Number(ctx.from?.id || 0)}`;
     if (this.pendingLuckInputs.has(luckKey)) {
       const normalized = this.normalizeArabicDigits(String(text || '').trim());
+      const isKnownCommandLike = /^(شراء|بيع|اهداء|إهداء|ارسال|إرسال|متجر|هدايا|ممتلكاتي|حظ)\b/i.test(normalized);
+      if (isKnownCommandLike) {
+        // Do not let pending luck block normal group commands.
+        this.pendingLuckInputs.delete(luckKey);
+        return false;
+      }
       if (!/^\d+$/.test(normalized)) {
         await ctx.reply('❌ اختَر رقم واحد فقط بين 1 و 1000.');
         return true;
@@ -2323,9 +2329,15 @@ class GroupGamesHandler {
     const row = this.getOrCreateScoreRow(group, ctx.from);
     const totalPrice = gift.price * qty;
     if ((row.points || 0) < totalPrice) {
-      return ctx.reply(`❌ فلوسك غير كافية. المطلوب ${this.formatCurrency(totalPrice)}.`, {
+      return ctx.reply(
+        `❌ فلوسك غير كافية.\n` +
+        `• المطلوب: ${this.formatCurrency(totalPrice)}\n` +
+        `• فلوسك الآن: ${this.formatCurrency(row.points || 0)}`,
+        {
+        parse_mode: 'HTML',
         reply_to_message_id: ctx.message?.message_id
-      });
+        }
+      );
     }
 
     row.points = (row.points || 0) - totalPrice;
