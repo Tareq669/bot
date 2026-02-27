@@ -288,7 +288,7 @@ class BankGameHandler {
   static async handleWheel(ctx) {
     if (!this.isGroupChat(ctx)) return;
     return this.withBank(ctx, async (_user, p) => {
-      const cost = 5000000;
+      const cost = 500;
       if (p.balance < cost) return ctx.reply(`❌ تحتاج ${this.fmt(cost)} للعجلة.`);
       p.balance -= cost;
       const r = Math.random();
