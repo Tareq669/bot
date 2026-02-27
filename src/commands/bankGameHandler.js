@@ -119,7 +119,47 @@ class BankGameHandler {
     const result = await fn(user, p);
     user.bankProfile = p;
     await user.save();
+    await this.syncBankBalanceToGameWallet(ctx?.chat?.id, user, ctx?.from, p.balance);
     return result;
+  }
+
+  static async syncBankBalanceToGameWallet(chatId, userDoc, userRef, balance) {
+    const groupId = String(chatId || '');
+    const uid = Number(userRef?.id || userRef?.userId || userDoc?.userId || 0);
+    if (!groupId || !uid) return;
+    const safeBalance = Math.max(0, Number(balance || 0));
+
+    // Sync global profile points to bank balance.
+    const doc = userDoc || await User.findOne({ userId: uid });
+    if (doc) {
+      const profile = (doc.globalGameProfile && typeof doc.globalGameProfile === 'object')
+        ? { ...doc.globalGameProfile }
+        : {};
+      profile.points = safeBalance;
+      profile.migrated = true;
+      doc.globalGameProfile = profile;
+      await doc.save();
+    }
+
+    // Sync current group score row points to bank balance.
+    const group = await Group.findOne({ groupId });
+    if (!group) return;
+    if (!group.gameSystem) group.gameSystem = {};
+    if (!Array.isArray(group.gameSystem.scores)) group.gameSystem.scores = [];
+    let row = group.gameSystem.scores.find((s) => Number(s.userId) === uid);
+    if (!row) {
+      group.gameSystem.scores.push({
+        userId: uid,
+        username: userRef?.username || userRef?.first_name || `user_${uid}`,
+        points: safeBalance,
+        weeklyPoints: 0,
+        monthlyPoints: 0,
+        giftInventory: []
+      });
+      row = group.gameSystem.scores[group.gameSystem.scores.length - 1];
+    }
+    row.points = safeBalance;
+    await group.save();
   }
 
   static applyBoost(amount, p) {
@@ -249,6 +289,7 @@ class BankGameHandler {
     p.balance = 10000;
     user.bankProfile = p;
     await user.save();
+    await this.syncBankBalanceToGameWallet(ctx?.chat?.id, user, ctx?.from, p.balance);
     return ctx.reply(`✅ تم انشاء حساب بنكي.\n• رصيد البداية: ${this.fmt(p.balance)}`);
   }
 
@@ -301,9 +342,10 @@ class BankGameHandler {
       if (!ok) {
         const fine = Math.min(Math.max(1000, Math.floor(p.balance * 0.03)), p.balance);
         p.balance -= fine;
-        meDoc.bankProfile = p;
-        targetDoc.bankProfile = tp;
-        await Promise.all([meDoc.save(), targetDoc.save()]);
+      meDoc.bankProfile = p;
+      targetDoc.bankProfile = tp;
+      await Promise.all([meDoc.save(), targetDoc.save()]);
+      await this.syncBankBalanceToGameWallet(ctx?.chat?.id, targetDoc, target, tp.balance);
         return ctx.reply(`🚨 انمسكت! خسرّت غرامة ${this.fmt(fine)}\n• رصيدك: ${this.fmt(p.balance)}`);
       }
 
@@ -314,6 +356,7 @@ class BankGameHandler {
       meDoc.bankProfile = p;
       targetDoc.bankProfile = tp;
       await Promise.all([meDoc.save(), targetDoc.save()]);
+      await this.syncBankBalanceToGameWallet(ctx?.chat?.id, targetDoc, target, tp.balance);
       return ctx.reply(`🕶️ زرف ناجح: +${this.fmt(amount)}\n• رصيدك: ${this.fmt(p.balance)}`);
     });
   }
@@ -642,6 +685,8 @@ class BankGameHandler {
     payer.bankProfile = pp;
     debtor.bankProfile = dp;
     await Promise.all([payer.save(), debtor.save()]);
+    await this.syncBankBalanceToGameWallet(ctx?.chat?.id, payer, ctx?.from, pp.balance);
+    await this.syncBankBalanceToGameWallet(ctx?.chat?.id, debtor, target, dp.balance);
     return ctx.reply(`🤝 تم سداد ${this.fmt(pay)} من ديون العضو.\n• رصيدك: ${this.fmt(pp.balance)}`);
   }
 
