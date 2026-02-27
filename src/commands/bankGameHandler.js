@@ -3,12 +3,12 @@
 const GROUP_TYPES = new Set(['group', 'supergroup']);
 
 const ASSETS = {
-  car: { name: 'Ø³ÙŠØ§Ø±Ø©', aliases: ['Ø³ÙŠØ§Ø±Ø©', 'Ø³ÙŠØ§Ø±Ù‡', 'Ø§Ù„Ø³ÙŠØ§Ø±Ø©', 'Ø§Ù„Ø³ÙŠØ§Ø±Ù‡'], buy: 150000, sellFactor: 0.7 },
-  diamond: { name: 'Ù…Ø§Ø³Ø©', aliases: ['Ù…Ø§Ø³Ø©', 'Ù…Ø§Ø³Ù‡', 'Ø§Ù„Ù…Ø§Ø³Ø©', 'Ø§Ù„Ù…Ø§Ø³Ù‡'], buy: 220000, sellFactor: 0.7 },
-  house: { name: 'Ø¨ÙŠØª', aliases: ['Ø¨ÙŠØª', 'Ø§Ù„Ø¨ÙŠØª'], buy: 380000, sellFactor: 0.7 },
-  palace: { name: 'Ù‚ØµØ±', aliases: ['Ù‚ØµØ±', 'Ø§Ù„Ù‚ØµØ±'], buy: 750000, sellFactor: 0.7 },
-  villa: { name: 'ÙÙŠÙ„Ø§', aliases: ['ÙÙŠÙ„Ø§', 'Ø§Ù„ÙÙŠÙ„Ø§'], buy: 520000, sellFactor: 0.7 },
-  rose: { name: 'ÙˆØ±Ø¯Ø©', aliases: ['ÙˆØ±Ø¯Ø©', 'ÙˆØ±Ø¯Ù‡', 'ÙˆØ±ÙˆØ¯', 'ÙˆØ±Ø¯Ø©'], buy: 25000, sellFactor: 0.7 }
+  car: { name: 'سيارة', aliases: ['سيارة', 'سياره', 'السيارة', 'السياره'], buy: 150000, sellFactor: 0.7 },
+  diamond: { name: 'ماسة', aliases: ['ماسة', 'ماسه', 'الماسة', 'الماسه'], buy: 220000, sellFactor: 0.7 },
+  house: { name: 'بيت', aliases: ['بيت', 'البيت'], buy: 380000, sellFactor: 0.7 },
+  palace: { name: 'قصر', aliases: ['قصر', 'القصر'], buy: 750000, sellFactor: 0.7 },
+  villa: { name: 'فيلا', aliases: ['فيلا', 'الفيلا'], buy: 520000, sellFactor: 0.7 },
+  rose: { name: 'وردة', aliases: ['وردة', 'ورده', 'ورود', 'وردة'], buy: 25000, sellFactor: 0.7 }
 };
 
 class BankGameHandler {
@@ -30,7 +30,7 @@ class BankGameHandler {
 
   static fmt(n) {
     const x = Number.isFinite(Number(n)) ? Number(n) : 0;
-    return `${Math.floor(x).toLocaleString('en-US')} Ø¯ÙˆÙ„Ø§Ø± ðŸ’¸`;
+    return `${Math.floor(x).toLocaleString('en-US')} دولار 💸`;
   }
 
   static parseIntSafe(v) {
@@ -108,10 +108,10 @@ class BankGameHandler {
 
   static async withBank(ctx, fn, { requireAccount = true, allowWhenJailed = false } = {}) {
     const user = await this.ensureUser(ctx.from);
-    if (!user) return ctx.reply('âŒ ØªØ¹Ø°Ø± Ø§Ù„ÙˆØµÙˆÙ„ Ù„Ø­Ø³Ø§Ø¨Ùƒ.');
+    if (!user) return ctx.reply('❌ تعذر الوصول لحسابك.');
     const p = this.normalizeProfile(user.bankProfile || {});
-    if (requireAccount && !p.created) return ctx.reply('âŒ Ù…Ø§ Ø¹Ù†Ø¯Ùƒ Ø­Ø³Ø§Ø¨ Ø¨Ù†ÙƒÙŠ. Ø§ÙƒØªØ¨: Ø§Ù†Ø´Ø§Ø¡ Ø­Ø³Ø§Ø¨ Ø¨Ù†ÙƒÙŠ');
-    if (!allowWhenJailed && this.isJailed(p)) return ctx.reply('â›“ï¸ Ø£Ù†Øª Ø¨Ø§Ù„Ø³Ø¬Ù† Ø¨Ø³Ø¨Ø¨ Ø¯ÙŠÙˆÙ† Ù…ØªØ£Ø®Ø±Ø©. Ø§ÙƒØªØ¨: Ø³Ø¯Ø§Ø¯ Ø¯ÙŠÙˆÙ†ÙŠ');
+    if (requireAccount && !p.created) return ctx.reply('❌ ما عندك حساب بنكي. اكتب: انشاء حساب بنكي');
+    if (!allowWhenJailed && this.isJailed(p)) return ctx.reply('⛓️ أنت بالسجن بسبب ديون متأخرة. اكتب: سداد ديوني');
     const result = await fn(user, p);
     user.bankProfile = p;
     await user.save();
@@ -151,12 +151,12 @@ class BankGameHandler {
     if (!this.isGroupChat(ctx)) return;
     const user = await this.ensureUser(ctx.from);
     const p = this.normalizeProfile(user.bankProfile || {});
-    if (p.created) return ctx.reply('ðŸ¦ Ø­Ø³Ø§Ø¨Ùƒ Ø§Ù„Ø¨Ù†ÙƒÙŠ Ù…ÙˆØ¬ÙˆØ¯ Ø¨Ø§Ù„ÙØ¹Ù„.');
+    if (p.created) return ctx.reply('🏦 حسابك البنكي موجود بالفعل.');
     p.created = true;
     p.balance = 10000;
     user.bankProfile = p;
     await user.save();
-    return ctx.reply(`âœ… ØªÙ… Ø§Ù†Ø´Ø§Ø¡ Ø­Ø³Ø§Ø¨ Ø¨Ù†ÙƒÙŠ.\nâ€¢ Ø±ØµÙŠØ¯ Ø§Ù„Ø¨Ø¯Ø§ÙŠØ©: ${this.fmt(p.balance)}`);
+    return ctx.reply(`✅ تم انشاء حساب بنكي.\n• رصيد البداية: ${this.fmt(p.balance)}`);
   }
 
   static async handleSalary(ctx) {
@@ -164,12 +164,12 @@ class BankGameHandler {
     return this.withBank(ctx, async (_user, p) => {
       const cd = 12 * 60 * 60 * 1000;
       const left = cd - (this.now() - Number(p.salaryLastAt || 0));
-      if (left > 0) return ctx.reply(`â³ Ø§Ù„Ø±Ø§ØªØ¨ Ø¨Ø¹Ø¯ ${Math.ceil(left / 3600000)} Ø³Ø§Ø¹Ø©.`);
+      if (left > 0) return ctx.reply(`⏳ الراتب بعد ${Math.ceil(left / 3600000)} ساعة.`);
       const base = Math.floor(15000 + Math.random() * 10000);
       const amount = this.applyBoost(base, p);
       p.balance += amount;
       p.salaryLastAt = this.now();
-      return ctx.reply(`ðŸ’¼ ØªÙ… ØµØ±Ù Ø±Ø§ØªØ¨Ùƒ: +${this.fmt(amount)}\nâ€¢ Ø±ØµÙŠØ¯Ùƒ: ${this.fmt(p.balance)}`);
+      return ctx.reply(`💼 تم صرف راتبك: +${this.fmt(amount)}\n• رصيدك: ${this.fmt(p.balance)}`);
     });
   }
 
@@ -178,12 +178,12 @@ class BankGameHandler {
     return this.withBank(ctx, async (_user, p) => {
       const cd = 30 * 60 * 1000;
       const left = cd - (this.now() - Number(p.tipLastAt || 0));
-      if (left > 0) return ctx.reply(`â³ Ø§Ù„Ø¨Ø®Ø´ÙŠØ´ Ø¨Ø¹Ø¯ ${Math.ceil(left / 60000)} Ø¯Ù‚ÙŠÙ‚Ø©.`);
+      if (left > 0) return ctx.reply(`⏳ البخشيش بعد ${Math.ceil(left / 60000)} دقيقة.`);
       const base = Math.floor(1500 + Math.random() * 4500);
       const amount = this.applyBoost(base, p);
       p.balance += amount;
       p.tipLastAt = this.now();
-      return ctx.reply(`ðŸª™ Ø¨Ø®Ø´ÙŠØ´: +${this.fmt(amount)}\nâ€¢ Ø±ØµÙŠØ¯Ùƒ: ${this.fmt(p.balance)}`);
+      return ctx.reply(`🪙 بخشيش: +${this.fmt(amount)}\n• رصيدك: ${this.fmt(p.balance)}`);
     });
   }
 
@@ -191,17 +191,17 @@ class BankGameHandler {
     if (!this.isGroupChat(ctx)) return;
     return this.withBank(ctx, async (meDoc, p) => {
       const target = this.parseTargetFromReply(ctx);
-      if (!target) return ctx.reply('âŒ Ø§Ù„Ø²Ø±Ù ÙŠÙƒÙˆÙ† Ø¨Ø§Ù„Ø±Ø¯ Ø¹Ù„Ù‰ Ø±Ø³Ø§Ù„Ø© Ø§Ù„Ø´Ø®Øµ.');
-      if (Number(target.id) === Number(ctx.from.id)) return ctx.reply('âŒ Ù…Ø§ Ø¨ØµÙŠØ± ØªØ²Ø±Ù Ø­Ø§Ù„Ùƒ ðŸ˜…');
+      if (!target) return ctx.reply('❌ الزرف يكون بالرد على رسالة الشخص.');
+      if (Number(target.id) === Number(ctx.from.id)) return ctx.reply('❌ ما بصير تزرف حالك 😅');
 
       const cd = 60 * 60 * 1000;
       const left = cd - (this.now() - Number(p.stealLastAt || 0));
-      if (left > 0) return ctx.reply(`â³ Ø§Ù„Ø²Ø±Ù Ø¨Ø¹Ø¯ ${Math.ceil(left / 60000)} Ø¯Ù‚ÙŠÙ‚Ø©.`);
+      if (left > 0) return ctx.reply(`⏳ الزرف بعد ${Math.ceil(left / 60000)} دقيقة.`);
 
       const targetDoc = await this.ensureUser(target);
       const tp = this.normalizeProfile(targetDoc.bankProfile || {});
-      if (!tp.created) return ctx.reply('âŒ Ø§Ù„Ø´Ø®Øµ Ù…Ø§ Ø¹Ù†Ø¯Ù‡ Ø­Ø³Ø§Ø¨ Ø¨Ù†ÙƒÙŠ.');
-      if (tp.balance <= 0) return ctx.reply('âŒ Ø±ØµÙŠØ¯ Ø§Ù„Ø´Ø®Øµ ØµÙØ±.');
+      if (!tp.created) return ctx.reply('❌ الشخص ما عنده حساب بنكي.');
+      if (tp.balance <= 0) return ctx.reply('❌ رصيد الشخص صفر.');
 
       p.stealLastAt = this.now();
       const ok = Math.random() < 0.55;
@@ -211,7 +211,7 @@ class BankGameHandler {
         meDoc.bankProfile = p;
         targetDoc.bankProfile = tp;
         await Promise.all([meDoc.save(), targetDoc.save()]);
-        return ctx.reply(`ðŸš¨ Ø§Ù†Ù…Ø³ÙƒØª! Ø®Ø³Ø±Ù‘Øª ØºØ±Ø§Ù…Ø© ${this.fmt(fine)}\nâ€¢ Ø±ØµÙŠØ¯Ùƒ: ${this.fmt(p.balance)}`);
+        return ctx.reply(`🚨 انمسكت! خسرّت غرامة ${this.fmt(fine)}\n• رصيدك: ${this.fmt(p.balance)}`);
       }
 
       const stealAmount = Math.max(1000, Math.floor(tp.balance * (0.01 + Math.random() * 0.07)));
@@ -221,7 +221,7 @@ class BankGameHandler {
       meDoc.bankProfile = p;
       targetDoc.bankProfile = tp;
       await Promise.all([meDoc.save(), targetDoc.save()]);
-      return ctx.reply(`ðŸ•¶ï¸ Ø²Ø±Ù Ù†Ø§Ø¬Ø­: +${this.fmt(amount)}\nâ€¢ Ø±ØµÙŠØ¯Ùƒ: ${this.fmt(p.balance)}`);
+      return ctx.reply(`🕶️ زرف ناجح: +${this.fmt(amount)}\n• رصيدك: ${this.fmt(p.balance)}`);
     });
   }
 
@@ -230,14 +230,14 @@ class BankGameHandler {
     return this.withBank(ctx, async (_user, p) => {
       const args = String(ctx.message?.text || '').trim().split(/\s+/);
       const amountArg = args.find((x) => /^\d+$/.test(x));
-      const all = /ÙÙ„ÙˆØ³ÙŠ/.test(String(ctx.message?.text || ''));
+      const all = /فلوسي/.test(String(ctx.message?.text || ''));
       const amount = all ? Math.floor(p.balance) : (amountArg ? this.parseIntSafe(amountArg) : Math.min(50000, Math.floor(p.balance * 0.25)));
-      if (!Number.isFinite(amount) || amount <= 0) return ctx.reply('âŒ Ø§ÙƒØªØ¨ Ù…Ø¨Ù„Øº ØµØ­ÙŠØ­ Ù„Ù„Ø§Ø³ØªØ«Ù…Ø§Ø±.');
-      if (p.balance < amount) return ctx.reply('âŒ Ø±ØµÙŠØ¯Ùƒ ØºÙŠØ± ÙƒØ§ÙÙŠ.');
+      if (!Number.isFinite(amount) || amount <= 0) return ctx.reply('❌ اكتب مبلغ صحيح للاستثمار.');
+      if (p.balance < amount) return ctx.reply('❌ رصيدك غير كافي.');
 
       const cd = 6 * 60 * 60 * 1000;
       const left = cd - (this.now() - Number(p.investLastAt || 0));
-      if (left > 0) return ctx.reply(`â³ Ø§Ù„Ø§Ø³ØªØ«Ù…Ø§Ø± Ø¨Ø¹Ø¯ ${Math.ceil(left / 3600000)} Ø³Ø§Ø¹Ø©.`);
+      if (left > 0) return ctx.reply(`⏳ الاستثمار بعد ${Math.ceil(left / 3600000)} ساعة.`);
 
       const ratio = 0.06 + Math.random() * 0.18;
       const profit = Math.floor(amount * ratio);
@@ -245,10 +245,10 @@ class BankGameHandler {
       p.investLastAt = this.now();
       p.balance += totalGain;
       return ctx.reply(
-        'ðŸ“ˆ Ø§Ø³ØªØ«Ù…Ø§Ø± Ù†Ø§Ø¬Ø­\n' +
-        `â€¢ Ù†Ø³Ø¨Ø© Ø§Ù„Ø±Ø¨Ø­ â†¢ ${(ratio * 100).toFixed(1)}%\n` +
-        `â€¢ Ù…Ø¨Ù„Øº Ø§Ù„Ø±Ø¨Ø­ â†¢ ${this.fmt(totalGain)}\n` +
-        `â€¢ Ø±ØµÙŠØ¯Ùƒ â†¢ ${this.fmt(p.balance)}`
+        '📈 استثمار ناجح\n' +
+        `• نسبة الربح ↢ ${(ratio * 100).toFixed(1)}%\n` +
+        `• مبلغ الربح ↢ ${this.fmt(totalGain)}\n` +
+        `• رصيدك ↢ ${this.fmt(p.balance)}`
       );
     });
   }
@@ -259,12 +259,12 @@ class BankGameHandler {
       const args = String(ctx.message?.text || '').trim().split(/\s+/);
       const amountArg = args.find((x) => /^\d+$/.test(x));
       const amount = this.parseIntSafe(amountArg || 0);
-      if (!Number.isFinite(amount) || amount <= 0) return ctx.reply('âŒ Ø§ÙƒØªØ¨ Ø§Ù„Ù…Ø¨Ù„Øº. Ù…Ø«Ø§Ù„: Ù…Ø¶Ø§Ø±Ø¨Ù‡ 50000');
-      if (p.balance < amount) return ctx.reply('âŒ Ø±ØµÙŠØ¯Ùƒ ØºÙŠØ± ÙƒØ§ÙÙŠ.');
+      if (!Number.isFinite(amount) || amount <= 0) return ctx.reply('❌ اكتب المبلغ. مثال: مضاربه 50000');
+      if (p.balance < amount) return ctx.reply('❌ رصيدك غير كافي.');
       const ratio = -0.5 + Math.random() * 1.1;
       const delta = Math.floor(amount * ratio);
       p.balance = Math.max(0, p.balance + delta);
-      return ctx.reply(`ðŸŽ² Ù†ØªÙŠØ¬Ø© Ø§Ù„Ù…Ø¶Ø§Ø±Ø¨Ø©: ${delta >= 0 ? '+' : ''}${this.fmt(delta)}\nâ€¢ Ø±ØµÙŠØ¯Ùƒ: ${this.fmt(p.balance)}`);
+      return ctx.reply(`🎲 نتيجة المضاربة: ${delta >= 0 ? '+' : ''}${this.fmt(delta)}\n• رصيدك: ${this.fmt(p.balance)}`);
     });
   }
 
@@ -276,12 +276,12 @@ class BankGameHandler {
         p.luckDayKey = key;
         p.luckPlaysToday = 0;
       }
-      if (p.luckPlaysToday >= 10) return ctx.reply('ðŸ§¾ ÙˆØµÙ„Øª Ø­Ø¯ Ø§Ù„Ø­Ø¸ Ø§Ù„ÙŠÙˆÙ…ÙŠ (10).');
+      if (p.luckPlaysToday >= 10) return ctx.reply('🧾 وصلت حد الحظ اليومي (10).');
       const gain = Math.floor(-5000 + Math.random() * 22000);
       p.luckPlaysToday += 1;
       if (gain >= 0) p.balance += this.applyBoost(gain, p);
       else p.balance = Math.max(0, p.balance + gain);
-      return ctx.reply(`ðŸ€ ${gain >= 0 ? 'Ù…Ø¨Ø±ÙˆÙƒ' : 'Ø­Ø¸ Ø£ÙˆÙØ±'}: ${gain >= 0 ? '+' : ''}${this.fmt(gain)}\nâ€¢ Ø±ØµÙŠØ¯Ùƒ: ${this.fmt(p.balance)}\nâ€¢ Ù…Ø­Ø§ÙˆÙ„Ø§Øª Ø§Ù„ÙŠÙˆÙ…: ${p.luckPlaysToday}/10`);
+      return ctx.reply(`🍀 ${gain >= 0 ? 'مبروك' : 'حظ أوفر'}: ${gain >= 0 ? '+' : ''}${this.fmt(gain)}\n• رصيدك: ${this.fmt(p.balance)}\n• محاولات اليوم: ${p.luckPlaysToday}/10`);
     });
   }
 
@@ -289,39 +289,39 @@ class BankGameHandler {
     if (!this.isGroupChat(ctx)) return;
     return this.withBank(ctx, async (_user, p) => {
       const cost = 5000000;
-      if (p.balance < cost) return ctx.reply(`âŒ ØªØ­ØªØ§Ø¬ ${this.fmt(cost)} Ù„Ù„Ø¹Ø¬Ù„Ø©.`);
+      if (p.balance < cost) return ctx.reply(`❌ تحتاج ${this.fmt(cost)} للعجلة.`);
       p.balance -= cost;
       const r = Math.random();
       let line = '';
       if (r < 0.22) {
         p.assets.car = Number(p.assets.car || 0) + 1;
-        line = 'ðŸš— Ø±Ø¨Ø­Øª: Ø³ÙŠØ§Ø±Ø©';
+        line = '🚗 ربحت: سيارة';
       } else if (r < 0.44) {
         p.assets.diamond = Number(p.assets.diamond || 0) + 1;
-        line = 'ðŸ’Ž Ø±Ø¨Ø­Øª: Ù…Ø§Ø³Ø©';
+        line = '💎 ربحت: ماسة';
       } else if (r < 0.62) {
         p.boost2xUntil = this.now() + (3 * 60 * 1000);
-        line = 'âš¡ Ø±Ø¨Ø­Øª: x2 Ù„Ù…Ø¯Ø© 3 Ø¯Ù‚Ø§Ø¦Ù‚';
+        line = '⚡ ربحت: x2 لمدة 3 دقائق';
       } else {
         const cash = Math.floor(250000 + Math.random() * 1500000);
         p.balance += cash;
-        line = `ðŸ’° Ø±Ø¨Ø­Øª: ${this.fmt(cash)}`;
+        line = `💰 ربحت: ${this.fmt(cash)}`;
       }
-      return ctx.reply(`ðŸŽ¡ Ù†ØªÙŠØ¬Ø© Ø§Ù„Ø¹Ø¬Ù„Ø©:\n${line}\nâ€¢ Ø±ØµÙŠØ¯Ùƒ: ${this.fmt(p.balance)}`);
+      return ctx.reply(`🎡 نتيجة العجلة:\n${line}\n• رصيدك: ${this.fmt(p.balance)}`);
     });
   }
 
   static async handleMyAssets(ctx) {
     if (!this.isGroupChat(ctx)) return;
     return this.withBank(ctx, async (_user, p) => {
-      const lines = Object.entries(ASSETS).map(([k, a]) => `â€¢ ${a.name} â†¤ï¸Ž ${Number(p.assets[k] || 0)}`);
-      return ctx.reply(`ðŸ“¦ Ù…Ù…ØªÙ„ÙƒØ§ØªÙƒ Ø§Ù„Ø¨Ù†ÙƒÙŠØ©:\n\n${lines.join('\n')}`);
+      const lines = Object.entries(ASSETS).map(([k, a]) => `• ${a.name} ↤︎ ${Number(p.assets[k] || 0)}`);
+      return ctx.reply(`📦 ممتلكاتك البنكية:\n\n${lines.join('\n')}`);
     });
   }
 
   static async handleAssetBuyText(ctx) {
     if (!this.isGroupChat(ctx)) return false;
-    const m = /^Ø´Ø±Ø§Ø¡\s+(\d+)\s+(.+)$/i.exec(String(ctx.message?.text || '').trim());
+    const m = /^شراء\s+(\d+)\s+(.+)$/i.exec(String(ctx.message?.text || '').trim());
     if (!m) return false;
     const qty = Math.max(1, this.parseIntSafe(m[1]));
     const assetKey = this.parseAsset(m[2]);
@@ -330,17 +330,17 @@ class BankGameHandler {
     await this.withBank(ctx, async (_user, p) => {
       const asset = ASSETS[assetKey];
       const cost = asset.buy * qty;
-      if (p.balance < cost) return ctx.reply(`âŒ Ø±ØµÙŠØ¯Ùƒ ØºÙŠØ± ÙƒØ§ÙÙŠ.\nâ€¢ Ø§Ù„Ù…Ø·Ù„ÙˆØ¨: ${this.fmt(cost)}\nâ€¢ Ø±ØµÙŠØ¯Ùƒ: ${this.fmt(p.balance)}`);
+      if (p.balance < cost) return ctx.reply(`❌ رصيدك غير كافي.\n• المطلوب: ${this.fmt(cost)}\n• رصيدك: ${this.fmt(p.balance)}`);
       p.balance -= cost;
       p.assets[assetKey] = Number(p.assets[assetKey] || 0) + qty;
-      return ctx.reply(`âœ… ØªÙ… Ø´Ø±Ø§Ø¡ ${qty} ${asset.name}\nâ€¢ Ø§Ù„ØªÙƒÙ„ÙØ©: ${this.fmt(cost)}\nâ€¢ Ø±ØµÙŠØ¯Ùƒ: ${this.fmt(p.balance)}`);
+      return ctx.reply(`✅ تم شراء ${qty} ${asset.name}\n• التكلفة: ${this.fmt(cost)}\n• رصيدك: ${this.fmt(p.balance)}`);
     });
     return true;
   }
 
   static async handleAssetSellText(ctx) {
     if (!this.isGroupChat(ctx)) return false;
-    const m = /^Ø¨ÙŠØ¹\s+(\d+)\s+(.+)$/i.exec(String(ctx.message?.text || '').trim());
+    const m = /^بيع\s+(\d+)\s+(.+)$/i.exec(String(ctx.message?.text || '').trim());
     if (!m) return false;
     const qty = Math.max(1, this.parseIntSafe(m[1]));
     const assetKey = this.parseAsset(m[2]);
@@ -348,30 +348,30 @@ class BankGameHandler {
 
     await this.withBank(ctx, async (_user, p) => {
       const own = Number(p.assets[assetKey] || 0);
-      if (own < qty) return ctx.reply(`âŒ Ù…Ø§ Ø¹Ù†Ø¯Ùƒ ÙƒÙ…ÙŠØ© ÙƒØ§ÙÙŠØ©. Ø§Ù„Ù…ÙˆØ¬ÙˆØ¯: ${own}`);
+      if (own < qty) return ctx.reply(`❌ ما عندك كمية كافية. الموجود: ${own}`);
       const asset = ASSETS[assetKey];
       const payout = Math.floor(asset.buy * asset.sellFactor) * qty;
       p.assets[assetKey] = own - qty;
       p.balance += payout;
-      return ctx.reply(`âœ… ØªÙ… Ø¨ÙŠØ¹ ${qty} ${asset.name}\nâ€¢ Ø§Ù„Ù…Ø¨Ù„Øº: ${this.fmt(payout)}\nâ€¢ Ø±ØµÙŠØ¯Ùƒ: ${this.fmt(p.balance)}`);
+      return ctx.reply(`✅ تم بيع ${qty} ${asset.name}\n• المبلغ: ${this.fmt(payout)}\n• رصيدك: ${this.fmt(p.balance)}`);
     });
     return true;
   }
 
   static async handleAssetGiftText(ctx) {
     if (!this.isGroupChat(ctx)) return false;
-    const m = /^Ø§Ù‡Ø¯Ø§Ø¡\s+(\d+)\s+(.+)$/i.exec(String(ctx.message?.text || '').trim());
+    const m = /^اهداء\s+(\d+)\s+(.+)$/i.exec(String(ctx.message?.text || '').trim());
     if (!m) return false;
     const qty = Math.max(1, this.parseIntSafe(m[1]));
     const assetKey = this.parseAsset(m[2]);
     if (!assetKey) return false;
     const target = this.parseTargetFromReply(ctx);
     if (!target) {
-      await ctx.reply('âŒ Ø§Ù„Ø¥Ù‡Ø¯Ø§Ø¡ ÙŠÙƒÙˆÙ† Ø¨Ø§Ù„Ø±Ø¯ Ø¹Ù„Ù‰ Ø§Ù„Ø´Ø®Øµ.');
+      await ctx.reply('❌ الإهداء يكون بالرد على الشخص.');
       return true;
     }
     if (Number(target.id) === Number(ctx.from?.id || 0)) {
-      await ctx.reply('âŒ Ù„Ø§ ÙŠÙ…ÙƒÙ†Ùƒ Ø§Ù„Ø¥Ù‡Ø¯Ø§Ø¡ Ù„Ù†ÙØ³Ùƒ.');
+      await ctx.reply('❌ لا يمكنك الإهداء لنفسك.');
       return true;
     }
 
@@ -380,21 +380,21 @@ class BankGameHandler {
     const sp = this.normalizeProfile(sender.bankProfile || {});
     const rp = this.normalizeProfile(receiver.bankProfile || {});
     if (!sp.created) {
-      await ctx.reply('âŒ Ù…Ø§ Ø¹Ù†Ø¯Ùƒ Ø­Ø³Ø§Ø¨ Ø¨Ù†ÙƒÙŠ. Ø§ÙƒØªØ¨: Ø§Ù†Ø´Ø§Ø¡ Ø­Ø³Ø§Ø¨ Ø¨Ù†ÙƒÙŠ');
+      await ctx.reply('❌ ما عندك حساب بنكي. اكتب: انشاء حساب بنكي');
       return true;
     }
     if (this.isJailed(sp)) {
-      await ctx.reply('â›“ï¸ Ø£Ù†Øª Ø¨Ø§Ù„Ø³Ø¬Ù† Ø¨Ø³Ø¨Ø¨ Ø¯ÙŠÙˆÙ† Ù…ØªØ£Ø®Ø±Ø©.');
+      await ctx.reply('⛓️ أنت بالسجن بسبب ديون متأخرة.');
       return true;
     }
     if (!rp.created) {
-      await ctx.reply('âŒ Ø§Ù„Ù…Ø³ØªÙ„Ù… Ù…Ø§ Ø¹Ù†Ø¯Ù‡ Ø­Ø³Ø§Ø¨ Ø¨Ù†ÙƒÙŠ.');
+      await ctx.reply('❌ المستلم ما عنده حساب بنكي.');
       return true;
     }
 
     const own = Number(sp.assets[assetKey] || 0);
     if (own < qty) {
-      await ctx.reply(`âŒ Ù…Ø§ Ø¹Ù†Ø¯Ùƒ ÙƒÙ…ÙŠØ© ÙƒØ§ÙÙŠØ©. Ø§Ù„Ù…ÙˆØ¬ÙˆØ¯: ${own}`);
+      await ctx.reply(`❌ ما عندك كمية كافية. الموجود: ${own}`);
       return true;
     }
     sp.assets[assetKey] = own - qty;
@@ -403,119 +403,119 @@ class BankGameHandler {
     receiver.bankProfile = rp;
     await Promise.all([sender.save(), receiver.save()]);
     const asset = ASSETS[assetKey];
-    await ctx.reply(`ðŸŽ ØªÙ… Ø§Ù‡Ø¯Ø§Ø¡ ${qty} ${asset.name} Ø¨Ù†Ø¬Ø§Ø­.`);
+    await ctx.reply(`🎁 تم اهداء ${qty} ${asset.name} بنجاح.`);
     return true;
   }
 
   static async handleStocksPrice(ctx) {
     if (!this.isGroupChat(ctx)) return;
     const price = this.stockPrice();
-    return ctx.reply(`ðŸ“Š Ø³Ø¹Ø± Ø§Ù„Ø§Ø³Ù‡Ù… Ø§Ù„Ø¢Ù†: ${this.fmt(price)} Ù„Ù„Ø³Ù‡Ù… Ø§Ù„ÙˆØ§Ø­Ø¯.`);
+    return ctx.reply(`📊 سعر الاسهم الآن: ${this.fmt(price)} للسهم الواحد.`);
   }
 
   static async handleBuyStocks(ctx) {
     if (!this.isGroupChat(ctx)) return;
     return this.withBank(ctx, async (_user, p) => {
-      const m = /Ø´Ø±Ø§Ø¡\s+Ø§Ø³Ù‡Ù…(?:\s+(\d+))?/i.exec(String(ctx.message?.text || ''));
+      const m = /شراء\s+اسهم(?:\s+(\d+))?/i.exec(String(ctx.message?.text || ''));
       const qty = Math.max(1, this.parseIntSafe(m?.[1] || 1));
       const price = this.stockPrice();
       const total = price * qty;
-      if (p.balance < total) return ctx.reply(`âŒ Ø±ØµÙŠØ¯Ùƒ ØºÙŠØ± ÙƒØ§ÙÙŠ.\nâ€¢ Ø§Ù„Ù…Ø·Ù„ÙˆØ¨: ${this.fmt(total)}\nâ€¢ Ø±ØµÙŠØ¯Ùƒ: ${this.fmt(p.balance)}`);
+      if (p.balance < total) return ctx.reply(`❌ رصيدك غير كافي.\n• المطلوب: ${this.fmt(total)}\n• رصيدك: ${this.fmt(p.balance)}`);
       p.balance -= total;
       p.stocksUnits = Number(p.stocksUnits || 0) + qty;
-      return ctx.reply(`âœ… ØªÙ… Ø´Ø±Ø§Ø¡ ${qty} Ø³Ù‡Ù….\nâ€¢ Ø§Ù„Ø³Ø¹Ø±: ${this.fmt(price)}\nâ€¢ Ø§Ù„ØªÙƒÙ„ÙØ©: ${this.fmt(total)}\nâ€¢ Ø£Ø³Ù‡Ù…Ùƒ: ${p.stocksUnits}`);
+      return ctx.reply(`✅ تم شراء ${qty} سهم.\n• السعر: ${this.fmt(price)}\n• التكلفة: ${this.fmt(total)}\n• أسهمك: ${p.stocksUnits}`);
     });
   }
 
   static async handleSellStocks(ctx) {
     if (!this.isGroupChat(ctx)) return;
     return this.withBank(ctx, async (_user, p) => {
-      const m = /Ø¨ÙŠØ¹\s+Ø§Ø³Ù‡Ù…(?:\s+(\d+))?/i.exec(String(ctx.message?.text || ''));
+      const m = /بيع\s+اسهم(?:\s+(\d+))?/i.exec(String(ctx.message?.text || ''));
       const qty = Math.max(1, this.parseIntSafe(m?.[1] || 1));
-      if (Number(p.stocksUnits || 0) < qty) return ctx.reply(`âŒ Ù…Ø§ Ø¹Ù†Ø¯Ùƒ Ø£Ø³Ù‡Ù… ÙƒØ§ÙÙŠØ©. Ø£Ø³Ù‡Ù…Ùƒ: ${p.stocksUnits || 0}`);
+      if (Number(p.stocksUnits || 0) < qty) return ctx.reply(`❌ ما عندك أسهم كافية. أسهمك: ${p.stocksUnits || 0}`);
       const price = this.stockPrice();
       const total = price * qty;
       p.stocksUnits = Number(p.stocksUnits || 0) - qty;
       p.balance += total;
-      return ctx.reply(`âœ… ØªÙ… Ø¨ÙŠØ¹ ${qty} Ø³Ù‡Ù….\nâ€¢ Ø§Ù„Ø³Ø¹Ø±: ${this.fmt(price)}\nâ€¢ Ø§Ù„Ù…Ø¨Ù„Øº: ${this.fmt(total)}\nâ€¢ Ø£Ø³Ù‡Ù…Ùƒ: ${p.stocksUnits}`);
+      return ctx.reply(`✅ تم بيع ${qty} سهم.\n• السعر: ${this.fmt(price)}\n• المبلغ: ${this.fmt(total)}\n• أسهمك: ${p.stocksUnits}`);
     });
   }
 
   static async handleLoan(ctx) {
     if (!this.isGroupChat(ctx)) return;
     return this.withBank(ctx, async (_user, p) => {
-      if (Number(p.debtAmount || 0) > 0) return ctx.reply(`âŒ Ø¹Ù†Ø¯Ùƒ Ù‚Ø±Ø¶ Ù‚Ø§Ø¦Ù…: ${this.fmt(p.debtAmount)}\nØ§ÙƒØªØ¨: Ø¯ÙŠÙˆÙ†ÙŠ`);
+      if (Number(p.debtAmount || 0) > 0) return ctx.reply(`❌ عندك قرض قائم: ${this.fmt(p.debtAmount)}\nاكتب: ديوني`);
       const amount = Math.floor(80000 + Math.random() * 420000);
       p.debtAmount = amount;
       p.debtDueAt = this.now() + 24 * 60 * 60 * 1000;
       p.balance += amount;
-      return ctx.reply(`ðŸ¦ ØªÙ… Ù…Ù†Ø­Ùƒ Ù‚Ø±Ø¶: ${this.fmt(amount)}\nâ€¢ Ù…ÙˆØ¹Ø¯ Ø§Ù„Ø³Ø¯Ø§Ø¯: Ø®Ù„Ø§Ù„ 24 Ø³Ø§Ø¹Ø©\nâ€¢ Ø±ØµÙŠØ¯Ùƒ: ${this.fmt(p.balance)}`);
+      return ctx.reply(`🏦 تم منحك قرض: ${this.fmt(amount)}\n• موعد السداد: خلال 24 ساعة\n• رصيدك: ${this.fmt(p.balance)}`);
     });
   }
 
   static async handlePrisonStatus(ctx) {
     if (!this.isGroupChat(ctx)) return;
     return this.withBank(ctx, async (_user, p) => {
-      if (this.isJailed(p)) return ctx.reply('â›“ï¸ Ø­Ø§Ù„ØªÙƒ: Ù…Ø³Ø¬ÙˆÙ† Ø¨Ø³Ø¨Ø¨ Ø¯ÙŠÙˆÙ† Ù…ØªØ£Ø®Ø±Ø©.');
-      if (Number(p.debtAmount || 0) > 0) return ctx.reply('âš ï¸ Ø¹Ù†Ø¯Ùƒ Ø¯ÙŠÙ† Ù‚Ø§Ø¦Ù… Ù„ÙƒÙ† Ù„Ø³Ù‡ Ø¶Ù…Ù† Ù…Ø¯Ø© Ø§Ù„Ø³Ø¯Ø§Ø¯.');
-      return ctx.reply('âœ… Ø­Ø§Ù„ØªÙƒ: Ù„Ø³Øª Ù…Ø³Ø¬ÙˆÙ†.');
+      if (this.isJailed(p)) return ctx.reply('⛓️ حالتك: مسجون بسبب ديون متأخرة.');
+      if (Number(p.debtAmount || 0) > 0) return ctx.reply('⚠️ عندك دين قائم لكن لسه ضمن مدة السداد.');
+      return ctx.reply('✅ حالتك: لست مسجون.');
     }, { requireAccount: true, allowWhenJailed: true });
   }
 
   static async handleMyDebts(ctx) {
     if (!this.isGroupChat(ctx)) return;
     return this.withBank(ctx, async (_user, p) => {
-      if (Number(p.debtAmount || 0) <= 0) return ctx.reply('âœ… Ù…Ø§ Ø¹Ù„ÙŠÙƒ Ø£ÙŠ Ø¯ÙŠÙˆÙ†.');
+      if (Number(p.debtAmount || 0) <= 0) return ctx.reply('✅ ما عليك أي ديون.');
       const left = Number(p.debtDueAt || 0) - this.now();
-      const state = left > 0 ? `Ù…ØªØ¨Ù‚ÙŠ ${Math.ceil(left / 3600000)} Ø³Ø§Ø¹Ø©` : 'Ù…ØªØ£Ø®Ø± - Ø­Ø§Ù„Ø© Ø³Ø¬Ù†';
-      return ctx.reply(`ðŸ“„ Ø¯ÙŠÙˆÙ†Ùƒ:\nâ€¢ Ø§Ù„Ù…Ø¨Ù„Øº: ${this.fmt(p.debtAmount)}\nâ€¢ Ø§Ù„Ø­Ø§Ù„Ø©: ${state}`);
+      const state = left > 0 ? `متبقي ${Math.ceil(left / 3600000)} ساعة` : 'متأخر - حالة سجن';
+      return ctx.reply(`📄 ديونك:\n• المبلغ: ${this.fmt(p.debtAmount)}\n• الحالة: ${state}`);
     }, { requireAccount: true, allowWhenJailed: true });
   }
 
   static async handleTargetDebts(ctx) {
     if (!this.isGroupChat(ctx)) return;
     const target = this.parseTargetFromReply(ctx);
-    if (!target) return ctx.reply('âŒ Ø§Ø³ØªØ®Ø¯Ù…Ù‡Ø§ Ø¨Ø§Ù„Ø±Ø¯ Ø¹Ù„Ù‰ Ø§Ù„Ø´Ø®Øµ.');
+    if (!target) return ctx.reply('❌ استخدمها بالرد على الشخص.');
     const doc = await this.ensureUser(target);
     const p = this.normalizeProfile(doc.bankProfile || {});
-    if (!p.created) return ctx.reply('âŒ Ø§Ù„Ø´Ø®Øµ Ù…Ø§ Ø¹Ù†Ø¯Ù‡ Ø­Ø³Ø§Ø¨ Ø¨Ù†ÙƒÙŠ.');
-    if (Number(p.debtAmount || 0) <= 0) return ctx.reply('âœ… Ù…Ø§ Ø¹Ù„ÙŠÙ‡ Ø¯ÙŠÙˆÙ†.');
+    if (!p.created) return ctx.reply('❌ الشخص ما عنده حساب بنكي.');
+    if (Number(p.debtAmount || 0) <= 0) return ctx.reply('✅ ما عليه ديون.');
     const left = Number(p.debtDueAt || 0) - this.now();
-    const state = left > 0 ? `Ù…ØªØ¨Ù‚ÙŠ ${Math.ceil(left / 3600000)} Ø³Ø§Ø¹Ø©` : 'Ù…ØªØ£Ø®Ø± - Ø­Ø§Ù„Ø© Ø³Ø¬Ù†';
-    return ctx.reply(`ðŸ“„ Ø¯ÙŠÙˆÙ†Ù‡:\nâ€¢ Ø§Ù„Ù…Ø¨Ù„Øº: ${this.fmt(p.debtAmount)}\nâ€¢ Ø§Ù„Ø­Ø§Ù„Ø©: ${state}`);
+    const state = left > 0 ? `متبقي ${Math.ceil(left / 3600000)} ساعة` : 'متأخر - حالة سجن';
+    return ctx.reply(`📄 ديونه:\n• المبلغ: ${this.fmt(p.debtAmount)}\n• الحالة: ${state}`);
   }
 
   static async handleRepayMine(ctx) {
     if (!this.isGroupChat(ctx)) return;
     return this.withBank(ctx, async (_user, p) => {
-      if (Number(p.debtAmount || 0) <= 0) return ctx.reply('âœ… Ù…Ø§ Ø¹Ù„ÙŠÙƒ Ø¯ÙŠÙˆÙ†.');
+      if (Number(p.debtAmount || 0) <= 0) return ctx.reply('✅ ما عليك ديون.');
       const pay = Math.min(p.balance, p.debtAmount);
-      if (pay <= 0) return ctx.reply('âŒ Ø±ØµÙŠØ¯Ùƒ ØµÙØ±ØŒ Ù…Ø§ ØªÙ‚Ø¯Ø± ØªØ³Ø¯Ø¯.');
+      if (pay <= 0) return ctx.reply('❌ رصيدك صفر، ما تقدر تسدد.');
       p.balance -= pay;
       p.debtAmount -= pay;
       if (p.debtAmount <= 0) {
         p.debtAmount = 0;
         p.debtDueAt = 0;
-        return ctx.reply(`âœ… ØªÙ… Ø³Ø¯Ø§Ø¯ Ø¯ÙŠÙˆÙ†Ùƒ Ø¨Ø§Ù„ÙƒØ§Ù…Ù„.\nâ€¢ Ø§Ù„Ù…Ø¯ÙÙˆØ¹: ${this.fmt(pay)}\nâ€¢ Ø±ØµÙŠØ¯Ùƒ: ${this.fmt(p.balance)}`);
+        return ctx.reply(`✅ تم سداد ديونك بالكامل.\n• المدفوع: ${this.fmt(pay)}\n• رصيدك: ${this.fmt(p.balance)}`);
       }
-      return ctx.reply(`âœ… ØªÙ… Ø³Ø¯Ø§Ø¯ Ø¬Ø²Ø¡ Ù…Ù† Ø§Ù„Ø¯ÙŠÙ†.\nâ€¢ Ø§Ù„Ù…Ø¯ÙÙˆØ¹: ${this.fmt(pay)}\nâ€¢ Ø§Ù„Ù…ØªØ¨Ù‚ÙŠ: ${this.fmt(p.debtAmount)}\nâ€¢ Ø±ØµÙŠØ¯Ùƒ: ${this.fmt(p.balance)}`);
+      return ctx.reply(`✅ تم سداد جزء من الدين.\n• المدفوع: ${this.fmt(pay)}\n• المتبقي: ${this.fmt(p.debtAmount)}\n• رصيدك: ${this.fmt(p.balance)}`);
     }, { requireAccount: true, allowWhenJailed: true });
   }
 
   static async handleRepayTarget(ctx) {
     if (!this.isGroupChat(ctx)) return;
     const target = this.parseTargetFromReply(ctx);
-    if (!target) return ctx.reply('âŒ Ø§Ø³ØªØ®Ø¯Ù…Ù‡Ø§ Ø¨Ø§Ù„Ø±Ø¯ Ø¹Ù„Ù‰ Ø§Ù„Ø´Ø®Øµ.');
+    if (!target) return ctx.reply('❌ استخدمها بالرد على الشخص.');
     if (Number(target.id) === Number(ctx.from.id)) return this.handleRepayMine(ctx);
 
     const payer = await this.ensureUser(ctx.from);
     const debtor = await this.ensureUser(target);
     const pp = this.normalizeProfile(payer.bankProfile || {});
     const dp = this.normalizeProfile(debtor.bankProfile || {});
-    if (!pp.created || !dp.created) return ctx.reply('âŒ Ù„Ø§Ø²Ù… Ø§Ù„Ø·Ø±ÙÙŠÙ† ÙŠÙƒÙˆÙ† Ø¹Ù†Ø¯Ù‡Ù… Ø­Ø³Ø§Ø¨ Ø¨Ù†ÙƒÙŠ.');
-    if (Number(dp.debtAmount || 0) <= 0) return ctx.reply('âœ… Ø§Ù„Ø´Ø®Øµ Ù…Ø§ Ø¹Ù„ÙŠÙ‡ Ø¯ÙŠÙˆÙ†.');
+    if (!pp.created || !dp.created) return ctx.reply('❌ لازم الطرفين يكون عندهم حساب بنكي.');
+    if (Number(dp.debtAmount || 0) <= 0) return ctx.reply('✅ الشخص ما عليه ديون.');
     const pay = Math.min(pp.balance, dp.debtAmount);
-    if (pay <= 0) return ctx.reply('âŒ Ø±ØµÙŠØ¯Ùƒ ØºÙŠØ± ÙƒØ§ÙÙ Ù„Ù„Ø³Ø¯Ø§Ø¯.');
+    if (pay <= 0) return ctx.reply('❌ رصيدك غير كافٍ للسداد.');
     pp.balance -= pay;
     dp.debtAmount -= pay;
     if (dp.debtAmount <= 0) {
@@ -525,7 +525,7 @@ class BankGameHandler {
     payer.bankProfile = pp;
     debtor.bankProfile = dp;
     await Promise.all([payer.save(), debtor.save()]);
-    return ctx.reply(`ðŸ¤ ØªÙ… Ø³Ø¯Ø§Ø¯ ${this.fmt(pay)} Ù…Ù† Ø¯ÙŠÙˆÙ† Ø§Ù„Ø¹Ø¶Ùˆ.\nâ€¢ Ø±ØµÙŠØ¯Ùƒ: ${this.fmt(pp.balance)}`);
+    return ctx.reply(`🤝 تم سداد ${this.fmt(pay)} من ديون العضو.\n• رصيدك: ${this.fmt(pp.balance)}`);
   }
 
   static async handleTopGroups(ctx) {
@@ -534,12 +534,12 @@ class BankGameHandler {
       .sort({ 'statistics.messagesCount': -1 })
       .limit(20)
       .select('groupTitle statistics.messagesCount gameSystem.scores');
-    if (!groups.length) return ctx.reply('â„¹ï¸ Ù„Ø§ ØªÙˆØ¬Ø¯ Ø¨ÙŠØ§Ù†Ø§Øª Ù‚Ø±ÙˆØ¨Ø§Øª Ø¨Ø¹Ø¯.');
-    let text = 'ðŸ† ØªÙˆØ¨ Ø§Ù„Ù‚Ø±ÙˆØ¨Ø§Øª (Top 20)\n\n';
+    if (!groups.length) return ctx.reply('ℹ️ لا توجد بيانات قروبات بعد.');
+    let text = '🏆 توب القروبات (Top 20)\n\n';
     groups.forEach((g, i) => {
       const msgCount = Number(g.statistics?.messagesCount || 0);
       const players = Number(Array.isArray(g.gameSystem?.scores) ? g.gameSystem.scores.length : 0);
-      text += `${i + 1}. ${g.groupTitle || 'Group'} â€” Ø±Ø³Ø§Ø¦Ù„: ${msgCount} | Ù„Ø§Ø¹Ø¨ÙŠÙ†: ${players}\n`;
+      text += `${i + 1}. ${g.groupTitle || 'Group'} — رسائل: ${msgCount} | لاعبين: ${players}\n`;
     });
     return ctx.reply(text);
   }
@@ -548,12 +548,12 @@ class BankGameHandler {
     if (!this.isGroupChat(ctx)) return;
     const group = await Group.findOne({ groupId: String(ctx.chat.id) });
     const rows = Array.isArray(group?.gameSystem?.scores) ? [...group.gameSystem.scores] : [];
-    if (!rows.length) return ctx.reply('â„¹ï¸ Ù„Ø§ ØªÙˆØ¬Ø¯ Ø¨ÙŠØ§Ù†Ø§Øª ØªÙØ§Ø¹Ù„ Ø¨Ø¹Ø¯.');
+    if (!rows.length) return ctx.reply('ℹ️ لا توجد بيانات تفاعل بعد.');
     rows.sort((a, b) => Number(b.points || 0) - Number(a.points || 0));
     const top = rows.slice(0, 10);
-    let text = 'ðŸ”¥ ØªÙˆØ¨ Ø£ÙƒØ«Ø± 10 Ù…ØªÙØ§Ø¹Ù„ÙŠÙ† Ø¨Ø§Ù„Ù‚Ø±ÙˆØ¨\n\n';
+    let text = '🔥 توب أكثر 10 متفاعلين بالقروب\n\n';
     top.forEach((r, i) => {
-      text += `${i + 1}. ${r.username || r.userId} â€” ${this.fmt(r.points || 0)}\n`;
+      text += `${i + 1}. ${r.username || r.userId} — ${this.fmt(r.points || 0)}\n`;
     });
     return ctx.reply(text);
   }
