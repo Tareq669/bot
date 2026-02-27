@@ -363,14 +363,6 @@ const LOUNGE_PRODUCTS = {
     baseStock: 45,
     market: true
   },
-  snack: {
-    key: 'snack',
-    name: '🥪 سناك',
-    aliases: ['سناك', 'snack', 'سندويش', 'ساندويش'],
-    price: 4,
-    baseStock: 40,
-    market: true
-  },
   mojito: {
     key: 'mojito',
     name: '🍃 عصير موهيتو',
@@ -409,6 +401,30 @@ const LOUNGE_PRODUCTS = {
     aliases: ['عصير موز', 'موز', 'banana juice'],
     price: 4,
     baseStock: 45,
+    market: true
+  },
+  avocado_juice: {
+    key: 'avocado_juice',
+    name: '🥑 عصير افوكادو',
+    aliases: ['عصير افوكادو', 'افوكادو', 'avocado juice'],
+    price: 5,
+    baseStock: 40,
+    market: true
+  },
+  strawberry_juice: {
+    key: 'strawberry_juice',
+    name: '🍓 عصير فراولة',
+    aliases: ['عصير فراولة', 'فراولة', 'strawberry juice'],
+    price: 5,
+    baseStock: 40,
+    market: true
+  },
+  mango_juice: {
+    key: 'mango_juice',
+    name: '🥭 عصير مانجا',
+    aliases: ['عصير مانجا', 'مانجا', 'mango juice'],
+    price: 5,
+    baseStock: 40,
     market: true
   },
   seven_up: {
@@ -457,6 +473,14 @@ const LOUNGE_PRODUCTS = {
     aliases: ['شاي لاتيه', 'لاتيه', 'chai latte'],
     price: 5,
     baseStock: 40,
+    market: true
+  },
+  hot_chocolate: {
+    key: 'hot_chocolate',
+    name: '🍫 هوت شوكليت',
+    aliases: ['هوت شوكليت', 'hot chocolate'],
+    price: 6,
+    baseStock: 35,
     market: true
   },
   hookah_head: {
@@ -510,10 +534,11 @@ const LOUNGE_PRODUCTS = {
   }
 };
 const CAFE_CONSUMABLE_KEYS = new Set([
-  'coffee', 'tea', 'juice', 'snack',
+  'coffee', 'tea', 'juice',
   'mojito', 'orange_juice', 'lemon_juice', 'fruit_juice', 'banana_juice',
+  'avocado_juice', 'strawberry_juice', 'mango_juice',
   'seven_up', 'cola', 'mirinda',
-  'nescafe', 'cappuccino', 'chai_latte'
+  'nescafe', 'cappuccino', 'chai_latte', 'hot_chocolate'
 ]);
 const LOUNGE_PUFF_ALIASES = [/^هف{1,5}$/i, /^(?:نفس\s*ارجيلة|نفس\s*أرجيلة|نفس\s*دخان|فيب)$/i, /^نفخة\s*سيجار$/i];
 const LOUNGE_PUFF_LINES = [
@@ -738,18 +763,21 @@ class GroupGamesHandler {
       coffee: 0,
       tea: 0,
       juice: 0,
-      snack: 0,
       mojito: 0,
       orange_juice: 0,
       lemon_juice: 0,
       fruit_juice: 0,
       banana_juice: 0,
+      avocado_juice: 0,
+      strawberry_juice: 0,
+      mango_juice: 0,
       seven_up: 0,
       cola: 0,
       mirinda: 0,
       nescafe: 0,
       cappuccino: 0,
       chai_latte: 0,
+      hot_chocolate: 0,
       cigarette: 0,
       cigar: 0,
       vape: 0,
@@ -3028,9 +3056,8 @@ class GroupGamesHandler {
     return ctx.reply(
       `🪩 <b>لاونج جو</b>\n\n` +
       `رصيدك: ${this.formatCurrency(row.points || 0)}\n\n` +
-      `🥤 <b>المشروبات الباردة</b>\n${line('mojito')}\n${line('orange_juice')}\n${line('lemon_juice')}\n${line('fruit_juice')}\n${line('banana_juice')}\n${line('seven_up')}\n${line('cola')}\n${line('mirinda')}\n${line('juice')}\n\n` +
-      `☕ <b>المشروبات الساخنة</b>\n${line('tea')}\n${line('coffee')}\n${line('nescafe')}\n${line('cappuccino')}\n${line('chai_latte')}\n\n` +
-      `🍽️ <b>خفيفات</b>\n${line('snack')}\n\n` +
+      `🥤 <b>المشروبات الباردة</b>\n${line('mojito')}\n${line('orange_juice')}\n${line('lemon_juice')}\n${line('fruit_juice')}\n${line('banana_juice')}\n${line('avocado_juice')}\n${line('strawberry_juice')}\n${line('mango_juice')}\n${line('seven_up')}\n${line('cola')}\n${line('mirinda')}\n${line('juice')}\n\n` +
+      `☕ <b>المشروبات الساخنة</b>\n${line('tea')}\n${line('coffee')}\n${line('nescafe')}\n${line('cappuccino')}\n${line('chai_latte')}\n${line('hot_chocolate')}\n\n` +
       `🚬 <b>الدخان</b>\n${line('cigarette')}\n${line('cigar')}\n${line('vape')}\n${line('vape_liquid')}\n${line('lighter')}\n\n` +
       `🫧 <b>الأرجيلة</b>\n${line('hookah')}\n${line('hookah_head')}\n${line('coal')}\n${line('molasses_apple')}\n${line('molasses_mint')}\n\n` +
       `🎮 <b>جلسة الأصحاب</b>\n• افتح جلسة ارجيلة\n• انضم\n• نفس\n\n` +
@@ -3448,7 +3475,7 @@ class GroupGamesHandler {
     if (existing && Date.now() < Number(existing.endsAt || 0)) {
       return ctx.reply(`⏳ فيه طلب شغال بالفعل: ${existing.qty} ${LOUNGE_PRODUCTS[existing.itemKey]?.name || existing.itemKey}`);
     }
-    const keys = ['coffee', 'tea', 'juice', 'snack'];
+    const keys = ['coffee', 'tea', 'juice', 'mojito', 'orange_juice', 'lemon_juice', 'fruit_juice', 'banana_juice', 'avocado_juice', 'strawberry_juice', 'mango_juice', 'seven_up', 'cola', 'mirinda', 'nescafe', 'cappuccino', 'chai_latte', 'hot_chocolate'];
     const itemKey = this.pickRandom(keys);
     const qty = 1 + Math.floor(Math.random() * 3);
     const reward = (this.getCafePrice(LOUNGE_PRODUCTS[itemKey], market) * qty) + 6;
@@ -3530,7 +3557,6 @@ class GroupGamesHandler {
       if (normalized === this.normalizeText('قهوة')) key = 'coffee';
       else if (normalized === this.normalizeText('شاي')) key = 'tea';
       else if (normalized === this.normalizeText('عصير')) key = 'juice';
-      else if (normalized === this.normalizeText('سناك')) key = 'snack';
     }
     if (!key || !CAFE_CONSUMABLE_KEYS.has(key)) return false;
 
@@ -3546,12 +3572,15 @@ class GroupGamesHandler {
     row.loungeInventory[key] = Number(row.loungeInventory[key] || 0) - 1;
     const xpBoostMap = {
       coffee: 2, tea: 1, nescafe: 2, cappuccino: 2, chai_latte: 2,
+      hot_chocolate: 2,
       juice: 1, mojito: 1, orange_juice: 1, lemon_juice: 1, fruit_juice: 1, banana_juice: 1,
-      seven_up: 1, cola: 1, mirinda: 1, snack: 1
+      avocado_juice: 1, strawberry_juice: 1, mango_juice: 1,
+      seven_up: 1, cola: 1, mirinda: 1
     };
     const moodBoostMap = {
-      snack: 3, cappuccino: 3, chai_latte: 3, nescafe: 3, coffee: 3,
+      hot_chocolate: 3, cappuccino: 3, chai_latte: 3, nescafe: 3, coffee: 3,
       tea: 2, juice: 2, mojito: 2, orange_juice: 2, lemon_juice: 2, fruit_juice: 2, banana_juice: 2,
+      avocado_juice: 2, strawberry_juice: 2, mango_juice: 2,
       seven_up: 2, cola: 2, mirinda: 2
     };
     const xpBoost = Number(xpBoostMap[key] || 1);
@@ -4638,18 +4667,21 @@ class GroupGamesHandler {
       `( قهوة ↤︎ ${row.loungeInventory.coffee || 0} )`,
       `( شاي ↤︎ ${row.loungeInventory.tea || 0} )`,
       `( عصير ↤︎ ${row.loungeInventory.juice || 0} )`,
-      `( سناك ↤︎ ${row.loungeInventory.snack || 0} )`,
       `( عصير موهيتو ↤︎ ${row.loungeInventory.mojito || 0} )`,
       `( عصير برتقال ↤︎ ${row.loungeInventory.orange_juice || 0} )`,
       `( عصير ليمون ↤︎ ${row.loungeInventory.lemon_juice || 0} )`,
       `( عصير فواكه ↤︎ ${row.loungeInventory.fruit_juice || 0} )`,
       `( عصير موز ↤︎ ${row.loungeInventory.banana_juice || 0} )`,
+      `( عصير افوكادو ↤︎ ${row.loungeInventory.avocado_juice || 0} )`,
+      `( عصير فراولة ↤︎ ${row.loungeInventory.strawberry_juice || 0} )`,
+      `( عصير مانجا ↤︎ ${row.loungeInventory.mango_juice || 0} )`,
       `( سفن أب ↤︎ ${row.loungeInventory.seven_up || 0} )`,
       `( كوكاكولا ↤︎ ${row.loungeInventory.cola || 0} )`,
       `( ماريندا ↤︎ ${row.loungeInventory.mirinda || 0} )`,
       `( نسكفيه ↤︎ ${row.loungeInventory.nescafe || 0} )`,
       `( كابتشينو ↤︎ ${row.loungeInventory.cappuccino || 0} )`,
       `( شاي لاتيه ↤︎ ${row.loungeInventory.chai_latte || 0} )`,
+      `( هوت شوكليت ↤︎ ${row.loungeInventory.hot_chocolate || 0} )`,
       `( سيجارة ↤︎ ${row.loungeInventory.cigarette || 0} )`,
       `( سيجار ↤︎ ${row.loungeInventory.cigar || 0} )`,
       `( فيب ↤︎ ${row.loungeInventory.vape || 0} )`,
@@ -4680,18 +4712,21 @@ class GroupGamesHandler {
       (row.loungeInventory.coffee || 0) * LOUNGE_PRODUCTS.coffee.price +
       (row.loungeInventory.tea || 0) * LOUNGE_PRODUCTS.tea.price +
       (row.loungeInventory.juice || 0) * LOUNGE_PRODUCTS.juice.price +
-      (row.loungeInventory.snack || 0) * LOUNGE_PRODUCTS.snack.price +
       (row.loungeInventory.mojito || 0) * LOUNGE_PRODUCTS.mojito.price +
       (row.loungeInventory.orange_juice || 0) * LOUNGE_PRODUCTS.orange_juice.price +
       (row.loungeInventory.lemon_juice || 0) * LOUNGE_PRODUCTS.lemon_juice.price +
       (row.loungeInventory.fruit_juice || 0) * LOUNGE_PRODUCTS.fruit_juice.price +
       (row.loungeInventory.banana_juice || 0) * LOUNGE_PRODUCTS.banana_juice.price +
+      (row.loungeInventory.avocado_juice || 0) * LOUNGE_PRODUCTS.avocado_juice.price +
+      (row.loungeInventory.strawberry_juice || 0) * LOUNGE_PRODUCTS.strawberry_juice.price +
+      (row.loungeInventory.mango_juice || 0) * LOUNGE_PRODUCTS.mango_juice.price +
       (row.loungeInventory.seven_up || 0) * LOUNGE_PRODUCTS.seven_up.price +
       (row.loungeInventory.cola || 0) * LOUNGE_PRODUCTS.cola.price +
       (row.loungeInventory.mirinda || 0) * LOUNGE_PRODUCTS.mirinda.price +
       (row.loungeInventory.nescafe || 0) * LOUNGE_PRODUCTS.nescafe.price +
       (row.loungeInventory.cappuccino || 0) * LOUNGE_PRODUCTS.cappuccino.price +
       (row.loungeInventory.chai_latte || 0) * LOUNGE_PRODUCTS.chai_latte.price +
+      (row.loungeInventory.hot_chocolate || 0) * LOUNGE_PRODUCTS.hot_chocolate.price +
       (row.loungeInventory.lighter || 0) * LOUNGE_PRODUCTS.lighter.price
     );
 
@@ -5285,9 +5320,12 @@ class GroupGamesHandler {
       '• كافيتيريا | قائمة الكافيتيريا\n' +
       '• شراء سيجارة 2 | شراء دخان\n' +
       '• شراء قهوة | شراء شاي | شراء نسكفيه | شراء كابتشينو | شراء شاي لاتيه\n' +
+      '• شراء هوت شوكليت\n' +
       '• شراء عصير موهيتو | شراء عصير برتقال | شراء عصير ليمون | شراء عصير فواكه | شراء عصير موز\n' +
-      '• شراء سفن اب | شراء كوكاكولا | شراء ماريندا | شراء سناك\n' +
-      '• اشرب قهوة | اشرب شاي | اشرب عصير موهيتو | اشرب برتقال | اشرب ليمون | اشرب فواكه | اشرب موز | كل سناك\n' +
+      '• شراء عصير افوكادو | شراء عصير فراولة | شراء عصير مانجا\n' +
+      '• شراء سفن اب | شراء كوكاكولا | شراء ماريندا\n' +
+      '• اشرب قهوة | اشرب شاي | اشرب عصير موهيتو | اشرب برتقال | اشرب ليمون | اشرب فواكه | اشرب موز\n' +
+      '• اشرب افوكادو | اشرب فراولة | اشرب مانجا | اشرب هوت شوكليت\n' +
       '• شراء قداحة | شرط للتوليع\n' +
       '• اشتغل بالكافيتيريا\n' +
       '• طلب كافيتيريا | سلم الطلب\n' +
