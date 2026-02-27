@@ -333,19 +333,95 @@ const LOUNGE_PRODUCTS = {
     name: '🫧 أرجيلة',
     aliases: ['ارجيلة', 'أرجيلة', 'شيشة', 'شيشة', 'hookah'],
     price: 70,
+    baseStock: 25,
+    market: true,
     puffs: 25,
     needsLighter: false,
     igniteAliases: ['جهز ارجيلة', 'تجهيز ارجيلة', 'شغل ارجيلة']
+  },
+  coffee: {
+    key: 'coffee',
+    name: '☕ قهوة',
+    aliases: ['قهوة', 'قهوه', 'coffee'],
+    price: 8,
+    baseStock: 60,
+    market: true
+  },
+  tea: {
+    key: 'tea',
+    name: '🍵 شاي',
+    aliases: ['شاي', 'tea'],
+    price: 7,
+    baseStock: 60,
+    market: true
+  },
+  juice: {
+    key: 'juice',
+    name: '🧃 عصير',
+    aliases: ['عصير', 'juice'],
+    price: 9,
+    baseStock: 45,
+    market: true
+  },
+  snack: {
+    key: 'snack',
+    name: '🥪 سناك',
+    aliases: ['سناك', 'snack', 'سندويش', 'ساندويش'],
+    price: 10,
+    baseStock: 40,
+    market: true
+  },
+  hookah_head: {
+    key: 'hookah_head',
+    name: '🧱 راس أرجيلة',
+    aliases: ['راس ارجيلة', 'راس أرجيلة', 'راس', 'حجر ارجيلة', 'hookah head'],
+    price: 10,
+    baseStock: 70,
+    market: true
+  },
+  coal: {
+    key: 'coal',
+    name: '🔥 فحم',
+    aliases: ['فحم', 'coal'],
+    price: 6,
+    baseStock: 90,
+    market: true
+  },
+  molasses_apple: {
+    key: 'molasses_apple',
+    name: '🍎 معسل تفاح',
+    aliases: ['معسل تفاح', 'تفاح', 'ارجيلة تفاح', 'أرجيلة تفاح', 'molasses apple'],
+    price: 12,
+    baseStock: 60,
+    market: true
+  },
+  molasses_mint: {
+    key: 'molasses_mint',
+    name: '🌿 معسل نعناع',
+    aliases: ['معسل نعناع', 'نعناع', 'ارجيلة نعناع', 'أرجيلة نعناع', 'molasses mint'],
+    price: 12,
+    baseStock: 60,
+    market: true
+  },
+  vape_liquid: {
+    key: 'vape_liquid',
+    name: '🧴 سائل فيب',
+    aliases: ['سائل فيب', 'ليكويد', 'liquid', 'vape liquid'],
+    price: 14,
+    baseStock: 50,
+    market: true
   },
   lighter: {
     key: 'lighter',
     name: '🪔 قداحة',
     aliases: ['قداحة', 'ولاعة', 'قداحه', 'ولاعه', 'lighter'],
     price: 20,
+    baseStock: 50,
+    market: true,
     ignitionsPerUnit: 25
   }
 };
-const LOUNGE_PUFF_ALIASES = [/^هف{1,5}$/i, /^(?:نفس\s*ارجيلة|نفس\s*أرجيلة|فيب)$/i, /^نفخة\s*سيجار$/i];
+const LOUNGE_PUFF_ALIASES = [/^هف{1,5}$/i, /^(?:نفس\s*ارجيلة|نفس\s*أرجيلة|نفس\s*دخان|فيب)$/i, /^نفخة\s*سيجار$/i, /^نفس$/i];
 const LOUNGE_PUFF_LINES = [
   '😶‍🌫️ نفس رايق... المزاج تمام.',
   '💨 هالنفخة زبطت الجو.',
@@ -380,6 +456,8 @@ const LOUNGE_FINISH_LINES = {
     '🪔 الشرارة خلصت... بدك قداحة جديدة.'
   ]
 };
+const CAFE_WORK_COOLDOWN_MS = 45 * 60 * 1000;
+const LOUNGE_DAILY_PUFF_LIMIT = 100;
 const WHO_AM_I_BANK = [
   { clues: ['نبي الله', 'ابتلعه الحوت', 'دعا في الظلمات'], answers: ['يونس', 'يونس عليه السلام'] },
   { clues: ['قائد مسلم', 'فتح القدس', 'اسمه صلاح'], answers: ['صلاح الدين', 'صلاح الدين الايوبي'] },
@@ -478,6 +556,8 @@ class GroupGamesHandler {
   static activeDuelByChat = new Map();
   static activeConfessions = new Map();
   static confessionQuestions = new Map();
+  static activeCafeRequests = new Map();
+  static activeHookahSessions = new Map();
   static lastQuestionByGroup = new Map();
   static questionQueues = new Map();
   static userCooldowns = new Map();
@@ -561,10 +641,19 @@ class GroupGamesHandler {
 
   static defaultLoungeInventory() {
     return {
+      coffee: 0,
+      tea: 0,
+      juice: 0,
+      snack: 0,
       cigarette: 0,
       cigar: 0,
       vape: 0,
+      vape_liquid: 0,
       hookah: 0,
+      hookah_head: 0,
+      coal: 0,
+      molasses_apple: 0,
+      molasses_mint: 0,
       lighter: 0,
       lighterFuel: 0
     };
@@ -598,6 +687,42 @@ class GroupGamesHandler {
     s.totalPuffs = Math.max(0, Number(s.totalPuffs || 0));
     s.startedAt = s.startedAt || null;
     return s;
+  }
+
+  static defaultCafeProfile() {
+    return {
+      reputation: 0,
+      mood: 0,
+      moodUntil: null,
+      workLastAt: null,
+      ordersCompleted: 0,
+      cafeEarnings: 0,
+      weeklyCafeEarnings: 0,
+      weeklyKey: '',
+      puffDayKey: '',
+      puffsToday: 0,
+      hookahPuffs: 0,
+      smokePuffs: 0,
+      loungePuffs: 0
+    };
+  }
+
+  static normalizeCafeProfile(value = {}) {
+    const p = { ...this.defaultCafeProfile(), ...(value || {}) };
+    p.reputation = Math.max(0, Number(p.reputation || 0));
+    p.mood = Math.max(0, Number(p.mood || 0));
+    p.ordersCompleted = Math.max(0, Number(p.ordersCompleted || 0));
+    p.cafeEarnings = Math.max(0, Number(p.cafeEarnings || 0));
+    p.weeklyCafeEarnings = Math.max(0, Number(p.weeklyCafeEarnings || 0));
+    p.puffsToday = Math.max(0, Number(p.puffsToday || 0));
+    p.hookahPuffs = Math.max(0, Number(p.hookahPuffs || 0));
+    p.smokePuffs = Math.max(0, Number(p.smokePuffs || 0));
+    p.loungePuffs = Math.max(0, Number(p.loungePuffs || 0));
+    p.weeklyKey = String(p.weeklyKey || '');
+    p.puffDayKey = String(p.puffDayKey || '');
+    p.moodUntil = p.moodUntil || null;
+    p.workLastAt = p.workLastAt || null;
+    return p;
   }
 
   static normalizeLoungeToken(value) {
@@ -814,7 +939,11 @@ class GroupGamesHandler {
       if (!row.investDayKey) row.investDayKey = '';
       row.loungeInventory = this.normalizeLoungeInventory(row.loungeInventory || {});
       row.loungeState = this.normalizeLoungeState(row.loungeState || {});
+      row.cafeProfile = this.normalizeCafeProfile(row.cafeProfile || {});
     });
+    if (!group.gameSystem.cafeMarket || typeof group.gameSystem.cafeMarket !== 'object') {
+      group.gameSystem.cafeMarket = { dayKey: '', stocks: {}, sold: {} };
+    }
     if (!Array.isArray(group.gameSystem.teams)) group.gameSystem.teams = [];
     if (!group.gameSystem.tournament) group.gameSystem.tournament = { active: false, season: 1, startedAt: null, endedAt: null, rewards: { first: 100, second: 60, third: 40 } };
     if (!group.gameSystem.tournament.rewards) group.gameSystem.tournament.rewards = { first: 100, second: 60, third: 40 };
@@ -1032,6 +1161,7 @@ class GroupGamesHandler {
         investLastAt: null,
         loungeInventory: this.defaultLoungeInventory(),
         loungeState: this.defaultLoungeState(),
+        cafeProfile: this.defaultCafeProfile(),
         wins: 0,
         streak: 0,
         bestStreak: 0,
@@ -1072,6 +1202,7 @@ class GroupGamesHandler {
     if (!row.investDayKey) row.investDayKey = '';
     row.loungeInventory = this.normalizeLoungeInventory(row.loungeInventory || {});
     row.loungeState = this.normalizeLoungeState(row.loungeState || {});
+    row.cafeProfile = this.normalizeCafeProfile(row.cafeProfile || {});
     return row;
   }
 
@@ -1113,7 +1244,8 @@ class GroupGamesHandler {
       duelLosses: 0,
       arenaJoined: false,
       loungeInventory: this.defaultLoungeInventory(),
-      loungeState: this.defaultLoungeState()
+      loungeState: this.defaultLoungeState(),
+      cafeProfile: this.defaultCafeProfile()
     };
   }
 
@@ -1150,6 +1282,7 @@ class GroupGamesHandler {
     p.arenaJoined = Boolean(p.arenaJoined);
     p.loungeInventory = this.normalizeLoungeInventory(p.loungeInventory || {});
     p.loungeState = this.normalizeLoungeState(p.loungeState || {});
+    p.cafeProfile = this.normalizeCafeProfile(p.cafeProfile || {});
     p.migrated = Boolean(p.migrated);
     return p;
   }
@@ -1166,6 +1299,7 @@ class GroupGamesHandler {
       || Number(row?.scratchTotalPlays || 0) > 0
       || Number(row?.luckTotalPlays || 0) > 0
       || Object.values(this.normalizeLoungeInventory(row?.loungeInventory || {})).some((n) => Number(n || 0) > 0)
+      || Number(row?.cafeProfile?.cafeEarnings || 0) > 0
     );
   }
 
@@ -1211,6 +1345,7 @@ class GroupGamesHandler {
     row.arenaJoined = p.arenaJoined;
     row.loungeInventory = this.normalizeLoungeInventory(p.loungeInventory || {});
     row.loungeState = this.normalizeLoungeState(p.loungeState || {});
+    row.cafeProfile = this.normalizeCafeProfile(p.cafeProfile || {});
   }
 
   static applyRowToProfile(row, profile) {
@@ -1260,6 +1395,7 @@ class GroupGamesHandler {
     p.arenaJoined = Boolean(row.arenaJoined);
     p.loungeInventory = this.normalizeLoungeInventory(row.loungeInventory || {});
     p.loungeState = this.normalizeLoungeState(row.loungeState || {});
+    p.cafeProfile = this.normalizeCafeProfile(row.cafeProfile || {});
     p.migrated = true;
     return p;
   }
@@ -2014,7 +2150,7 @@ class GroupGamesHandler {
     const luckKey = `${String(ctx.chat.id)}:${Number(ctx.from?.id || 0)}`;
     if (this.pendingLuckInputs.has(luckKey)) {
       const normalized = this.normalizeArabicDigits(String(text || '').trim());
-      const isKnownCommandLike = /^(شراء|بيع|اهداء|إهداء|ارسال|إرسال|متجر|هدايا|ممتلكاتي|حظ|كرسي|انهاء|إنهاء|سؤال)\b/i.test(normalized);
+      const isKnownCommandLike = /^(شراء|بيع|اهداء|إهداء|ارسال|إرسال|متجر|هدايا|ممتلكاتي|حظ|كرسي|انهاء|إنهاء|سؤال|لاونج|كافيتيريا|قائمة|مزاجي|طلب|سلم|ولع|هف|انضم|نفس)\b/i.test(normalized);
       if (isKnownCommandLike) {
         // Do not let pending luck block normal group commands.
         this.pendingLuckInputs.delete(luckKey);
@@ -2035,6 +2171,12 @@ class GroupGamesHandler {
 
     const handledConfession = await this.handleIncomingConfessionText(ctx, text);
     if (handledConfession) return true;
+
+    const norm = this.normalizeText(String(text || ''));
+    if (norm === 'نفس') {
+      const handledSessionPuff = await this.handleHookahSessionPuff(ctx);
+      if (handledSessionPuff) return true;
+    }
 
     const groupId = String(ctx.chat.id);
     const round = this.activeRounds.get(groupId);
@@ -2767,25 +2909,34 @@ class GroupGamesHandler {
     await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
     row.loungeInventory = this.normalizeLoungeInventory(row.loungeInventory || {});
     row.loungeState = this.normalizeLoungeState(row.loungeState || {});
+    row.cafeProfile = this.resetCafeDailyAndWeekly(row.cafeProfile || {});
+    const market = this.ensureCafeMarket(group);
     await group.save();
 
-    const lines = [
-      `• ${LOUNGE_PRODUCTS.cigarette.name} (${this.formatCurrency(LOUNGE_PRODUCTS.cigarette.price)})`,
-      `• ${LOUNGE_PRODUCTS.cigar.name} (${this.formatCurrency(LOUNGE_PRODUCTS.cigar.price)})`,
-      `• ${LOUNGE_PRODUCTS.vape.name} (${this.formatCurrency(LOUNGE_PRODUCTS.vape.price)})`,
-      `• ${LOUNGE_PRODUCTS.hookah.name} (${this.formatCurrency(LOUNGE_PRODUCTS.hookah.price)})`,
-      `• ${LOUNGE_PRODUCTS.lighter.name} (${this.formatCurrency(LOUNGE_PRODUCTS.lighter.price)}) | ${LOUNGE_PRODUCTS.lighter.ignitionsPerUnit} توليعة`
-    ];
+    const line = (k) => {
+      const p = LOUNGE_PRODUCTS[k];
+      const unit = this.getCafePrice(p, market);
+      const stock = Number(market.stocks?.[p.key] || 0);
+      return `• ${p.name} (${this.formatCurrency(unit)}) | المخزون: ${stock}`;
+    };
     return ctx.reply(
       `🪩 <b>لاونج جو</b>\n\n` +
       `رصيدك: ${this.formatCurrency(row.points || 0)}\n\n` +
-      `${lines.join('\n')}\n\n` +
+      `☕ <b>المشروبات</b>\n${line('coffee')}\n${line('tea')}\n${line('juice')}\n${line('snack')}\n\n` +
+      `🚬 <b>الدخان</b>\n${line('cigarette')}\n${line('cigar')}\n${line('vape')}\n${line('vape_liquid')}\n${line('lighter')}\n\n` +
+      `🫧 <b>الأرجيلة</b>\n${line('hookah')}\n${line('hookah_head')}\n${line('coal')}\n${line('molasses_apple')}\n${line('molasses_mint')}\n\n` +
+      `🎮 <b>جلسة الأصحاب</b>\n• افتح جلسة ارجيلة\n• انضم\n• نفس\n\n` +
       `الأوامر السهلة:\n` +
+      `• كافيتيريا | قائمة الكافيتيريا\n` +
       `• شراء سيجارة 2\n` +
+      `• شراء قهوة\n` +
       `• شراء قداحة\n` +
+      `• اشتغل بالكافيتيريا\n` +
+      `• طلب كافيتيريا\n` +
+      `• سلم الطلب\n` +
       `• ولع سيجارة\n` +
       `• هف / هفف / هففف / هفففف / هففففف\n` +
-      `• مستلزماتي`,
+      `• مزاجي | توب الكافيتيريا`,
       { parse_mode: 'HTML' }
     );
   }
@@ -2800,6 +2951,76 @@ class GroupGamesHandler {
     return { productKey, qty };
   }
 
+  static ensureCafeMarket(group) {
+    const dayKey = this.getDateKey();
+    if (!group.gameSystem.cafeMarket || typeof group.gameSystem.cafeMarket !== 'object') {
+      group.gameSystem.cafeMarket = { dayKey: '', stocks: {}, sold: {} };
+    }
+    const market = group.gameSystem.cafeMarket;
+    if (market.dayKey !== dayKey) {
+      market.dayKey = dayKey;
+      market.stocks = {};
+      market.sold = {};
+      Object.values(LOUNGE_PRODUCTS).forEach((p) => {
+        if (!p.market) return;
+        const base = Math.max(1, Number(p.baseStock || 30));
+        const variance = Math.floor(base * 0.25);
+        const stock = Math.max(1, base - variance + Math.floor(Math.random() * (variance * 2 + 1)));
+        market.stocks[p.key] = stock;
+        market.sold[p.key] = 0;
+      });
+    }
+    return market;
+  }
+
+  static getCafePrice(product, market) {
+    const base = Math.max(1, Number(product?.price || 1));
+    if (!product?.market) return base;
+    const baseStock = Math.max(1, Number(product.baseStock || 30));
+    const stock = Math.max(0, Number(market?.stocks?.[product.key] || 0));
+    const sold = Math.max(0, Number(market?.sold?.[product.key] || 0));
+    const remainingRatio = Math.max(0, Math.min(1, stock / baseStock));
+    const mult = 1 + ((1 - remainingRatio) * 0.6) + ((sold / Math.max(1, baseStock)) * 0.2);
+    return Math.max(1, Math.floor(base * mult));
+  }
+
+  static resetCafeDailyAndWeekly(cafeProfile) {
+    const p = this.normalizeCafeProfile(cafeProfile || {});
+    const day = this.getDateKey();
+    const week = this.getWeekKey();
+    if (p.puffDayKey !== day) {
+      p.puffDayKey = day;
+      p.puffsToday = 0;
+    }
+    if (p.weeklyKey !== week) {
+      p.weeklyKey = week;
+      p.weeklyCafeEarnings = 0;
+    }
+    return p;
+  }
+
+  static async applyCafeWeeklyRewards(group) {
+    const weekKey = this.getWeekKey();
+    group.gameSystem.state = group.gameSystem.state || {};
+    if (group.gameSystem.state.cafeRewardWeekKey === weekKey) return null;
+
+    const rows = [...(group.gameSystem.scores || [])];
+    rows.forEach((r) => { r.cafeProfile = this.resetCafeDailyAndWeekly(r.cafeProfile || {}); });
+    rows.sort((a, b) => Number(b.cafeProfile?.weeklyCafeEarnings || 0) - Number(a.cafeProfile?.weeklyCafeEarnings || 0));
+    const top = rows.slice(0, 3);
+    if (top.length === 0) {
+      group.gameSystem.state.cafeRewardWeekKey = weekKey;
+      return null;
+    }
+    const rewards = [35, 20, 10];
+    top.forEach((r, i) => {
+      r.points = Number(r.points || 0) + Number(rewards[i] || 0);
+      r.updatedAt = new Date();
+    });
+    group.gameSystem.state.cafeRewardWeekKey = weekKey;
+    return { top, rewards };
+  }
+
   static async handleLoungeBuyCommand(ctx) {
     if (!this.isGroupChat(ctx)) return false;
     const parsed = this.parseLoungeBuy(ctx.message?.text || '');
@@ -2809,18 +3030,29 @@ class GroupGamesHandler {
     if (!product) return false;
 
     const group = await this.ensureGroupRecord(ctx);
+    const market = this.ensureCafeMarket(group);
     const row = this.getOrCreateScoreRow(group, ctx.from);
     const userDoc = await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
     row.loungeInventory = this.normalizeLoungeInventory(row.loungeInventory || {});
     row.loungeState = this.normalizeLoungeState(row.loungeState || {});
+    row.cafeProfile = this.resetCafeDailyAndWeekly(row.cafeProfile || {});
 
-    const total = Number(product.price || 0) * parsed.qty;
+    const inStock = Number(market.stocks?.[product.key] || 0);
+    if (product.market && inStock < parsed.qty) {
+      return ctx.reply(`❌ المخزون الحالي ما بكفي.\n• المتاح: ${inStock}\n• المطلوب: ${parsed.qty}`);
+    }
+    const unitPrice = this.getCafePrice(product, market);
+    const total = Number(unitPrice || 0) * parsed.qty;
     if (Number(row.points || 0) < total) {
       return ctx.reply(`❌ فلوسك غير كافية.\n• المطلوب: ${this.formatCurrency(total)}\n• فلوسك: ${this.formatCurrency(row.points || 0)}`);
     }
 
     row.points = Number(row.points || 0) - total;
     row.loungeInventory[product.key] = Number(row.loungeInventory[product.key] || 0) + parsed.qty;
+    if (product.market) {
+      market.stocks[product.key] = Math.max(0, Number(market.stocks[product.key] || 0) - parsed.qty);
+      market.sold[product.key] = Number(market.sold[product.key] || 0) + parsed.qty;
+    }
     if (product.key === 'lighter') {
       const fuelAdd = parsed.qty * Number(product.ignitionsPerUnit || 25);
       row.loungeInventory.lighterFuel = Number(row.loungeInventory.lighterFuel || 0) + fuelAdd;
@@ -2834,8 +3066,52 @@ class GroupGamesHandler {
       : '';
     return ctx.reply(
       `✅ تم شراء ${parsed.qty} ${product.name}\n` +
+      `• سعر القطعة: ${this.formatCurrency(unitPrice)}\n` +
       `• التكلفة: ${this.formatCurrency(total)}\n` +
       `• الرصيد الآن: ${this.formatCurrency(row.points || 0)}${extra}`
+    );
+  }
+
+  static parseLoungeSell(text) {
+    const match = /^بيع\s+(.+?)(?:\s+(\d+))?$/i.exec(String(text || '').trim());
+    if (!match) return null;
+    const rawName = String(match[1] || '').trim();
+    const qty = Math.max(1, Math.min(50, parseInt(this.normalizeArabicDigits(match[2] || '1'), 10) || 1));
+    const productKey = this.normalizeLoungeToken(rawName);
+    if (!productKey) return null;
+    return { productKey, qty };
+  }
+
+  static async handleLoungeSellCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return false;
+    const parsed = this.parseLoungeSell(ctx.message?.text || '');
+    if (!parsed) return false;
+    const product = LOUNGE_PRODUCTS[parsed.productKey];
+    if (!product) return false;
+
+    const group = await this.ensureGroupRecord(ctx);
+    const market = this.ensureCafeMarket(group);
+    const row = this.getOrCreateScoreRow(group, ctx.from);
+    const userDoc = await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
+    row.loungeInventory = this.normalizeLoungeInventory(row.loungeInventory || {});
+    const own = Number(row.loungeInventory[product.key] || 0);
+    if (own < parsed.qty) {
+      return ctx.reply(`❌ ما عندك الكمية المطلوبة للبيع.\n• الموجود: ${own}`);
+    }
+
+    const unitPrice = this.getCafePrice(product, market);
+    const sellUnit = Math.max(1, Math.floor(unitPrice * 0.7));
+    const payout = sellUnit * parsed.qty;
+    row.loungeInventory[product.key] = own - parsed.qty;
+    row.points = Number(row.points || 0) + payout;
+    row.updatedAt = new Date();
+    await group.save();
+    await this.syncRowToGlobal(userDoc, row);
+    return ctx.reply(
+      `✅ تم بيع ${parsed.qty} ${product.name}\n` +
+      `• سعر البيع للقطعة: ${this.formatCurrency(sellUnit)}\n` +
+      `• المبلغ المستلم: ${this.formatCurrency(payout)}\n` +
+      `• فلوسك الآن: ${this.formatCurrency(row.points || 0)}`
     );
   }
 
@@ -2867,6 +3143,31 @@ class GroupGamesHandler {
       return ctx.reply(`❌ ما عندك ${product.name}. اكتب: شراء ${product.aliases[0]}`);
     }
 
+    if (productKey === 'hookah') {
+      if (Number(row.loungeInventory.hookah_head || 0) <= 0) {
+        return ctx.reply('❌ الأرجيلة بدون راس. اشتري: راس أرجيلة');
+      }
+      if (Number(row.loungeInventory.coal || 0) <= 0) {
+        return ctx.reply('❌ ما في فحم. اشتري: فحم');
+      }
+      const apple = Number(row.loungeInventory.molasses_apple || 0);
+      const mint = Number(row.loungeInventory.molasses_mint || 0);
+      if (apple <= 0 && mint <= 0) {
+        return ctx.reply('❌ ناقص معسل. اشتري: معسل تفاح أو معسل نعناع');
+      }
+      row.loungeInventory.hookah_head = Math.max(0, Number(row.loungeInventory.hookah_head || 0) - 1);
+      row.loungeInventory.coal = Math.max(0, Number(row.loungeInventory.coal || 0) - 1);
+      if (apple > 0) row.loungeInventory.molasses_apple = apple - 1;
+      else row.loungeInventory.molasses_mint = Math.max(0, mint - 1);
+    }
+
+    if (productKey === 'vape') {
+      if (Number(row.loungeInventory.vape_liquid || 0) <= 0) {
+        return ctx.reply('❌ جهاز الفيب موجود، بس بدون سائل. اشتري: سائل فيب');
+      }
+      row.loungeInventory.vape_liquid = Math.max(0, Number(row.loungeInventory.vape_liquid || 0) - 1);
+    }
+
     if (product.needsLighter) {
       const fuel = Number(row.loungeInventory.lighterFuel || 0);
       if (fuel <= 0) {
@@ -2875,7 +3176,9 @@ class GroupGamesHandler {
       row.loungeInventory.lighterFuel = fuel - 1;
     }
 
-    row.loungeInventory[productKey] = Number(row.loungeInventory[productKey] || 0) - 1;
+    if (productKey === 'cigarette' || productKey === 'cigar') {
+      row.loungeInventory[productKey] = Number(row.loungeInventory[productKey] || 0) - 1;
+    }
     row.loungeState = {
       active: true,
       productKey,
@@ -2913,23 +3216,46 @@ class GroupGamesHandler {
     const userDoc = await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
     row.loungeInventory = this.normalizeLoungeInventory(row.loungeInventory || {});
     row.loungeState = this.normalizeLoungeState(row.loungeState || {});
+    row.cafeProfile = this.resetCafeDailyAndWeekly(row.cafeProfile || {});
 
     if (!row.loungeState.active || !row.loungeState.productKey) {
       return ctx.reply('❌ ما في شي مولّع عندك الآن. اكتب: ولع سيجارة أو جهز ارجيلة أو شغل فيب.');
+    }
+    const idleMs = row.loungeState.startedAt ? (Date.now() - new Date(row.loungeState.startedAt).getTime()) : 0;
+    if (idleMs > (2 * 60 * 1000)) {
+      row.loungeState = this.defaultLoungeState();
+      await group.save();
+      await this.syncRowToGlobal(userDoc, row);
+      return ctx.reply('💨 المنتج طفى لحاله من طول الغيبة... ولّعه من جديد.');
     }
 
     if (this.checkCooldown(ctx, 'lounge:puff', 1000 * 20)) {
       return ctx.reply('⏳ تمهّل شوي قبل النفس اللي بعده.');
     }
+    if ((row.cafeProfile.puffsToday || 0) >= LOUNGE_DAILY_PUFF_LIMIT) {
+      return ctx.reply(`🧾 وصلت الحد اليومي للنفخات (${LOUNGE_DAILY_PUFF_LIMIT})`);
+    }
+    const puffCost = 1;
+    if (Number(row.points || 0) < puffCost) {
+      return ctx.reply('❌ لازم يكون معك على الأقل 1 دولار لكل نفس.');
+    }
 
     row.loungeState.puffsLeft = Math.max(0, Number(row.loungeState.puffsLeft || 0) - 1);
-    const reward = 1;
-    row.points = Number(row.points || 0) + reward;
+    row.loungeState.startedAt = new Date();
+    const reward = 1 + Math.floor(Math.random() * 2);
+    row.points = Math.max(0, Number(row.points || 0) - puffCost) + reward;
+    row.cafeProfile.puffsToday = Number(row.cafeProfile.puffsToday || 0) + 1;
+    row.cafeProfile.loungePuffs = Number(row.cafeProfile.loungePuffs || 0) + 1;
+    row.cafeProfile.mood = Math.min(100, Number(row.cafeProfile.mood || 0) + 1);
+    row.cafeProfile.moodUntil = new Date(Date.now() + 15 * 60 * 1000);
+    if (row.loungeState.productKey === 'hookah') row.cafeProfile.hookahPuffs = Number(row.cafeProfile.hookahPuffs || 0) + 1;
+    else row.cafeProfile.smokePuffs = Number(row.cafeProfile.smokePuffs || 0) + 1;
     row.updatedAt = new Date();
 
     let message = `${this.pickRandom(LOUNGE_PUFF_LINES)}\n` +
       `• ${row.loungeState.productName}: ${row.loungeState.puffsLeft}/${row.loungeState.totalPuffs}\n` +
-      `• +${this.formatCurrency(reward)}`;
+      `• الصافي: +${this.formatCurrency(Math.max(0, reward - puffCost))}\n` +
+      `• المزاج: ${row.cafeProfile.mood}/100`;
 
     if (row.loungeState.puffsLeft <= 0) {
       message += `\n\n${this.pickLoungeFinishLine(row.loungeState.productKey)}`;
@@ -2948,6 +3274,7 @@ class GroupGamesHandler {
     await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
     row.loungeInventory = this.normalizeLoungeInventory(row.loungeInventory || {});
     row.loungeState = this.normalizeLoungeState(row.loungeState || {});
+    row.cafeProfile = this.resetCafeDailyAndWeekly(row.cafeProfile || {});
     await group.save();
 
     const sessionLine = row.loungeState.active
@@ -2959,11 +3286,313 @@ class GroupGamesHandler {
       `• سيجار: ${row.loungeInventory.cigar || 0}\n` +
       `• فيب: ${row.loungeInventory.vape || 0}\n` +
       `• أرجيلة: ${row.loungeInventory.hookah || 0}\n` +
+      `• راس أرجيلة: ${row.loungeInventory.hookah_head || 0}\n` +
+      `• فحم: ${row.loungeInventory.coal || 0}\n` +
+      `• معسل تفاح: ${row.loungeInventory.molasses_apple || 0}\n` +
+      `• معسل نعناع: ${row.loungeInventory.molasses_mint || 0}\n` +
       `• قداحة: ${row.loungeInventory.lighter || 0}\n` +
       `• توليعات متبقية: ${row.loungeInventory.lighterFuel || 0}\n\n` +
-      `• الحالة: ${sessionLine}`,
+      `• الحالة: ${sessionLine}\n` +
+      `• مزاجك: ${row.cafeProfile.mood || 0}/100\n` +
+      `• نفخات اليوم: ${row.cafeProfile.puffsToday || 0}/${LOUNGE_DAILY_PUFF_LIMIT}`,
       { parse_mode: 'HTML' }
     );
+  }
+
+  static async handleCafeWorkCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const group = await this.ensureGroupRecord(ctx);
+    const row = this.getOrCreateScoreRow(group, ctx.from);
+    const userDoc = await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
+    row.cafeProfile = this.resetCafeDailyAndWeekly(row.cafeProfile || {});
+    const last = row.cafeProfile.workLastAt ? new Date(row.cafeProfile.workLastAt).getTime() : 0;
+    const left = CAFE_WORK_COOLDOWN_MS - (Date.now() - last);
+    if (left > 0) {
+      return ctx.reply(`⏳ تقدر تشتغل بعد ${Math.ceil(left / 60000)} دقيقة.`);
+    }
+    const salary = 7 + Math.floor(Math.random() * 12);
+    const gotTip = Math.random() < 0.35;
+    const tip = gotTip ? (2 + Math.floor(Math.random() * 7)) : 0;
+    const total = salary + tip;
+    row.points = Number(row.points || 0) + total;
+    row.cafeProfile.workLastAt = new Date();
+    row.cafeProfile.reputation = Number(row.cafeProfile.reputation || 0) + 1;
+    row.cafeProfile.ordersCompleted = Number(row.cafeProfile.ordersCompleted || 0) + 1;
+    row.cafeProfile.cafeEarnings = Number(row.cafeProfile.cafeEarnings || 0) + total;
+    row.cafeProfile.weeklyCafeEarnings = Number(row.cafeProfile.weeklyCafeEarnings || 0) + total;
+    row.updatedAt = new Date();
+    await group.save();
+    await this.syncRowToGlobal(userDoc, row);
+    return ctx.reply(
+      `👨‍🍳 اشتغلت بالكافيتيريا بنجاح!\n` +
+      `• الأجر: ${this.formatCurrency(salary)}\n` +
+      `${gotTip ? `• بقشيش: ${this.formatCurrency(tip)}\n` : ''}` +
+      `• إجمالي الربح: ${this.formatCurrency(total)}\n` +
+      `• السمعة: ${row.cafeProfile.reputation}`
+    );
+  }
+
+  static async handleCafeRequestCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const group = await this.ensureGroupRecord(ctx);
+    const market = this.ensureCafeMarket(group);
+    const existing = this.activeCafeRequests.get(String(ctx.chat.id));
+    if (existing && Date.now() < Number(existing.endsAt || 0)) {
+      return ctx.reply(`⏳ فيه طلب شغال بالفعل: ${existing.qty} ${LOUNGE_PRODUCTS[existing.itemKey]?.name || existing.itemKey}`);
+    }
+    const keys = ['coffee', 'tea', 'juice', 'snack'];
+    const itemKey = this.pickRandom(keys);
+    const qty = 1 + Math.floor(Math.random() * 3);
+    const reward = (this.getCafePrice(LOUNGE_PRODUCTS[itemKey], market) * qty) + 6;
+    this.activeCafeRequests.set(String(ctx.chat.id), {
+      itemKey,
+      qty,
+      reward,
+      endsAt: Date.now() + (6 * 60 * 1000)
+    });
+    return ctx.reply(
+      `📣 <b>طلب كافيتيريا جماعي</b>\n\n` +
+      `مين يجيب ${qty} ${LOUNGE_PRODUCTS[itemKey].name}؟\n` +
+      `🎁 مكافأة أول مَن يسلّم: ${this.formatCurrency(reward)}\n\n` +
+      `للتسليم اكتب: <b>سلم الطلب</b>`,
+      { parse_mode: 'HTML' }
+    );
+  }
+
+  static async handleCafeDeliverCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const req = this.activeCafeRequests.get(String(ctx.chat.id));
+    if (!req || Date.now() > Number(req.endsAt || 0)) {
+      this.activeCafeRequests.delete(String(ctx.chat.id));
+      return ctx.reply('ℹ️ ما في طلب كافيتيريا نشط حالياً.');
+    }
+    const group = await this.ensureGroupRecord(ctx);
+    const row = this.getOrCreateScoreRow(group, ctx.from);
+    const userDoc = await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
+    row.loungeInventory = this.normalizeLoungeInventory(row.loungeInventory || {});
+    row.cafeProfile = this.resetCafeDailyAndWeekly(row.cafeProfile || {});
+    if (Number(row.loungeInventory[req.itemKey] || 0) < Number(req.qty || 1)) {
+      return ctx.reply(`❌ ما عندك الكمية الكافية للتسليم.\n• المطلوب: ${req.qty} ${LOUNGE_PRODUCTS[req.itemKey].name}`);
+    }
+    row.loungeInventory[req.itemKey] = Number(row.loungeInventory[req.itemKey] || 0) - Number(req.qty || 1);
+    row.points = Number(row.points || 0) + Number(req.reward || 0);
+    row.cafeProfile.reputation = Number(row.cafeProfile.reputation || 0) + 2;
+    row.cafeProfile.ordersCompleted = Number(row.cafeProfile.ordersCompleted || 0) + 1;
+    row.cafeProfile.cafeEarnings = Number(row.cafeProfile.cafeEarnings || 0) + Number(req.reward || 0);
+    row.cafeProfile.weeklyCafeEarnings = Number(row.cafeProfile.weeklyCafeEarnings || 0) + Number(req.reward || 0);
+    row.updatedAt = new Date();
+    this.activeCafeRequests.delete(String(ctx.chat.id));
+    await group.save();
+    await this.syncRowToGlobal(userDoc, row);
+    return ctx.reply(
+      `✅ ${this.mentionUser(ctx.from.id, ctx.from.first_name || ctx.from.username || 'عضو')} سلّم الطلب أول واحد!\n` +
+      `• المكافأة: ${this.formatCurrency(req.reward)}\n` +
+      `• السمعة: ${row.cafeProfile.reputation}`,
+      { parse_mode: 'HTML' }
+    );
+  }
+
+  static async handleMoodCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const group = await this.ensureGroupRecord(ctx);
+    const row = this.getOrCreateScoreRow(group, ctx.from);
+    await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
+    row.cafeProfile = this.resetCafeDailyAndWeekly(row.cafeProfile || {});
+    const activeMood = row.cafeProfile.moodUntil && new Date(row.cafeProfile.moodUntil).getTime() > Date.now();
+    const bonus = activeMood ? '10%' : '0%';
+    await group.save();
+    return ctx.reply(
+      `😌 مزاجك الحالي: ${row.cafeProfile.mood || 0}/100\n` +
+      `• بونص اللعب المؤقت: ${bonus}\n` +
+      `• السمعة: ${row.cafeProfile.reputation || 0}`
+    );
+  }
+
+  static async handleCafeConsumeCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return false;
+    const text = this.normalizeText(String(ctx.message?.text || ''));
+    let key = null;
+    if (/^اشرب\s*قهوه|^اشرب\s*قهوة|^قهوة$/i.test(text)) key = 'coffee';
+    else if (/^اشرب\s*شاي|^شاي$/i.test(text)) key = 'tea';
+    else if (/^اشرب\s*عصير|^عصير$/i.test(text)) key = 'juice';
+    else if (/^كل\s*سناك|^سناك$/i.test(text)) key = 'snack';
+    if (!key) return false;
+
+    const group = await this.ensureGroupRecord(ctx);
+    const row = this.getOrCreateScoreRow(group, ctx.from);
+    const userDoc = await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
+    row.loungeInventory = this.normalizeLoungeInventory(row.loungeInventory || {});
+    row.cafeProfile = this.resetCafeDailyAndWeekly(row.cafeProfile || {});
+
+    if (Number(row.loungeInventory[key] || 0) <= 0) {
+      return ctx.reply(`❌ ما عندك ${LOUNGE_PRODUCTS[key].name}. اشتريه أول.`);
+    }
+    row.loungeInventory[key] = Number(row.loungeInventory[key] || 0) - 1;
+    const xpBoost = key === 'coffee' ? 2 : key === 'tea' ? 1 : key === 'juice' ? 1 : 1;
+    const moodBoost = key === 'snack' ? 3 : 2;
+    row.cafeProfile.mood = Math.min(100, Number(row.cafeProfile.mood || 0) + moodBoost);
+    row.cafeProfile.moodUntil = new Date(Date.now() + 15 * 60 * 1000);
+    this.awardXp(row, xpBoost);
+    row.updatedAt = new Date();
+    await group.save();
+    await this.syncRowToGlobal(userDoc, row);
+    return ctx.reply(
+      `✅ استمتعت بـ ${LOUNGE_PRODUCTS[key].name}\n` +
+      `• +${xpBoost} XP\n` +
+      `• +${moodBoost} مزاج\n` +
+      `• مزاجك الآن: ${row.cafeProfile.mood}/100`
+    );
+  }
+
+  static async handleCafeTopCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const group = await this.ensureGroupRecord(ctx);
+    const weekly = await this.applyCafeWeeklyRewards(group);
+    const rows = [...(group.gameSystem.scores || [])];
+    rows.forEach((r) => { r.cafeProfile = this.resetCafeDailyAndWeekly(r.cafeProfile || {}); });
+    rows.sort((a, b) => {
+      const aScore = Number(a.cafeProfile?.weeklyCafeEarnings || 0) + (Number(a.cafeProfile?.reputation || 0) * 5);
+      const bScore = Number(b.cafeProfile?.weeklyCafeEarnings || 0) + (Number(b.cafeProfile?.reputation || 0) * 5);
+      return bScore - aScore;
+    });
+    const top = rows.slice(0, 10);
+    if (top.length === 0) return ctx.reply('ℹ️ لا يوجد نشاط كافيتيريا بعد.');
+    let text = '🏆 <b>توب الكافيتيريا</b>\n\n';
+    if (weekly?.top?.length) {
+      text += `🎁 تم صرف جوائز الأسبوع تلقائيًا (${this.getWeekKey()})\n\n`;
+      await Promise.all(weekly.top.map(async (r) => {
+        const doc = await this.ensureGlobalProfileAndSyncRow(
+          r,
+          { id: Number(r.userId), username: r.username, first_name: r.username }
+        );
+        await this.syncRowToGlobal(doc, r);
+      }));
+    }
+    top.forEach((r, i) => {
+      text += `${i + 1}. ${r.username || r.userId} — ربح أسبوعي ${this.formatCurrency(r.cafeProfile.weeklyCafeEarnings || 0)} | سمعة ${r.cafeProfile.reputation || 0}\n`;
+    });
+    await group.save();
+    return ctx.reply(text, { parse_mode: 'HTML' });
+  }
+
+  static async handleHookahPuffsTopCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const group = await this.ensureGroupRecord(ctx);
+    const rows = [...(group.gameSystem.scores || [])];
+    rows.forEach((r) => { r.cafeProfile = this.resetCafeDailyAndWeekly(r.cafeProfile || {}); });
+    rows.sort((a, b) => Number(b.cafeProfile?.hookahPuffs || 0) - Number(a.cafeProfile?.hookahPuffs || 0));
+    const top = rows.slice(0, 10);
+    if (top.length === 0) return ctx.reply('ℹ️ لا يوجد بيانات نفخات أرجيلة بعد.');
+    let text = '🫧 <b>توب نفس الأرجيلة</b>\n\n';
+    top.forEach((r, i) => {
+      text += `${i + 1}. ${r.username || r.userId} — ${r.cafeProfile.hookahPuffs || 0} نفس\n`;
+    });
+    return ctx.reply(text, { parse_mode: 'HTML' });
+  }
+
+  static async handleSmokePuffsTopCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const group = await this.ensureGroupRecord(ctx);
+    const rows = [...(group.gameSystem.scores || [])];
+    rows.forEach((r) => { r.cafeProfile = this.resetCafeDailyAndWeekly(r.cafeProfile || {}); });
+    rows.sort((a, b) => Number(b.cafeProfile?.smokePuffs || 0) - Number(a.cafeProfile?.smokePuffs || 0));
+    const top = rows.slice(0, 10);
+    if (top.length === 0) return ctx.reply('ℹ️ لا يوجد بيانات دخان بعد.');
+    let text = '🚬 <b>توب الدخان</b>\n\n';
+    top.forEach((r, i) => {
+      text += `${i + 1}. ${r.username || r.userId} — ${r.cafeProfile.smokePuffs || 0} نفس\n`;
+    });
+    return ctx.reply(text, { parse_mode: 'HTML' });
+  }
+
+  static getActiveHookahSession(chatId) {
+    const key = String(chatId);
+    const s = this.activeHookahSessions.get(key);
+    if (!s) return null;
+    if (Date.now() > Number(s.endsAt || 0)) {
+      this.activeHookahSessions.delete(key);
+      return null;
+    }
+    return s;
+  }
+
+  static async finalizeHookahSession(ctx, session, reason = 'end') {
+    this.activeHookahSessions.delete(String(session.chatId));
+    const members = Array.from(session.members.values());
+    members.sort((a, b) => Number(b.puffs || 0) - Number(a.puffs || 0));
+    const top = members[0];
+    const reasonText = reason === 'expired' ? '⏰ انتهى وقت الجلسة.' : '🛑 تم إنهاء الجلسة.';
+    let text = `🪩 <b>انتهت جلسة الأرجيلة</b>\n\n${reasonText}\n`;
+    if (top) {
+      text += `🥇 الأكثر نفسًا: ${top.name} (${top.puffs} نفس)\n`;
+      text += `😎 صاحب المزاج: ${top.name}`;
+    } else {
+      text += 'ما حدا شارك للأسف.';
+    }
+    return ctx.reply(text, { parse_mode: 'HTML' });
+  }
+
+  static async handleHookahSessionOpen(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const existing = this.getActiveHookahSession(ctx.chat.id);
+    if (existing) return ctx.reply('⏳ في جلسة أرجيلة شغالة بالفعل.');
+    const session = {
+      chatId: String(ctx.chat.id),
+      ownerId: Number(ctx.from.id),
+      endsAt: Date.now() + (10 * 60 * 1000),
+      members: new Map()
+    };
+    session.members.set(Number(ctx.from.id), {
+      userId: Number(ctx.from.id),
+      name: ctx.from.first_name || ctx.from.username || String(ctx.from.id),
+      puffs: 0
+    });
+    this.activeHookahSessions.set(String(ctx.chat.id), session);
+    return ctx.reply(
+      `🪩 بدأت جلسة أرجيلة لمدة 10 دقائق!\n` +
+      `• للانضمام: انضم\n` +
+      `• للنفس داخل الجلسة: نفس`
+    );
+  }
+
+  static async handleHookahSessionJoin(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const session = this.getActiveHookahSession(ctx.chat.id);
+    if (!session) return ctx.reply('ℹ️ ما في جلسة أرجيلة نشطة الآن.');
+    const uid = Number(ctx.from.id);
+    if (!session.members.has(uid)) {
+      session.members.set(uid, { userId: uid, name: ctx.from.first_name || ctx.from.username || String(uid), puffs: 0 });
+    }
+    return ctx.reply(`✅ ${ctx.from.first_name || 'عضو'} انضم للجلسة.`);
+  }
+
+  static async handleHookahSessionPuff(ctx) {
+    if (!this.isGroupChat(ctx)) return false;
+    const session = this.getActiveHookahSession(ctx.chat.id);
+    if (!session) return false;
+    if (Date.now() > Number(session.endsAt || 0)) {
+      await this.finalizeHookahSession(ctx, session, 'expired');
+      return true;
+    }
+    const uid = Number(ctx.from.id);
+    if (!session.members.has(uid)) {
+      return ctx.reply('❌ لازم تنضم أول: اكتب "انضم"');
+    }
+    const rowGroup = await this.ensureGroupRecord(ctx);
+    const row = this.getOrCreateScoreRow(rowGroup, ctx.from);
+    const userDoc = await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
+    row.cafeProfile = this.resetCafeDailyAndWeekly(row.cafeProfile || {});
+    row.cafeProfile.hookahPuffs = Number(row.cafeProfile.hookahPuffs || 0) + 1;
+    row.cafeProfile.loungePuffs = Number(row.cafeProfile.loungePuffs || 0) + 1;
+    row.cafeProfile.puffsToday = Number(row.cafeProfile.puffsToday || 0) + 1;
+    row.points = Number(row.points || 0) + 1;
+    row.updatedAt = new Date();
+    const m = session.members.get(uid);
+    m.puffs = Number(m.puffs || 0) + 1;
+    session.members.set(uid, m);
+    await rowGroup.save();
+    await this.syncRowToGlobal(userDoc, row);
+    return ctx.reply(`💨 نفس رايق! ${ctx.from.first_name || 'عضو'} صار عنده ${m.puffs} نفس داخل الجلسة.`);
   }
 
   static async handleGroupProfileCommand(ctx) {
@@ -3880,10 +4509,19 @@ class GroupGamesHandler {
       ...dynamicExtraLines
     ].join('\n');
     const loungeRows = [
+      `( قهوة ↤︎ ${row.loungeInventory.coffee || 0} )`,
+      `( شاي ↤︎ ${row.loungeInventory.tea || 0} )`,
+      `( عصير ↤︎ ${row.loungeInventory.juice || 0} )`,
+      `( سناك ↤︎ ${row.loungeInventory.snack || 0} )`,
       `( سيجارة ↤︎ ${row.loungeInventory.cigarette || 0} )`,
       `( سيجار ↤︎ ${row.loungeInventory.cigar || 0} )`,
       `( فيب ↤︎ ${row.loungeInventory.vape || 0} )`,
       `( ارجيلة ↤︎ ${row.loungeInventory.hookah || 0} )`,
+      `( راس ارجيلة ↤︎ ${row.loungeInventory.hookah_head || 0} )`,
+      `( فحم ↤︎ ${row.loungeInventory.coal || 0} )`,
+      `( معسل تفاح ↤︎ ${row.loungeInventory.molasses_apple || 0} )`,
+      `( معسل نعناع ↤︎ ${row.loungeInventory.molasses_mint || 0} )`,
+      `( سائل فيب ↤︎ ${row.loungeInventory.vape_liquid || 0} )`,
       `( قداحة ↤︎ ${row.loungeInventory.lighter || 0} )`,
       `( توليعات قداحة ↤︎ ${row.loungeInventory.lighterFuel || 0} )`
     ].join('\n');
@@ -3897,6 +4535,15 @@ class GroupGamesHandler {
       (row.loungeInventory.cigar || 0) * LOUNGE_PRODUCTS.cigar.price +
       (row.loungeInventory.vape || 0) * LOUNGE_PRODUCTS.vape.price +
       (row.loungeInventory.hookah || 0) * LOUNGE_PRODUCTS.hookah.price +
+      (row.loungeInventory.hookah_head || 0) * LOUNGE_PRODUCTS.hookah_head.price +
+      (row.loungeInventory.coal || 0) * LOUNGE_PRODUCTS.coal.price +
+      (row.loungeInventory.molasses_apple || 0) * LOUNGE_PRODUCTS.molasses_apple.price +
+      (row.loungeInventory.molasses_mint || 0) * LOUNGE_PRODUCTS.molasses_mint.price +
+      (row.loungeInventory.vape_liquid || 0) * LOUNGE_PRODUCTS.vape_liquid.price +
+      (row.loungeInventory.coffee || 0) * LOUNGE_PRODUCTS.coffee.price +
+      (row.loungeInventory.tea || 0) * LOUNGE_PRODUCTS.tea.price +
+      (row.loungeInventory.juice || 0) * LOUNGE_PRODUCTS.juice.price +
+      (row.loungeInventory.snack || 0) * LOUNGE_PRODUCTS.snack.price +
       (row.loungeInventory.lighter || 0) * LOUNGE_PRODUCTS.lighter.price
     );
 
@@ -4487,11 +5134,18 @@ class GroupGamesHandler {
       '• استثمار فلوسي | استثمار مباشر\n\n' +
       '<b>سادسًا: لاونج جو</b>\n' +
       '• لاونج | عرض قائمة اللاونج\n' +
+      '• كافيتيريا | قائمة الكافيتيريا\n' +
       '• شراء سيجارة 2 | شراء دخان\n' +
+      '• شراء قهوة | شراء شاي | شراء عصير | شراء سناك\n' +
+      '• اشرب قهوة | اشرب شاي | اشرب عصير | كل سناك\n' +
       '• شراء قداحة | شرط للتوليع\n' +
+      '• اشتغل بالكافيتيريا\n' +
+      '• طلب كافيتيريا | سلم الطلب\n' +
       '• ولع سيجارة | ولع سيجار | شغل فيب | جهز ارجيلة\n' +
       '• هف | هفف | هففف | هفففف | هففففف\n' +
-      '• مستلزماتي | عرض المتبقي\n\n' +
+      '• افتح جلسة ارجيلة | انضم | نفس\n' +
+      '• مستلزماتي | مزاجي\n' +
+      '• توب الكافيتيريا | توب نفس ارجيلة | توب الدخان\n\n' +
       '<b>سابعًا: القلاع والحكام</b>\n' +
       '• انشاء قلعه | /gcastle\n' +
       '• قلعتي | /gmycastle\n' +

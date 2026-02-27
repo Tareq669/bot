@@ -121,6 +121,7 @@ const GROUP_ONLY_COMMANDS = new Set([
   'gtemplate_member', 'gtemplate_admin', 'gideal_member', 'gideal_admin', 'gshow_ideal_member', 'gshow_ideal_admin', 'gwelcome', 'gsuggest',
   'gfaq', 'gsuggestmenu', 'gsuggeststats', 'gsuggesttop', 'gquiz', 'gmath', 'gword', 'gdaily', 'gmcq', 'gvote', 'gquizset', 'gleader', 'gweekly', 'ggame', 'ggames',
   'g', 'gteam', 'gteams', 'gtour', 'gwho', 'griddle', 'gtype', 'chance', 'gduel', 'gstore', 'gbuy', 'ggifts', 'ggift', 'gassets', 'gwealth', 'gprofile', 'ginvest', 'gluck', 'gluckstats', 'gmonth', 'gmonthly', 'gbonus', 'glevels', 'glounge',
+  'gcafework', 'gcafereq', 'gcafedeliver', 'gmood', 'gtopcafe', 'gtophookah', 'gtopsmoke', 'ghookahsession',
   'gcastle', 'gmycastle', 'gresstore', 'gbuyres', 'gmyres', 'gupcastle', 'gbarracks', 'gbuyarmy', 'guparmy', 'gtreasure', 'gshield', 'gmyshield', 'gwar', 'garena', 'gfighters', 'grulers', 'gally', 'gallyreq',
   'gconfess', 'gconfessend',
   'gbuygift', 'gsellgift', 'gscratch', 'gscratchstats', 'ggrantmoney', 'gtakemoney', 'whisper'
@@ -281,6 +282,11 @@ Promise.all([
       { command: 'gmonthly', description: 'صرف مكافأة شهرية' },
       { command: 'gbonus', description: 'ضبط مكافآت الترقية' },
       { command: 'glounge', description: 'لاونج الجروب (دخان/أرجيلة)' },
+      { command: 'gcafework', description: 'عمل بالكافيتيريا' },
+      { command: 'gcafereq', description: 'فتح طلب كافيتيريا' },
+      { command: 'gcafedeliver', description: 'تسليم الطلب' },
+      { command: 'gmood', description: 'مزاجك الحالي' },
+      { command: 'gtopcafe', description: 'توب الكافيتيريا' },
       { command: 'gcastle', description: 'إنشاء قلعة' },
       { command: 'gmycastle', description: 'تفاصيل قلعتي' },
       { command: 'gresstore', description: 'متجر الموارد' },
@@ -417,6 +423,14 @@ bot.command('gmonth', (ctx) => GroupGamesHandler.handleMonthlyBoardCommand(ctx))
 bot.command('gmonthly', (ctx) => GroupGamesHandler.handleMonthlyRewardCommand(ctx));
 bot.command('gbonus', (ctx) => GroupGamesHandler.handleTierRewardsCommand(ctx));
 bot.command('glounge', (ctx) => GroupGamesHandler.handleLoungeMenuCommand(ctx));
+bot.command('gcafework', (ctx) => GroupGamesHandler.handleCafeWorkCommand(ctx));
+bot.command('gcafereq', (ctx) => GroupGamesHandler.handleCafeRequestCommand(ctx));
+bot.command('gcafedeliver', (ctx) => GroupGamesHandler.handleCafeDeliverCommand(ctx));
+bot.command('gmood', (ctx) => GroupGamesHandler.handleMoodCommand(ctx));
+bot.command('gtopcafe', (ctx) => GroupGamesHandler.handleCafeTopCommand(ctx));
+bot.command('gtophookah', (ctx) => GroupGamesHandler.handleHookahPuffsTopCommand(ctx));
+bot.command('gtopsmoke', (ctx) => GroupGamesHandler.handleSmokePuffsTopCommand(ctx));
+bot.command('ghookahsession', (ctx) => GroupGamesHandler.handleHookahSessionOpen(ctx));
 bot.command('gcastle', (ctx) => GroupGamesHandler.handleCreateCastleCommand(ctx));
 bot.command('gmycastle', (ctx) => GroupGamesHandler.handleMyCastleCommand(ctx));
 bot.command('gresstore', (ctx) => GroupGamesHandler.handleResourceStoreCommand(ctx));
@@ -2517,9 +2531,21 @@ bot.hears(/^روليت$/i, (ctx) => GroupGamesHandler.handleChanceCommand(ctx));
 bot.hears(/^كرسي\s*الاعتراف$/i, (ctx) => GroupGamesHandler.handleConfessionStart(ctx));
 bot.hears(/^انهاء\s*كرسي\s*الاعتراف$/i, (ctx) => GroupGamesHandler.handleConfessionEnd(ctx));
 bot.hears(/^(?:لاونج|كافيتيريا|كافتيريا)$/i, (ctx) => GroupGamesHandler.handleLoungeMenuCommand(ctx));
+bot.hears(/^قائمة\s*(?:الكافيتيريا|كافيتيريا)$/i, (ctx) => GroupGamesHandler.handleLoungeMenuCommand(ctx));
 bot.hears(/^(?:مستلزماتي|مستلزماتي\s*باللاونج)$/i, (ctx) => GroupGamesHandler.handleLoungeSuppliesCommand(ctx));
+bot.hears(/^اشتغل\s*بالكافيتيريا$/i, (ctx) => GroupGamesHandler.handleCafeWorkCommand(ctx));
+bot.hears(/^طلب\s*كافيتيريا$/i, (ctx) => GroupGamesHandler.handleCafeRequestCommand(ctx));
+bot.hears(/^سلم\s*الطلب$/i, (ctx) => GroupGamesHandler.handleCafeDeliverCommand(ctx));
+bot.hears(/^مزاجي$/i, (ctx) => GroupGamesHandler.handleMoodCommand(ctx));
+bot.hears(/^(?:اشرب\s*قهوة|اشرب\s*شاي|اشرب\s*عصير|كل\s*سناك|قهوة|شاي|عصير|سناك)$/i, (ctx) => GroupGamesHandler.handleCafeConsumeCommand(ctx));
+bot.hears(/^توب\s*الكافيتيريا$/i, (ctx) => GroupGamesHandler.handleCafeTopCommand(ctx));
+bot.hears(/^توب\s*لاونج$/i, (ctx) => GroupGamesHandler.handleCafeTopCommand(ctx));
+bot.hears(/^توب\s*نفس\s*ارجيلة$/i, (ctx) => GroupGamesHandler.handleHookahPuffsTopCommand(ctx));
+bot.hears(/^توب\s*الدخان$/i, (ctx) => GroupGamesHandler.handleSmokePuffsTopCommand(ctx));
+bot.hears(/^افتح\s*جلسة\s*ارجيلة$/i, (ctx) => GroupGamesHandler.handleHookahSessionOpen(ctx));
+bot.hears(/^انضم$/i, (ctx) => GroupGamesHandler.handleHookahSessionJoin(ctx));
 bot.hears(/^(?:ولع\s*سيجارة|توليع\s*سيجارة|اشعل\s*سيجارة|ولع\s*دخان|ولع\s*سيجار|توليع\s*سيجار|اشعل\s*سيجار|شغل\s*فيب|ابدأ\s*فيب|جهز\s*ارجيلة|جهز\s*أرجيلة|تجهيز\s*ارجيلة|شغل\s*ارجيلة|شغل\s*أرجيلة)$/i, (ctx) => GroupGamesHandler.handleLoungeIgniteCommand(ctx));
-bot.hears(/^(?:هف|هفف|هففف|هفففف|هففففف|فيب|نفخة\s*سيجار|نفس\s*ارجيلة|نفس\s*أرجيلة)$/i, (ctx) => GroupGamesHandler.handleLoungePuffCommand(ctx));
+bot.hears(/^(?:هف|هفف|هففف|هفففف|هففففف|فيب|نفخة\s*سيجار|نفس\s*ارجيلة|نفس\s*أرجيلة|نفس\s*دخان|نفس)$/i, (ctx) => GroupGamesHandler.handleLoungePuffCommand(ctx));
 bot.hears(/^تحدي(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleDuelCommand(ctx));
 bot.hears(/^متجر\s*الجروب$/i, (ctx) => GroupGamesHandler.handleStoreCommand(ctx));
 bot.hears(/^شراء\s*هد(?:ي|ي)ة(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleBuyGiftForSelfCommand(ctx));
@@ -2527,6 +2553,8 @@ bot.hears(/^بيع\s*هد(?:ي|ي)ة(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.ha
 bot.hears(/^كشط(?:\s+\d+)?$/i, (ctx) => GroupGamesHandler.handleScratchCommand(ctx));
 bot.hears(/^(?:احصائيات|إحصائيات)\s*الكشط$/i, (ctx) => GroupGamesHandler.handleScratchStatsCommand(ctx));
 bot.hears(/^بيع(?:\s+.+)?$/i, async (ctx) => {
+  const handledLounge = await GroupGamesHandler.handleLoungeSellCommand(ctx);
+  if (handledLounge) return;
   const handled = await BankGameHandler.handleAssetSellText(ctx);
   if (!handled) {
     return GroupGamesHandler.handleSimpleSellCommand(ctx);
@@ -2623,8 +2651,19 @@ bot.hears(/^\/(?:كرسي_الاعتراف|gconfess)$/i, (ctx) => GroupGamesHand
 bot.hears(/^\/(?:انهاء_كرسي_الاعتراف|gconfessend)$/i, (ctx) => GroupGamesHandler.handleConfessionEnd(ctx));
 bot.hears(/^\/(?:لاونج|glounge)$/i, (ctx) => GroupGamesHandler.handleLoungeMenuCommand(ctx));
 bot.hears(/^\/(?:مستلزماتي|supplies)$/i, (ctx) => GroupGamesHandler.handleLoungeSuppliesCommand(ctx));
+bot.hears(/^\/(?:اشتغل_بالكافيتيريا|gcafework)$/i, (ctx) => GroupGamesHandler.handleCafeWorkCommand(ctx));
+bot.hears(/^\/(?:طلب_كافيتيريا|gcafereq)$/i, (ctx) => GroupGamesHandler.handleCafeRequestCommand(ctx));
+bot.hears(/^\/(?:سلم_الطلب|gcafedeliver)$/i, (ctx) => GroupGamesHandler.handleCafeDeliverCommand(ctx));
+bot.hears(/^\/(?:مزاجي|gmood)$/i, (ctx) => GroupGamesHandler.handleMoodCommand(ctx));
+bot.hears(/^\/(?:اشرب_قهوة|اشرب_شاي|اشرب_عصير|كل_سناك|drink)$/i, (ctx) => GroupGamesHandler.handleCafeConsumeCommand(ctx));
+bot.hears(/^\/(?:توب_الكافيتيريا|gtopcafe)$/i, (ctx) => GroupGamesHandler.handleCafeTopCommand(ctx));
+bot.hears(/^\/(?:توب_لاونج|toplounge)$/i, (ctx) => GroupGamesHandler.handleCafeTopCommand(ctx));
+bot.hears(/^\/(?:توب_نفس_ارجيلة|gtophookah)$/i, (ctx) => GroupGamesHandler.handleHookahPuffsTopCommand(ctx));
+bot.hears(/^\/(?:توب_الدخان|gtopsmoke)$/i, (ctx) => GroupGamesHandler.handleSmokePuffsTopCommand(ctx));
+bot.hears(/^\/(?:افتح_جلسة_ارجيلة|ghookahsession)$/i, (ctx) => GroupGamesHandler.handleHookahSessionOpen(ctx));
+bot.hears(/^\/(?:انضم|gjoin)$/i, (ctx) => GroupGamesHandler.handleHookahSessionJoin(ctx));
 bot.hears(/^\/(?:ولع_سيجارة|ولع_دخان|ولع_سيجار|شغل_فيب|جهز_ارجيلة|ignite)$/i, (ctx) => GroupGamesHandler.handleLoungeIgniteCommand(ctx));
-bot.hears(/^\/(?:هف|huff|puff)$/i, (ctx) => GroupGamesHandler.handleLoungePuffCommand(ctx));
+bot.hears(/^\/(?:هف|huff|puff|نفس)$/i, (ctx) => GroupGamesHandler.handleLoungePuffCommand(ctx));
 bot.hears(/^\/(?:تحدي)(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleDuelCommand(ctx));
 bot.hears(/^\/(?:متجر_الجروب|المتجر)$/i, (ctx) => GroupGamesHandler.handleStoreCommand(ctx));
 bot.hears(/^\/(?:شراء_هدية|شراءهدية|شراء_هديه|شراءهديه)(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleBuyGiftForSelfCommand(ctx));
@@ -2632,6 +2671,8 @@ bot.hears(/^\/(?:بيع_هدية|بيعهدية|بيع_هديه|بيعهديه)(
 bot.hears(/^\/(?:كشط|كشط_اكواد|كشطاكواد)(?:\s+\d+)?$/i, (ctx) => GroupGamesHandler.handleScratchCommand(ctx));
 bot.hears(/^\/(?:احصائيات_الكشط|إحصائيات_الكشط|احصائياتالكشط|إحصائياتالكشط)$/i, (ctx) => GroupGamesHandler.handleScratchStatsCommand(ctx));
 bot.hears(/^\/(?:بيع)(?:\s+.+)?$/i, async (ctx) => {
+  const handledLounge = await GroupGamesHandler.handleLoungeSellCommand(ctx);
+  if (handledLounge) return;
   const handled = await BankGameHandler.handleAssetSellText(ctx);
   if (!handled) {
     return GroupGamesHandler.handleSimpleSellCommand(ctx);
