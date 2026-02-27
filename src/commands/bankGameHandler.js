@@ -132,6 +132,69 @@ class BankGameHandler {
     return null;
   }
 
+  static parseAssetQtyText(text, verbRegex) {
+    const raw = String(text || '').trim();
+    const m = new RegExp(`^${verbRegex}\\s+(.+)$`, 'i').exec(raw);
+    if (!m) return null;
+    const rest = String(m[1] || '').trim();
+    if (!rest) return null;
+    const parts = rest.split(/\s+/).filter(Boolean);
+    if (!parts.length) return null;
+
+    let qty = 1;
+    let assetText = rest;
+
+    if (/^\d+$/.test(parts[0])) {
+      qty = Math.max(1, this.parseIntSafe(parts[0]));
+      assetText = parts.slice(1).join(' ');
+    } else if (parts.length > 1 && /^\d+$/.test(parts[parts.length - 1])) {
+      qty = Math.max(1, this.parseIntSafe(parts[parts.length - 1]));
+      assetText = parts.slice(0, -1).join(' ');
+    }
+
+    const assetKey = this.parseAsset(assetText);
+    if (!assetKey) return null;
+    return { qty, assetKey };
+  }
+
+  static async adjustGroupGiftInventory(chatId, userRef, assetKey, delta) {
+    const groupId = String(chatId || '');
+    const userId = Number(userRef?.id || userRef?.userId || 0);
+    if (!groupId || !userId || !assetKey || !delta) return;
+
+    const group = await Group.findOne({ groupId });
+    if (!group) return;
+    if (!group.gameSystem) group.gameSystem = {};
+    if (!Array.isArray(group.gameSystem.scores)) group.gameSystem.scores = [];
+
+    let row = group.gameSystem.scores.find((s) => Number(s.userId) === userId);
+    if (!row) {
+      group.gameSystem.scores.push({
+        userId,
+        username: userRef?.username || userRef?.first_name || `user_${userId}`,
+        points: 0,
+        weeklyPoints: 0,
+        monthlyPoints: 0,
+        giftInventory: []
+      });
+      row = group.gameSystem.scores[group.gameSystem.scores.length - 1];
+    }
+
+    if (!Array.isArray(row.giftInventory)) row.giftInventory = [];
+    const key = String(assetKey);
+    const name = ASSETS[key]?.name || key;
+    const idx = row.giftInventory.findIndex((g) => String(g?.key || '') === key);
+    if (idx < 0) {
+      if (delta > 0) row.giftInventory.push({ key, name, count: Number(delta) });
+    } else {
+      row.giftInventory[idx].count = Math.max(0, Number(row.giftInventory[idx].count || 0) + Number(delta || 0));
+      row.giftInventory[idx].name = name;
+      if (row.giftInventory[idx].count <= 0) row.giftInventory.splice(idx, 1);
+    }
+
+    await group.save();
+  }
+
   static parseTargetFromReply(ctx) {
     const u = ctx?.message?.reply_to_message?.from;
     if (!u || u.is_bot) return null;
@@ -295,9 +358,11 @@ class BankGameHandler {
       let line = '';
       if (r < 0.22) {
         p.assets.car = Number(p.assets.car || 0) + 1;
+        await this.adjustGroupGiftInventory(ctx.chat.id, ctx.from, 'car', 1);
         line = '🚗 ربحت: سيارة';
       } else if (r < 0.44) {
         p.assets.diamond = Number(p.assets.diamond || 0) + 1;
+        await this.adjustGroupGiftInventory(ctx.chat.id, ctx.from, 'diamond', 1);
         line = '💎 ربحت: ماسة';
       } else if (r < 0.62) {
         p.boost2xUntil = this.now() + (3 * 60 * 1000);
@@ -321,11 +386,9 @@ class BankGameHandler {
 
   static async handleAssetBuyText(ctx) {
     if (!this.isGroupChat(ctx)) return false;
-    const m = /^شراء\s+(\d+)\s+(.+)$/i.exec(String(ctx.message?.text || '').trim());
-    if (!m) return false;
-    const qty = Math.max(1, this.parseIntSafe(m[1]));
-    const assetKey = this.parseAsset(m[2]);
-    if (!assetKey) return false;
+    const parsed = this.parseAssetQtyText(ctx.message?.text || '', 'شراء');
+    if (!parsed) return false;
+    const { qty, assetKey } = parsed;
 
     await this.withBank(ctx, async (_user, p) => {
       const asset = ASSETS[assetKey];
@@ -333,6 +396,7 @@ class BankGameHandler {
       if (p.balance < cost) return ctx.reply(`❌ رصيدك غير كافي.\n• المطلوب: ${this.fmt(cost)}\n• رصيدك: ${this.fmt(p.balance)}`);
       p.balance -= cost;
       p.assets[assetKey] = Number(p.assets[assetKey] || 0) + qty;
+      await this.adjustGroupGiftInventory(ctx.chat.id, ctx.from, assetKey, qty);
       return ctx.reply(`✅ تم شراء ${qty} ${asset.name}\n• التكلفة: ${this.fmt(cost)}\n• رصيدك: ${this.fmt(p.balance)}`);
     });
     return true;
@@ -340,11 +404,9 @@ class BankGameHandler {
 
   static async handleAssetSellText(ctx) {
     if (!this.isGroupChat(ctx)) return false;
-    const m = /^بيع\s+(\d+)\s+(.+)$/i.exec(String(ctx.message?.text || '').trim());
-    if (!m) return false;
-    const qty = Math.max(1, this.parseIntSafe(m[1]));
-    const assetKey = this.parseAsset(m[2]);
-    if (!assetKey) return false;
+    const parsed = this.parseAssetQtyText(ctx.message?.text || '', 'بيع');
+    if (!parsed) return false;
+    const { qty, assetKey } = parsed;
 
     await this.withBank(ctx, async (_user, p) => {
       const own = Number(p.assets[assetKey] || 0);
@@ -353,6 +415,7 @@ class BankGameHandler {
       const payout = Math.floor(asset.buy * asset.sellFactor) * qty;
       p.assets[assetKey] = own - qty;
       p.balance += payout;
+      await this.adjustGroupGiftInventory(ctx.chat.id, ctx.from, assetKey, -qty);
       return ctx.reply(`✅ تم بيع ${qty} ${asset.name}\n• المبلغ: ${this.fmt(payout)}\n• رصيدك: ${this.fmt(p.balance)}`);
     });
     return true;
@@ -360,11 +423,9 @@ class BankGameHandler {
 
   static async handleAssetGiftText(ctx) {
     if (!this.isGroupChat(ctx)) return false;
-    const m = /^اهداء\s+(\d+)\s+(.+)$/i.exec(String(ctx.message?.text || '').trim());
-    if (!m) return false;
-    const qty = Math.max(1, this.parseIntSafe(m[1]));
-    const assetKey = this.parseAsset(m[2]);
-    if (!assetKey) return false;
+    const parsed = this.parseAssetQtyText(ctx.message?.text || '', 'اهداء');
+    if (!parsed) return false;
+    const { qty, assetKey } = parsed;
     const target = this.parseTargetFromReply(ctx);
     if (!target) {
       await ctx.reply('❌ الإهداء يكون بالرد على الشخص.');
@@ -402,6 +463,8 @@ class BankGameHandler {
     sender.bankProfile = sp;
     receiver.bankProfile = rp;
     await Promise.all([sender.save(), receiver.save()]);
+    await this.adjustGroupGiftInventory(ctx.chat.id, ctx.from, assetKey, -qty);
+    await this.adjustGroupGiftInventory(ctx.chat.id, target, assetKey, qty);
     const asset = ASSETS[assetKey];
     await ctx.reply(`🎁 تم اهداء ${qty} ${asset.name} بنجاح.`);
     return true;
