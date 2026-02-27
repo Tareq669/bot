@@ -421,7 +421,7 @@ const LOUNGE_PRODUCTS = {
     ignitionsPerUnit: 25
   }
 };
-const LOUNGE_PUFF_ALIASES = [/^هف{1,5}$/i, /^(?:نفس\s*ارجيلة|نفس\s*أرجيلة|نفس\s*دخان|فيب)$/i, /^نفخة\s*سيجار$/i, /^نفس$/i];
+const LOUNGE_PUFF_ALIASES = [/^هف{1,5}$/i, /^(?:نفس\s*ارجيلة|نفس\s*أرجيلة|نفس\s*دخان|فيب)$/i, /^نفخة\s*سيجار$/i];
 const LOUNGE_PUFF_LINES = [
   '😶‍🌫️ نفس رايق... المزاج تمام.',
   '💨 هالنفخة زبطت الجو.',
