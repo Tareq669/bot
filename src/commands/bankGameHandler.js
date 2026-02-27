@@ -356,21 +356,35 @@ class BankGameHandler {
       p.balance -= cost;
       const r = Math.random();
       let line = '';
-      if (r < 0.22) {
+      if (r < 0.05) {
+        // Very rare high-value physical reward.
         p.assets.car = Number(p.assets.car || 0) + 1;
         await this.adjustGroupGiftInventory(ctx.chat.id, ctx.from, 'car', 1);
-        line = '🚗 ربحت: سيارة';
-      } else if (r < 0.44) {
+        line = '🔥 حظ قوي جدًا: ربحت سيارة';
+      } else if (r < 0.1) {
+        // Rare high-value physical reward.
         p.assets.diamond = Number(p.assets.diamond || 0) + 1;
         await this.adjustGroupGiftInventory(ctx.chat.id, ctx.from, 'diamond', 1);
-        line = '💎 ربحت: ماسة';
-      } else if (r < 0.62) {
+        line = '💎 حظ قوي: ربحت ماسة';
+      } else if (r < 0.2) {
+        // Rare temporary multiplier reward.
         p.boost2xUntil = this.now() + (3 * 60 * 1000);
-        line = '⚡ ربحت: x2 لمدة 3 دقائق';
-      } else {
-        const cash = Math.floor(250000 + Math.random() * 1500000);
+        line = '⚡ حظ قوي: ربحت x2 لمدة 3 دقائق';
+      } else if (r < 0.65) {
+        // Low luck cash outcome.
+        const cash = Math.floor(300 + Math.random() * 900); // 300 - 1199
         p.balance += cash;
-        line = `💰 ربحت: ${this.fmt(cash)}`;
+        line = `🍀 حظ قليل: ربحت ${this.fmt(cash)}`;
+      } else if (r < 0.92) {
+        // Good luck cash outcome.
+        const cash = Math.floor(1200 + Math.random() * 3800); // 1200 - 4999
+        p.balance += cash;
+        line = `✅ حظ جيد: ربحت ${this.fmt(cash)}`;
+      } else {
+        // Strong luck cash outcome (rare).
+        const cash = Math.floor(5000 + Math.random() * 10000); // 5000 - 14999
+        p.balance += cash;
+        line = `🚀 حظ قوي: ربحت ${this.fmt(cash)}`;
       }
       return ctx.reply(`🎡 نتيجة العجلة:\n${line}\n• رصيدك: ${this.fmt(p.balance)}`);
     });
