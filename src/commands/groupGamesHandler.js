@@ -300,6 +300,86 @@ const UNIQUE_GIFTS = [
   { key: 'palace', name: '🏰 قصر', price: 120 },
   { key: 'santa', name: '🎅 هدية بابا نويل', price: 18 }
 ];
+const LOUNGE_PRODUCTS = {
+  cigarette: {
+    key: 'cigarette',
+    name: '🚬 سيجارة',
+    aliases: ['سيجارة', 'سيجاره', 'دخان', 'سيجارة عادية', 'cigarette'],
+    price: 12,
+    puffs: 5,
+    needsLighter: true,
+    igniteAliases: ['ولع سيجارة', 'توليع سيجارة', 'اشعل سيجارة', 'ولع دخان']
+  },
+  cigar: {
+    key: 'cigar',
+    name: '🟤 سيجار',
+    aliases: ['سيجار', 'cigar'],
+    price: 35,
+    puffs: 8,
+    needsLighter: true,
+    igniteAliases: ['ولع سيجار', 'توليع سيجار', 'اشعل سيجار']
+  },
+  vape: {
+    key: 'vape',
+    name: '💨 فيب',
+    aliases: ['فيب', 'vape', 'فيب جهاز', 'جهاز فيب'],
+    price: 45,
+    puffs: 20,
+    needsLighter: false,
+    igniteAliases: ['شغل فيب', 'ابدأ فيب', 'ولع فيب', 'فيب']
+  },
+  hookah: {
+    key: 'hookah',
+    name: '🫧 أرجيلة',
+    aliases: ['ارجيلة', 'أرجيلة', 'شيشة', 'شيشة', 'hookah'],
+    price: 70,
+    puffs: 25,
+    needsLighter: false,
+    igniteAliases: ['جهز ارجيلة', 'تجهيز ارجيلة', 'شغل ارجيلة']
+  },
+  lighter: {
+    key: 'lighter',
+    name: '🪔 قداحة',
+    aliases: ['قداحة', 'ولاعة', 'قداحه', 'ولاعه', 'lighter'],
+    price: 20,
+    ignitionsPerUnit: 25
+  }
+};
+const LOUNGE_PUFF_ALIASES = [/^هف{1,5}$/i, /^(?:نفس\s*ارجيلة|نفس\s*أرجيلة|فيب)$/i, /^نفخة\s*سيجار$/i];
+const LOUNGE_PUFF_LINES = [
+  '😶‍🌫️ نفس رايق... المزاج تمام.',
+  '💨 هالنفخة زبطت الجو.',
+  '🫰 نفس سريع وتركّزك صار أعلى.',
+  '🔥 مزاج عالي... كمل على مهلك.',
+  '😌 نفس مرتب... وخليك رايق.'
+];
+const LOUNGE_FINISH_LINES = {
+  cigarette: [
+    '🚬 وصلت للفلتر يا معلم... اشتري وحدة جديدة قبل ما تمسك الورق!',
+    '🚬 فلتر وبس! السيجارة خلصت، جيب غيرها.',
+    '🚬 آخر نفس راح... وصلت للفلتر، اشتري سيجارة جديدة.'
+  ],
+  cigar: [
+    '🟤 السيجار خلص وصار ذكرى... جيب واحد فاخر جديد.',
+    '🟤 خلص السيجار بالكامل، وقت التحديث.',
+    '🟤 آخر نفخة سيجار... اطلب غيره.'
+  ],
+  vape: [
+    '💨 الفيب فصل فجأة... البطارية نامت، بدك جهاز/شحنة جديدة.',
+    '💨 السائل خلص والفيب صار فاضي... جهز واحد جديد.',
+    '💨 ما ضل نفخات في الفيب، بدك تعبئة جديدة.'
+  ],
+  hookah: [
+    '🔥 الراس انحرق بالكامل... اطلب غيره بسرعة.',
+    '🫧 الأرجيلة خلصت، الراس اتحمّص... جهّز راس جديد.',
+    '🔥 خلصت النفخات والراس اتحرق... بدها تبديل.'
+  ],
+  lighter: [
+    '🪔 القداحة خلصت غاز... جيب قداحة جديدة يا بطل.',
+    '🪔 ولاعة بلا نار! اشتري قداحة جديدة.',
+    '🪔 الشرارة خلصت... بدك قداحة جديدة.'
+  ]
+};
 const WHO_AM_I_BANK = [
   { clues: ['نبي الله', 'ابتلعه الحوت', 'دعا في الظلمات'], answers: ['يونس', 'يونس عليه السلام'] },
   { clues: ['قائد مسلم', 'فتح القدس', 'اسمه صلاح'], answers: ['صلاح الدين', 'صلاح الدين الايوبي'] },
@@ -477,6 +557,63 @@ class GroupGamesHandler {
   static formatCurrency(amount) {
     const value = Math.max(0, Math.floor(Number(amount) || 0));
     return `${value.toLocaleString('en-US')} دولار 💸`;
+  }
+
+  static defaultLoungeInventory() {
+    return {
+      cigarette: 0,
+      cigar: 0,
+      vape: 0,
+      hookah: 0,
+      lighter: 0,
+      lighterFuel: 0
+    };
+  }
+
+  static normalizeLoungeInventory(value = {}) {
+    const base = { ...this.defaultLoungeInventory(), ...(value || {}) };
+    Object.keys(this.defaultLoungeInventory()).forEach((k) => {
+      base[k] = Math.max(0, Number(base[k] || 0));
+    });
+    return base;
+  }
+
+  static defaultLoungeState() {
+    return {
+      active: false,
+      productKey: '',
+      productName: '',
+      puffsLeft: 0,
+      totalPuffs: 0,
+      startedAt: null
+    };
+  }
+
+  static normalizeLoungeState(value = {}) {
+    const s = { ...this.defaultLoungeState(), ...(value || {}) };
+    s.active = Boolean(s.active);
+    s.productKey = String(s.productKey || '');
+    s.productName = String(s.productName || '');
+    s.puffsLeft = Math.max(0, Number(s.puffsLeft || 0));
+    s.totalPuffs = Math.max(0, Number(s.totalPuffs || 0));
+    s.startedAt = s.startedAt || null;
+    return s;
+  }
+
+  static normalizeLoungeToken(value) {
+    const x = this.normalizeText(String(value || ''));
+    if (!x) return null;
+    for (const product of Object.values(LOUNGE_PRODUCTS)) {
+      if ((product.aliases || []).some((a) => this.normalizeText(a) === x)) {
+        return product.key;
+      }
+    }
+    return null;
+  }
+
+  static pickLoungeFinishLine(productKey) {
+    const lines = LOUNGE_FINISH_LINES[productKey] || ['✅ خلص العنصر.'];
+    return this.pickRandom(lines);
   }
 
   static shuffleWord(word) {
@@ -675,6 +812,8 @@ class GroupGamesHandler {
       if (!Number.isFinite(row.duelLosses)) row.duelLosses = 0;
       if (typeof row.arenaJoined !== 'boolean') row.arenaJoined = false;
       if (!row.investDayKey) row.investDayKey = '';
+      row.loungeInventory = this.normalizeLoungeInventory(row.loungeInventory || {});
+      row.loungeState = this.normalizeLoungeState(row.loungeState || {});
     });
     if (!Array.isArray(group.gameSystem.teams)) group.gameSystem.teams = [];
     if (!group.gameSystem.tournament) group.gameSystem.tournament = { active: false, season: 1, startedAt: null, endedAt: null, rewards: { first: 100, second: 60, third: 40 } };
@@ -751,6 +890,10 @@ class GroupGamesHandler {
         Markup.button.callback('🎁 الهدايا', 'group:quick:gifts'),
         Markup.button.callback('📦 ممتلكاتي', 'group:quick:assets')
       ],
+      [
+        Markup.button.callback('🪩 لاونج', 'group:quick:lounge'),
+        Markup.button.callback('🧰 مستلزماتي', 'group:quick:supplies')
+      ],
       [Markup.button.callback('📘 مساعدة', 'group:quick:help')]
     ]);
   }
@@ -788,6 +931,8 @@ class GroupGamesHandler {
     if (action === 'store') return this.handleStoreCommand(ctx);
     if (action === 'gifts') return this.handleGiftCatalogCommand(ctx);
     if (action === 'assets') return this.handleAssetsCommand(ctx);
+    if (action === 'lounge') return this.handleLoungeMenuCommand(ctx);
+    if (action === 'supplies') return this.handleLoungeSuppliesCommand(ctx);
     if (action === 'help') return this.handleGamesHelp(ctx);
     return null;
   }
@@ -885,6 +1030,8 @@ class GroupGamesHandler {
         arenaJoined: false,
         investDayKey: '',
         investLastAt: null,
+        loungeInventory: this.defaultLoungeInventory(),
+        loungeState: this.defaultLoungeState(),
         wins: 0,
         streak: 0,
         bestStreak: 0,
@@ -923,6 +1070,8 @@ class GroupGamesHandler {
     if (!Number.isFinite(row.duelLosses)) row.duelLosses = 0;
     if (typeof row.arenaJoined !== 'boolean') row.arenaJoined = false;
     if (!row.investDayKey) row.investDayKey = '';
+    row.loungeInventory = this.normalizeLoungeInventory(row.loungeInventory || {});
+    row.loungeState = this.normalizeLoungeState(row.loungeState || {});
     return row;
   }
 
@@ -962,7 +1111,9 @@ class GroupGamesHandler {
       treasureLastAt: null,
       duelWins: 0,
       duelLosses: 0,
-      arenaJoined: false
+      arenaJoined: false,
+      loungeInventory: this.defaultLoungeInventory(),
+      loungeState: this.defaultLoungeState()
     };
   }
 
@@ -997,6 +1148,8 @@ class GroupGamesHandler {
     p.duelWins = Number(p.duelWins || 0);
     p.duelLosses = Number(p.duelLosses || 0);
     p.arenaJoined = Boolean(p.arenaJoined);
+    p.loungeInventory = this.normalizeLoungeInventory(p.loungeInventory || {});
+    p.loungeState = this.normalizeLoungeState(p.loungeState || {});
     p.migrated = Boolean(p.migrated);
     return p;
   }
@@ -1012,6 +1165,7 @@ class GroupGamesHandler {
       || Number(row?.armyPower || 0) > 0
       || Number(row?.scratchTotalPlays || 0) > 0
       || Number(row?.luckTotalPlays || 0) > 0
+      || Object.values(this.normalizeLoungeInventory(row?.loungeInventory || {})).some((n) => Number(n || 0) > 0)
     );
   }
 
@@ -1055,6 +1209,8 @@ class GroupGamesHandler {
     row.duelWins = p.duelWins;
     row.duelLosses = p.duelLosses;
     row.arenaJoined = p.arenaJoined;
+    row.loungeInventory = this.normalizeLoungeInventory(p.loungeInventory || {});
+    row.loungeState = this.normalizeLoungeState(p.loungeState || {});
   }
 
   static applyRowToProfile(row, profile) {
@@ -1102,6 +1258,8 @@ class GroupGamesHandler {
     p.duelWins = Number(row.duelWins || 0);
     p.duelLosses = Number(row.duelLosses || 0);
     p.arenaJoined = Boolean(row.arenaJoined);
+    p.loungeInventory = this.normalizeLoungeInventory(row.loungeInventory || {});
+    p.loungeState = this.normalizeLoungeState(row.loungeState || {});
     p.migrated = true;
     return p;
   }
@@ -2602,6 +2760,212 @@ class GroupGamesHandler {
     return this.handleSellGiftCommand(ctx);
   }
 
+  static async handleLoungeMenuCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const group = await this.ensureGroupRecord(ctx);
+    const row = this.getOrCreateScoreRow(group, ctx.from);
+    await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
+    row.loungeInventory = this.normalizeLoungeInventory(row.loungeInventory || {});
+    row.loungeState = this.normalizeLoungeState(row.loungeState || {});
+    await group.save();
+
+    const lines = [
+      `• ${LOUNGE_PRODUCTS.cigarette.name} (${this.formatCurrency(LOUNGE_PRODUCTS.cigarette.price)})`,
+      `• ${LOUNGE_PRODUCTS.cigar.name} (${this.formatCurrency(LOUNGE_PRODUCTS.cigar.price)})`,
+      `• ${LOUNGE_PRODUCTS.vape.name} (${this.formatCurrency(LOUNGE_PRODUCTS.vape.price)})`,
+      `• ${LOUNGE_PRODUCTS.hookah.name} (${this.formatCurrency(LOUNGE_PRODUCTS.hookah.price)})`,
+      `• ${LOUNGE_PRODUCTS.lighter.name} (${this.formatCurrency(LOUNGE_PRODUCTS.lighter.price)}) | ${LOUNGE_PRODUCTS.lighter.ignitionsPerUnit} توليعة`
+    ];
+    return ctx.reply(
+      `🪩 <b>لاونج جو</b>\n\n` +
+      `رصيدك: ${this.formatCurrency(row.points || 0)}\n\n` +
+      `${lines.join('\n')}\n\n` +
+      `الأوامر السهلة:\n` +
+      `• شراء سيجارة 2\n` +
+      `• شراء قداحة\n` +
+      `• ولع سيجارة\n` +
+      `• هف / هفف / هففف / هفففف / هففففف\n` +
+      `• مستلزماتي`,
+      { parse_mode: 'HTML' }
+    );
+  }
+
+  static parseLoungeBuy(text) {
+    const match = /^شراء\s+(.+?)(?:\s+(\d+))?$/i.exec(String(text || '').trim());
+    if (!match) return null;
+    const rawName = String(match[1] || '').trim();
+    const qty = Math.max(1, Math.min(50, parseInt(this.normalizeArabicDigits(match[2] || '1'), 10) || 1));
+    const productKey = this.normalizeLoungeToken(rawName);
+    if (!productKey) return null;
+    return { productKey, qty };
+  }
+
+  static async handleLoungeBuyCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return false;
+    const parsed = this.parseLoungeBuy(ctx.message?.text || '');
+    if (!parsed) return false;
+
+    const product = LOUNGE_PRODUCTS[parsed.productKey];
+    if (!product) return false;
+
+    const group = await this.ensureGroupRecord(ctx);
+    const row = this.getOrCreateScoreRow(group, ctx.from);
+    const userDoc = await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
+    row.loungeInventory = this.normalizeLoungeInventory(row.loungeInventory || {});
+    row.loungeState = this.normalizeLoungeState(row.loungeState || {});
+
+    const total = Number(product.price || 0) * parsed.qty;
+    if (Number(row.points || 0) < total) {
+      return ctx.reply(`❌ فلوسك غير كافية.\n• المطلوب: ${this.formatCurrency(total)}\n• فلوسك: ${this.formatCurrency(row.points || 0)}`);
+    }
+
+    row.points = Number(row.points || 0) - total;
+    row.loungeInventory[product.key] = Number(row.loungeInventory[product.key] || 0) + parsed.qty;
+    if (product.key === 'lighter') {
+      const fuelAdd = parsed.qty * Number(product.ignitionsPerUnit || 25);
+      row.loungeInventory.lighterFuel = Number(row.loungeInventory.lighterFuel || 0) + fuelAdd;
+    }
+    row.updatedAt = new Date();
+    await group.save();
+    await this.syncRowToGlobal(userDoc, row);
+
+    const extra = product.key === 'lighter'
+      ? `\n• توليعات القداحة المتاحة: ${row.loungeInventory.lighterFuel}`
+      : '';
+    return ctx.reply(
+      `✅ تم شراء ${parsed.qty} ${product.name}\n` +
+      `• التكلفة: ${this.formatCurrency(total)}\n` +
+      `• الرصيد الآن: ${this.formatCurrency(row.points || 0)}${extra}`
+    );
+  }
+
+  static parseIgniteProduct(text) {
+    const normalized = this.normalizeText(String(text || ''));
+    for (const product of Object.values(LOUNGE_PRODUCTS)) {
+      if (!Array.isArray(product.igniteAliases)) continue;
+      if (product.igniteAliases.some((a) => this.normalizeText(a) === normalized)) {
+        return product.key;
+      }
+    }
+    return null;
+  }
+
+  static async handleLoungeIgniteCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return false;
+    const productKey = this.parseIgniteProduct(ctx.message?.text || '');
+    if (!productKey) return false;
+    const product = LOUNGE_PRODUCTS[productKey];
+    if (!product) return false;
+
+    const group = await this.ensureGroupRecord(ctx);
+    const row = this.getOrCreateScoreRow(group, ctx.from);
+    const userDoc = await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
+    row.loungeInventory = this.normalizeLoungeInventory(row.loungeInventory || {});
+    row.loungeState = this.normalizeLoungeState(row.loungeState || {});
+
+    if (Number(row.loungeInventory[productKey] || 0) <= 0) {
+      return ctx.reply(`❌ ما عندك ${product.name}. اكتب: شراء ${product.aliases[0]}`);
+    }
+
+    if (product.needsLighter) {
+      const fuel = Number(row.loungeInventory.lighterFuel || 0);
+      if (fuel <= 0) {
+        return ctx.reply('❌ السيجارة موجودة بس ما معك قداحة/غاز كفاية... اشتري قداحة أول.');
+      }
+      row.loungeInventory.lighterFuel = fuel - 1;
+    }
+
+    row.loungeInventory[productKey] = Number(row.loungeInventory[productKey] || 0) - 1;
+    row.loungeState = {
+      active: true,
+      productKey,
+      productName: product.name,
+      puffsLeft: Number(product.puffs || 5),
+      totalPuffs: Number(product.puffs || 5),
+      startedAt: new Date()
+    };
+    row.updatedAt = new Date();
+    await group.save();
+    await this.syncRowToGlobal(userDoc, row);
+
+    const lighterLine = product.needsLighter
+      ? `\n• توليعات القداحة المتبقية: ${row.loungeInventory.lighterFuel}`
+      : '';
+    return ctx.reply(
+      `🔥 تم تجهيز ${product.name}\n` +
+      `• النفخات المتاحة: ${row.loungeState.puffsLeft}/${row.loungeState.totalPuffs}${lighterLine}\n` +
+      '• الآن استخدم: هف أو هفف أو هففف...'
+    );
+  }
+
+  static isPuffAlias(text) {
+    const t = String(text || '').trim();
+    return LOUNGE_PUFF_ALIASES.some((pattern) => pattern.test(t));
+  }
+
+  static async handleLoungePuffCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return false;
+    const text = String(ctx.message?.text || '').trim();
+    if (!this.isPuffAlias(text)) return false;
+
+    const group = await this.ensureGroupRecord(ctx);
+    const row = this.getOrCreateScoreRow(group, ctx.from);
+    const userDoc = await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
+    row.loungeInventory = this.normalizeLoungeInventory(row.loungeInventory || {});
+    row.loungeState = this.normalizeLoungeState(row.loungeState || {});
+
+    if (!row.loungeState.active || !row.loungeState.productKey) {
+      return ctx.reply('❌ ما في شي مولّع عندك الآن. اكتب: ولع سيجارة أو جهز ارجيلة أو شغل فيب.');
+    }
+
+    if (this.checkCooldown(ctx, 'lounge:puff', 1000 * 20)) {
+      return ctx.reply('⏳ تمهّل شوي قبل النفس اللي بعده.');
+    }
+
+    row.loungeState.puffsLeft = Math.max(0, Number(row.loungeState.puffsLeft || 0) - 1);
+    const reward = 1;
+    row.points = Number(row.points || 0) + reward;
+    row.updatedAt = new Date();
+
+    let message = `${this.pickRandom(LOUNGE_PUFF_LINES)}\n` +
+      `• ${row.loungeState.productName}: ${row.loungeState.puffsLeft}/${row.loungeState.totalPuffs}\n` +
+      `• +${this.formatCurrency(reward)}`;
+
+    if (row.loungeState.puffsLeft <= 0) {
+      message += `\n\n${this.pickLoungeFinishLine(row.loungeState.productKey)}`;
+      row.loungeState = this.defaultLoungeState();
+    }
+
+    await group.save();
+    await this.syncRowToGlobal(userDoc, row);
+    return ctx.reply(message);
+  }
+
+  static async handleLoungeSuppliesCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const group = await this.ensureGroupRecord(ctx);
+    const row = this.getOrCreateScoreRow(group, ctx.from);
+    await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
+    row.loungeInventory = this.normalizeLoungeInventory(row.loungeInventory || {});
+    row.loungeState = this.normalizeLoungeState(row.loungeState || {});
+    await group.save();
+
+    const sessionLine = row.loungeState.active
+      ? `✅ نشط: ${row.loungeState.productName} (${row.loungeState.puffsLeft}/${row.loungeState.totalPuffs})`
+      : '❌ ما في جلسة تدخين نشطة.';
+    return ctx.reply(
+      `🧰 <b>مستلزماتك</b>\n\n` +
+      `• سيجارة: ${row.loungeInventory.cigarette || 0}\n` +
+      `• سيجار: ${row.loungeInventory.cigar || 0}\n` +
+      `• فيب: ${row.loungeInventory.vape || 0}\n` +
+      `• أرجيلة: ${row.loungeInventory.hookah || 0}\n` +
+      `• قداحة: ${row.loungeInventory.lighter || 0}\n` +
+      `• توليعات متبقية: ${row.loungeInventory.lighterFuel || 0}\n\n` +
+      `• الحالة: ${sessionLine}`,
+      { parse_mode: 'HTML' }
+    );
+  }
+
   static async handleGroupProfileCommand(ctx) {
     if (!this.isGroupChat(ctx)) return;
     const group = await this.ensureGroupRecord(ctx);
@@ -3474,6 +3838,8 @@ class GroupGamesHandler {
 
     const inventory = this.normalizeGiftInventoryList(row.giftInventory);
     row.giftInventory = inventory;
+    row.loungeInventory = this.normalizeLoungeInventory(row.loungeInventory || {});
+    row.loungeState = this.normalizeLoungeState(row.loungeState || {});
     const normalizeName = (value) => this.normalizeText(String(value || '')).trim();
     const countByName = {};
     const countByKey = {};
@@ -3513,12 +3879,26 @@ class GroupGamesHandler {
       ...assetsLines.map((x) => `( ${x.label} ↤︎ ${sumBy(x.keys, x.names)} )`),
       ...dynamicExtraLines
     ].join('\n');
+    const loungeRows = [
+      `( سيجارة ↤︎ ${row.loungeInventory.cigarette || 0} )`,
+      `( سيجار ↤︎ ${row.loungeInventory.cigar || 0} )`,
+      `( فيب ↤︎ ${row.loungeInventory.vape || 0} )`,
+      `( ارجيلة ↤︎ ${row.loungeInventory.hookah || 0} )`,
+      `( قداحة ↤︎ ${row.loungeInventory.lighter || 0} )`,
+      `( توليعات قداحة ↤︎ ${row.loungeInventory.lighterFuel || 0} )`
+    ].join('\n');
 
     const totalItems = inventory.reduce((sum, x) => sum + Number(x?.count || 0), 0);
     const totalEstimatedValue = inventory.reduce((sum, x) => {
       const meta = UNIQUE_GIFTS.find((g) => g.key === x.key);
       return sum + (Number(meta?.price || 0) * Number(x?.count || 0));
-    }, 0);
+    }, 0) + (
+      (row.loungeInventory.cigarette || 0) * LOUNGE_PRODUCTS.cigarette.price +
+      (row.loungeInventory.cigar || 0) * LOUNGE_PRODUCTS.cigar.price +
+      (row.loungeInventory.vape || 0) * LOUNGE_PRODUCTS.vape.price +
+      (row.loungeInventory.hookah || 0) * LOUNGE_PRODUCTS.hookah.price +
+      (row.loungeInventory.lighter || 0) * LOUNGE_PRODUCTS.lighter.price
+    );
 
     const activeBoost = row.activeBoost?.expiresAt && new Date(row.activeBoost.expiresAt).getTime() > Date.now()
       ? `✅ ${row.activeBoost.multiplier || 1}x حتى ${new Date(row.activeBoost.expiresAt).toLocaleString('ar-EG')}`
@@ -3528,6 +3908,8 @@ class GroupGamesHandler {
     return ctx.reply(
       `📦 <b>أهلاً بك في قائمة ممتلكاتك</b>\n\n` +
       `${rowsText}\n\n` +
+      `🪩 <b>قسم اللاونج</b>\n` +
+      `${loungeRows}\n\n` +
       `🏷️ اللقب الحالي: ${row.title || 'مبتدئ'}\n` +
       `🚀 المعزز النشط: ${activeBoost}\n` +
       `🎁 إجمالي الهدايا: ${totalItems}\n` +
@@ -4037,6 +4419,7 @@ class GroupGamesHandler {
     if (action === 'gweekly') return this.handleWeeklyCommand(ctx);
     if (action === 'gmonth') return this.handleMonthlyBoardCommand(ctx);
     if (action === 'glevels') return this.handleLevelsCommand(ctx);
+    if (action === 'glounge') return this.handleLoungeMenuCommand(ctx);
     if (action === 'gconfess') return this.handleConfessionStart(ctx);
     if (action === 'gconfess_end') return this.handleConfessionEnd(ctx);
     return null;
@@ -4053,6 +4436,7 @@ class GroupGamesHandler {
       [Markup.button.callback('🪑 كرسي الاعتراف', 'group:games:gconfess'), Markup.button.callback('🧠 تحدي يومي', 'group:games:gdaily')],
       [Markup.button.callback('🏁 المتصدرين', 'group:games:gleader'), Markup.button.callback('📅 سباق الأسبوع', 'group:games:gweekly')],
       [Markup.button.callback('🗓️ سباق الشهر', 'group:games:gmonth'), Markup.button.callback('🏅 لوحة المستويات', 'group:games:glevels')],
+      [Markup.button.callback('🪩 لاونج', 'group:games:glounge'), Markup.button.callback('🧰 مستلزماتي', 'group:quick:supplies')],
       [Markup.button.callback('🛑 إنهاء كرسي الاعتراف', 'group:games:gconfess_end')]
     ]);
     return ctx.reply(
@@ -4070,6 +4454,7 @@ class GroupGamesHandler {
       '• /gvote | تصويت\n' +
       '• /gconfess (بالرد) | بدء كرسي الاعتراف\n' +
       '• /gconfessend | إنهاء كرسي الاعتراف\n' +
+      '• /glounge | لاونج جو (الدخان/الأرجيلة)\n' +
       '• /gdaily | تحدي يومي\n\n' +
       '<b>ثانيًا: النظام والترتيب</b>\n' +
       '• /gleader | إجمالي المتصدرين\n' +
@@ -4100,7 +4485,14 @@ class GroupGamesHandler {
       '<b>خامسًا: الثروة</b>\n' +
       '• /gwealth | لوحة أغنى ممتلكات\n' +
       '• استثمار فلوسي | استثمار مباشر\n\n' +
-      '<b>سادسًا: القلاع والحكام</b>\n' +
+      '<b>سادسًا: لاونج جو</b>\n' +
+      '• لاونج | عرض قائمة اللاونج\n' +
+      '• شراء سيجارة 2 | شراء دخان\n' +
+      '• شراء قداحة | شرط للتوليع\n' +
+      '• ولع سيجارة | ولع سيجار | شغل فيب | جهز ارجيلة\n' +
+      '• هف | هفف | هففف | هفففف | هففففف\n' +
+      '• مستلزماتي | عرض المتبقي\n\n' +
+      '<b>سابعًا: القلاع والحكام</b>\n' +
       '• انشاء قلعه | /gcastle\n' +
       '• قلعتي | /gmycastle\n' +
       '• متجر الموارد | /gresstore\n' +
@@ -4119,7 +4511,7 @@ class GroupGamesHandler {
       '• توب الحكام | /grulers\n' +
       '• تحالف @user | /gally @user\n' +
       '• طلبات التحالف | /gallyreq\n\n' +
-      '<b>سابعًا: إدارة متقدمة</b>\n' +
+      '<b>ثامنًا: إدارة متقدمة</b>\n' +
       '• /ggame | إعدادات ألعاب الجروب\n' +
       '• /gquizset 5 | سلسلة كويز\n' +
       '• /gteam | فريقك\n' +
