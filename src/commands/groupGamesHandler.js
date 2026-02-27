@@ -2357,6 +2357,7 @@ class GroupGamesHandler {
     if (!this.isGroupChat(ctx)) return;
     const isAdmin = await this.isGroupAdmin(ctx);
     if (!isAdmin) return ctx.reply('❌ هذا الأمر للمشرفين فقط.');
+    const args = this.parseCommandArgs(ctx);
 
     const group = await this.ensureGroupRecord(ctx);
 
