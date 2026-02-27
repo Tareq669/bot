@@ -197,6 +197,32 @@ class BankGameHandler {
     }
 
     await group.save();
+
+    // Keep global profile in sync, otherwise GroupGames sync may overwrite group row later.
+    const userDoc = await User.findOne({ userId });
+    if (!userDoc) return;
+    const profile = (userDoc.globalGameProfile && typeof userDoc.globalGameProfile === 'object')
+      ? { ...userDoc.globalGameProfile }
+      : {};
+    const inv = Array.isArray(profile.giftInventory)
+      ? profile.giftInventory.map((x) => ({
+        key: String(x?.key || ''),
+        name: String(x?.name || x?.key || ''),
+        count: Math.max(0, Number(x?.count || 0))
+      })).filter((x) => x.key)
+      : [];
+    const gIdx = inv.findIndex((g) => g.key === key);
+    if (gIdx < 0) {
+      if (delta > 0) inv.push({ key, name, count: Number(delta) });
+    } else {
+      inv[gIdx].count = Math.max(0, Number(inv[gIdx].count || 0) + Number(delta || 0));
+      inv[gIdx].name = name;
+      if (inv[gIdx].count <= 0) inv.splice(gIdx, 1);
+    }
+    profile.giftInventory = inv;
+    profile.migrated = true;
+    userDoc.globalGameProfile = profile;
+    await userDoc.save();
   }
 
   static parseTargetFromReply(ctx) {
