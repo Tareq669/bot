@@ -53,6 +53,8 @@ class BankGameHandler {
       luckDayKey: '',
       luckPlaysToday: 0,
       wheelLastAt: 0,
+      wheelDayKey: '',
+      wheelPlaysToday: 0,
       boost2xUntil: 0,
       assets: {},
       stocksUnits: 0,
@@ -72,6 +74,8 @@ class BankGameHandler {
     x.luckDayKey = String(x.luckDayKey || '');
     x.luckPlaysToday = Math.max(0, Number(x.luckPlaysToday || 0));
     x.wheelLastAt = Number(x.wheelLastAt || 0);
+    x.wheelDayKey = String(x.wheelDayKey || '');
+    x.wheelPlaysToday = Math.max(0, Number(x.wheelPlaysToday || 0));
     x.boost2xUntil = Number(x.boost2xUntil || 0);
     x.stocksUnits = Math.max(0, Number(x.stocksUnits || 0));
     x.debtAmount = Math.max(0, Number(x.debtAmount || 0));
@@ -351,9 +355,19 @@ class BankGameHandler {
   static async handleWheel(ctx) {
     if (!this.isGroupChat(ctx)) return;
     return this.withBank(ctx, async (_user, p) => {
+      const dayKey = this.getDateKey();
+      if (p.wheelDayKey !== dayKey) {
+        p.wheelDayKey = dayKey;
+        p.wheelPlaysToday = 0;
+      }
+      if (Number(p.wheelPlaysToday || 0) >= 3) {
+        return ctx.reply('🧾 وصلت حد العجلة اليومي (3 مرات).');
+      }
       const cost = 500;
       if (p.balance < cost) return ctx.reply(`❌ تحتاج ${this.fmt(cost)} للعجلة.`);
       p.balance -= cost;
+      p.wheelLastAt = this.now();
+      p.wheelPlaysToday = Number(p.wheelPlaysToday || 0) + 1;
       const r = Math.random();
       let line = '';
       if (r < 0.05) {
