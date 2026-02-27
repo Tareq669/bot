@@ -22,6 +22,7 @@ const GroupAdminHandler = require('./commands/groupAdminHandler');
 const GroupGamesHandler = require('./commands/groupGamesHandler');
 const WhisperHandler = require('./commands/whisperHandler');
 const QuranicGamesHandler = require('./commands/quranicGamesHandler');
+const BankGameHandler = require('./commands/bankGameHandler');
 const EconomyHandler = require('./commands/economyHandler');
 const ContentHandler = require('./commands/contentHandler');
 const ProfileHandler = require('./commands/profileHandler');
@@ -2481,6 +2482,24 @@ bot.hears('🕌 الأذان', (ctx) => ChatGamesUtilityHandler.handleAdhanText(
 bot.hears(/^اكس\s*اوه$/i, (ctx) => ChatGamesUtilityHandler.handleXoStart(ctx));
 bot.hears(/^طقس(?:\s+(.+))?$/i, (ctx) => ChatGamesUtilityHandler.handleWeatherText(ctx, ctx.match[1]));
 bot.hears(/^(?:اذان|أذان)(?:\s+(.+))?$/i, (ctx) => ChatGamesUtilityHandler.handleAdhanText(ctx, ctx.match[1]));
+// Group Bank Game commands
+bot.hears(/^انشاء\s*حساب\s*بنكي$/i, (ctx) => BankGameHandler.handleCreateAccount(ctx));
+bot.hears(/^راتب$/i, (ctx) => BankGameHandler.handleSalary(ctx));
+bot.hears(/^بخشيش$/i, (ctx) => BankGameHandler.handleTip(ctx));
+bot.hears(/^زرف$/i, (ctx) => BankGameHandler.handleSteal(ctx));
+bot.hears(/^مضاربه(?:\s+\d+)?$/i, (ctx) => BankGameHandler.handleSpeculate(ctx));
+bot.hears(/^العجله$/i, (ctx) => BankGameHandler.handleWheel(ctx));
+bot.hears(/^سعر\s*الاسهم$/i, (ctx) => BankGameHandler.handleStocksPrice(ctx));
+bot.hears(/^شراء\s*اسهم(?:\s+\d+)?$/i, (ctx) => BankGameHandler.handleBuyStocks(ctx));
+bot.hears(/^بيع\s*اسهم(?:\s+\d+)?$/i, (ctx) => BankGameHandler.handleSellStocks(ctx));
+bot.hears(/^قرض$/i, (ctx) => BankGameHandler.handleLoan(ctx));
+bot.hears(/^سجني$/i, (ctx) => BankGameHandler.handlePrisonStatus(ctx));
+bot.hears(/^ديوني$/i, (ctx) => BankGameHandler.handleMyDebts(ctx));
+bot.hears(/^ديونه$/i, (ctx) => BankGameHandler.handleTargetDebts(ctx));
+bot.hears(/^سداد\s*ديوني$/i, (ctx) => BankGameHandler.handleRepayMine(ctx));
+bot.hears(/^سداد\s*ديونه$/i, (ctx) => BankGameHandler.handleRepayTarget(ctx));
+bot.hears(/^توب\s*القروبات$/i, (ctx) => BankGameHandler.handleTopGroups(ctx));
+bot.hears(/^(?:توب\s*المتفاعلين|الاكثر\s*تفاعلا|الأكثر\s*تفاعلا)$/i, (ctx) => BankGameHandler.handleTopActiveInGroup(ctx));
 // Group Arabic aliases (without slash)
 bot.hears(/^العاب\s*الجروب$/i, (ctx) => GroupGamesHandler.handleGamesHelp(ctx));
 bot.hears(/^مين\s*انا$/i, (ctx) => GroupGamesHandler.handleWhoAmICommand(ctx));
@@ -2493,12 +2512,27 @@ bot.hears(/^شراء\s*هد(?:ي|ي)ة(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.
 bot.hears(/^بيع\s*هد(?:ي|ي)ة(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleSellGiftCommand(ctx));
 bot.hears(/^كشط(?:\s+\d+)?$/i, (ctx) => GroupGamesHandler.handleScratchCommand(ctx));
 bot.hears(/^(?:احصائيات|إحصائيات)\s*الكشط$/i, (ctx) => GroupGamesHandler.handleScratchStatsCommand(ctx));
-bot.hears(/^بيع(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleSimpleSellCommand(ctx));
-bot.hears(/^شراء(?!\s*موارد)(?!\s*جيش)(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleSimpleBuyCommand(ctx));
+bot.hears(/^بيع(?:\s+.+)?$/i, async (ctx) => {
+  const handled = await BankGameHandler.handleAssetSellText(ctx);
+  if (!handled) {
+    return GroupGamesHandler.handleSimpleSellCommand(ctx);
+  }
+});
+bot.hears(/^شراء(?!\s*موارد)(?!\s*جيش)(?:\s+.+)?$/i, async (ctx) => {
+  const handled = await BankGameHandler.handleAssetBuyText(ctx);
+  if (!handled) {
+    return GroupGamesHandler.handleSimpleBuyCommand(ctx);
+  }
+});
 bot.hears(/^(?:الهدايا|هدايا)$/i, (ctx) => GroupGamesHandler.handleGiftCatalogCommand(ctx));
 bot.hears(/^(?:ممتلكاتي|ممتلكاتي\s*بالجروب|املاكي|أملاكي)$/i, (ctx) => GroupGamesHandler.handleAssetsCommand(ctx));
 bot.hears(/^(?:اغنى\s*ممتلكات|أغنى\s*ممتلكات|لوحة\s*الممتلكات)$/i, (ctx) => GroupGamesHandler.handleWealthCommand(ctx));
-bot.hears(/^اهداء(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleGiftCommand(ctx));
+bot.hears(/^اهداء(?:\s+.+)?$/i, async (ctx) => {
+  const handled = await BankGameHandler.handleAssetGiftText(ctx);
+  if (!handled) {
+    return GroupGamesHandler.handleGiftCommand(ctx);
+  }
+});
 bot.hears(/^ارسال(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleGiftCommand(ctx));
 bot.hears(/^(?:ملفي|حسابي\s*بالجروب)$/i, (ctx) => GroupGamesHandler.handleGroupProfileCommand(ctx));
 bot.hears(/^(?:نقاطي|فلوسي|رصيدي)$/i, (ctx) => GroupGamesHandler.handleMyMoneyCommand(ctx));
@@ -2548,6 +2582,23 @@ bot.hears(/^(?:تصويت|صوت)$/i, (ctx) => GroupGamesHandler.handleVoteComma
 bot.hears(/^(?:متصدرين|الترتيب)$/i, (ctx) => GroupGamesHandler.handleLeaderCommand(ctx));
 bot.hears(/^(?:اسبوعي|سباق\s*الأسبوع|سباق\s*الاسبوع)$/i, (ctx) => GroupGamesHandler.handleWeeklyCommand(ctx));
 // Group Arabic slash aliases
+bot.hears(/^\/(?:انشاء_حساب_بنكي|حساب_بنكي|gbank)$/i, (ctx) => BankGameHandler.handleCreateAccount(ctx));
+bot.hears(/^\/(?:راتب|gsalary)$/i, (ctx) => BankGameHandler.handleSalary(ctx));
+bot.hears(/^\/(?:بخشيش|gtip)$/i, (ctx) => BankGameHandler.handleTip(ctx));
+bot.hears(/^\/(?:زرف|gsteal)$/i, (ctx) => BankGameHandler.handleSteal(ctx));
+bot.hears(/^\/(?:مضاربه|مضاربة|gspec)(?:\s+\d+)?$/i, (ctx) => BankGameHandler.handleSpeculate(ctx));
+bot.hears(/^\/(?:العجله|العجلة|gwheel)$/i, (ctx) => BankGameHandler.handleWheel(ctx));
+bot.hears(/^\/(?:سعر_الاسهم|سعرالاسهم|gstockprice)$/i, (ctx) => BankGameHandler.handleStocksPrice(ctx));
+bot.hears(/^\/(?:شراء_اسهم|شراءاسهم|gbuystock)(?:\s+\d+)?$/i, (ctx) => BankGameHandler.handleBuyStocks(ctx));
+bot.hears(/^\/(?:بيع_اسهم|بيعاسهم|gsellstock)(?:\s+\d+)?$/i, (ctx) => BankGameHandler.handleSellStocks(ctx));
+bot.hears(/^\/(?:قرض|gloan)$/i, (ctx) => BankGameHandler.handleLoan(ctx));
+bot.hears(/^\/(?:سجني|gjail)$/i, (ctx) => BankGameHandler.handlePrisonStatus(ctx));
+bot.hears(/^\/(?:ديوني|gdebts)$/i, (ctx) => BankGameHandler.handleMyDebts(ctx));
+bot.hears(/^\/(?:ديونه|gdebt_him)$/i, (ctx) => BankGameHandler.handleTargetDebts(ctx));
+bot.hears(/^\/(?:سداد_ديوني|سدادديوني|grepay)$/i, (ctx) => BankGameHandler.handleRepayMine(ctx));
+bot.hears(/^\/(?:سداد_ديونه|سدادديونه|grepay_him)$/i, (ctx) => BankGameHandler.handleRepayTarget(ctx));
+bot.hears(/^\/(?:توب_القروبات|topgroups)$/i, (ctx) => BankGameHandler.handleTopGroups(ctx));
+bot.hears(/^\/(?:توب_المتفاعلين|topactive)$/i, (ctx) => BankGameHandler.handleTopActiveInGroup(ctx));
 bot.hears(/^\/(?:مين_انا|مينانا)$/i, (ctx) => GroupGamesHandler.handleWhoAmICommand(ctx));
 bot.hears(/^\/(?:الغاز|الغاز_ذكية|لغز)$/i, (ctx) => GroupGamesHandler.handleRiddleCommand(ctx));
 bot.hears(/^\/(?:سرعة_الكتابة|سرعة)$/i, (ctx) => GroupGamesHandler.handleTypingCommand(ctx));
@@ -2558,12 +2609,27 @@ bot.hears(/^\/(?:شراء_هدية|شراءهدية|شراء_هديه|شراءه
 bot.hears(/^\/(?:بيع_هدية|بيعهدية|بيع_هديه|بيعهديه)(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleSellGiftCommand(ctx));
 bot.hears(/^\/(?:كشط|كشط_اكواد|كشطاكواد)(?:\s+\d+)?$/i, (ctx) => GroupGamesHandler.handleScratchCommand(ctx));
 bot.hears(/^\/(?:احصائيات_الكشط|إحصائيات_الكشط|احصائياتالكشط|إحصائياتالكشط)$/i, (ctx) => GroupGamesHandler.handleScratchStatsCommand(ctx));
-bot.hears(/^\/(?:بيع)(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleSimpleSellCommand(ctx));
-bot.hears(/^\/(?:شراء)(?!\s*موارد)(?!\s*جيش)(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleSimpleBuyCommand(ctx));
+bot.hears(/^\/(?:بيع)(?:\s+.+)?$/i, async (ctx) => {
+  const handled = await BankGameHandler.handleAssetSellText(ctx);
+  if (!handled) {
+    return GroupGamesHandler.handleSimpleSellCommand(ctx);
+  }
+});
+bot.hears(/^\/(?:شراء)(?!\s*موارد)(?!\s*جيش)(?:\s+.+)?$/i, async (ctx) => {
+  const handled = await BankGameHandler.handleAssetBuyText(ctx);
+  if (!handled) {
+    return GroupGamesHandler.handleSimpleBuyCommand(ctx);
+  }
+});
 bot.hears(/^\/(?:هدايا|الهدايا)$/i, (ctx) => GroupGamesHandler.handleGiftCatalogCommand(ctx));
 bot.hears(/^\/(?:ممتلكاتي|املاكي|أملاكي)$/i, (ctx) => GroupGamesHandler.handleAssetsCommand(ctx));
 bot.hears(/^\/(?:اغنى_ممتلكات|أغنى_ممتلكات|لوحة_الممتلكات)$/i, (ctx) => GroupGamesHandler.handleWealthCommand(ctx));
-bot.hears(/^\/(?:اهداء)(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleGiftCommand(ctx));
+bot.hears(/^\/(?:اهداء)(?:\s+.+)?$/i, async (ctx) => {
+  const handled = await BankGameHandler.handleAssetGiftText(ctx);
+  if (!handled) {
+    return GroupGamesHandler.handleGiftCommand(ctx);
+  }
+});
 bot.hears(/^\/(?:ارسال)(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleGiftCommand(ctx));
 bot.hears(/^\/(?:ملفي|ملفي_بالجروب)$/i, (ctx) => GroupGamesHandler.handleGroupProfileCommand(ctx));
 bot.hears(/^\/(?:نقاطي|فلوسي|رصيدي)$/i, (ctx) => GroupGamesHandler.handleMyMoneyCommand(ctx));

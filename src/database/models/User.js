@@ -299,6 +299,8 @@ const userSchema = new mongoose.Schema({
 
   // Global group-game economy/profile (shared across all groups)
   globalGameProfile: mongoose.Schema.Types.Mixed,
+  // Shared global bank profile (can be reused across groups/bots on same DB)
+  bankProfile: mongoose.Schema.Types.Mixed,
 
   createdAt: {
     type: Date,

@@ -30,6 +30,8 @@ const userSchema = new mongoose.Schema({
   },
   // Shared cross-group profile for group games economy
   globalGameProfile: mongoose.Schema.Types.Mixed,
+  // Shared global bank profile (can be reused across groups/bots on same DB)
+  bankProfile: mongoose.Schema.Types.Mixed,
   lastDailyReward: { type: Date, default: null },
   lastActivity: { type: Date, default: Date.now },
   createdAt: { type: Date, default: Date.now }
