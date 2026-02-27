@@ -396,6 +396,8 @@ class GroupGamesHandler {
   static activeVoteByChat = new Map();
   static activeDuels = new Map();
   static activeDuelByChat = new Map();
+  static activeConfessions = new Map();
+  static confessionQuestions = new Map();
   static lastQuestionByGroup = new Map();
   static questionQueues = new Map();
   static userCooldowns = new Map();
@@ -1854,7 +1856,7 @@ class GroupGamesHandler {
     const luckKey = `${String(ctx.chat.id)}:${Number(ctx.from?.id || 0)}`;
     if (this.pendingLuckInputs.has(luckKey)) {
       const normalized = this.normalizeArabicDigits(String(text || '').trim());
-      const isKnownCommandLike = /^(شراء|بيع|اهداء|إهداء|ارسال|إرسال|متجر|هدايا|ممتلكاتي|حظ)\b/i.test(normalized);
+      const isKnownCommandLike = /^(شراء|بيع|اهداء|إهداء|ارسال|إرسال|متجر|هدايا|ممتلكاتي|حظ|كرسي|انهاء|إنهاء|سؤال)\b/i.test(normalized);
       if (isKnownCommandLike) {
         // Do not let pending luck block normal group commands.
         this.pendingLuckInputs.delete(luckKey);
@@ -1872,6 +1874,9 @@ class GroupGamesHandler {
       this.pendingLuckInputs.delete(luckKey);
       return this.processLuckPick(ctx, picked);
     }
+
+    const handledConfession = await this.handleIncomingConfessionText(ctx, text);
+    if (handledConfession) return true;
 
     const groupId = String(ctx.chat.id);
     const round = this.activeRounds.get(groupId);
@@ -3722,6 +3727,212 @@ class GroupGamesHandler {
     }, false);
   }
 
+  static buildConfessionKeyboard(token) {
+    return Markup.inlineKeyboard([
+      [Markup.button.callback('🛑 إنهاء كرسي الاعتراف', `group:confess:end:${token}`)]
+    ]);
+  }
+
+  static getActiveConfession(chatId) {
+    const key = String(chatId);
+    const session = this.activeConfessions.get(key);
+    if (!session) return null;
+    if (Date.now() > Number(session.endsAt || 0)) {
+      this.activeConfessions.delete(key);
+      this.confessionQuestions.delete(session.token);
+      return null;
+    }
+    return session;
+  }
+
+  static async handleConfessionStart(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const chatId = String(ctx.chat.id);
+    const running = this.getActiveConfession(chatId);
+    if (running) {
+      return ctx.reply(
+        `⏳ فيه كرسي اعتراف شغال حاليًا مع ${this.mentionUser(running.chairUserId, running.chairName)}.\n` +
+        'إذا بدكم تنهوه اكتبوا: انهاء كرسي الاعتراف',
+        { parse_mode: 'HTML' }
+      );
+    }
+
+    const target = ctx.message?.reply_to_message?.from;
+    if (!target || target.is_bot) {
+      return ctx.reply('❌ البداية تكون بالرد على رسالة الشخص.\nمثال: رد على رسالته واكتب "كرسي الاعتراف".');
+    }
+
+    const token = this.token('cf');
+    const chairName = target.first_name || target.username || String(target.id);
+    const ownerName = ctx.from?.first_name || ctx.from?.username || String(ctx.from?.id || '');
+    const durationMin = 12;
+    const endsAt = Date.now() + durationMin * 60 * 1000;
+
+    const msg = await ctx.reply(
+      `🎤 <b>كرسي الاعتراف بدأ</b>\n\n` +
+      `• صاحب الكرسي: ${this.mentionUser(target.id, chairName)}\n` +
+      `• المدة: ${durationMin} دقيقة\n\n` +
+      '📝 طريقة اللعب:\n' +
+      '1) أي عضو يسأل بس <b>بالرد على هذه الرسالة</b>.\n' +
+      `2) صاحب الكرسي يجاوب بالرد على السؤال.\n` +
+      '3) لإنهاء الجلسة: زر الإنهاء أو "انهاء كرسي الاعتراف".',
+      { parse_mode: 'HTML', reply_markup: this.buildConfessionKeyboard(token).reply_markup }
+    );
+
+    this.activeConfessions.set(chatId, {
+      token,
+      chatId,
+      ownerUserId: Number(ctx.from.id),
+      ownerName,
+      chairUserId: Number(target.id),
+      chairName,
+      anchorMessageId: Number(msg.message_id),
+      startedAt: Date.now(),
+      endsAt
+    });
+    this.confessionQuestions.set(token, new Map());
+  }
+
+  static async handleConfessionEnd(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const session = this.getActiveConfession(ctx.chat.id);
+    if (!session) return ctx.reply('ℹ️ ما في كرسي اعتراف شغال حاليًا.');
+
+    const isAdmin = await this.isGroupAdmin(ctx);
+    const uid = Number(ctx.from?.id || 0);
+    const allowed = isAdmin || uid === Number(session.ownerUserId) || uid === Number(session.chairUserId);
+    if (!allowed) {
+      return ctx.reply('❌ فقط المشرف أو اللي بدأ الجلسة أو صاحب الكرسي يقدر ينهيها.');
+    }
+    return this.finishConfessionSession(ctx, session, 'manual');
+  }
+
+  static async finishConfessionSession(ctx, session, reason = 'manual') {
+    this.activeConfessions.delete(String(session.chatId));
+    const qmap = this.confessionQuestions.get(session.token) || new Map();
+    this.confessionQuestions.delete(session.token);
+    const total = qmap.size;
+    const answered = Array.from(qmap.values()).filter((x) => Boolean(x.answered)).length;
+    const durationMin = Math.max(1, Math.round((Date.now() - Number(session.startedAt || Date.now())) / 60000));
+    const reasonText = reason === 'expired' ? '⏰ انتهى وقت الجلسة تلقائيًا.' : '✅ تم إنهاء الجلسة.';
+
+    return ctx.reply(
+      `🪑 <b>انتهى كرسي الاعتراف</b>\n\n` +
+      `${reasonText}\n` +
+      `• صاحب الكرسي: ${this.mentionUser(session.chairUserId, session.chairName)}\n` +
+      `• مدة الجلسة: ${durationMin} دقيقة\n` +
+      `• عدد الأسئلة: ${total}\n` +
+      `• الأسئلة المُجاب عنها: ${answered}`,
+      { parse_mode: 'HTML' }
+    );
+  }
+
+  static async handleConfessionAction(ctx, action, token) {
+    if (!this.isGroupChat(ctx)) return;
+    await ctx.answerCbQuery().catch(() => {});
+    const session = this.getActiveConfession(ctx.chat.id);
+    if (!session || session.token !== token) {
+      return ctx.reply('ℹ️ جلسة كرسي الاعتراف هذه انتهت.');
+    }
+    if (action !== 'end') return;
+
+    const isAdmin = await this.isGroupAdmin(ctx);
+    const uid = Number(ctx.from?.id || 0);
+    const allowed = isAdmin || uid === Number(session.ownerUserId) || uid === Number(session.chairUserId);
+    if (!allowed) {
+      return ctx.reply('❌ فقط المشرف أو اللي بدأ الجلسة أو صاحب الكرسي يقدر ينهيها.');
+    }
+    return this.finishConfessionSession(ctx, session, 'manual');
+  }
+
+  static async handleIncomingConfessionText(ctx, text) {
+    if (!this.isGroupChat(ctx)) return false;
+    const session = this.getActiveConfession(ctx.chat.id);
+    if (!session) return false;
+
+    if (Date.now() > Number(session.endsAt || 0)) {
+      await this.finishConfessionSession(ctx, session, 'expired');
+      return true;
+    }
+
+    const message = ctx.message || {};
+    const uid = Number(ctx.from?.id || 0);
+    const replyToId = Number(message?.reply_to_message?.message_id || 0);
+    const token = session.token;
+    const qmap = this.confessionQuestions.get(token) || new Map();
+    this.confessionQuestions.set(token, qmap);
+
+    const askText = String(text || '').trim();
+    const normalized = this.normalizeText(askText);
+
+    // Any member asks by replying to the session anchor message
+    if (replyToId && replyToId === Number(session.anchorMessageId)) {
+      if (uid === Number(session.chairUserId)) {
+        await ctx.reply('ℹ️ أنت صاحب الكرسي. للجواب رد على سؤال العضو مباشرة.');
+        return true;
+      }
+      if (!askText || askText.length < 2) {
+        await ctx.reply('❌ اكتب سؤال واضح.');
+        return true;
+      }
+      qmap.set(Number(message.message_id), {
+        askerId: uid,
+        askerName: ctx.from?.first_name || ctx.from?.username || String(uid),
+        questionText: askText,
+        answered: false
+      });
+      await ctx.reply(
+        `✅ تم تسجيل السؤال لـ ${this.mentionUser(session.chairUserId, session.chairName)}.\n` +
+        'صاحب الكرسي يجاوب بالرد على نفس السؤال.',
+        { parse_mode: 'HTML', reply_to_message_id: Number(message.message_id) }
+      );
+      return true;
+    }
+
+    // Chair answers by replying to a stored question
+    if (replyToId && uid === Number(session.chairUserId) && qmap.has(replyToId)) {
+      const q = qmap.get(replyToId);
+      if (q.answered) {
+        await ctx.reply('ℹ️ هذا السؤال مجاوب عليه مسبقًا.', { reply_to_message_id: Number(message.message_id) });
+        return true;
+      }
+      q.answered = true;
+      q.answerText = askText;
+      q.answeredAt = Date.now();
+      qmap.set(replyToId, q);
+
+      await ctx.reply(
+        `💬 <b>جواب كرسي الاعتراف</b>\n` +
+        `• السؤال من: ${this.mentionUser(q.askerId, q.askerName)}\n` +
+        `• الجواب: ${askText}`,
+        { parse_mode: 'HTML', reply_to_message_id: Number(message.message_id) }
+      );
+      return true;
+    }
+
+    // Optional short command format while a session is active
+    if (/^(?:سؤال\s+اعتراف|سؤال)\b/.test(normalized) && uid !== Number(session.chairUserId)) {
+      const pure = askText.replace(/^(?:سؤال\s+اعتراف|سؤال)\s*/i, '').trim();
+      if (!pure) {
+        await ctx.reply('❌ اكتب السؤال بعد كلمة "سؤال". مثال: سؤال ليش بتحب البرمجة؟');
+        return true;
+      }
+      qmap.set(Number(message.message_id), {
+        askerId: uid,
+        askerName: ctx.from?.first_name || ctx.from?.username || String(uid),
+        questionText: pure,
+        answered: false
+      });
+      await ctx.reply(
+        `✅ تم تسجيل السؤال لـ ${this.mentionUser(session.chairUserId, session.chairName)}.`,
+        { parse_mode: 'HTML', reply_to_message_id: Number(message.message_id) }
+      );
+      return true;
+    }
+
+    return false;
+  }
+
   static async handleMonthlyRewardCommand(ctx) {
     if (!this.isGroupChat(ctx)) return;
     const isAdmin = await this.isGroupAdmin(ctx);
@@ -3826,6 +4037,8 @@ class GroupGamesHandler {
     if (action === 'gweekly') return this.handleWeeklyCommand(ctx);
     if (action === 'gmonth') return this.handleMonthlyBoardCommand(ctx);
     if (action === 'glevels') return this.handleLevelsCommand(ctx);
+    if (action === 'gconfess') return this.handleConfessionStart(ctx);
+    if (action === 'gconfess_end') return this.handleConfessionEnd(ctx);
     return null;
   }
 
@@ -3837,9 +4050,10 @@ class GroupGamesHandler {
       [Markup.button.callback('🎯 مين أنا', 'group:games:gwho'), Markup.button.callback('🧠 ألغاز', 'group:games:griddle')],
       [Markup.button.callback('⚡ سرعة الكتابة', 'group:games:gtype'), Markup.button.callback('⚔️ تحدي عضوين', 'group:games:gduel')],
       [Markup.button.callback('🎲 روليت', 'group:games:gchance'), Markup.button.callback('📊 تصويت', 'group:games:gvote')],
-      [Markup.button.callback('🧠 تحدي يومي', 'group:games:gdaily'), Markup.button.callback('🏁 المتصدرين', 'group:games:gleader')],
-      [Markup.button.callback('📅 سباق الأسبوع', 'group:games:gweekly'), Markup.button.callback('🗓️ سباق الشهر', 'group:games:gmonth')],
-      [Markup.button.callback('🏅 لوحة المستويات', 'group:games:glevels')]
+      [Markup.button.callback('🪑 كرسي الاعتراف', 'group:games:gconfess'), Markup.button.callback('🧠 تحدي يومي', 'group:games:gdaily')],
+      [Markup.button.callback('🏁 المتصدرين', 'group:games:gleader'), Markup.button.callback('📅 سباق الأسبوع', 'group:games:gweekly')],
+      [Markup.button.callback('🗓️ سباق الشهر', 'group:games:gmonth'), Markup.button.callback('🏅 لوحة المستويات', 'group:games:glevels')],
+      [Markup.button.callback('🛑 إنهاء كرسي الاعتراف', 'group:games:gconfess_end')]
     ]);
     return ctx.reply(
       '🎮 <b>مساعدة ألعاب الجروب (موحّدة)</b>\n\n' +
@@ -3854,6 +4068,8 @@ class GroupGamesHandler {
       '• /chance | روليت\n' +
       '• /gduel @user | تحدي عضوين\n' +
       '• /gvote | تصويت\n' +
+      '• /gconfess (بالرد) | بدء كرسي الاعتراف\n' +
+      '• /gconfessend | إنهاء كرسي الاعتراف\n' +
       '• /gdaily | تحدي يومي\n\n' +
       '<b>ثانيًا: النظام والترتيب</b>\n' +
       '• /gleader | إجمالي المتصدرين\n' +
@@ -3910,7 +4126,7 @@ class GroupGamesHandler {
       '• /gteams | ترتيب الفرق\n' +
       '• /gtour | البطولة الأسبوعية (مشرف)\n\n' +
       '<b>أوامر عربية بدون سلاش</b>\n' +
-      'العاب الجروب | مين انا | الغاز | سرعة الكتابة | روليت | متصدرين | اسبوعي | متصدرين الشهر | ملفي | متجر الجروب | الهدايا | ممتلكاتي | اغنى ممتلكات | استثمار فلوسي | حظ | احصائيات الحظ | كشط | احصائيات الكشط | انشاء قلعه | قلعتي | متجر الموارد | شراء موارد | مواردي | تطوير قلعتي | انشاء معكسر | شراء جيش | تطوير الجيش | بحث الكنز | تفعيل الحصانه | تعطيل الحصانه | حصانتي | مبارزه | الانضمام للمبارزه | المبارزين | توب الحكام | تحالف | طلبات التحالف\n\n' +
+      'العاب الجروب | مين انا | الغاز | سرعة الكتابة | روليت | متصدرين | اسبوعي | متصدرين الشهر | ملفي | متجر الجروب | الهدايا | ممتلكاتي | اغنى ممتلكات | استثمار فلوسي | حظ | احصائيات الحظ | كشط | احصائيات الكشط | كرسي الاعتراف | انهاء كرسي الاعتراف | انشاء قلعه | قلعتي | متجر الموارد | شراء موارد | مواردي | تطوير قلعتي | انشاء معكسر | شراء جيش | تطوير الجيش | بحث الكنز | تفعيل الحصانه | تعطيل الحصانه | حصانتي | مبارزه | الانضمام للمبارزه | المبارزين | توب الحكام | تحالف | طلبات التحالف\n\n' +
       `العملة: كل إجابة صحيحة = <b>${this.formatCurrency(1)}</b>.`,
       { parse_mode: 'HTML', reply_markup: keyboard.reply_markup }
     );
