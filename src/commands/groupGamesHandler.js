@@ -1806,7 +1806,16 @@ class GroupGamesHandler {
 
     const group = await this.ensureGroupRecord(ctx);
     if (Number(group.settings?.primaryOwnerId || 0) === targetUserId) return true;
-    if (Number(group.settings?.basicOwnerId || 0) === targetUserId) return true;
+    const basicOwnerIds = Array.isArray(group.settings?.basicOwnerIds)
+      ? group.settings.basicOwnerIds.map(Number)
+      : (Number.isInteger(group.settings?.basicOwnerId) ? [Number(group.settings.basicOwnerId)] : []);
+    const ownerIds = Array.isArray(group.settings?.ownerIds) ? group.settings.ownerIds.map(Number) : [];
+    const managerIds = Array.isArray(group.settings?.managerIds) ? group.settings.managerIds.map(Number) : [];
+    const adminIds = Array.isArray(group.settings?.adminIds) ? group.settings.adminIds.map(Number) : [];
+    if (basicOwnerIds.includes(targetUserId)) return true;
+    if (ownerIds.includes(targetUserId)) return true;
+    if (managerIds.includes(targetUserId)) return true;
+    if (adminIds.includes(targetUserId)) return true;
 
     try {
       const member = await ctx.telegram.getChatMember(ctx.chat.id, targetUserId);

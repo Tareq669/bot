@@ -128,9 +128,25 @@ const groupSchema = new mongoose.Schema({
       type: Number,
       default: null
     },
+    basicOwnerIds: {
+      type: [Number],
+      default: []
+    },
     basicOwnerId: {
       type: Number,
       default: null
+    },
+    ownerIds: {
+      type: [Number],
+      default: []
+    },
+    managerIds: {
+      type: [Number],
+      default: []
+    },
+    adminIds: {
+      type: [Number],
+      default: []
     },
     premiumMemberIds: {
       type: [Number],
