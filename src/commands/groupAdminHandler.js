@@ -2873,19 +2873,19 @@ class GroupAdminHandler {
         // ignore
       }
 
-      const who = user.first_name || user.username || String(user.id);
-      const when = new Date().toLocaleString('ar');
+      const who = this.mentionUser(user.id, user.first_name || user.username || String(user.id));
       const note =
-        '🚨 إشعار مغادرة مشرف\n\n' +
-        `👥 المجموعة: ${chat.title || 'Unknown'}\n` +
-        `👤 المشرف: ${who}\n` +
-        `🆔 ${user.id}\n` +
-        `🕒 ${when}`;
+        '• هنالك مشرف غادر قروبك\n\n' +
+        `• اسمه ↤︎ ${who}\n` +
+        `• ايديه ↤︎ <code>${user.id}</code>\n` +
+        `• بقروبك ↤︎ ${this.escapeHtml(chat.title || 'Unknown')}\n-`;
 
       await this.addModerationLog(group, 'admin_left_group', user.id, null, `status ${oldStatus} -> ${newStatus}`);
       await group.save();
 
-      await Promise.all([...owners].map((ownerId) => ctx.telegram.sendMessage(ownerId, note).catch(() => null)));
+      await Promise.all([...owners].map((ownerId) => ctx.telegram.sendMessage(ownerId, note, {
+        parse_mode: 'HTML'
+      }).catch(() => null)));
     } catch (_error) {
       // ignore chat_member failures
     }
