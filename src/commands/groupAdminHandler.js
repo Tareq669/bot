@@ -1354,7 +1354,8 @@ class GroupAdminHandler {
     const group = await this.ensureGroupRecord(ctx);
     const rawText = String(ctx.message?.text || '').trim();
     const enableMatch = /^(?:تفعيل\s*الحمايه|تفعيل\s*الحماية|\/gprotectionlevel)\s+(\d+)$/i.exec(rawText);
-    const disableMatch = /^(?:تعطيل\s*الحمايه|تعطيل\s*الحماية|\/gprotectionlevel)\s+(?:0|off|disable)$/i.exec(rawText);
+    const disableMatch = /^(?:تعطيل\s*الحمايه|تعطيل\s*الحماية)\s+2$/i.exec(rawText)
+      || /^(?:\/gprotectionlevel)\s+(?:0|off|disable)$/i.exec(rawText);
     if (!enableMatch && !disableMatch) {
       return ctx.reply(
         '❌ الصيغة:\n' +
@@ -1365,7 +1366,7 @@ class GroupAdminHandler {
       );
     }
 
-    if (disableMatch || /^(?:تعطيل\s*الحمايه|تعطيل\s*الحماية)\s+2$/i.test(rawText)) {
+    if (disableMatch) {
       group.settings.protectionPresetLevel = 0;
       group.settings.floodProtection = false;
       group.settings.filterBadWords = false;
