@@ -64,6 +64,14 @@ const groupSchema = new mongoose.Schema({
       type: Boolean,
       default: false
     },
+    tournamentEnabled: {
+      type: Boolean,
+      default: true
+    },
+    blockedTournamentIds: {
+      type: [String],
+      default: []
+    },
     blockLongMessages: {
       type: Boolean,
       default: true

@@ -23,6 +23,7 @@ const GroupGamesHandler = require('./commands/groupGamesHandler');
 const WhisperHandler = require('./commands/whisperHandler');
 const QuranicGamesHandler = require('./commands/quranicGamesHandler');
 const BankGameHandler = require('./commands/bankGameHandler');
+const TournamentChallengeHandler = require('./commands/tournamentChallengeHandler');
 const EconomyHandler = require('./commands/economyHandler');
 const ContentHandler = require('./commands/contentHandler');
 const ProfileHandler = require('./commands/profileHandler');
@@ -106,6 +107,7 @@ const bot = new Telegraf(process.env.BOT_TOKEN, {
 // Initialize session middleware
 bot.use(session());
 GroupGamesHandler.setup(bot);
+TournamentChallengeHandler.setup(bot);
 
 const PRIVATE_ONLY_COMMANDS = new Set([
   'khatma', 'adhkar', 'quran', 'quotes', 'poetry', 'games', 'economy', 'stats', 'rewards',
@@ -481,6 +483,11 @@ bot.command('gteam', (ctx) => GroupGamesHandler.handleTeamCommand(ctx));
 bot.command('gteams', (ctx) => GroupGamesHandler.handleTeamsCommand(ctx));
 bot.command('gtour', (ctx) => GroupGamesHandler.handleTournamentCommand(ctx));
 bot.command('g', (ctx) => GroupGamesHandler.handleQuickStart(ctx));
+bot.command('tcreate', (ctx) => TournamentChallengeHandler.handleCreateTournamentCommand(ctx));
+bot.command('taddq', (ctx) => TournamentChallengeHandler.handleAddQuestionsCommand(ctx));
+bot.command('tdelq', (ctx) => TournamentChallengeHandler.handleDeleteQuestionsCommand(ctx));
+bot.command('ttournaments', (ctx) => TournamentChallengeHandler.handleListTournaments(ctx));
+bot.command('tjoined', (ctx) => TournamentChallengeHandler.handleTournamentJoinedGroups(ctx));
 
 // --- COMMAND HANDLERS ---
 bot.command('profile', (ctx) => CommandHandler.handleProfile(ctx));
@@ -2537,6 +2544,15 @@ bot.hears(/^زوجاتي$/i, (ctx) => BankGameHandler.handleWivesList(ctx));
 bot.hears(/^زوجتي\s+(?:الاولى|الأولى|اولى|الثانية|الثانيه|ثانية|الثالثة|الثالثه|ثالثة|الرابعة|الرابعه|رابعة|[1-4])$/i, (ctx) => BankGameHandler.handleSpecificWife(ctx));
 bot.hears(/^توب\s*المتزوجين$/i, (ctx) => BankGameHandler.handleTopMarried(ctx));
 bot.hears(/^حذف\s*المتزوجين$/i, (ctx) => BankGameHandler.handleDeleteMarried(ctx));
+bot.hears(/^انشاء\s*بطوله$/i, (ctx) => TournamentChallengeHandler.handleCreateTournamentCommand(ctx));
+bot.hears(/^اضف\s*اسئله\s*البطوله$/i, (ctx) => TournamentChallengeHandler.handleAddQuestionsCommand(ctx));
+bot.hears(/^حذف\s*اسئله\s*البطوله$/i, (ctx) => TournamentChallengeHandler.handleDeleteQuestionsCommand(ctx));
+bot.hears(/^منضمين\s*البطوله$/i, (ctx) => TournamentChallengeHandler.handleTournamentJoinedGroups(ctx));
+bot.hears(/^البطولات$/i, (ctx) => TournamentChallengeHandler.handleListTournaments(ctx));
+bot.hears(/^الانضمام\s*للبطوله$/i, (ctx) => TournamentChallengeHandler.handleGroupJoinTournament(ctx));
+bot.hears(/^انا$/i, (ctx) => TournamentChallengeHandler.handleParticipantJoin(ctx));
+bot.hears(/^تفعيل\s*البطوله$/i, (ctx) => TournamentChallengeHandler.handleGroupTournamentToggle(ctx, true));
+bot.hears(/^تعطيل\s*البطوله$/i, (ctx) => TournamentChallengeHandler.handleGroupTournamentToggle(ctx, false));
 bot.hears(/^توب\s*القروبات$/i, (ctx) => BankGameHandler.handleTopGroups(ctx));
 bot.hears(/^(?:توب\s*المتفاعلين|الاكثر\s*تفاعلا|الأكثر\s*تفاعلا)$/i, (ctx) => BankGameHandler.handleTopActiveInGroup(ctx));
 // Group Arabic aliases (without slash)
@@ -2691,6 +2707,15 @@ bot.hears(/^\/(?:زوجاتي|gwives)$/i, (ctx) => BankGameHandler.handleWivesLi
 bot.hears(/^\/(?:زوجتي|gwife)\s+(?:الاولى|الأولى|اولى|الثانية|الثانيه|ثانية|الثالثة|الثالثه|ثالثة|الرابعة|الرابعه|رابعة|[1-4])$/i, (ctx) => BankGameHandler.handleSpecificWife(ctx));
 bot.hears(/^\/(?:توب_المتزوجين|topmarried)$/i, (ctx) => BankGameHandler.handleTopMarried(ctx));
 bot.hears(/^\/(?:حذف_المتزوجين|delmarried)$/i, (ctx) => BankGameHandler.handleDeleteMarried(ctx));
+bot.hears(/^\/(?:انشاء_بطوله|tcreate)$/i, (ctx) => TournamentChallengeHandler.handleCreateTournamentCommand(ctx));
+bot.hears(/^\/(?:اضف_اسئله_البطوله|taddq)$/i, (ctx) => TournamentChallengeHandler.handleAddQuestionsCommand(ctx));
+bot.hears(/^\/(?:حذف_اسئله_البطوله|tdelq)$/i, (ctx) => TournamentChallengeHandler.handleDeleteQuestionsCommand(ctx));
+bot.hears(/^\/(?:منضمين_البطوله|tjoined)$/i, (ctx) => TournamentChallengeHandler.handleTournamentJoinedGroups(ctx));
+bot.hears(/^\/(?:البطولات|ttournaments)$/i, (ctx) => TournamentChallengeHandler.handleListTournaments(ctx));
+bot.hears(/^\/(?:الانضمام_للبطوله|tjoin)$/i, (ctx) => TournamentChallengeHandler.handleGroupJoinTournament(ctx));
+bot.hears(/^\/(?:انا|tme)$/i, (ctx) => TournamentChallengeHandler.handleParticipantJoin(ctx));
+bot.hears(/^\/(?:تفعيل_البطوله|tenable)$/i, (ctx) => TournamentChallengeHandler.handleGroupTournamentToggle(ctx, true));
+bot.hears(/^\/(?:تعطيل_البطوله|tdisable)$/i, (ctx) => TournamentChallengeHandler.handleGroupTournamentToggle(ctx, false));
 bot.hears(/^\/(?:توب_القروبات|topgroups)$/i, (ctx) => BankGameHandler.handleTopGroups(ctx));
 bot.hears(/^\/(?:توب_المتفاعلين|topactive)$/i, (ctx) => BankGameHandler.handleTopActiveInGroup(ctx));
 bot.hears(/^\/(?:مين_انا|مينانا)$/i, (ctx) => GroupGamesHandler.handleWhoAmICommand(ctx));
@@ -3579,6 +3604,8 @@ bot.on('text', async (ctx) => {
     const message = ctx.message.text;
 
     if (GroupAdminHandler.isGroupChat(ctx)) {
+      const handledTournament = await TournamentChallengeHandler.handleGroupText(ctx, message);
+      if (handledTournament) return;
       const handledGame = await GroupGamesHandler.handleIncomingGroupText(ctx, message);
       if (handledGame) return;
       const wasModerated = await GroupAdminHandler.processGroupMessage(ctx);
@@ -3599,6 +3626,9 @@ bot.on('text', async (ctx) => {
 
     const handledTemplateText = await GroupAdminHandler.handlePrivateTemplateText(ctx, message);
     if (handledTemplateText) return;
+
+    const handledTournamentPrivate = await TournamentChallengeHandler.handlePrivateText(ctx, message);
+    if (handledTournamentPrivate) return;
 
     // Handle feature awaiting input
     if (ctx.session && ctx.session.featureAwait) {
