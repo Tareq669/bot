@@ -1353,18 +1353,42 @@ class GroupAdminHandler {
 
     const group = await this.ensureGroupRecord(ctx);
     const rawText = String(ctx.message?.text || '').trim();
-    const match = /^(?:تفعيل\s*الحمايه|تفعيل\s*الحماية|\/gprotectionlevel)\s+(\d+)$/i.exec(rawText);
-    if (!match) {
+    const enableMatch = /^(?:تفعيل\s*الحمايه|تفعيل\s*الحماية|\/gprotectionlevel)\s+(\d+)$/i.exec(rawText);
+    const disableMatch = /^(?:تعطيل\s*الحمايه|تعطيل\s*الحماية|\/gprotectionlevel)\s+(?:0|off|disable)$/i.exec(rawText);
+    if (!enableMatch && !disableMatch) {
       return ctx.reply(
         '❌ الصيغة:\n' +
         '• تفعيل الحمايه 2\n' +
-        '• /gprotectionlevel 2'
+        '• تعطيل الحمايه 2\n' +
+        '• /gprotectionlevel 2\n' +
+        '• /gprotectionlevel off'
       );
     }
 
-    const level = parseInt(match[1], 10);
+    if (disableMatch || /^(?:تعطيل\s*الحمايه|تعطيل\s*الحماية)\s+2$/i.test(rawText)) {
+      group.settings.protectionPresetLevel = 0;
+      group.settings.floodProtection = false;
+      group.settings.filterBadWords = false;
+      group.settings.blockExplicitContent = false;
+      group.settings.blockLongMessages = false;
+      group.settings.warningPolicy.enabled = false;
+      group.settings.warningPolicy.muteAt = 0;
+      group.settings.warningPolicy.banAt = 0;
+      group.settings.warningPolicy.muteMinutes = 0;
+      await group.save();
+      return ctx.reply(
+        '✅ تم تعطيل الحمايه 2\n\n' +
+        '• حماية التكرار ↤︎ معطلة\n' +
+        '• فلتر الكلمات ↤︎ معطل\n' +
+        '• منع الاباحيه ↤︎ معطل\n' +
+        '• الرسائل الطويلة ↤︎ معطلة\n' +
+        '• العقوبات التلقائية ↤︎ معطلة'
+      );
+    }
+
+    const level = parseInt(enableMatch[1], 10);
     if (level !== 2) {
-      return ctx.reply('❌ المتاح حاليًا فقط: تفعيل الحمايه 2');
+      return ctx.reply('❌ المتاح حاليًا فقط: تفعيل الحمايه 2 أو تعطيل الحمايه 2');
     }
 
     group.settings.protectionPresetLevel = 2;
@@ -2977,7 +3001,7 @@ class GroupAdminHandler {
       await this.handleDetectToggle(ctx);
       return true;
     }
-    if (/^(تفعيل الحمايه\s+\d+|تفعيل الحماية\s+\d+|\/gprotectionlevel\b)/i.test(rawText)) {
+    if (/^(تفعيل الحمايه\s+\d+|تفعيل الحماية\s+\d+|تعطيل الحمايه\s+(?:\d+)|تعطيل الحماية\s+(?:\d+)|\/gprotectionlevel\b)/i.test(rawText)) {
       await this.handleProtectionPresetCommand(ctx);
       return true;
     }
