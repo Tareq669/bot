@@ -178,6 +178,7 @@ const DEFAULT_VOTE_TOPICS = [
 
 const CELEBRATION_LINES = ['إجابة ممتازة!', 'مستوى قوي!', 'رد سريع جدًا!', 'أداء احترافي!'];
 const GENDER_VALUES = { boy: 'boy', girl: 'girl' };
+const COMPETITION_TEAMS = { boys: 'boys', girls: 'girls' };
 const STORY_LETTERS = ['ا', 'ب', 'ت', 'ث', 'ج', 'ح', 'خ', 'د', 'ر', 'س', 'ش', 'ص', 'ض', 'ط', 'ع', 'ف', 'ق', 'ك', 'ل', 'م', 'ن', 'ه', 'و', 'ي'];
 const STORY_STOPWORDS = new Set(['من', 'في', 'على', 'عن', 'الى', 'إلى', 'هذا', 'هذي', 'هاي', 'هو', 'هي', 'كان', 'كانت', 'صار', 'صارت', 'بعد', 'قبل', 'مع', 'بدون', 'بس', 'يعني', 'مرة', 'مره', 'انه', 'انو', 'انوه', 'انا', 'انت', 'انتي', 'احنا', 'هم', 'كل', 'لما', 'ثم', 'و', 'او', 'أو', 'يا']);
 const DEFAULT_GENDER_WORDS = {
@@ -776,10 +777,27 @@ class GroupGamesHandler {
     return '';
   }
 
+  static normalizeCompetitionTeamValue(value) {
+    const normalized = this.normalizeText(String(value || ''));
+    if (['العيال', 'عيال', 'ولد', 'اولاد', 'أولاد', 'شباب', 'الشباب', 'boys', 'boy'].includes(normalized)) {
+      return COMPETITION_TEAMS.boys;
+    }
+    if (['البنات', 'بنات', 'بنت', 'صبايا', 'الصبايا', 'girls', 'girl'].includes(normalized)) {
+      return COMPETITION_TEAMS.girls;
+    }
+    return '';
+  }
+
   static getGenderLabel(value) {
     if (value === GENDER_VALUES.boy) return 'ولد';
     if (value === GENDER_VALUES.girl) return 'بنت';
     return 'غير محدد';
+  }
+
+  static getCompetitionTeamLabel(value) {
+    if (value === COMPETITION_TEAMS.boys) return 'العيال';
+    if (value === COMPETITION_TEAMS.girls) return 'البنات';
+    return 'غير منضم';
   }
 
   static defaultGenderSettings() {
@@ -1170,6 +1188,7 @@ class GroupGamesHandler {
     if (!Array.isArray(group.gameSystem.scores)) group.gameSystem.scores = [];
     group.gameSystem.scores.forEach((row) => {
       row.gender = this.normalizeGenderValue(row.gender);
+      row.competitionTeam = this.normalizeCompetitionTeamValue(row.competitionTeam);
       if (!Number.isFinite(row.points)) row.points = 0;
       if (!Number.isFinite(row.weeklyPoints)) row.weeklyPoints = 0;
       if (!Number.isFinite(row.monthlyPoints)) row.monthlyPoints = 0;
@@ -1407,6 +1426,7 @@ class GroupGamesHandler {
         giftsSent: 0,
         giftsReceived: 0,
         gender: '',
+        competitionTeam: '',
         giftInventory: [],
         scratchDayKey: '',
         scratchPlaysToday: 0,
@@ -1452,6 +1472,7 @@ class GroupGamesHandler {
     }
     row.username = user.username || user.first_name || String(userId);
     row.gender = this.normalizeGenderValue(row.gender);
+    row.competitionTeam = this.normalizeCompetitionTeamValue(row.competitionTeam);
     if (!Array.isArray(row.giftInventory)) row.giftInventory = [];
     if (!row.scratchDayKey) row.scratchDayKey = '';
     if (!Number.isFinite(row.scratchPlaysToday)) row.scratchPlaysToday = 0;
@@ -1493,6 +1514,9 @@ class GroupGamesHandler {
       giftsSent: 0,
       giftsReceived: 0,
       gender: '',
+      competitionTeam: '',
+      competitionPoints: 0,
+      competitionWins: 0,
       giftInventory: [],
       scratchDayKey: '',
       scratchPlaysToday: 0,
@@ -1536,6 +1560,9 @@ class GroupGamesHandler {
     p.giftsSent = Number(p.giftsSent || 0);
     p.giftsReceived = Number(p.giftsReceived || 0);
     p.gender = this.normalizeGenderValue(p.gender);
+    p.competitionTeam = this.normalizeCompetitionTeamValue(p.competitionTeam);
+    p.competitionPoints = Number(p.competitionPoints || 0);
+    p.competitionWins = Number(p.competitionWins || 0);
     p.giftInventory = Array.isArray(p.giftInventory) ? p.giftInventory.map((x) => ({
       key: String(x?.key || ''),
       name: String(x?.name || x?.key || ''),
@@ -1591,6 +1618,7 @@ class GroupGamesHandler {
     row.giftsSent = p.giftsSent;
     row.giftsReceived = p.giftsReceived;
     row.gender = p.gender;
+    row.competitionTeam = p.competitionTeam;
     row.giftInventory = p.giftInventory.map((x) => ({ key: x.key, name: x.name, count: x.count }));
 
     row.scratchDayKey = p.scratchDayKey || '';
@@ -1637,6 +1665,7 @@ class GroupGamesHandler {
     p.giftsSent = Number(row.giftsSent || 0);
     p.giftsReceived = Number(row.giftsReceived || 0);
     p.gender = this.normalizeGenderValue(row.gender);
+    p.competitionTeam = this.normalizeCompetitionTeamValue(row.competitionTeam || p.competitionTeam);
     p.giftInventory = Array.isArray(row.giftInventory) ? row.giftInventory.map((x) => ({
       key: String(x?.key || ''),
       name: String(x?.name || x?.key || ''),
@@ -1716,6 +1745,22 @@ class GroupGamesHandler {
     if (!userDoc) return;
     userDoc.globalGameProfile = this.applyRowToProfile(row, userDoc.globalGameProfile || {});
     await userDoc.save();
+  }
+
+  static async awardCompetitionPoints(userDoc, row, amount) {
+    if (!userDoc) return null;
+    const team = this.normalizeCompetitionTeamValue(row?.competitionTeam);
+    const reward = Math.max(0, Number(amount || 0));
+    if (!team || reward < 1) return null;
+    userDoc.globalGameProfile = this.normalizeGlobalGameProfile(userDoc.globalGameProfile || {});
+    userDoc.globalGameProfile.competitionTeam = team;
+    userDoc.globalGameProfile.competitionPoints = Number(userDoc.globalGameProfile.competitionPoints || 0) + reward;
+    userDoc.globalGameProfile.competitionWins = Number(userDoc.globalGameProfile.competitionWins || 0) + 1;
+    return {
+      team,
+      points: userDoc.globalGameProfile.competitionPoints,
+      wins: userDoc.globalGameProfile.competitionWins
+    };
   }
 
   static awardXp(row, xpAmount) {
@@ -2026,6 +2071,128 @@ class GroupGamesHandler {
     const label = type === 'girls' ? 'البنات' : 'العيال';
     const count = (group.gameSystem?.scores || []).filter((row) => this.normalizeGenderValue(row.gender) === wanted).length;
     return ctx.reply(`📊 عدد ${label} ↤︎ ${count}`, { reply_to_message_id: ctx.message?.message_id });
+  }
+
+  static async handleJoinCompetitionTeamCommand(ctx, forcedTeam = '') {
+    if (!this.isGroupChat(ctx)) return;
+    const group = await this.ensureGroupRecord(ctx);
+    const row = this.getOrCreateScoreRow(group, ctx.from);
+    const userDoc = await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
+    const profile = this.normalizeGlobalGameProfile(userDoc?.globalGameProfile || {});
+    const raw = String(ctx.message?.text || '').trim();
+    const selected = this.normalizeCompetitionTeamValue(
+      forcedTeam || this.parseTextAfterPrefix(raw, /^(?:الدخول\s*لفريق|\/(?:gjoinboys|gjoingirls))\s*/i)
+    );
+
+    if (!selected) {
+      return ctx.reply('❌ استخدم:\n• الدخول لفريق العيال\n• الدخول لفريق البنات', {
+        reply_to_message_id: ctx.message?.message_id
+      });
+    }
+
+    const previousTeam = this.normalizeCompetitionTeamValue(row.competitionTeam || profile.competitionTeam);
+    if (previousTeam && previousTeam !== selected) {
+      userDoc.globalGameProfile = this.normalizeGlobalGameProfile(userDoc.globalGameProfile || {});
+      userDoc.globalGameProfile.competitionPoints = 0;
+      userDoc.globalGameProfile.competitionWins = 0;
+    }
+    row.competitionTeam = selected;
+    row.updatedAt = new Date();
+    await group.save();
+    await this.syncRowToGlobal(userDoc, row);
+    return ctx.reply(
+      `✅ ${this.mentionUser(ctx.from.id, ctx.from.first_name || ctx.from.username || 'عضو')}\n• تم انضمامك لفريق ↤︎ ${this.getCompetitionTeamLabel(selected)}`,
+      { parse_mode: 'HTML', reply_to_message_id: ctx.message?.message_id }
+    );
+  }
+
+  static async handleLeaveCompetitionTeamCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const group = await this.ensureGroupRecord(ctx);
+    const row = this.getOrCreateScoreRow(group, ctx.from);
+    const userDoc = await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
+    const team = this.normalizeCompetitionTeamValue(row.competitionTeam);
+    if (!team) {
+      return ctx.reply('ℹ️ أنت غير منضم لأي فريق حاليًا.', {
+        reply_to_message_id: ctx.message?.message_id
+      });
+    }
+
+    row.competitionTeam = '';
+    row.updatedAt = new Date();
+    await group.save();
+    await this.syncRowToGlobal(userDoc, row);
+    return ctx.reply(
+      `✅ ${this.mentionUser(ctx.from.id, ctx.from.first_name || ctx.from.username || 'عضو')}\n• خرجت من فريق ↤︎ ${this.getCompetitionTeamLabel(team)}`,
+      { parse_mode: 'HTML', reply_to_message_id: ctx.message?.message_id }
+    );
+  }
+
+  static async handleMyCompetitionTeamCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const group = await this.ensureGroupRecord(ctx);
+    const row = this.getOrCreateScoreRow(group, ctx.from);
+    const userDoc = await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
+    const profile = this.normalizeGlobalGameProfile(userDoc?.globalGameProfile || {});
+    const team = this.normalizeCompetitionTeamValue(row.competitionTeam || profile.competitionTeam);
+    return ctx.reply(
+      `${this.mentionUser(ctx.from.id, ctx.from.first_name || ctx.from.username || 'عضو')}\n` +
+      `• فريقك ↤︎ ${this.getCompetitionTeamLabel(team)}\n` +
+      `• نقاط التنافس ↤︎ ${Number(profile.competitionPoints || 0)}\n` +
+      `• مرات التسجيل ↤︎ ${Number(profile.competitionWins || 0)}`,
+      { parse_mode: 'HTML', reply_to_message_id: ctx.message?.message_id }
+    );
+  }
+
+  static async handleCompetitionTopCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const docs = await User.find(
+      { 'globalGameProfile.competitionTeam': { $in: [COMPETITION_TEAMS.boys, COMPETITION_TEAMS.girls] } },
+      { firstName: 1, username: 1, userId: 1, globalGameProfile: 1 }
+    ).lean();
+
+    if (!docs.length) {
+      return ctx.reply('📊 لا يوجد أي أعضاء منضمين للتنافس بعد.', {
+        reply_to_message_id: ctx.message?.message_id
+      });
+    }
+
+    const totals = {
+      [COMPETITION_TEAMS.boys]: { points: 0, count: 0 },
+      [COMPETITION_TEAMS.girls]: { points: 0, count: 0 }
+    };
+    const members = [];
+    docs.forEach((doc) => {
+      const profile = this.normalizeGlobalGameProfile(doc.globalGameProfile || {});
+      const team = this.normalizeCompetitionTeamValue(profile.competitionTeam);
+      if (!team) return;
+      totals[team].points += Number(profile.competitionPoints || 0);
+      totals[team].count += 1;
+      members.push({
+        team,
+        points: Number(profile.competitionPoints || 0),
+        wins: Number(profile.competitionWins || 0),
+        name: doc.username ? `@${doc.username}` : (doc.firstName || `user_${doc.userId}`)
+      });
+    });
+
+    members.sort((a, b) => b.points - a.points || b.wins - a.wins);
+    const leader = totals[COMPETITION_TEAMS.boys].points === totals[COMPETITION_TEAMS.girls].points
+      ? 'تعادل'
+      : (totals[COMPETITION_TEAMS.boys].points > totals[COMPETITION_TEAMS.girls].points ? 'العيال' : 'البنات');
+
+    let text =
+      '🏁 <b>توب التنافس</b>\n\n' +
+      `• فريق العيال ↤︎ ${totals[COMPETITION_TEAMS.boys].points} نقطة | أعضاء: ${totals[COMPETITION_TEAMS.boys].count}\n` +
+      `• فريق البنات ↤︎ ${totals[COMPETITION_TEAMS.girls].points} نقطة | أعضاء: ${totals[COMPETITION_TEAMS.girls].count}\n` +
+      `• المتصدر الحالي ↤︎ ${leader}\n\n` +
+      '<b>أفضل المشاركين</b>\n';
+
+    members.slice(0, 10).forEach((member, index) => {
+      text += `${index + 1}. ${this.escapeHtml(member.name)} — ${this.getCompetitionTeamLabel(member.team)} — ${member.points} نقطة\n`;
+    });
+
+    return ctx.reply(text, { parse_mode: 'HTML', reply_to_message_id: ctx.message?.message_id });
   }
 
   static async handleGenderWordsCommand(ctx, action) {
@@ -2747,6 +2914,7 @@ class GroupGamesHandler {
       }
     }
 
+    await this.awardCompetitionPoints(userDoc, row, finalReward);
     await this.syncRowToGlobal(userDoc, row);
 
     return {
