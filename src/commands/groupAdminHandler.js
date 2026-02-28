@@ -313,6 +313,7 @@ class GroupAdminHandler {
   static normalizeGroupState(group) {
     if (!group.settings) group.settings = {};
     if (typeof group.settings.lockLinks !== 'boolean') group.settings.lockLinks = false;
+    if (typeof group.settings.lockStickers !== 'boolean') group.settings.lockStickers = false;
     if (typeof group.settings.filterBadWords !== 'boolean') group.settings.filterBadWords = true;
     if (typeof group.settings.blockExplicitContent !== 'boolean') group.settings.blockExplicitContent = true;
     if (typeof group.settings.floodProtection !== 'boolean') group.settings.floodProtection = true;
@@ -437,6 +438,7 @@ class GroupAdminHandler {
       `🆔 المعرف: <code>${group?.groupId || 'N/A'}</code>\n\n` +
       '<b>الإعدادات الحالية:</b>\n' +
       `• منع الروابط: ${settings.lockLinks ? '✅' : '❌'}\n` +
+      `• قفل الملصقات: ${settings.lockStickers ? '✅' : '❌'}\n` +
       `• فلتر الكلمات: ${settings.filterBadWords ? '✅' : '❌'}\n` +
       `• منع الإباحي: ${settings.blockExplicitContent ? '✅' : '❌'}\n` +
       `• حماية التكرار: ${settings.floodProtection ? '✅' : '❌'}\n` +
@@ -456,6 +458,7 @@ class GroupAdminHandler {
       '• /gpolicy 2 3 10\n' +
       '• /gprotect\n' +
       '• /gprotect links on|off\n' +
+      '• /gprotect stickers on|off\n' +
       '• /gprotect words on|off\n' +
       '• /gprotect flood on|off\n' +
       '• /gprotect nsfw on|off\n' +
@@ -506,6 +509,7 @@ class GroupAdminHandler {
 
   static groupPanelKeyboard(group) {
     const lockLinks = Boolean(group?.settings?.lockLinks);
+    const lockStickers = Boolean(group?.settings?.lockStickers);
     const filterBadWords = Boolean(group?.settings?.filterBadWords);
     const floodProtection = Boolean(group?.settings?.floodProtection);
     const exemptAdmins = Boolean(group?.settings?.exemptAdminsFromProtection);
@@ -516,6 +520,7 @@ class GroupAdminHandler {
         Markup.button.callback(filterBadWords ? '🔓 كلمات' : '🔒 كلمات', 'group:toggle:filterBadWords')
       ],
       [
+        Markup.button.callback(lockStickers ? '🔓 ملصقات' : '🔒 ملصقات', 'group:toggle:lockStickers'),
         Markup.button.callback(floodProtection ? '🔓 تكرار' : '🔒 تكرار', 'group:toggle:floodProtection')
       ],
       [
@@ -601,6 +606,7 @@ class GroupAdminHandler {
     return (
       '🛡️ <b>حالة الحماية الحالية</b>\n\n' +
       `• الروابط: ${group.settings?.lockLinks ? '✅ مقفلة' : '❌ مفتوحة'}\n` +
+      `• الملصقات: ${group.settings?.lockStickers ? '✅ مقفلة' : '❌ مفتوحة'}\n` +
       `• الكلمات: ${group.settings?.filterBadWords ? '✅ مفعلة' : '❌ معطلة'}\n` +
       `• الإباحي: ${group.settings?.blockExplicitContent ? '✅ مفعلة' : '❌ معطلة'}\n` +
       `• التكرار: ${group.settings?.floodProtection ? '✅ مفعلة' : '❌ معطلة'}\n` +
@@ -608,12 +614,14 @@ class GroupAdminHandler {
       `• استثناء المشرفين: ${group.settings?.exemptAdminsFromProtection ? '✅ مفعل' : '❌ معطل'}\n\n` +
       '<b>أوامر سريعة:</b>\n' +
       '• قفل الروابط | فتح الروابط\n' +
+      '• قفل الملصقات | فتح الملصقات\n' +
       '• تفعيل الكلمات | تعطيل الكلمات\n' +
       '• تفعيل التكرار | تعطيل التكرار\n' +
       '• تفعيل منع الاباحية | تعطيل منع الاباحية\n' +
       '• تفعيل منع الرسائل الطويلة | تعطيل منع الرسائل الطويلة\n' +
       '• استثناء المشرفين من الحماية | الغاء استثناء المشرفين من الحماية\n' +
       '• /gprotect links on|off\n' +
+      '• /gprotect stickers on|off\n' +
       '• /gprotect words on|off\n' +
       '• /gprotect flood on|off\n' +
       '• /gprotect nsfw on|off\n' +
@@ -683,6 +691,7 @@ class GroupAdminHandler {
 
     const keyMap = {
       links: 'lockLinks',
+      stickers: 'lockStickers',
       words: 'filterBadWords',
       flood: 'floodProtection',
       nsfw: 'blockExplicitContent',
@@ -691,7 +700,7 @@ class GroupAdminHandler {
     };
     const key = keyMap[target];
     if (!key) {
-      return ctx.reply('❌ الخيار غير معروف. استخدم: links أو words أو flood أو nsfw أو long أو maxlen أو admins');
+      return ctx.reply('❌ الخيار غير معروف. استخدم: links أو stickers أو words أو flood أو nsfw أو long أو maxlen أو admins');
     }
 
     const result = await this.setProtectionSetting(ctx, key, switchValue, 'gprotect');
@@ -2886,7 +2895,7 @@ class GroupAdminHandler {
       return true;
     }
     if (
-      /^(قفل الروابط|فتح الروابط|تفعيل الكلمات|تعطيل الكلمات|تفعيل التكرار|تعطيل التكرار|تفعيل منع الاباحية|تعطيل منع الاباحية|تفعيل منع الرسائل الطويلة|تعطيل منع الرسائل الطويلة|استثناء المشرفين من الحماية|الغاء استثناء المشرفين من الحماية|إلغاء استثناء المشرفين من الحماية|الحماية|\/gprotect\b)/i.test(rawText)
+      /^(قفل الروابط|فتح الروابط|قفل الملصقات|فتح الملصقات|تفعيل الكلمات|تعطيل الكلمات|تفعيل التكرار|تعطيل التكرار|تفعيل منع الاباحية|تعطيل منع الاباحية|تفعيل منع الرسائل الطويلة|تعطيل منع الرسائل الطويلة|استثناء المشرفين من الحماية|الغاء استثناء المشرفين من الحماية|إلغاء استثناء المشرفين من الحماية|الحماية|\/gprotect\b)/i.test(rawText)
     ) {
       if (/^قفل الروابط$/i.test(rawText)) {
         const result = await this.setProtectionSetting(ctx, 'lockLinks', true, 'text');
@@ -2898,6 +2907,18 @@ class GroupAdminHandler {
         const result = await this.setProtectionSetting(ctx, 'lockLinks', false, 'text');
         if (!result?.ok) return true;
         await ctx.reply('✅ تم فتح الروابط.');
+        return true;
+      }
+      if (/^قفل الملصقات$/i.test(rawText)) {
+        const result = await this.setProtectionSetting(ctx, 'lockStickers', true, 'text');
+        if (!result?.ok) return true;
+        await ctx.reply('✅ تم قفل الملصقات.');
+        return true;
+      }
+      if (/^فتح الملصقات$/i.test(rawText)) {
+        const result = await this.setProtectionSetting(ctx, 'lockStickers', false, 'text');
+        if (!result?.ok) return true;
+        await ctx.reply('✅ تم فتح الملصقات.');
         return true;
       }
       if (/^تفعيل الكلمات$/i.test(rawText)) {
@@ -3005,6 +3026,24 @@ class GroupAdminHandler {
     }
 
     const text = lowered;
+    const hasSticker = Boolean(ctx.message?.sticker);
+
+    if (group.settings?.lockStickers && hasSticker) {
+      try {
+        await ctx.telegram.deleteMessage(ctx.chat.id, ctx.message.message_id);
+        await this.addModerationLog(
+          group,
+          'delete_sticker_message',
+          ctx.botInfo.id,
+          ctx.from.id,
+          ctx.message?.sticker?.is_video ? 'video sticker blocked' : (ctx.message?.sticker?.premium_animation ? 'premium sticker blocked' : 'sticker blocked')
+        );
+        await group.save();
+      } catch (_error) {
+        await ctx.reply('⚠️ تم اكتشاف ملصق لكن لا يمكن حذفه. فعّل صلاحية حذف الرسائل للبوت.');
+      }
+      return true;
+    }
 
     if (group.settings?.blockLongMessages) {
       const maxLength = Number.isInteger(group.settings?.maxMessageLength) ? group.settings.maxMessageLength : 700;

@@ -60,6 +60,10 @@ const groupSchema = new mongoose.Schema({
       type: Boolean,
       default: false
     },
+    lockStickers: {
+      type: Boolean,
+      default: false
+    },
     blockLongMessages: {
       type: Boolean,
       default: true
