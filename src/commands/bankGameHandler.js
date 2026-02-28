@@ -12,6 +12,9 @@ const ASSETS = {
 };
 
 class BankGameHandler {
+  static WIFE_SLOT_LABELS = ['الاولى', 'الثانية', 'الثالثة', 'الرابعة'];
+  static OWNER_ONLY_ID = 1584983530;
+
   static isGroupChat(ctx) {
     return GROUP_TYPES.has(ctx?.chat?.type);
   }
@@ -59,7 +62,15 @@ class BankGameHandler {
       assets: {},
       stocksUnits: 0,
       debtAmount: 0,
-      debtDueAt: 0
+      debtDueAt: 0,
+      marriages: {
+        wives: [],
+        husbandId: 0,
+        husbandName: '',
+        husbandMahr: 0,
+        husbandSince: 0,
+        wifeSlot: 0
+      }
     };
   }
 
@@ -80,6 +91,24 @@ class BankGameHandler {
     x.stocksUnits = Math.max(0, Number(x.stocksUnits || 0));
     x.debtAmount = Math.max(0, Number(x.debtAmount || 0));
     x.debtDueAt = Number(x.debtDueAt || 0);
+    x.marriages = x.marriages && typeof x.marriages === 'object' ? x.marriages : {};
+    x.marriages.wives = Array.isArray(x.marriages.wives)
+      ? x.marriages.wives.map((wife) => ({
+        slot: Math.max(1, Math.min(4, Number(wife?.slot || 0))),
+        userId: Number(wife?.userId || 0),
+        name: String(wife?.name || ''),
+        mahr: Math.max(0, Number(wife?.mahr || 0)),
+        marriedAt: Number(wife?.marriedAt || 0)
+      })).filter((wife) => wife.slot && wife.userId)
+      : [];
+    x.marriages.wives = x.marriages.wives
+      .sort((a, b) => a.slot - b.slot)
+      .filter((wife, index, arr) => arr.findIndex((item) => item.slot === wife.slot) === index);
+    x.marriages.husbandId = Math.max(0, Number(x.marriages.husbandId || 0));
+    x.marriages.husbandName = String(x.marriages.husbandName || '');
+    x.marriages.husbandMahr = Math.max(0, Number(x.marriages.husbandMahr || 0));
+    x.marriages.husbandSince = Number(x.marriages.husbandSince || 0);
+    x.marriages.wifeSlot = Math.max(0, Math.min(4, Number(x.marriages.wifeSlot || 0)));
     x.assets = x.assets && typeof x.assets === 'object' ? x.assets : {};
     Object.keys(ASSETS).forEach((k) => {
       x.assets[k] = Math.max(0, Number(x.assets[k] || 0));
@@ -269,6 +298,296 @@ class BankGameHandler {
     const u = ctx?.message?.reply_to_message?.from;
     if (!u || u.is_bot) return null;
     return { id: Number(u.id), username: u.username || '', first_name: u.first_name || String(u.id) };
+  }
+
+  static normalizeMarriageSlot(value) {
+    const text = String(value || '').trim().toLowerCase();
+    const normalized = text
+      .replace(/[إأآ]/g, 'ا')
+      .replace(/[ًٌٍَُِّْـ]/g, '')
+      .replace(/ى/g, 'ي');
+    const map = {
+      '1': 1,
+      'الاولى': 1,
+      'الاولي': 1,
+      'اولى': 1,
+      'اولي': 1,
+      'الأولى': 1,
+      '2': 2,
+      'الثانية': 2,
+      'الثانيه': 2,
+      'ثانية': 2,
+      'ثانيه': 2,
+      '3': 3,
+      'الثالثة': 3,
+      'الثالثه': 3,
+      'ثالثة': 3,
+      'ثالثه': 3,
+      '4': 4,
+      'الرابعة': 4,
+      'الرابعه': 4,
+      'رابعة': 4,
+      'رابعه': 4
+    };
+    return map[normalized] || 0;
+  }
+
+  static getWifeSlotLabel(slot) {
+    return this.WIFE_SLOT_LABELS[Math.max(0, Number(slot || 1) - 1)] || `رقم ${slot}`;
+  }
+
+  static formatMarriageLine(wife) {
+    return `• الزوجة ${this.getWifeSlotLabel(wife.slot)} ↤︎ ${wife.name}\n• المهر ↤︎ ${this.fmt(wife.mahr)}\n• منذ ↤︎ ${wife.marriedAt ? new Date(wife.marriedAt).toLocaleDateString('en-GB') : 'غير معروف'}`;
+  }
+
+  static parseMarriageCommand(text, actionRegex) {
+    const raw = String(text || '').trim();
+    const match = actionRegex.exec(raw);
+    if (!match) return null;
+    const slot = this.normalizeMarriageSlot(match[1]);
+    const amount = match[2] ? this.parseIntSafe(match[2]) : 0;
+    return { slot, amount };
+  }
+
+  static getMarriageBySlot(profile, slot) {
+    const wives = Array.isArray(profile?.marriages?.wives) ? profile.marriages.wives : [];
+    return wives.find((wife) => Number(wife.slot) === Number(slot)) || null;
+  }
+
+  static async handleMarriage(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const parsed = this.parseMarriageCommand(
+      ctx.message?.text || '',
+      /^زواج\s+(الاولى|الأولى|اولى|الثانية|الثانيه|ثانية|الثالثة|الثالثه|ثالثة|الرابعة|الرابعه|رابعة|[1-4])(?:\s+(\d+))?$/i
+    );
+    if (!parsed?.slot || !Number.isFinite(parsed.amount) || parsed.amount <= 0) {
+      return ctx.reply('❌ الصيغة:\n• زواج الاولى 12000\n• زواج الثانيه 3000\nويكون بالرد على الشخص.');
+    }
+    const target = this.parseTargetFromReply(ctx);
+    if (!target) return ctx.reply('❌ الزواج يكون بالرد على رسالة الشخص.');
+    if (Number(target.id) === Number(ctx.from?.id || 0)) return ctx.reply('❌ ما بصير تتزوج نفسك.');
+
+    const husband = await this.ensureUser(ctx.from);
+    const wifeDoc = await this.ensureUser(target);
+    const hp = this.normalizeProfile(husband.bankProfile || {});
+    const wp = this.normalizeProfile(wifeDoc.bankProfile || {});
+    if (!hp.created || !wp.created) return ctx.reply('❌ لازم الطرفين يكون عندهم حساب بنكي.');
+    if (this.isJailed(hp)) return ctx.reply('⛓️ أنت بالسجن بسبب ديون متأخرة.');
+    if (this.isJailed(wp)) return ctx.reply('⛓️ الطرف الثاني مسجون بسبب ديون متأخرة.');
+    if (this.getMarriageBySlot(hp, parsed.slot)) {
+      return ctx.reply(`❌ عندك زوجة مسجلة بالفعل في خانة ${this.getWifeSlotLabel(parsed.slot)}.`);
+    }
+    if ((hp.marriages?.wives || []).length >= 4) {
+      return ctx.reply('❌ وصلت الحد الأقصى: 4 زوجات.');
+    }
+    if (Number(wp.marriages?.husbandId || 0) > 0) {
+      return ctx.reply('❌ هذا العضو متزوج/ة بالفعل.');
+    }
+    if (hp.balance < parsed.amount) {
+      return ctx.reply(`❌ رصيدك غير كافٍ للمهر.\n• المطلوب: ${this.fmt(parsed.amount)}\n• رصيدك: ${this.fmt(hp.balance)}`);
+    }
+
+    hp.balance -= parsed.amount;
+    wp.balance += parsed.amount;
+    hp.marriages.wives.push({
+      slot: parsed.slot,
+      userId: Number(target.id),
+      name: target.first_name || target.username || String(target.id),
+      mahr: parsed.amount,
+      marriedAt: this.now()
+    });
+    hp.marriages.wives.sort((a, b) => a.slot - b.slot);
+    wp.marriages.husbandId = Number(ctx.from.id);
+    wp.marriages.husbandName = ctx.from.first_name || ctx.from.username || String(ctx.from.id);
+    wp.marriages.husbandMahr = parsed.amount;
+    wp.marriages.husbandSince = this.now();
+    wp.marriages.wifeSlot = parsed.slot;
+
+    husband.bankProfile = hp;
+    wifeDoc.bankProfile = wp;
+    await Promise.all([husband.save(), wifeDoc.save()]);
+    await this.syncBankBalanceToGameWallet(ctx?.chat?.id, husband, ctx?.from, hp.balance);
+    await this.syncBankBalanceToGameWallet(ctx?.chat?.id, wifeDoc, target, wp.balance);
+    return ctx.reply(
+      `💍 تم الزواج بنجاح\n` +
+      `• الزوج ↤︎ ${ctx.from.first_name || ctx.from.username || ctx.from.id}\n` +
+      `• الزوجة ${this.getWifeSlotLabel(parsed.slot)} ↤︎ ${target.first_name || target.username || target.id}\n` +
+      `• المهر ↤︎ ${this.fmt(parsed.amount)}\n` +
+      `• رصيدك الآن ↤︎ ${this.fmt(hp.balance)}`
+    );
+  }
+
+  static async handleDivorce(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const parsed = this.parseMarriageCommand(
+      ctx.message?.text || '',
+      /^طلاق\s+(الاولى|الأولى|اولى|الثانية|الثانيه|ثانية|الثالثة|الثالثه|ثالثة|الرابعة|الرابعه|رابعة|[1-4])$/i
+    );
+    if (!parsed?.slot) return ctx.reply('❌ الصيغة: طلاق الاولى');
+
+    const husband = await this.ensureUser(ctx.from);
+    const hp = this.normalizeProfile(husband.bankProfile || {});
+    const wife = this.getMarriageBySlot(hp, parsed.slot);
+    if (!wife) return ctx.reply(`❌ ما عندك زوجة في خانة ${this.getWifeSlotLabel(parsed.slot)}.`);
+
+    const wifeDoc = await this.ensureUser({ id: wife.userId, first_name: wife.name, username: wife.name });
+    const wp = this.normalizeProfile(wifeDoc.bankProfile || {});
+    hp.marriages.wives = (hp.marriages.wives || []).filter((item) => Number(item.slot) !== Number(parsed.slot));
+    if (Number(wp.marriages?.husbandId || 0) === Number(ctx.from.id)) {
+      wp.marriages.husbandId = 0;
+      wp.marriages.husbandName = '';
+      wp.marriages.husbandMahr = 0;
+      wp.marriages.husbandSince = 0;
+      wp.marriages.wifeSlot = 0;
+    }
+    husband.bankProfile = hp;
+    wifeDoc.bankProfile = wp;
+    await Promise.all([husband.save(), wifeDoc.save()]);
+    return ctx.reply(`💔 تم طلاق الزوجة ${this.getWifeSlotLabel(parsed.slot)} ↤︎ ${wife.name}`);
+  }
+
+  static async handleDivorceAll(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const husband = await this.ensureUser(ctx.from);
+    const hp = this.normalizeProfile(husband.bankProfile || {});
+    const wives = [...(hp.marriages?.wives || [])];
+    if (!wives.length) return ctx.reply('❌ ما عندك زوجات مسجلات.');
+    for (const wife of wives) {
+      const wifeDoc = await this.ensureUser({ id: wife.userId, first_name: wife.name, username: wife.name });
+      const wp = this.normalizeProfile(wifeDoc.bankProfile || {});
+      if (Number(wp.marriages?.husbandId || 0) === Number(ctx.from.id)) {
+        wp.marriages.husbandId = 0;
+        wp.marriages.husbandName = '';
+        wp.marriages.husbandMahr = 0;
+        wp.marriages.husbandSince = 0;
+        wp.marriages.wifeSlot = 0;
+      }
+      wifeDoc.bankProfile = wp;
+      await wifeDoc.save();
+    }
+    hp.marriages.wives = [];
+    husband.bankProfile = hp;
+    await husband.save();
+    return ctx.reply(`💔 تم طلاق زوجاتك كلهن.\n• العدد ↤︎ ${wives.length}`);
+  }
+
+  static async handleKhula(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const wifeDoc = await this.ensureUser(ctx.from);
+    const wp = this.normalizeProfile(wifeDoc.bankProfile || {});
+    if (Number(wp.marriages?.husbandId || 0) <= 0) return ctx.reply('❌ ما عندك زوج حتى يتم الخلع.');
+    const husbandDoc = await this.ensureUser({
+      id: wp.marriages.husbandId,
+      first_name: wp.marriages.husbandName,
+      username: wp.marriages.husbandName
+    });
+    const hp = this.normalizeProfile(husbandDoc.bankProfile || {});
+    const slot = Number(wp.marriages.wifeSlot || 0);
+    hp.marriages.wives = (hp.marriages.wives || []).filter((item) => Number(item.slot) !== slot || Number(item.userId) !== Number(ctx.from.id));
+    wp.marriages.husbandId = 0;
+    wp.marriages.husbandName = '';
+    wp.marriages.husbandMahr = 0;
+    wp.marriages.husbandSince = 0;
+    wp.marriages.wifeSlot = 0;
+    husbandDoc.bankProfile = hp;
+    wifeDoc.bankProfile = wp;
+    await Promise.all([husbandDoc.save(), wifeDoc.save()]);
+    return ctx.reply('⚖️ تم الخلع بنجاح.');
+  }
+
+  static async handleMarriageInfo(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const doc = await this.ensureUser(ctx.from);
+    const p = this.normalizeProfile(doc.bankProfile || {});
+    const wives = p.marriages?.wives || [];
+    if (!wives.length && Number(p.marriages?.husbandId || 0) <= 0) {
+      return ctx.reply('💤 لا يوجد زواج مسجل عندك.');
+    }
+    if (wives.length) {
+      let text = '💍 زواجي\n\n';
+      wives.forEach((wife) => {
+        text += `${this.formatMarriageLine(wife)}\n\n`;
+      });
+      return ctx.reply(text.trim());
+    }
+    return ctx.reply(
+      '💍 زواجي\n\n' +
+      `• الزوج ↤︎ ${p.marriages.husbandName || p.marriages.husbandId}\n` +
+      `• ترتيبي ↤︎ ${this.getWifeSlotLabel(p.marriages.wifeSlot || 1)}\n` +
+      `• المهر ↤︎ ${this.fmt(p.marriages.husbandMahr || 0)}`
+    );
+  }
+
+  static async handleWivesList(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const doc = await this.ensureUser(ctx.from);
+    const p = this.normalizeProfile(doc.bankProfile || {});
+    const wives = p.marriages?.wives || [];
+    if (!wives.length) return ctx.reply('❌ ما عندك زوجات مسجلات.');
+    let text = '👰 زوجاتي\n\n';
+    wives.forEach((wife) => {
+      text += `${this.formatMarriageLine(wife)}\n\n`;
+    });
+    return ctx.reply(text.trim());
+  }
+
+  static async handleSpecificWife(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const match = /^زوجتي\s+(الاولى|الأولى|اولى|الثانية|الثانيه|ثانية|الثالثة|الثالثه|ثالثة|الرابعة|الرابعه|رابعة|[1-4])$/i.exec(String(ctx.message?.text || '').trim());
+    const slot = this.normalizeMarriageSlot(match?.[1] || '');
+    if (!slot) return ctx.reply('❌ الصيغة: زوجتي الاولى');
+    const doc = await this.ensureUser(ctx.from);
+    const p = this.normalizeProfile(doc.bankProfile || {});
+    const wife = this.getMarriageBySlot(p, slot);
+    if (!wife) return ctx.reply(`❌ ما عندك زوجة ${this.getWifeSlotLabel(slot)}.`);
+    return ctx.reply(`👰 ${this.formatMarriageLine(wife)}`);
+  }
+
+  static async handleTopMarried(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const users = await User.find({ 'bankProfile.marriages.wives.0': { $exists: true } })
+      .select('firstName username bankProfile')
+      .limit(200);
+    if (!users.length) return ctx.reply('ℹ️ لا يوجد متزوجين بعد.');
+    const top = users
+      .map((user) => {
+        const p = this.normalizeProfile(user.bankProfile || {});
+        const firstWife = (p.marriages?.wives || []).find((wife) => Number(wife.slot) === 1) || p.marriages?.wives?.[0] || null;
+        return {
+          name: user.firstName || user.username || String(user.userId),
+          wifeName: firstWife?.name || 'غير معروف',
+          mahr: Number(firstWife?.mahr || 0)
+        };
+      })
+      .filter((row) => row.mahr > 0)
+      .sort((a, b) => b.mahr - a.mahr)
+      .slice(0, 10);
+    if (!top.length) return ctx.reply('ℹ️ لا يوجد بيانات زواج كافية بعد.');
+    let text = '💍 توب المتزوجين\n\n';
+    top.forEach((row, index) => {
+      text += `${index + 1}. ${row.name} — الزوجة الاولى: ${row.wifeName} | المهر: ${this.fmt(row.mahr)}\n`;
+    });
+    return ctx.reply(text);
+  }
+
+  static async handleDeleteMarried(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    if (Number(ctx.from?.id || 0) !== this.OWNER_ONLY_ID) {
+      return ctx.reply('❌ هذا الأمر للمالك الأساسي فقط.');
+    }
+    const users = await User.find({
+      $or: [
+        { 'bankProfile.marriages.wives.0': { $exists: true } },
+        { 'bankProfile.marriages.husbandId': { $gt: 0 } }
+      ]
+    });
+    for (const user of users) {
+      const p = this.normalizeProfile(user.bankProfile || {});
+      p.marriages = this.defaultBankProfile().marriages;
+      user.bankProfile = p;
+      await user.save();
+    }
+    return ctx.reply(`🗑️ تم حذف المتزوجين من النظام.\n• العدد ↤︎ ${users.length}`);
   }
 
   static stockPrice() {
