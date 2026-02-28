@@ -1353,10 +1353,19 @@ class GroupAdminHandler {
 
     const group = await this.ensureGroupRecord(ctx);
     const rawText = String(ctx.message?.text || '').trim();
-    const enableMatch = /^(?:تفعيل\s*الحمايه|تفعيل\s*الحماية|\/gprotectionlevel)\s+(\d+)$/i.exec(rawText);
-    const disableMatch = /^(?:تعطيل\s*الحمايه|تعطيل\s*الحماية)\s+2$/i.exec(rawText)
-      || /^(?:\/gprotectionlevel)\s+(?:0|off|disable)$/i.exec(rawText);
-    if (!enableMatch && !disableMatch) {
+    const normalized = this.normalizePlainText(rawText)
+      .replace(/[إأآ]/g, 'ا')
+      .replace(/ة/g, 'ه');
+    const enablePreset =
+      normalized === 'تفعيل الحمايه 2'
+      || normalized === '/gprotectionlevel 2';
+    const disablePreset =
+      normalized === 'تعطيل الحمايه 2'
+      || normalized === '/gprotectionlevel off'
+      || normalized === '/gprotectionlevel disable'
+      || normalized === '/gprotectionlevel 0';
+
+    if (!enablePreset && !disablePreset) {
       return ctx.reply(
         '❌ الصيغة:\n' +
         '• تفعيل الحمايه 2\n' +
@@ -1366,7 +1375,7 @@ class GroupAdminHandler {
       );
     }
 
-    if (disableMatch) {
+    if (disablePreset) {
       group.settings.protectionPresetLevel = 0;
       group.settings.floodProtection = false;
       group.settings.filterBadWords = false;
@@ -1385,11 +1394,6 @@ class GroupAdminHandler {
         '• الرسائل الطويلة ↤︎ معطلة\n' +
         '• العقوبات التلقائية ↤︎ معطلة'
       );
-    }
-
-    const level = parseInt(enableMatch[1], 10);
-    if (level !== 2) {
-      return ctx.reply('❌ المتاح حاليًا فقط: تفعيل الحمايه 2 أو تعطيل الحمايه 2');
     }
 
     group.settings.protectionPresetLevel = 2;
