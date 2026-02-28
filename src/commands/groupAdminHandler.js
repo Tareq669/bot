@@ -329,6 +329,7 @@ class GroupAdminHandler {
     if (!Number.isInteger(group.settings.warningPolicy.muteAt)) group.settings.warningPolicy.muteAt = 2;
     if (!Number.isInteger(group.settings.warningPolicy.banAt)) group.settings.warningPolicy.banAt = 3;
     if (!Number.isInteger(group.settings.warningPolicy.muteMinutes)) group.settings.warningPolicy.muteMinutes = 10;
+    if (!Number.isInteger(group.settings.protectionPresetLevel)) group.settings.protectionPresetLevel = 0;
     if (typeof group.settings.requireReasonsForModeration !== 'boolean') group.settings.requireReasonsForModeration = false;
     if (typeof group.settings.disableGameEngagement !== 'boolean') group.settings.disableGameEngagement = false;
     if (typeof group.settings.notifyAdminLeave !== 'boolean') group.settings.notifyAdminLeave = false;
@@ -411,6 +412,32 @@ class GroupAdminHandler {
   static formatPolicy(policy) {
     if (!policy.enabled) return '❌ معطلة';
     return `✅ مفعلة | كتم عند: ${policy.muteAt} | حظر عند: ${policy.banAt} | مدة الكتم: ${policy.muteMinutes}د`;
+  }
+
+  static getProtectionPresetLabel(level) {
+    const value = Number(level || 0);
+    if (value === 2) return 'المستوى 2';
+    if (value === 1) return 'المستوى 1';
+    return 'غير مفعل';
+  }
+
+  static buildProtectionSettingsText(group) {
+    const settings = group?.settings || {};
+    const policy = this.getWarningPolicy(group);
+    return (
+      '🛡️ <b>اعدادات الحمايه</b>\n\n' +
+      `• مستوى الحمايه ↤︎ ${this.getProtectionPresetLabel(settings.protectionPresetLevel)}\n` +
+      `• حماية التكرار ↤︎ ${settings.floodProtection ? '✅' : '❌'}\n` +
+      `• فلتر الكلمات ↤︎ ${settings.filterBadWords ? '✅' : '❌'}\n` +
+      `• منع الاباحيه ↤︎ ${settings.blockExplicitContent ? '✅' : '❌'}\n` +
+      `• منع الرسائل الطويله ↤︎ ${settings.blockLongMessages ? '✅' : '❌'}\n` +
+      `• قفل الروابط ↤︎ ${settings.lockLinks ? '✅' : '❌'}\n` +
+      `• قفل الملصقات ↤︎ ${settings.lockStickers ? '✅' : '❌'}\n` +
+      `• العقوبات التلقائيه ↤︎ ${policy.enabled ? '✅' : '❌'}\n` +
+      `• الكتم عند ↤︎ ${policy.muteAt}\n` +
+      `• الحظر عند ↤︎ ${policy.banAt}\n` +
+      `• مدة الكتم ↤︎ ${policy.muteMinutes} دقيقة`
+    );
   }
 
   static async addModerationLog(group, action, actorId, targetId = null, reason = '', metadata = null) {
@@ -1300,6 +1327,62 @@ class GroupAdminHandler {
       await group.save();
       return ctx.reply(this.formatRoleActionMessage('تم تنزيله من المالكين الاساسيين', target), { parse_mode: 'HTML' });
     }
+  }
+
+  static async handleProtectionPresetCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const canUse = await this.isOwnerOrBasic(ctx);
+    if (!canUse) return ctx.reply('❌ هذا الأمر للمالك الأساسي أو الأساسي فقط.');
+
+    const group = await this.ensureGroupRecord(ctx);
+    const rawText = String(ctx.message?.text || '').trim();
+    const match = /^(?:تفعيل\s*الحمايه|تفعيل\s*الحماية|\/gprotectionlevel)\s+(\d+)$/i.exec(rawText);
+    if (!match) {
+      return ctx.reply(
+        '❌ الصيغة:\n' +
+        '• تفعيل الحمايه 2\n' +
+        '• /gprotectionlevel 2'
+      );
+    }
+
+    const level = parseInt(match[1], 10);
+    if (level !== 2) {
+      return ctx.reply('❌ المتاح حاليًا فقط: تفعيل الحمايه 2');
+    }
+
+    group.settings.protectionPresetLevel = 2;
+    group.settings.floodProtection = true;
+    group.settings.filterBadWords = true;
+    group.settings.blockExplicitContent = true;
+    group.settings.blockLongMessages = true;
+    group.settings.warningPolicy = {
+      enabled: true,
+      muteAt: 2,
+      banAt: 3,
+      muteMinutes: 15
+    };
+    group.updatedAt = new Date();
+    await this.addModerationLog(group, 'protection_preset_update', ctx.from.id, null, 'level=2');
+    await group.save();
+
+    return ctx.reply(
+      '✅ تم تفعيل الحمايه 2\n\n' +
+      '• حماية التكرار ↤︎ مفعلة\n' +
+      '• فلتر الكلمات ↤︎ مفعل\n' +
+      '• منع الاباحيه ↤︎ مفعل\n' +
+      '• منع الرسائل الطويله ↤︎ مفعل\n' +
+      '• الكتم عند ↤︎ 2\n' +
+      '• الحظر عند ↤︎ 3\n' +
+      '• مدة الكتم ↤︎ 15 دقيقة'
+    );
+  }
+
+  static async handleProtectionSettingsCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const canUse = await this.isAdminOrHigher(ctx);
+    if (!canUse) return ctx.reply('❌ هذا الأمر للمشرفين فقط.');
+    const group = await this.ensureGroupRecord(ctx);
+    return ctx.reply(this.buildProtectionSettingsText(group), { parse_mode: 'HTML' });
   }
 
   static async handleOwnerRoleCommand(ctx) {
@@ -2872,6 +2955,14 @@ class GroupAdminHandler {
     }
     if (/^(تعطيل الكشف|تفعيل الكشف|\/gdetect\b)/i.test(rawText)) {
       await this.handleDetectToggle(ctx);
+      return true;
+    }
+    if (/^(تفعيل الحمايه\s+\d+|تفعيل الحماية\s+\d+|\/gprotectionlevel\b)/i.test(rawText)) {
+      await this.handleProtectionPresetCommand(ctx);
+      return true;
+    }
+    if (/^(اعدادات الحمايه|إعدادات الحمايه|اعدادات الحماية|إعدادات الحماية|\/gprotectionsettings\b)/i.test(rawText)) {
+      await this.handleProtectionSettingsCommand(ctx);
       return true;
     }
     if (/^(قفل الانلاين للكل|فتح الانلاين للكل|\/gonline\b)/i.test(rawText)) {

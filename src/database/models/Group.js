@@ -108,6 +108,10 @@ const groupSchema = new mongoose.Schema({
         default: 10
       }
     },
+    protectionPresetLevel: {
+      type: Number,
+      default: 0
+    },
     requireReasonsForModeration: {
       type: Boolean,
       default: false
