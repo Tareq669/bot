@@ -132,6 +132,10 @@ const groupSchema = new mongoose.Schema({
       type: Number,
       default: null
     },
+    premiumMemberIds: {
+      type: [Number],
+      default: []
+    },
     exceptions: [Number],
     templates: {
       member: {

@@ -1801,8 +1801,13 @@ class GroupGamesHandler {
 
   static async isGroupAdmin(ctx, userId = null) {
     if (!this.isGroupChat(ctx)) return false;
-    const targetUserId = userId || ctx.from?.id;
+    const targetUserId = Number(userId || ctx.from?.id);
     if (!targetUserId) return false;
+
+    const group = await this.ensureGroupRecord(ctx);
+    if (Number(group.settings?.primaryOwnerId || 0) === targetUserId) return true;
+    if (Number(group.settings?.basicOwnerId || 0) === targetUserId) return true;
+
     try {
       const member = await ctx.telegram.getChatMember(ctx.chat.id, targetUserId);
       return ['creator', 'administrator'].includes(member.status);
