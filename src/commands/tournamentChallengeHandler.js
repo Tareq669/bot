@@ -1,4 +1,6 @@
-const { Tournament, Group } = require('../database/models');
+const models = require('../database/models');
+const Tournament = models.Tournament || require('../database/models/Tournament');
+const Group = models.Group || require('../database/models/Group');
 const GroupAdminHandler = require('./groupAdminHandler');
 
 class TournamentChallengeHandler {
