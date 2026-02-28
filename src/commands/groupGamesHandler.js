@@ -177,6 +177,17 @@ const DEFAULT_VOTE_TOPICS = [
 ];
 
 const CELEBRATION_LINES = ['إجابة ممتازة!', 'مستوى قوي!', 'رد سريع جدًا!', 'أداء احترافي!'];
+const GENDER_VALUES = { boy: 'boy', girl: 'girl' };
+const STORY_LETTERS = ['ا', 'ب', 'ت', 'ث', 'ج', 'ح', 'خ', 'د', 'ر', 'س', 'ش', 'ص', 'ض', 'ط', 'ع', 'ف', 'ق', 'ك', 'ل', 'م', 'ن', 'ه', 'و', 'ي'];
+const STORY_STOPWORDS = new Set(['من', 'في', 'على', 'عن', 'الى', 'إلى', 'هذا', 'هذي', 'هاي', 'هو', 'هي', 'كان', 'كانت', 'صار', 'صارت', 'بعد', 'قبل', 'مع', 'بدون', 'بس', 'يعني', 'مرة', 'مره', 'انه', 'انو', 'انوه', 'انا', 'انت', 'انتي', 'احنا', 'هم', 'كل', 'لما', 'ثم', 'و', 'او', 'أو', 'يا']);
+const DEFAULT_GENDER_WORDS = {
+  boys: ['ولد', 'العيال', 'عيال', 'شباب', 'رجال', 'رجال الجروب'],
+  girls: ['بنت', 'بنات', 'الصبايا', 'صبايا', 'البنات']
+};
+const DEFAULT_GENDER_REPLIES = {
+  boys: ['🧢 تم تسجيل الكلمة للعيال.', '🧢 هالكلمة محسوبة على العيال.', '🧢 تمام، هاي من كلمات العيال.'],
+  girls: ['🎀 تم تسجيل الكلمة للبنات.', '🎀 هالكلمة محسوبة على البنات.', '🎀 تمام، هاي من كلمات البنات.']
+};
 const GROUP_STORE = [
   // Paired titles (male/female) with equal prices
   { key: 'knight_m', title: '⚔️ الفارس', price: 45, type: 'title' },
@@ -758,6 +769,136 @@ class GroupGamesHandler {
     return `${value.toLocaleString('en-US')} دولار 💸`;
   }
 
+  static normalizeGenderValue(value) {
+    const normalized = this.normalizeText(String(value || ''));
+    if (['ولد', 'ذكر', 'شاب', 'رجل', 'boy', 'male'].includes(normalized)) return GENDER_VALUES.boy;
+    if (['بنت', 'انثى', 'أنثى', 'فتاه', 'فتاة', 'girl', 'female'].includes(normalized)) return GENDER_VALUES.girl;
+    return '';
+  }
+
+  static getGenderLabel(value) {
+    if (value === GENDER_VALUES.boy) return 'ولد';
+    if (value === GENDER_VALUES.girl) return 'بنت';
+    return 'غير محدد';
+  }
+
+  static defaultGenderSettings() {
+    return {
+      words: {
+        boys: [...DEFAULT_GENDER_WORDS.boys],
+        girls: [...DEFAULT_GENDER_WORDS.girls]
+      },
+      replies: {
+        boys: [...DEFAULT_GENDER_REPLIES.boys],
+        girls: [...DEFAULT_GENDER_REPLIES.girls]
+      }
+    };
+  }
+
+  static normalizeStringList(list = []) {
+    const seen = new Set();
+    return (Array.isArray(list) ? list : [])
+      .map((x) => String(x || '').trim())
+      .filter(Boolean)
+      .filter((item) => {
+        const key = this.normalizeText(item);
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+  }
+
+  static normalizeGenderWordSettings(settings = {}) {
+    const defaults = this.defaultGenderSettings();
+    return {
+      boys: this.normalizeStringList(settings?.boys || defaults.words.boys),
+      girls: this.normalizeStringList(settings?.girls || defaults.words.girls)
+    };
+  }
+
+  static normalizeGenderReplySettings(settings = {}) {
+    const defaults = this.defaultGenderSettings();
+    return {
+      boys: this.normalizeStringList(settings?.boys || defaults.replies.boys),
+      girls: this.normalizeStringList(settings?.girls || defaults.replies.girls)
+    };
+  }
+
+  static defaultStorySession() {
+    return {
+      active: false,
+      hostUserId: null,
+      hostName: '',
+      expectedLetter: '',
+      startedAt: null,
+      endsAt: null,
+      lastEntryAt: null,
+      acceptedCount: 0,
+      entries: [],
+      participantIds: []
+    };
+  }
+
+  static normalizeStorySession(session = {}) {
+    const base = { ...this.defaultStorySession(), ...(session || {}) };
+    base.active = Boolean(base.active);
+    base.hostUserId = Number(base.hostUserId || 0) || null;
+    base.hostName = String(base.hostName || '');
+    base.expectedLetter = String(base.expectedLetter || '').trim();
+    base.startedAt = base.startedAt || null;
+    base.endsAt = base.endsAt || null;
+    base.lastEntryAt = base.lastEntryAt || null;
+    base.acceptedCount = Math.max(0, Number(base.acceptedCount || 0));
+    base.entries = Array.isArray(base.entries) ? base.entries.map((entry) => ({
+      userId: Number(entry?.userId || 0),
+      username: String(entry?.username || ''),
+      text: String(entry?.text || '').trim(),
+      startsWith: String(entry?.startsWith || '').trim(),
+      endsWith: String(entry?.endsWith || '').trim(),
+      createdAt: entry?.createdAt || new Date()
+    })).filter((entry) => entry.userId && entry.text) : [];
+    base.participantIds = Array.isArray(base.participantIds)
+      ? [...new Set(base.participantIds.map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0))]
+      : [];
+    if (!base.acceptedCount) base.acceptedCount = base.entries.length;
+    return base;
+  }
+
+  static extractArabicWords(text) {
+    return String(text || '')
+      .split(/\s+/)
+      .map((x) => this.normalizeText(x))
+      .filter(Boolean);
+  }
+
+  static extractStoryEdgeLetters(text) {
+    const normalized = this.normalizeText(String(text || ''));
+    const compact = normalized.replace(/\s+/g, '');
+    if (!compact) return { first: '', last: '' };
+    return { first: compact[0] || '', last: compact[compact.length - 1] || '' };
+  }
+
+  static guessStoryTopic(entries = []) {
+    const counts = new Map();
+    entries.forEach((entry) => {
+      this.extractArabicWords(entry?.text || '').forEach((word) => {
+        if (!word || word.length < 3 || STORY_STOPWORDS.has(word)) return;
+        counts.set(word, (counts.get(word) || 0) + 1);
+      });
+    });
+    const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1]);
+    return sorted[0]?.[0] || 'سوالف متنوعة';
+  }
+
+  static buildStoryEntriesPreview(entries = []) {
+    if (!entries.length) return 'لسه ما في سوالف مسجلة.';
+    return entries.slice(0, 8).map((entry, index) => {
+      const name = this.escapeHtml(entry.username || `عضو ${entry.userId}`);
+      const text = this.escapeHtml(entry.text || '');
+      return `${index + 1}. <b>${name}</b>: ${text}`;
+    }).join('\n');
+  }
+
   static defaultLoungeInventory() {
     return {
       coffee: 0,
@@ -1006,6 +1147,8 @@ class GroupGamesHandler {
     if (typeof group.gameSystem.settings.autoQuestions !== 'boolean') group.gameSystem.settings.autoQuestions = false;
     if (!Number.isInteger(group.gameSystem.settings.intervalMinutes)) group.gameSystem.settings.intervalMinutes = 15;
     if (!Number.isInteger(group.gameSystem.settings.questionTimeoutSec)) group.gameSystem.settings.questionTimeoutSec = 25;
+    group.gameSystem.settings.genderWords = this.normalizeGenderWordSettings(group.gameSystem.settings.genderWords || {});
+    group.gameSystem.settings.genderReplies = this.normalizeGenderReplySettings(group.gameSystem.settings.genderReplies || {});
     if (!group.settings) group.settings = {};
     if (!group.settings.tierUpRewards) {
       group.settings.tierUpRewards = { silver: 10, gold: 20, platinum: 35, diamond: 60 };
@@ -1022,9 +1165,11 @@ class GroupGamesHandler {
     if (!group.gameSystem.state.weekKey) group.gameSystem.state.weekKey = this.getWeekKey();
     if (!group.gameSystem.state.monthKey) group.gameSystem.state.monthKey = this.getMonthKey();
     if (!group.gameSystem.state.lastMonthlyRewardKey) group.gameSystem.state.lastMonthlyRewardKey = '';
+    group.gameSystem.state.storySession = this.normalizeStorySession(group.gameSystem.state.storySession || {});
 
     if (!Array.isArray(group.gameSystem.scores)) group.gameSystem.scores = [];
     group.gameSystem.scores.forEach((row) => {
+      row.gender = this.normalizeGenderValue(row.gender);
       if (!Number.isFinite(row.points)) row.points = 0;
       if (!Number.isFinite(row.weeklyPoints)) row.weeklyPoints = 0;
       if (!Number.isFinite(row.monthlyPoints)) row.monthlyPoints = 0;
@@ -1261,6 +1406,7 @@ class GroupGamesHandler {
         activeBoost: { multiplier: 1, expiresAt: null },
         giftsSent: 0,
         giftsReceived: 0,
+        gender: '',
         giftInventory: [],
         scratchDayKey: '',
         scratchPlaysToday: 0,
@@ -1305,6 +1451,7 @@ class GroupGamesHandler {
       row = group.gameSystem.scores[group.gameSystem.scores.length - 1];
     }
     row.username = user.username || user.first_name || String(userId);
+    row.gender = this.normalizeGenderValue(row.gender);
     if (!Array.isArray(row.giftInventory)) row.giftInventory = [];
     if (!row.scratchDayKey) row.scratchDayKey = '';
     if (!Number.isFinite(row.scratchPlaysToday)) row.scratchPlaysToday = 0;
@@ -1345,6 +1492,7 @@ class GroupGamesHandler {
       points: 0,
       giftsSent: 0,
       giftsReceived: 0,
+      gender: '',
       giftInventory: [],
       scratchDayKey: '',
       scratchPlaysToday: 0,
@@ -1387,6 +1535,7 @@ class GroupGamesHandler {
     p.points = Number(p.points || 0);
     p.giftsSent = Number(p.giftsSent || 0);
     p.giftsReceived = Number(p.giftsReceived || 0);
+    p.gender = this.normalizeGenderValue(p.gender);
     p.giftInventory = Array.isArray(p.giftInventory) ? p.giftInventory.map((x) => ({
       key: String(x?.key || ''),
       name: String(x?.name || x?.key || ''),
@@ -1441,6 +1590,7 @@ class GroupGamesHandler {
     row.points = p.points;
     row.giftsSent = p.giftsSent;
     row.giftsReceived = p.giftsReceived;
+    row.gender = p.gender;
     row.giftInventory = p.giftInventory.map((x) => ({ key: x.key, name: x.name, count: x.count }));
 
     row.scratchDayKey = p.scratchDayKey || '';
@@ -1486,6 +1636,7 @@ class GroupGamesHandler {
     p.points = Number(row.points || 0);
     p.giftsSent = Number(row.giftsSent || 0);
     p.giftsReceived = Number(row.giftsReceived || 0);
+    p.gender = this.normalizeGenderValue(row.gender);
     p.giftInventory = Array.isArray(row.giftInventory) ? row.giftInventory.map((x) => ({
       key: String(x?.key || ''),
       name: String(x?.name || x?.key || ''),
@@ -1797,6 +1948,326 @@ class GroupGamesHandler {
     const found = (group.gameSystem.scores || []).find((s) => String(s.username || '').replace(/^@/, '').toLowerCase() === clean);
     if (!found) return null;
     return { id: Number(found.userId), username: found.username, first_name: found.username };
+  }
+
+  static parseTextAfterPrefix(text, prefixRegex) {
+    return String(text || '').replace(prefixRegex, '').trim();
+  }
+
+  static async handleSetGenderCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const group = await this.ensureGroupRecord(ctx);
+    const row = this.getOrCreateScoreRow(group, ctx.from);
+    const userDoc = await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
+    const raw = String(ctx.message?.text || '').trim();
+    const selected = this.normalizeGenderValue(this.parseTextAfterPrefix(raw, /^(?:تحديد\s*جنسي|\/(?:تحديد_جنسي|gsetgender))\s*/i));
+    if (!selected) {
+      return ctx.reply('❌ استخدم:\n• تحديد جنسي ولد\n• تحديد جنسي بنت', { reply_to_message_id: ctx.message?.message_id });
+    }
+
+    row.gender = selected;
+    row.updatedAt = new Date();
+    await group.save();
+    await this.syncRowToGlobal(userDoc, row);
+
+    return ctx.reply(
+      `✅ ${this.mentionUser(ctx.from.id, ctx.from.first_name || ctx.from.username || 'عضو')}\n• تم تحديد جنسك ↤︎ ${this.getGenderLabel(selected)}`,
+      { parse_mode: 'HTML', reply_to_message_id: ctx.message?.message_id }
+    );
+  }
+
+  static async handleDeleteGenderCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const group = await this.ensureGroupRecord(ctx);
+    const row = this.getOrCreateScoreRow(group, ctx.from);
+    const userDoc = await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
+    row.gender = '';
+    row.updatedAt = new Date();
+    await group.save();
+    await this.syncRowToGlobal(userDoc, row);
+    return ctx.reply(
+      `✅ ${this.mentionUser(ctx.from.id, ctx.from.first_name || ctx.from.username || 'عضو')}\n• تم حذف جنسك من السجل.`,
+      { parse_mode: 'HTML', reply_to_message_id: ctx.message?.message_id }
+    );
+  }
+
+  static async handleMyGenderCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const group = await this.ensureGroupRecord(ctx);
+    const row = this.getOrCreateScoreRow(group, ctx.from);
+    await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
+    return ctx.reply(
+      `${this.mentionUser(ctx.from.id, ctx.from.first_name || ctx.from.username || 'عضو')}\n• جنسك ↤︎ ${this.getGenderLabel(row.gender)}`,
+      { parse_mode: 'HTML', reply_to_message_id: ctx.message?.message_id }
+    );
+  }
+
+  static async handleTargetGenderCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const group = await this.ensureGroupRecord(ctx);
+    const raw = String(ctx.message?.text || '').trim();
+    const targetArg = this.parseTextAfterPrefix(raw, /^(?:جنسه|\/(?:جنسه|ggenderof))\s*/i);
+    const target = this.resolveTargetUser(ctx, group, targetArg);
+    if (!target?.id) {
+      return ctx.reply('❌ استخدم الأمر بالرد أو اكتب: جنسه @user', { reply_to_message_id: ctx.message?.message_id });
+    }
+    const row = this.getOrCreateScoreRow(group, target);
+    await this.ensureGlobalProfileAndSyncRow(row, target);
+    return ctx.reply(
+      `• المستخدم ↤︎ ${this.mentionUser(target.id, target.first_name || target.username || String(target.id))}\n• جنسه ↤︎ ${this.getGenderLabel(row.gender)}`,
+      { parse_mode: 'HTML', reply_to_message_id: ctx.message?.message_id }
+    );
+  }
+
+  static async handleGenderCountCommand(ctx, type) {
+    if (!this.isGroupChat(ctx)) return;
+    const group = await this.ensureGroupRecord(ctx);
+    const wanted = type === 'girls' ? GENDER_VALUES.girl : GENDER_VALUES.boy;
+    const label = type === 'girls' ? 'البنات' : 'العيال';
+    const count = (group.gameSystem?.scores || []).filter((row) => this.normalizeGenderValue(row.gender) === wanted).length;
+    return ctx.reply(`📊 عدد ${label} ↤︎ ${count}`, { reply_to_message_id: ctx.message?.message_id });
+  }
+
+  static async handleGenderWordsCommand(ctx, action) {
+    if (!this.isGroupChat(ctx)) return;
+    const isAdmin = await this.isGroupAdmin(ctx);
+    if (!isAdmin) return ctx.reply('❌ هذا الأمر للمشرفين فقط.');
+    const group = await this.ensureGroupRecord(ctx);
+    group.gameSystem.settings.genderWords = this.normalizeGenderWordSettings(group.gameSystem.settings.genderWords || {});
+    const text = String(ctx.message?.text || '').trim();
+
+    if (action === 'list_boys' || action === 'list_girls') {
+      const key = action === 'list_girls' ? 'girls' : 'boys';
+      const label = key === 'girls' ? 'البنات' : 'العيال';
+      const words = group.gameSystem.settings.genderWords[key];
+      return ctx.reply(`📝 كلمات ${label}\n\n${words.length ? words.map((x) => `• ${x}`).join('\n') : 'لا يوجد كلمات مضافة.'}`);
+    }
+
+    const targetKey = action.includes('girls') ? 'girls' : 'boys';
+    const label = targetKey === 'girls' ? 'البنات' : 'العيال';
+
+    if (action.startsWith('clear_')) {
+      group.gameSystem.settings.genderWords[targetKey] = [];
+      await group.save();
+      return ctx.reply(`✅ تم حذف كلمات ${label} كلها.`);
+    }
+
+    const payload = this.parseTextAfterPrefix(
+      text,
+      action.startsWith('add_')
+        ? /^(?:اضف\s*كلمات\s*(?:بنات|عيال)|\/(?:gaddgirlwords|gaddboywords))\s*/i
+        : /^(?:حذف\s*كلمه\s*(?:بنات|عيال)|\/(?:gdelgirlword|gdelboyword))\s*/i
+    );
+    const items = payload.split(/[,\n]+/).map((x) => x.trim()).filter(Boolean);
+    if (!items.length) {
+      return ctx.reply(`❌ اكتب الكلمات بعد الأمر.\nمثال: ${action.startsWith('add_') ? `اضف كلمات ${label} كلمة1, كلمة2` : `حذف كلمه ${label} كلمة1`}`);
+    }
+
+    if (action.startsWith('add_')) {
+      group.gameSystem.settings.genderWords[targetKey] = this.normalizeStringList([
+        ...group.gameSystem.settings.genderWords[targetKey],
+        ...items
+      ]);
+      await group.save();
+      return ctx.reply(`✅ تم إضافة ${items.length} كلمة إلى كلمات ${label}.`);
+    }
+
+    const removeSet = new Set(items.map((x) => this.normalizeText(x)));
+    group.gameSystem.settings.genderWords[targetKey] = group.gameSystem.settings.genderWords[targetKey]
+      .filter((word) => !removeSet.has(this.normalizeText(word)));
+    await group.save();
+    return ctx.reply(`✅ تم حذف الكلمات المطلوبة من كلمات ${label}.`);
+  }
+
+  static async handleGenderRepliesCommand(ctx, action) {
+    if (!this.isGroupChat(ctx)) return;
+    const isAdmin = await this.isGroupAdmin(ctx);
+    if (!isAdmin) return ctx.reply('❌ هذا الأمر للمشرفين فقط.');
+    const group = await this.ensureGroupRecord(ctx);
+    group.gameSystem.settings.genderReplies = this.normalizeGenderReplySettings(group.gameSystem.settings.genderReplies || {});
+    const text = String(ctx.message?.text || '').trim();
+
+    if (action === 'list_boys' || action === 'list_girls') {
+      const key = action === 'list_girls' ? 'girls' : 'boys';
+      const label = key === 'girls' ? 'البنات' : 'العيال';
+      const replies = group.gameSystem.settings.genderReplies[key];
+      return ctx.reply(`💬 ردود ${label}\n\n${replies.length ? replies.map((x, i) => `${i + 1}. ${x}`).join('\n') : 'لا يوجد ردود مضافة.'}`);
+    }
+
+    const targetKey = action.includes('girls') ? 'girls' : 'boys';
+    const label = targetKey === 'girls' ? 'البنات' : 'العيال';
+
+    if (action.startsWith('clear_')) {
+      group.gameSystem.settings.genderReplies[targetKey] = [];
+      await group.save();
+      return ctx.reply(`✅ تم مسح ردود ${label}.`);
+    }
+
+    let payload = text;
+    if (action === 'add_girls') payload = this.parseTextAfterPrefix(text, /^(?:اضف\s*رد\s*للبنات|\/(?:gaddgirlreply))\s*/i);
+    if (action === 'add_boys') payload = this.parseTextAfterPrefix(text, /^(?:اضف\s*رد\s*للعيال|\/(?:gaddboyreply))\s*/i);
+    if (action === 'remove_girls') payload = this.parseTextAfterPrefix(text, /^(?:حذف\s*رد\s*للبنات|\/(?:gdelgirlreply))\s*/i);
+    if (action === 'remove_boys') payload = this.parseTextAfterPrefix(text, /^(?:حذف\s*رد\s*للعيال|\/(?:gdelboyreply))\s*/i);
+    const items = payload.split(/\n+/).map((x) => x.trim()).filter(Boolean);
+    if (!items.length) {
+      return ctx.reply(`❌ اكتب الرد بعد الأمر.\nمثال: ${action.startsWith('add_') ? `اضف رد ${label === 'البنات' ? 'للبنات' : 'للعيال'} هلا` : `حذف رد ${label === 'البنات' ? 'للبنات' : 'للعيال'} هلا`}`);
+    }
+
+    if (action.startsWith('add_')) {
+      group.gameSystem.settings.genderReplies[targetKey] = this.normalizeStringList([
+        ...group.gameSystem.settings.genderReplies[targetKey],
+        ...items
+      ]);
+      await group.save();
+      return ctx.reply(`✅ تم إضافة ${items.length} رد إلى ردود ${label}.`);
+    }
+
+    const removeSet = new Set(items.map((x) => this.normalizeText(x)));
+    group.gameSystem.settings.genderReplies[targetKey] = group.gameSystem.settings.genderReplies[targetKey]
+      .filter((reply) => !removeSet.has(this.normalizeText(reply)));
+    await group.save();
+    return ctx.reply(`✅ تم حذف الردود المطلوبة من ردود ${label}.`);
+  }
+
+  static async maybeHandleGenderAutoReply(ctx, group, row, text) {
+    const gender = this.normalizeGenderValue(row?.gender);
+    if (!gender) return false;
+    const wordsCfg = this.normalizeGenderWordSettings(group.gameSystem.settings.genderWords || {});
+    const repliesCfg = this.normalizeGenderReplySettings(group.gameSystem.settings.genderReplies || {});
+    const key = gender === GENDER_VALUES.girl ? 'girls' : 'boys';
+    const words = wordsCfg[key] || [];
+    const replies = repliesCfg[key] || [];
+    if (!words.length || !replies.length) return false;
+    const tokens = this.extractArabicWords(text);
+    const matched = words.some((word) => {
+      const normalizedWord = this.normalizeText(word);
+      return normalizedWord && tokens.includes(normalizedWord);
+    });
+    if (!matched) return false;
+    await ctx.reply(this.pickRandom(replies), { reply_to_message_id: ctx.message?.message_id });
+    return true;
+  }
+
+  static async handleStoryTalkStart(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const group = await this.ensureGroupRecord(ctx);
+    const session = this.normalizeStorySession(group.gameSystem.state.storySession || {});
+    if (session.active && session.endsAt && new Date(session.endsAt).getTime() > Date.now()) {
+      return ctx.reply(
+        `⏳ سوالفكم شغالة حاليًا.\n• الحرف المطلوب ↤︎ ${session.expectedLetter}\n• اكتب: انهاء سوالفكم إذا بدكم توقفوها.`,
+        { reply_to_message_id: ctx.message?.message_id }
+      );
+    }
+
+    const expectedLetter = this.pickRandom(STORY_LETTERS);
+    group.gameSystem.state.storySession = this.normalizeStorySession({
+      active: true,
+      hostUserId: Number(ctx.from.id),
+      hostName: ctx.from.first_name || ctx.from.username || String(ctx.from.id),
+      expectedLetter,
+      startedAt: new Date(),
+      endsAt: new Date(Date.now() + 10 * 60 * 1000),
+      lastEntryAt: null,
+      acceptedCount: 0,
+      entries: [],
+      participantIds: []
+    });
+    await group.save();
+    return ctx.reply(
+      `🗣️ <b>بدأت لعبة سوالفكم</b>\n\n` +
+      `• ابدأوا السالفة بالحرف ↤︎ <b>${expectedLetter}</b>\n` +
+      '• كل رسالة مقبولة لازم تبدأ بالحرف المطلوب.\n' +
+      '• الحرف اللي بعده يصير آخر حرف من السالفة السابقة.\n' +
+      '• لإنهاء اللعبة: <b>انهاء سوالفكم</b>',
+      { parse_mode: 'HTML', reply_to_message_id: ctx.message?.message_id }
+    );
+  }
+
+  static async finishStoryTalkSession(ctx, group, reason = 'manual') {
+    const session = this.normalizeStorySession(group.gameSystem.state.storySession || {});
+    if (!session.active) return false;
+    const topic = this.guessStoryTopic(session.entries);
+    const participantCount = (session.participantIds || []).length;
+    const summary = this.buildStoryEntriesPreview(session.entries);
+    const participants = new Map();
+    session.entries.forEach((entry) => {
+      participants.set(entry.userId, (participants.get(entry.userId) || 0) + 1);
+    });
+    const topPlayer = [...participants.entries()].sort((a, b) => b[1] - a[1])[0];
+    const topLine = topPlayer
+      ? `• أكثر واحد سوالف ↤︎ ${this.mentionUser(topPlayer[0], session.entries.find((x) => Number(x.userId) === Number(topPlayer[0]))?.username || String(topPlayer[0]))} (${topPlayer[1]})\n`
+      : '';
+
+    group.gameSystem.state.storySession = this.defaultStorySession();
+    await group.save();
+    await ctx.reply(
+      `🛑 <b>انتهت سوالفكم</b>\n\n` +
+      `• السبب ↤︎ ${reason === 'timeout' ? 'انتهى الوقت' : 'تم إنهاؤها'}\n` +
+      `• عدد المشاركين ↤︎ ${participantCount}\n` +
+      `• عدد الرسائل المقبولة ↤︎ ${session.entries.length}\n` +
+      `${topLine}` +
+      `• سالفتكم كانت عن ↤︎ ${this.escapeHtml(topic)}\n\n` +
+      `<b>ملخص السوالف:</b>\n${summary}`,
+      { parse_mode: 'HTML', reply_to_message_id: ctx.message?.message_id }
+    );
+    return true;
+  }
+
+  static async handleStoryTalkEnd(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const group = await this.ensureGroupRecord(ctx);
+    const session = this.normalizeStorySession(group.gameSystem.state.storySession || {});
+    if (!session.active) return ctx.reply('ℹ️ ما في سوالفكم شغالة حاليًا.', { reply_to_message_id: ctx.message?.message_id });
+    const isAdmin = await this.isGroupAdmin(ctx);
+    if (!isAdmin && Number(ctx.from?.id) !== Number(session.hostUserId)) {
+      return ctx.reply('❌ فقط المشرف أو اللي بدأ اللعبة يقدر ينهيها.', { reply_to_message_id: ctx.message?.message_id });
+    }
+    return this.finishStoryTalkSession(ctx, group, 'manual');
+  }
+
+  static async maybeHandleStoryTalkMessage(ctx, group, row, text) {
+    const session = this.normalizeStorySession(group.gameSystem.state.storySession || {});
+    if (!session.active) return false;
+    const now = Date.now();
+    if (session.endsAt && new Date(session.endsAt).getTime() <= now) {
+      await this.finishStoryTalkSession(ctx, group, 'timeout');
+      return true;
+    }
+
+    const cleanText = String(text || '').trim();
+    if (!cleanText || cleanText.startsWith('/')) return false;
+    const edges = this.extractStoryEdgeLetters(cleanText);
+    if (!edges.first || !edges.last) return false;
+    if (edges.first !== session.expectedLetter) return false;
+
+    session.entries.push({
+      userId: Number(ctx.from.id),
+      username: ctx.from.first_name || ctx.from.username || String(ctx.from.id),
+      text: cleanText,
+      startsWith: edges.first,
+      endsWith: edges.last,
+      createdAt: new Date()
+    });
+    session.acceptedCount = Number(session.acceptedCount || 0) + 1;
+    session.lastEntryAt = new Date();
+    session.endsAt = new Date(Date.now() + 2 * 60 * 1000);
+    session.expectedLetter = edges.last;
+    session.participantIds = [...new Set([...(session.participantIds || []), Number(ctx.from.id)])];
+    group.gameSystem.state.storySession = this.normalizeStorySession(session);
+    await group.save();
+
+    if (session.entries.length >= 20) {
+      await this.finishStoryTalkSession(ctx, group, 'timeout');
+      return true;
+    }
+
+    await ctx.reply(
+      `✅ ${this.mentionUser(ctx.from.id, ctx.from.first_name || ctx.from.username || 'عضو')}\n` +
+      `• تم قبول السالفة\n` +
+      `• الحرف اللي بعده ↤︎ ${session.expectedLetter}`,
+      { parse_mode: 'HTML', reply_to_message_id: ctx.message?.message_id }
+    );
+    return true;
   }
 
   static async isGroupAdmin(ctx, userId = null) {
@@ -2297,7 +2768,7 @@ class GroupGamesHandler {
     const luckKey = `${String(ctx.chat.id)}:${Number(ctx.from?.id || 0)}`;
     if (this.pendingLuckInputs.has(luckKey)) {
       const normalized = this.normalizeArabicDigits(String(text || '').trim());
-      const isKnownCommandLike = /^(شراء|بيع|اهداء|إهداء|ارسال|إرسال|متجر|هدايا|ممتلكاتي|حظ|كرسي|انهاء|إنهاء|سؤال|لاونج|كافيتيريا|قائمة|مزاجي|طلب|سلم|ولع|هف|انضم|نفس)\b/i.test(normalized);
+      const isKnownCommandLike = /^(شراء|بيع|اهداء|إهداء|ارسال|إرسال|متجر|هدايا|ممتلكاتي|حظ|كرسي|انهاء|إنهاء|سؤال|لاونج|كافيتيريا|قائمة|مزاجي|طلب|سلم|ولع|هف|انضم|نفس|تحديد|جنسي|جنسه|اضف|حذف|عدد|كلمات|ردود|سوالفكم)\b/i.test(normalized);
       if (isKnownCommandLike) {
         // Do not let pending luck block normal group commands.
         this.pendingLuckInputs.delete(luckKey);
@@ -2319,11 +2790,21 @@ class GroupGamesHandler {
     const handledConfession = await this.handleIncomingConfessionText(ctx, text);
     if (handledConfession) return true;
 
+    const group = await this.ensureGroupRecord(ctx);
+    const row = this.getOrCreateScoreRow(group, ctx.from);
+    await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
+
+    const handledStory = await this.maybeHandleStoryTalkMessage(ctx, group, row, text);
+    if (handledStory) return true;
+
     const norm = this.normalizeText(String(text || ''));
     if (norm === 'نفس') {
       const handledSessionPuff = await this.handleHookahSessionPuff(ctx);
       if (handledSessionPuff) return true;
     }
+
+    const handledGenderReply = await this.maybeHandleGenderAutoReply(ctx, group, row, text);
+    if (handledGenderReply) return true;
 
     const groupId = String(ctx.chat.id);
     const round = this.activeRounds.get(groupId);
@@ -2344,7 +2825,6 @@ class GroupGamesHandler {
     if (!round.answersNorm.includes(input)) return false;
 
     this.clearRound(groupId);
-    const group = await this.ensureGroupRecord(ctx);
     const scoreMeta = await this.updateScore(group, ctx.from, round.reward);
     if (round.type === 'daily') group.gameSystem.state.lastDailyKey = this.getDateKey();
     group.updatedAt = new Date();
@@ -5309,6 +5789,9 @@ class GroupGamesHandler {
       '• /ginvest | استثمار فلوسك\n' +
       '• /ggrantmoney 1000 @user | منح فلوس (للمالك)\n' +
       '• /gtakemoney 1000 @user | سحب فلوس (للمالك)\n' +
+      '• /gsetgender ولد | /gsetgender بنت\n' +
+      '• /ggender | /ggenderof @user\n' +
+      '• /gstories | /gendstories\n' +
       '• /gluck | يبدأ اختيار رقم للحظ (1-1000)\n' +
       '• /gluckstats | إحصائيات الحظ\n' +
       '• /gmonthly | صرف المكافأة الشهرية (مشرف)\n' +
@@ -5372,9 +5855,11 @@ class GroupGamesHandler {
       '• /gquizset 5 | سلسلة كويز\n' +
       '• /gteam | فريقك\n' +
       '• /gteams | ترتيب الفرق\n' +
+      '• عدد البنات | عدد العيال | كلمات البنات | كلمات العيال\n' +
+      '• اضف رد للبنات | اضف رد للعيال | ردود البنات | ردود العيال\n' +
       '• /gtour | البطولة الأسبوعية (مشرف)\n\n' +
       '<b>أوامر عربية بدون سلاش</b>\n' +
-      'العاب الجروب | مين انا | الغاز | سرعة الكتابة | روليت | متصدرين | اسبوعي | متصدرين الشهر | ملفي | متجر الجروب | الهدايا | ممتلكاتي | اغنى ممتلكات | استثمار فلوسي | حظ | احصائيات الحظ | كشط | احصائيات الكشط | كرسي الاعتراف | انهاء كرسي الاعتراف | انشاء قلعه | قلعتي | متجر الموارد | شراء موارد | مواردي | تطوير قلعتي | انشاء معكسر | شراء جيش | تطوير الجيش | بحث الكنز | تفعيل الحصانه | تعطيل الحصانه | حصانتي | مبارزه | الانضمام للمبارزه | المبارزين | توب الحكام | تحالف | طلبات التحالف\n\n' +
+      'العاب الجروب | مين انا | الغاز | سرعة الكتابة | روليت | متصدرين | اسبوعي | متصدرين الشهر | ملفي | متجر الجروب | الهدايا | ممتلكاتي | اغنى ممتلكات | استثمار فلوسي | حظ | احصائيات الحظ | كشط | احصائيات الكشط | كرسي الاعتراف | انهاء كرسي الاعتراف | سوالفكم | انهاء سوالفكم | تحديد جنسي ولد | تحديد جنسي بنت | حذف جنسي | جنسي | جنسه | عدد البنات | عدد العيال | انشاء قلعه | قلعتي | متجر الموارد | شراء موارد | مواردي | تطوير قلعتي | انشاء معكسر | شراء جيش | تطوير الجيش | بحث الكنز | تفعيل الحصانه | تعطيل الحصانه | حصانتي | مبارزه | الانضمام للمبارزه | المبارزين | توب الحكام | تحالف | طلبات التحالف\n\n' +
       `العملة: كل إجابة صحيحة = <b>${this.formatCurrency(1)}</b>.`,
       { parse_mode: 'HTML', reply_markup: keyboard.reply_markup }
     );

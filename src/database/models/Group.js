@@ -280,6 +280,26 @@ const groupSchema = new mongoose.Schema({
       questionTimeoutSec: {
         type: Number,
         default: 25
+      },
+      genderWords: {
+        boys: {
+          type: [String],
+          default: []
+        },
+        girls: {
+          type: [String],
+          default: []
+        }
+      },
+      genderReplies: {
+        boys: {
+          type: [String],
+          default: []
+        },
+        girls: {
+          type: [String],
+          default: []
+        }
       }
     },
     state: {
@@ -299,12 +319,55 @@ const groupSchema = new mongoose.Schema({
       lastMonthlyRewardKey: {
         type: String,
         default: ''
+      },
+      storySession: {
+        active: {
+          type: Boolean,
+          default: false
+        },
+        hostUserId: {
+          type: Number,
+          default: null
+        },
+        hostName: {
+          type: String,
+          default: ''
+        },
+        expectedLetter: {
+          type: String,
+          default: ''
+        },
+        startedAt: Date,
+        endsAt: Date,
+        lastEntryAt: Date,
+        acceptedCount: {
+          type: Number,
+          default: 0
+        },
+        entries: [
+          {
+            userId: Number,
+            username: String,
+            text: String,
+            startsWith: String,
+            endsWith: String,
+            createdAt: {
+              type: Date,
+              default: Date.now
+            }
+          }
+        ],
+        participantIds: [Number]
       }
     },
     scores: [
       {
         userId: Number,
         username: String,
+        gender: {
+          type: String,
+          default: ''
+        },
         points: {
           type: Number,
           default: 0
