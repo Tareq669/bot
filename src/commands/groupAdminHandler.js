@@ -214,6 +214,23 @@ class GroupAdminHandler {
     return `<a href="tg://user?id=${id}">${safeLabel}</a>`;
   }
 
+  static async collectOwnerRecipients(ctx, group, chatId) {
+    const owners = new Set();
+    if (Number.isInteger(group?.settings?.primaryOwnerId)) owners.add(Number(group.settings.primaryOwnerId));
+    this.getRoleIds(group, 'basicOwnerIds').forEach((id) => owners.add(id));
+    this.getRoleIds(group, 'ownerIds').forEach((id) => owners.add(id));
+
+    try {
+      const admins = await ctx.telegram.getChatAdministrators(chatId);
+      const creator = admins.find((m) => m.status === 'creator');
+      if (creator?.user?.id) owners.add(Number(creator.user.id));
+    } catch (_error) {
+      // ignore
+    }
+
+    return owners;
+  }
+
   static formatRoleActionMessage(actionText, target) {
     const targetMention = this.mentionUser(
       target.id,
@@ -2855,37 +2872,40 @@ class GroupAdminHandler {
         await ctx.telegram.sendMessage(chat.id, welcome).catch(() => null);
       }
 
-      const wasAdmin = ['administrator', 'creator'].includes(oldStatus);
       const leftNow = ['left', 'kicked'].includes(newStatus);
-      if (!wasAdmin || !leftNow) return;
-      if (!group.settings.notifyAdminLeave) return;
+      if (!leftNow || user.id === ctx.botInfo?.id) return;
 
-      const owners = new Set();
-      if (Number.isInteger(group.settings.primaryOwnerId)) owners.add(Number(group.settings.primaryOwnerId));
-      this.getRoleIds(group, 'basicOwnerIds').forEach((id) => owners.add(id));
-      this.getRoleIds(group, 'ownerIds').forEach((id) => owners.add(id));
+      const wasAdmin = ['administrator', 'creator'].includes(oldStatus);
+      const owners = await this.collectOwnerRecipients(ctx, group, chat.id);
+      const who = this.mentionUser(user.id, user.first_name || user.username || String(user.id));
 
-      try {
-        const admins = await ctx.telegram.getChatAdministrators(chat.id);
-        const creator = admins.find((m) => m.status === 'creator');
-        if (creator?.user?.id) owners.add(Number(creator.user.id));
-      } catch (_error) {
-        // ignore
+      if (wasAdmin && group.settings.notifyAdminLeave) {
+        const adminNote =
+          '• هنالك مشرف غادر قروبك\n\n' +
+          `• اسمه ↤︎ ${who}\n` +
+          `• ايديه ↤︎ <code>${user.id}</code>\n` +
+          `• بقروبك ↤︎ ${this.escapeHtml(chat.title || 'Unknown')}\n-`;
+
+        await this.addModerationLog(group, 'admin_left_group', user.id, null, `status ${oldStatus} -> ${newStatus}`);
+        await group.save();
+        await Promise.all([...owners].map((ownerId) => ctx.telegram.sendMessage(ownerId, adminNote, {
+          parse_mode: 'HTML'
+        }).catch(() => null)));
+        return;
       }
 
-      const who = this.mentionUser(user.id, user.first_name || user.username || String(user.id));
-      const note =
-        '• هنالك مشرف غادر قروبك\n\n' +
-        `• اسمه ↤︎ ${who}\n` +
-        `• ايديه ↤︎ <code>${user.id}</code>\n` +
-        `• بقروبك ↤︎ ${this.escapeHtml(chat.title || 'Unknown')}\n-`;
-
-      await this.addModerationLog(group, 'admin_left_group', user.id, null, `status ${oldStatus} -> ${newStatus}`);
-      await group.save();
-
-      await Promise.all([...owners].map((ownerId) => ctx.telegram.sendMessage(ownerId, note, {
-        parse_mode: 'HTML'
-      }).catch(() => null)));
+      if (!wasAdmin) {
+        const memberNote =
+          '• هنالك عضو غادر قروبك\n\n' +
+          `• اسمه ↤︎ ${who}\n` +
+          `• ايديه ↤︎ <code>${user.id}</code>\n` +
+          `• بقروبك ↤︎ ${this.escapeHtml(chat.title || 'Unknown')}\n-`;
+        await this.addModerationLog(group, 'member_left_group', user.id, null, `status ${oldStatus} -> ${newStatus}`);
+        await group.save();
+        await Promise.all([...owners].map((ownerId) => ctx.telegram.sendMessage(ownerId, memberNote, {
+          parse_mode: 'HTML'
+        }).catch(() => null)));
+      }
     } catch (_error) {
       // ignore chat_member failures
     }
