@@ -342,10 +342,10 @@ class BankGameHandler {
       if (!ok) {
         const fine = Math.min(Math.max(1000, Math.floor(p.balance * 0.03)), p.balance);
         p.balance -= fine;
-      meDoc.bankProfile = p;
-      targetDoc.bankProfile = tp;
-      await Promise.all([meDoc.save(), targetDoc.save()]);
-      await this.syncBankBalanceToGameWallet(ctx?.chat?.id, targetDoc, target, tp.balance);
+        meDoc.bankProfile = p;
+        targetDoc.bankProfile = tp;
+        await Promise.all([meDoc.save(), targetDoc.save()]);
+        await this.syncBankBalanceToGameWallet(ctx?.chat?.id, targetDoc, target, tp.balance);
         return ctx.reply(`🚨 انمسكت! خسرّت غرامة ${this.fmt(fine)}\n• رصيدك: ${this.fmt(p.balance)}`);
       }
 
