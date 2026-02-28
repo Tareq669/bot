@@ -409,7 +409,7 @@ class BankGameHandler {
     await this.syncBankBalanceToGameWallet(ctx?.chat?.id, husband, ctx?.from, hp.balance);
     await this.syncBankBalanceToGameWallet(ctx?.chat?.id, wifeDoc, target, wp.balance);
     return ctx.reply(
-      `💍 تم الزواج بنجاح\n` +
+      '💍 تم الزواج بنجاح\n' +
       `• الزوج ↤︎ ${ctx.from.first_name || ctx.from.username || ctx.from.id}\n` +
       `• الزوجة ${this.getWifeSlotLabel(parsed.slot)} ↤︎ ${target.first_name || target.username || target.id}\n` +
       `• المهر ↤︎ ${this.fmt(parsed.amount)}\n` +
