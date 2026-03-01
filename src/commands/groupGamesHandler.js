@@ -5387,6 +5387,28 @@ class GroupGamesHandler {
       { label: 'وردة', keys: ['rose'], names: ['وردة', 'ورده', 'rose'] },
       { label: 'باقة ورود', keys: ['bouquet'], names: ['باقة ورود', 'باقه ورود', 'bouquet'] },
       { label: 'وجبة', keys: ['meal'], names: ['وجبة', 'وجبه', 'meal'] },
+      { label: 'قهوة', keys: ['coffee'], names: ['قهوة', 'قهوه', 'coffee'] },
+      { label: 'شاي', keys: ['tea'], names: ['شاي', 'tea'] },
+      { label: 'عصير', keys: ['juice'], names: ['عصير', 'juice'] },
+      { label: 'عصير موهيتو', keys: ['mojito'], names: ['عصير موهيتو', 'موهيتو', 'mojito'] },
+      { label: 'عصير برتقال', keys: ['orange_juice'], names: ['عصير برتقال', 'برتقال', 'orange juice'] },
+      { label: 'عصير ليمون', keys: ['lemon_juice'], names: ['عصير ليمون', 'ليمون', 'lemon juice'] },
+      { label: 'عصير فواكه', keys: ['fruit_juice'], names: ['عصير فواكه', 'فواكه', 'fruit juice'] },
+      { label: 'عصير موز', keys: ['banana_juice'], names: ['عصير موز', 'موز', 'banana juice'] },
+      { label: 'عصير افوكادو', keys: ['avocado_juice'], names: ['عصير افوكادو', 'افوكادو', 'avocado juice'] },
+      { label: 'عصير فراولة', keys: ['strawberry_juice'], names: ['عصير فراولة', 'فراولة', 'strawberry juice'] },
+      { label: 'عصير مانجا', keys: ['mango_juice'], names: ['عصير مانجا', 'مانجا', 'mango juice'] },
+      { label: 'سفن أب', keys: ['seven_up'], names: ['سفن أب', 'سفن اب', 'سڤن اب', 'seven up'] },
+      { label: 'كوكاكولا', keys: ['cola'], names: ['كوكاكولا', 'كوكا كولا', 'cola'] },
+      { label: 'ماريندا', keys: ['mirinda'], names: ['ماريندا', 'mirinda'] },
+      { label: 'نسكفيه', keys: ['nescafe'], names: ['نسكفيه', 'نسكافيه', 'nescafe'] },
+      { label: 'كابتشينو', keys: ['cappuccino'], names: ['كابتشينو', 'cappuccino'] },
+      { label: 'شاي لاتيه', keys: ['chai_latte'], names: ['شاي لاتيه', 'لاتيه', 'chai latte'] },
+      { label: 'هوت شوكليت', keys: ['hot_chocolate'], names: ['هوت شوكليت', 'hot chocolate'] },
+      { label: 'وجبة شاورما', keys: ['shawarma_meal'], names: ['وجبة شاورما', 'شاورما', 'shawarma'] },
+      { label: 'دجاجة مشوية', keys: ['grilled_chicken'], names: ['دجاجة مشوية', 'دجاج مشوي', 'فروج مشوي', 'grilled chicken'] },
+      { label: 'وجبة كباب', keys: ['kebab_meal'], names: ['وجبة كباب', 'كباب', 'kebab'] },
+      { label: 'مشاوي مشكل', keys: ['mixed_grill'], names: ['مشاوي مشكل', 'مشاوي مشكلة', 'مشاوي', 'mixed grill'] },
       { label: 'سيارة', keys: ['car'], names: ['سيارة', 'سياره', 'car'] },
       { label: 'بيت', keys: ['house'], names: ['بيت', 'house'] },
       { label: 'فيلا', keys: ['villa'], names: ['فيلا', 'villa'] },
@@ -5443,7 +5465,12 @@ class GroupGamesHandler {
       `( توليعات قداحة ↤︎ ${row.loungeInventory.lighterFuel || 0} )`
     ].join('\n');
 
-    const totalItems = inventory.reduce((sum, x) => sum + Number(x?.count || 0), 0);
+    const totalItems = inventory.reduce((sum, x) => sum + Number(x?.count || 0), 0)
+      + ['coffee', 'tea', 'juice', 'mojito', 'orange_juice', 'lemon_juice', 'fruit_juice', 'banana_juice',
+        'avocado_juice', 'strawberry_juice', 'mango_juice', 'seven_up', 'cola', 'mirinda',
+        'nescafe', 'cappuccino', 'chai_latte', 'hot_chocolate', 'shawarma_meal',
+        'grilled_chicken', 'kebab_meal', 'mixed_grill']
+        .reduce((sum, key) => sum + Number(row.loungeInventory[key] || 0), 0);
     const totalEstimatedValue = inventory.reduce((sum, x) => {
       const meta = UNIQUE_GIFTS.find((g) => g.key === x.key);
       return sum + (Number(meta?.price || 0) * Number(x?.count || 0));
