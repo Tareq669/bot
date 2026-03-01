@@ -5508,7 +5508,9 @@ class GroupGamesHandler {
 
     const noiseWords = new Set(['الى', 'إلى', 'ل', 'for', 'to', 'x', '×', 'هدية', 'هديه']);
     const compact = args.filter((x) => !noiseWords.has(String(x)));
-    const gift = this.resolveGiftByInput(compact[0] || args[0]);
+    const rawInput = this.extractGiftInputFromArgs(compact);
+    const giftTokens = rawInput ? rawInput.split(/\s+/) : [];
+    const gift = this.resolveGiftByInput(rawInput) || this.resolveGiftByInput(giftTokens[0]) || this.resolveGiftByInput(compact[0] || args[0]);
     if (!gift) return ctx.reply('❌ الهدية غير معروفة. استخدم /ggifts');
 
     const targetArg = compact.find((x) => String(x).startsWith('@') || /^\d+$/.test(String(x))) || null;
