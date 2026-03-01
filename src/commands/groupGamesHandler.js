@@ -300,6 +300,28 @@ const UNIQUE_GIFTS = [
   { key: 'rose', name: '🌹 وردة', price: 2 },
   { key: 'bouquet', name: '💐 باقة ورود', price: 6 },
   { key: 'meal', name: '🍽️ وجبة', price: 4 },
+  { key: 'coffee', name: '☕ قهوة', price: 3 },
+  { key: 'tea', name: '🍵 شاي', price: 2 },
+  { key: 'juice', name: '🧃 عصير', price: 3 },
+  { key: 'mojito', name: '🍃 عصير موهيتو', price: 4 },
+  { key: 'orange_juice', name: '🍊 عصير برتقال', price: 3 },
+  { key: 'lemon_juice', name: '🍋 عصير ليمون', price: 3 },
+  { key: 'fruit_juice', name: '🍹 عصير فواكه', price: 4 },
+  { key: 'banana_juice', name: '🍌 عصير موز', price: 4 },
+  { key: 'avocado_juice', name: '🥑 عصير افوكادو', price: 5 },
+  { key: 'strawberry_juice', name: '🍓 عصير فراولة', price: 5 },
+  { key: 'mango_juice', name: '🥭 عصير مانجا', price: 5 },
+  { key: 'seven_up', name: '🥤 سفن أب', price: 2 },
+  { key: 'cola', name: '🥤 كوكاكولا', price: 2 },
+  { key: 'mirinda', name: '🥤 ماريندا', price: 2 },
+  { key: 'nescafe', name: '☕ نسكفيه', price: 4 },
+  { key: 'cappuccino', name: '☕ كابتشينو', price: 5 },
+  { key: 'chai_latte', name: '☕ شاي لاتيه', price: 5 },
+  { key: 'hot_chocolate', name: '🍫 هوت شوكليت', price: 6 },
+  { key: 'shawarma_meal', name: '🌯 وجبة شاورما', price: 8 },
+  { key: 'grilled_chicken', name: '🍗 دجاجة مشوية', price: 14 },
+  { key: 'kebab_meal', name: '🍢 وجبة كباب', price: 12 },
+  { key: 'mixed_grill', name: '🍖 مشاوي مشكل', price: 16 },
   { key: 'car', name: '🚗 سيارة', price: 35 },
   { key: 'island', name: '🏝️ جزيرة', price: 90 },
   { key: 'plane', name: '✈️ طيارة', price: 110 },
@@ -495,6 +517,38 @@ const LOUNGE_PRODUCTS = {
     baseStock: 35,
     market: true
   },
+  shawarma_meal: {
+    key: 'shawarma_meal',
+    name: '🌯 وجبة شاورما',
+    aliases: ['شاورما', 'وجبة شاورما', 'سندويشة شاورما', 'shawarma'],
+    price: 8,
+    baseStock: 40,
+    market: true
+  },
+  grilled_chicken: {
+    key: 'grilled_chicken',
+    name: '🍗 دجاجة مشوية',
+    aliases: ['دجاجة مشوية', 'دجاج مشوي', 'فروج مشوي', 'grilled chicken'],
+    price: 14,
+    baseStock: 30,
+    market: true
+  },
+  kebab_meal: {
+    key: 'kebab_meal',
+    name: '🍢 وجبة كباب',
+    aliases: ['كباب', 'وجبة كباب', 'kebab', 'kebab meal'],
+    price: 12,
+    baseStock: 30,
+    market: true
+  },
+  mixed_grill: {
+    key: 'mixed_grill',
+    name: '🍖 مشاوي مشكل',
+    aliases: ['مشاوي مشكل', 'مشاوي مشكلة', 'مشاوي', 'mixed grill'],
+    price: 16,
+    baseStock: 25,
+    market: true
+  },
   hookah_head: {
     key: 'hookah_head',
     name: '🧱 راس أرجيلة',
@@ -550,7 +604,8 @@ const CAFE_CONSUMABLE_KEYS = new Set([
   'mojito', 'orange_juice', 'lemon_juice', 'fruit_juice', 'banana_juice',
   'avocado_juice', 'strawberry_juice', 'mango_juice',
   'seven_up', 'cola', 'mirinda',
-  'nescafe', 'cappuccino', 'chai_latte', 'hot_chocolate'
+  'nescafe', 'cappuccino', 'chai_latte', 'hot_chocolate',
+  'shawarma_meal', 'grilled_chicken', 'kebab_meal', 'mixed_grill'
 ]);
 const LOUNGE_PUFF_ALIASES = [/^هف{1,5}$/i, /^(?:نفس\s*ارجيلة|نفس\s*أرجيلة|نفس\s*دخان|فيب)$/i, /^نفخة\s*سيجار$/i];
 const LOUNGE_PUFF_LINES = [
@@ -937,6 +992,10 @@ class GroupGamesHandler {
       cappuccino: 0,
       chai_latte: 0,
       hot_chocolate: 0,
+      shawarma_meal: 0,
+      grilled_chicken: 0,
+      kebab_meal: 0,
+      mixed_grill: 0,
       cigarette: 0,
       cigar: 0,
       vape: 0,
@@ -1805,12 +1864,36 @@ class GroupGamesHandler {
         santa: ['هدية بابا نويل', 'هديه بابا نويل', 'هدية', 'هديه', 'santa'],
         car: ['سيارة', 'سياره', 'السيارة', 'السياره', 'car']
       };
-      const aliases = [g.key, g.name, this.normalizeText(g.name), ...(extraAliases[g.key] || [])];
+      const loungeAliases = Array.isArray(LOUNGE_PRODUCTS[g.key]?.aliases) ? LOUNGE_PRODUCTS[g.key].aliases : [];
+      const aliases = [g.key, g.name, this.normalizeText(g.name), ...(extraAliases[g.key] || []), ...loungeAliases];
       return aliases.some((x) => {
         const nx = this.normalizeText(String(x));
         return nx === normalizedRaw || nx === rawNoAl;
       });
     }) || null;
+  }
+
+  static isGiftLinkedToLounge(gift) {
+    return Boolean(gift?.key && LOUNGE_PRODUCTS[gift.key] && CAFE_CONSUMABLE_KEYS.has(gift.key));
+  }
+
+  static getOwnedGiftCount(row, gift) {
+    if (this.isGiftLinkedToLounge(gift)) {
+      row.loungeInventory = this.normalizeLoungeInventory(row.loungeInventory || {});
+      return Number(row.loungeInventory[gift.key] || 0);
+    }
+    const inventory = this.normalizeGiftInventoryList(row.giftInventory);
+    const slot = inventory.find((g) => g.key === gift.key);
+    return Number(slot?.count || 0);
+  }
+
+  static applyGiftDelta(row, gift, qtyDelta) {
+    if (this.isGiftLinkedToLounge(gift)) {
+      row.loungeInventory = this.normalizeLoungeInventory(row.loungeInventory || {});
+      row.loungeInventory[gift.key] = Math.max(0, Number(row.loungeInventory[gift.key] || 0) + Number(qtyDelta || 0));
+      return;
+    }
+    this.upsertGiftInventory(row, gift, qtyDelta);
   }
 
   static extractGiftInputFromArgs(args = []) {
@@ -3720,6 +3803,7 @@ class GroupGamesHandler {
       `رصيدك: ${this.formatCurrency(row.points || 0)}\n\n` +
       `🥤 <b>المشروبات الباردة</b>\n${line('mojito')}\n${line('orange_juice')}\n${line('lemon_juice')}\n${line('fruit_juice')}\n${line('banana_juice')}\n${line('avocado_juice')}\n${line('strawberry_juice')}\n${line('mango_juice')}\n${line('seven_up')}\n${line('cola')}\n${line('mirinda')}\n${line('juice')}\n\n` +
       `☕ <b>المشروبات الساخنة</b>\n${line('tea')}\n${line('coffee')}\n${line('nescafe')}\n${line('cappuccino')}\n${line('chai_latte')}\n${line('hot_chocolate')}\n\n` +
+      `🍽️ <b>الوجبات</b>\n${line('shawarma_meal')}\n${line('grilled_chicken')}\n${line('kebab_meal')}\n${line('mixed_grill')}\n\n` +
       `🚬 <b>الدخان</b>\n${line('cigarette')}\n${line('cigar')}\n${line('vape')}\n${line('vape_liquid')}\n${line('lighter')}\n\n` +
       `🫧 <b>الأرجيلة</b>\n${line('hookah')}\n${line('hookah_head')}\n${line('coal')}\n${line('molasses_apple')}\n${line('molasses_mint')}\n\n` +
       `🎮 <b>جلسة الأصحاب</b>\n• افتح جلسة ارجيلة\n• انضم\n• نفس\n\n` +
@@ -5210,7 +5294,7 @@ class GroupGamesHandler {
     }
 
     row.points = (row.points || 0) - totalPrice;
-    this.upsertGiftInventory(row, gift, qty);
+    this.applyGiftDelta(row, gift, qty);
     row.updatedAt = new Date();
     await group.save();
     await this.syncRowToGlobal(userDoc, row);
@@ -5245,9 +5329,7 @@ class GroupGamesHandler {
     const group = await this.ensureGroupRecord(ctx);
     const row = this.getOrCreateScoreRow(group, ctx.from);
     const userDoc = await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
-    const inventory = this.normalizeGiftInventoryList(row.giftInventory);
-    const slot = inventory.find((g) => g.key === gift.key);
-    const currentCount = Number(slot?.count || 0);
+    const currentCount = this.getOwnedGiftCount(row, gift);
     if (currentCount < qty) {
       return ctx.reply(`❌ ما عندك كمية كافية من ${gift.name}. الموجود عندك: ${currentCount}.`, {
         reply_to_message_id: ctx.message?.message_id
@@ -5257,7 +5339,7 @@ class GroupGamesHandler {
     const sellUnitPrice = Math.max(1, Math.floor(gift.price * 0.7));
     const totalPayout = sellUnitPrice * qty;
 
-    this.upsertGiftInventory(row, gift, -qty);
+    this.applyGiftDelta(row, gift, -qty);
     row.points = (row.points || 0) + totalPayout;
     row.updatedAt = new Date();
     await group.save();
@@ -5344,6 +5426,10 @@ class GroupGamesHandler {
       `( كابتشينو ↤︎ ${row.loungeInventory.cappuccino || 0} )`,
       `( شاي لاتيه ↤︎ ${row.loungeInventory.chai_latte || 0} )`,
       `( هوت شوكليت ↤︎ ${row.loungeInventory.hot_chocolate || 0} )`,
+      `( وجبة شاورما ↤︎ ${row.loungeInventory.shawarma_meal || 0} )`,
+      `( دجاجة مشوية ↤︎ ${row.loungeInventory.grilled_chicken || 0} )`,
+      `( وجبة كباب ↤︎ ${row.loungeInventory.kebab_meal || 0} )`,
+      `( مشاوي مشكل ↤︎ ${row.loungeInventory.mixed_grill || 0} )`,
       `( سيجارة ↤︎ ${row.loungeInventory.cigarette || 0} )`,
       `( سيجار ↤︎ ${row.loungeInventory.cigar || 0} )`,
       `( فيب ↤︎ ${row.loungeInventory.vape || 0} )`,
@@ -5389,6 +5475,10 @@ class GroupGamesHandler {
       (row.loungeInventory.cappuccino || 0) * LOUNGE_PRODUCTS.cappuccino.price +
       (row.loungeInventory.chai_latte || 0) * LOUNGE_PRODUCTS.chai_latte.price +
       (row.loungeInventory.hot_chocolate || 0) * LOUNGE_PRODUCTS.hot_chocolate.price +
+      (row.loungeInventory.shawarma_meal || 0) * LOUNGE_PRODUCTS.shawarma_meal.price +
+      (row.loungeInventory.grilled_chicken || 0) * LOUNGE_PRODUCTS.grilled_chicken.price +
+      (row.loungeInventory.kebab_meal || 0) * LOUNGE_PRODUCTS.kebab_meal.price +
+      (row.loungeInventory.mixed_grill || 0) * LOUNGE_PRODUCTS.mixed_grill.price +
       (row.loungeInventory.lighter || 0) * LOUNGE_PRODUCTS.lighter.price
     );
 
@@ -5441,7 +5531,7 @@ class GroupGamesHandler {
     senderRow.giftsSent = (senderRow.giftsSent || 0) + qty;
     receiverRow.giftsReceived = (receiverRow.giftsReceived || 0) + qty;
 
-    this.upsertGiftInventory(receiverRow, gift, qty);
+    this.applyGiftDelta(receiverRow, gift, qty);
     receiverRow.points = (receiverRow.points || 0) + Math.max(1, Math.floor(gift.price / 3)) * qty;
     this.awardXp(receiverRow, qty);
 
