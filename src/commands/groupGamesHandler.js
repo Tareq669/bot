@@ -1797,11 +1797,20 @@ class GroupGamesHandler {
     } else {
       this.applyProfileToRow(userDoc.globalGameProfile, row);
     }
+    if (userDoc.bankProfile && typeof userDoc.bankProfile === 'object' && userDoc.bankProfile.created) {
+      row.points = Math.max(0, Number(userDoc.bankProfile.balance || 0));
+    }
     return userDoc;
   }
 
   static async syncRowToGlobal(userDoc, row) {
     if (!userDoc) return;
+    if (userDoc.bankProfile && typeof userDoc.bankProfile === 'object' && userDoc.bankProfile.created) {
+      userDoc.bankProfile = {
+        ...userDoc.bankProfile,
+        balance: Math.max(0, Number(row?.points || 0))
+      };
+    }
     userDoc.globalGameProfile = this.applyRowToProfile(row, userDoc.globalGameProfile || {});
     await userDoc.save();
   }

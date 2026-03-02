@@ -2408,6 +2408,7 @@ bot.action('admin:broadcast', async (ctx) => {
 });
 
 bot.action('close', (ctx) => MenuHandler.handleClose(ctx));
+bot.action(/^bank:create:(visa|mastercard|payoneer)$/i, (ctx) => BankGameHandler.handleCreateAccountCard(ctx, ctx.match[1].toLowerCase()));
 
 // --- KHATMA ACTIONS ---
 bot.action('khatma:addpage', (ctx) => MenuHandler.handleKhatmaAddPage(ctx, 1));
@@ -2526,6 +2527,7 @@ bot.hears(/^طقس(?:\s+(.+))?$/i, (ctx) => ChatGamesUtilityHandler.handleWeathe
 bot.hears(/^(?:اذان|أذان)(?:\s+(.+))?$/i, (ctx) => ChatGamesUtilityHandler.handleAdhanText(ctx, ctx.match[1]));
 // Group Bank Game commands
 bot.hears(/^انشاء\s*حساب\s*بنكي$/i, (ctx) => BankGameHandler.handleCreateAccount(ctx));
+bot.hears(/^حسابي$/i, (ctx) => BankGameHandler.handleAccountInfo(ctx));
 bot.hears(/^راتب$/i, (ctx) => BankGameHandler.handleSalary(ctx));
 bot.hears(/^بخشيش$/i, (ctx) => BankGameHandler.handleTip(ctx));
 bot.hears(/^زرف$/i, (ctx) => BankGameHandler.handleSteal(ctx));
@@ -2695,6 +2697,7 @@ bot.hears(/^(?:اسبوعي|سباق\s*الأسبوع|سباق\s*الاسبوع)
 // Group Arabic slash aliases
 bot.hears(/^\/(?:انشاء_حساب_بنكي|حساب_بنكي|gbank)$/i, (ctx) => BankGameHandler.handleCreateAccount(ctx));
 bot.hears(/^\/(?:راتب|gsalary)$/i, (ctx) => BankGameHandler.handleSalary(ctx));
+bot.hears(/^\/(?:حسابي|gaccount)$/i, (ctx) => BankGameHandler.handleAccountInfo(ctx));
 bot.hears(/^\/(?:بخشيش|gtip)$/i, (ctx) => BankGameHandler.handleTip(ctx));
 bot.hears(/^\/(?:زرف|gsteal)$/i, (ctx) => BankGameHandler.handleSteal(ctx));
 bot.hears(/^\/(?:مضاربه|مضاربة|gspec)(?:\s+\d+)?$/i, (ctx) => BankGameHandler.handleSpeculate(ctx));

@@ -1,4 +1,5 @@
-﻿const { User, Group } = require('../database/models');
+﻿const Markup = require('telegraf/markup');
+const { User, Group } = require('../database/models');
 
 const GROUP_TYPES = new Set(['group', 'supergroup']);
 
@@ -36,6 +37,21 @@ class BankGameHandler {
     return `${Math.floor(x).toLocaleString('en-US')} دولار 💸`;
   }
 
+  static generateCardNumber(cardType = 'visa') {
+    const digits = String(Date.now()).slice(-10) + String(Math.floor(100000 + Math.random() * 900000));
+    const body = digits.slice(0, 15);
+    if (cardType === 'mastercard') return `5${body}`.slice(0, 16);
+    if (cardType === 'payoneer') return `6${body}`.slice(0, 16);
+    return `4${body}`.slice(0, 16);
+  }
+
+  static getCardTypeLabel(cardType = '') {
+    const normalized = String(cardType || '').toLowerCase();
+    if (normalized === 'mastercard') return 'ماستر كارد';
+    if (normalized === 'payoneer') return 'بايونير';
+    return 'فيزا';
+  }
+
   static parseIntSafe(v) {
     const normalized = String(v || '')
       .replace(/[\u0660-\u0669]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
@@ -48,6 +64,8 @@ class BankGameHandler {
     return {
       created: false,
       balance: 0,
+      cardType: '',
+      cardNumber: '',
       salaryLastAt: 0,
       tipLastAt: 0,
       stealLastAt: 0,
@@ -77,6 +95,8 @@ class BankGameHandler {
   static normalizeProfile(p = {}) {
     const x = { ...this.defaultBankProfile(), ...(p || {}) };
     x.balance = Math.max(0, Number(x.balance || 0));
+    x.cardType = String(x.cardType || '');
+    x.cardNumber = String(x.cardNumber || '');
     x.salaryLastAt = Number(x.salaryLastAt || 0);
     x.tipLastAt = Number(x.tipLastAt || 0);
     x.stealLastAt = Number(x.stealLastAt || 0);
@@ -604,20 +624,43 @@ class BankGameHandler {
     const user = await this.ensureUser(ctx.from);
     const p = this.normalizeProfile(user.bankProfile || {});
     if (p.created) return ctx.reply('🏦 حسابك البنكي موجود بالفعل.');
+    return ctx.reply(
+      '• من أجل انشاء حساب بنكي تختار نوع البطاقة\n\n↤︎ فيزا\n↤︎ ماستر كارد\n↤︎ بايونير\n\n- اضغط للنسخ',
+      Markup.inlineKeyboard([
+        [Markup.button.callback('↤︎ فيزا', 'bank:create:visa')],
+        [Markup.button.callback('↤︎ ماستر كارد', 'bank:create:mastercard')],
+        [Markup.button.callback('↤︎ بايونير', 'bank:create:payoneer')]
+      ])
+    );
+  }
+
+  static async handleCreateAccountCard(ctx, cardType) {
+    const user = await this.ensureUser(ctx.from);
+    const p = this.normalizeProfile(user.bankProfile || {});
+    if (p.created) {
+      await ctx.answerCbQuery('الحساب موجود بالفعل');
+      return ctx.reply('🏦 حسابك البنكي موجود بالفعل.');
+    }
     p.created = true;
+    p.cardType = String(cardType || 'visa');
+    p.cardNumber = this.generateCardNumber(p.cardType);
     p.balance = 10000;
     user.bankProfile = p;
     await user.save();
     await this.syncBankBalanceToGameWallet(ctx?.chat?.id, user, ctx?.from, p.balance);
-    return ctx.reply(`✅ تم انشاء حساب بنكي.\n• رصيد البداية: ${this.fmt(p.balance)}`);
+    await ctx.answerCbQuery('تم إنشاء الحساب');
+    return ctx.reply(
+      `✅ تم انشاء حساب بنكي.\n` +
+      `• نوع البطاقة: ${this.getCardTypeLabel(p.cardType)}\n` +
+      `• رقم البطاقة: \`${p.cardNumber}\`\n` +
+      `• رصيد البداية: ${this.fmt(p.balance)}`,
+      { parse_mode: 'Markdown' }
+    );
   }
 
   static async handleSalary(ctx) {
     if (!this.isGroupChat(ctx)) return;
     return this.withBank(ctx, async (_user, p) => {
-      const cd = 12 * 60 * 60 * 1000;
-      const left = cd - (this.now() - Number(p.salaryLastAt || 0));
-      if (left > 0) return ctx.reply(`⏳ الراتب بعد ${Math.ceil(left / 3600000)} ساعة.`);
       const base = Math.floor(15000 + Math.random() * 10000);
       const amount = this.applyBoost(base, p);
       p.balance += amount;
@@ -629,9 +672,6 @@ class BankGameHandler {
   static async handleTip(ctx) {
     if (!this.isGroupChat(ctx)) return;
     return this.withBank(ctx, async (_user, p) => {
-      const cd = 30 * 60 * 1000;
-      const left = cd - (this.now() - Number(p.tipLastAt || 0));
-      if (left > 0) return ctx.reply(`⏳ البخشيش بعد ${Math.ceil(left / 60000)} دقيقة.`);
       const base = Math.floor(1500 + Math.random() * 4500);
       const amount = this.applyBoost(base, p);
       p.balance += amount;
@@ -646,10 +686,6 @@ class BankGameHandler {
       const target = this.parseTargetFromReply(ctx);
       if (!target) return ctx.reply('❌ الزرف يكون بالرد على رسالة الشخص.');
       if (Number(target.id) === Number(ctx.from.id)) return ctx.reply('❌ ما بصير تزرف حالك 😅');
-
-      const cd = 60 * 60 * 1000;
-      const left = cd - (this.now() - Number(p.stealLastAt || 0));
-      if (left > 0) return ctx.reply(`⏳ الزرف بعد ${Math.ceil(left / 60000)} دقيقة.`);
 
       const targetDoc = await this.ensureUser(target);
       const tp = this.normalizeProfile(targetDoc.bankProfile || {});
@@ -689,10 +725,6 @@ class BankGameHandler {
       const amount = all ? Math.floor(p.balance) : (amountArg ? this.parseIntSafe(amountArg) : Math.min(50000, Math.floor(p.balance * 0.25)));
       if (!Number.isFinite(amount) || amount <= 0) return ctx.reply('❌ اكتب مبلغ صحيح للاستثمار.');
       if (p.balance < amount) return ctx.reply('❌ رصيدك غير كافي.');
-
-      const cd = 6 * 60 * 60 * 1000;
-      const left = cd - (this.now() - Number(p.investLastAt || 0));
-      if (left > 0) return ctx.reply(`⏳ الاستثمار بعد ${Math.ceil(left / 3600000)} ساعة.`);
 
       const ratio = 0.06 + Math.random() * 0.18;
       const profit = Math.floor(amount * ratio);
@@ -886,6 +918,23 @@ class BankGameHandler {
     return true;
   }
 
+  static async handleAccountInfo(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    return this.withBank(ctx, async (_user, p) => {
+      const totalAssets = Object.values(p.assets || {}).reduce((sum, value) => sum + Number(value || 0), 0);
+      return ctx.reply(
+        '🏦 حسابي\n\n' +
+        `• نوع البطاقة ↤︎ ${this.getCardTypeLabel(p.cardType)}\n` +
+        `• رقم البطاقة ↤︎ \`${p.cardNumber || 'غير محدد'}\`\n` +
+        `• فلوسي ↤︎ ${this.fmt(p.balance)}\n` +
+        `• أسهمي ↤︎ ${Number(p.stocksUnits || 0)}\n` +
+        `• ديوني ↤︎ ${this.fmt(p.debtAmount || 0)}\n` +
+        `• ممتلكاتي ↤︎ ${totalAssets}`,
+        { parse_mode: 'Markdown' }
+      );
+    }, { requireAccount: true, allowWhenJailed: true });
+  }
+
   static async handleStocksPrice(ctx) {
     if (!this.isGroupChat(ctx)) return;
     const price = this.stockPrice();
@@ -1041,4 +1090,6 @@ class BankGameHandler {
 }
 
 module.exports = BankGameHandler;
+
+
 
