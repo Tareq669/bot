@@ -3,11 +3,11 @@
 const GROUP_TYPES = new Set(['group', 'supergroup']);
 
 const ASSETS = {
-  car: { name: 'سيارة', aliases: ['سيارة', 'سياره', 'السيارة', 'السياره'], buy: 150000, sellFactor: 0.7 },
+  car: { name: 'سيارة', aliases: ['سيارة', 'سياره', 'السيارة', 'السياره'], buy: 35, sellFactor: 0.7 },
   diamond: { name: 'ماسة', aliases: ['ماسة', 'ماسه', 'الماسة', 'الماسه'], buy: 220000, sellFactor: 0.7 },
   house: { name: 'بيت', aliases: ['بيت', 'البيت'], buy: 380000, sellFactor: 0.7 },
-  palace: { name: 'قصر', aliases: ['قصر', 'القصر'], buy: 750000, sellFactor: 0.7 },
-  villa: { name: 'فيلا', aliases: ['فيلا', 'الفيلا'], buy: 520000, sellFactor: 0.7 },
+  palace: { name: 'قصر', aliases: ['قصر', 'القصر'], buy: 120, sellFactor: 0.7 },
+  villa: { name: 'فيلا', aliases: ['فيلا', 'الفيلا'], buy: 70, sellFactor: 0.7 },
   rose: { name: 'وردة', aliases: ['وردة', 'ورده', 'ورود', 'وردة'], buy: 25000, sellFactor: 0.7 }
 };
 
