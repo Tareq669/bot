@@ -901,20 +901,25 @@ class BankGameHandler {
       return true;
     }
 
-    const own = Number(sp.assets[assetKey] || 0);
-    if (own < qty) {
-      await ctx.reply(`❌ ما عندك كمية كافية. الموجود: ${own}`);
+    const asset = ASSETS[assetKey];
+    const cost = Number(asset.buy || 0) * qty;
+    if (Number(sp.balance || 0) < cost) {
+      await ctx.reply(`❌ فلوسك ما تكفي للإهداء. المطلوب: ${this.fmt(cost)}`);
       return true;
     }
-    sp.assets[assetKey] = own - qty;
+
+    sp.balance = Number(sp.balance || 0) - cost;
     rp.assets[assetKey] = Number(rp.assets[assetKey] || 0) + qty;
     sender.bankProfile = sp;
     receiver.bankProfile = rp;
     await Promise.all([sender.save(), receiver.save()]);
-    await this.adjustGroupGiftInventory(ctx.chat.id, ctx.from, assetKey, -qty);
     await this.adjustGroupGiftInventory(ctx.chat.id, target, assetKey, qty);
-    const asset = ASSETS[assetKey];
-    await ctx.reply(`🎁 تم اهداء ${qty} ${asset.name} بنجاح.`);
+    await this.syncBankBalanceToGameWallet(ctx.chat.id, sender, ctx.from, sp.balance);
+    await ctx.reply(
+      `🎁 تم اهداء ${qty} ${asset.name} بنجاح.\n` +
+      `• التكلفة ↤︎ ${this.fmt(cost)}\n` +
+      `• فلوسك الآن ↤︎ ${this.fmt(sp.balance)}`
+    );
     return true;
   }
 
