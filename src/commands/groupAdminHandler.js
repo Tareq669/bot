@@ -87,6 +87,35 @@ class GroupAdminHandler {
     return parts.slice(1);
   }
 
+  static async resolveModerationTarget(ctx) {
+    const replied = ctx.message?.reply_to_message?.from;
+    const args = this.parseCommandArgs(ctx);
+    if (replied?.id) {
+      return {
+        target: {
+          id: Number(replied.id),
+          firstName: replied.first_name || '',
+          username: replied.username || ''
+        },
+        args
+      };
+    }
+
+    if (!args.length) return { target: null, args: [] };
+    const first = String(args[0] || '').trim();
+    if (!first) return { target: null, args: [] };
+
+    let target = null;
+    if (first.startsWith('@')) {
+      target = await this.resolveTargetUser(ctx, [first]);
+    } else if (/^\d+$/.test(first)) {
+      target = await this.resolveTargetUser(ctx, [first]);
+    }
+
+    if (!target?.id) return { target: null, args };
+    return { target, args: args.slice(1) };
+  }
+
   static normalizePlainText(value) {
     return String(value || '')
       .toLowerCase()
@@ -298,6 +327,21 @@ class GroupAdminHandler {
     if (internalRoleLabel) return internalRoleLabel;
     if (memberStatus === 'administrator') return 'مشرف';
     return 'عضو';
+  }
+
+  static async handleMyRankCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const group = await this.ensureGroupRecord(ctx);
+    const member = await this.getChatMemberSafe(ctx, ctx.from?.id);
+    const internalRoleLabel = this.getInternalRoleLabel(group, ctx.from?.id);
+    const isPrimaryOwner = await this.isPrimaryOwner(ctx);
+    const roleLabel = this.getRoleLabel(member?.status, isPrimaryOwner, internalRoleLabel);
+    return ctx.reply(
+      `🏷️ <b>رتبتي</b>\n\n` +
+      `• المستخدم ↤︎ ${this.mentionUser(ctx.from?.id, ctx.from?.first_name || ctx.from?.username || String(ctx.from?.id || 'عضو'))}\n` +
+      `• رتبتك ↤︎ ${roleLabel}`,
+      { parse_mode: 'HTML' }
+    );
   }
 
   static parseReasonFromArgs(args, mode = 'text') {
@@ -2597,13 +2641,13 @@ class GroupAdminHandler {
     const botRights = await this.ensureBotModerationRights(ctx);
     if (!botRights.ok) return ctx.reply(botRights.message);
 
-    const targetUserId = this.getRepliedUserId(ctx);
-    if (!targetUserId) return ctx.reply('❌ يجب الرد على رسالة المستخدم للكتم.');
+    const { target, args } = await this.resolveModerationTarget(ctx);
+    const targetUserId = Number(target?.id || 0);
+    if (!targetUserId) return ctx.reply('❌ استخدم الكتم بالرد أو @user أو ID.');
 
     const targetIsAdmin = await this.isGroupAdmin(ctx, targetUserId);
     if (targetIsAdmin) return ctx.reply('❌ لا يمكن كتم مشرف.');
 
-    const args = this.parseCommandArgs(ctx);
     const minutes = Math.max(1, parseInt(args[0] || '10', 10) || 10);
     const group = await this.ensureGroupRecord(ctx);
     this.normalizeGroupState(group);
@@ -2634,7 +2678,10 @@ class GroupAdminHandler {
       });
       await this.addModerationLog(group, 'mute', ctx.from.id, targetUserId, reason);
       await group.save();
-      return ctx.reply(`🔇 تم كتم المستخدم لمدة ${minutes} دقيقة.`);
+      return ctx.reply(
+        `🔇 تم كتم ${this.mentionUser(targetUserId, target?.firstName || target?.username || String(targetUserId))} لمدة ${minutes} دقيقة.`,
+        { parse_mode: 'HTML' }
+      );
     } catch (_error) {
       return ctx.reply('❌ فشل الكتم. تأكد من صلاحيات البوت.');
     }
@@ -2649,8 +2696,9 @@ class GroupAdminHandler {
     const botRights = await this.ensureBotModerationRights(ctx);
     if (!botRights.ok) return ctx.reply(botRights.message);
 
-    const targetUserId = this.getRepliedUserId(ctx);
-    if (!targetUserId) return ctx.reply('❌ يجب الرد على رسالة المستخدم لفك الكتم.');
+    const { target } = await this.resolveModerationTarget(ctx);
+    const targetUserId = Number(target?.id || 0);
+    if (!targetUserId) return ctx.reply('❌ استخدم إلغاء الكتم بالرد أو @user أو ID.');
 
     try {
       await ctx.telegram.restrictChatMember(ctx.chat.id, targetUserId, {
@@ -2672,9 +2720,103 @@ class GroupAdminHandler {
       const group = await this.ensureGroupRecord(ctx);
       await this.addModerationLog(group, 'unmute', ctx.from.id, targetUserId);
       await group.save();
-      return ctx.reply('🔊 تم فك كتم المستخدم.');
+      return ctx.reply(
+        `🔊 تم إلغاء كتم ${this.mentionUser(targetUserId, target?.firstName || target?.username || String(targetUserId))}.`,
+        { parse_mode: 'HTML' }
+      );
     } catch (_error) {
       return ctx.reply('❌ فشل فك الكتم. تأكد من صلاحيات البوت.');
+    }
+  }
+
+  static async handleRestrictCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+
+    const isAdmin = await this.isAdminOrHigher(ctx);
+    if (!isAdmin) return ctx.reply('❌ هذا الأمر للمشرفين فقط.');
+
+    const botRights = await this.ensureBotModerationRights(ctx);
+    if (!botRights.ok) return ctx.reply(botRights.message);
+
+    const { target, args } = await this.resolveModerationTarget(ctx);
+    const targetUserId = Number(target?.id || 0);
+    if (!targetUserId) return ctx.reply('❌ استخدم التقييد بالرد أو @user أو ID.');
+
+    const targetIsAdmin = await this.isGroupAdmin(ctx, targetUserId);
+    if (targetIsAdmin) return ctx.reply('❌ لا يمكن تقييد مشرف.');
+
+    const minutes = Math.max(1, parseInt(args[0] || '10', 10) || 10);
+    const untilDate = Math.floor(Date.now() / 1000) + minutes * 60;
+    const group = await this.ensureGroupRecord(ctx);
+
+    try {
+      await ctx.telegram.restrictChatMember(ctx.chat.id, targetUserId, {
+        can_send_messages: true,
+        can_send_audios: false,
+        can_send_documents: false,
+        can_send_photos: false,
+        can_send_videos: false,
+        can_send_video_notes: false,
+        can_send_voice_notes: false,
+        can_send_polls: false,
+        can_send_other_messages: false,
+        can_add_web_page_previews: false,
+        can_change_info: false,
+        can_invite_users: false,
+        can_pin_messages: false,
+        can_manage_topics: false,
+        until_date: untilDate
+      });
+      await this.addModerationLog(group, 'restrict', ctx.from.id, targetUserId, `duration=${minutes}m`);
+      await group.save();
+      return ctx.reply(
+        `🔒 تم تقييد ${this.mentionUser(targetUserId, target?.firstName || target?.username || String(targetUserId))} لمدة ${minutes} دقيقة.`,
+        { parse_mode: 'HTML' }
+      );
+    } catch (_error) {
+      return ctx.reply('❌ فشل التقييد. تأكد من صلاحيات البوت.');
+    }
+  }
+
+  static async handleUnrestrictCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+
+    const isAdmin = await this.isAdminOrHigher(ctx);
+    if (!isAdmin) return ctx.reply('❌ هذا الأمر للمشرفين فقط.');
+
+    const botRights = await this.ensureBotModerationRights(ctx);
+    if (!botRights.ok) return ctx.reply(botRights.message);
+
+    const { target } = await this.resolveModerationTarget(ctx);
+    const targetUserId = Number(target?.id || 0);
+    if (!targetUserId) return ctx.reply('❌ استخدم إلغاء التقييد بالرد أو @user أو ID.');
+
+    try {
+      await ctx.telegram.restrictChatMember(ctx.chat.id, targetUserId, {
+        can_send_messages: true,
+        can_send_audios: true,
+        can_send_documents: true,
+        can_send_photos: true,
+        can_send_videos: true,
+        can_send_video_notes: true,
+        can_send_voice_notes: true,
+        can_send_polls: true,
+        can_send_other_messages: true,
+        can_add_web_page_previews: true,
+        can_change_info: false,
+        can_invite_users: true,
+        can_pin_messages: false,
+        can_manage_topics: false
+      });
+      const group = await this.ensureGroupRecord(ctx);
+      await this.addModerationLog(group, 'unrestrict', ctx.from.id, targetUserId);
+      await group.save();
+      return ctx.reply(
+        `🔓 تم إلغاء تقييد ${this.mentionUser(targetUserId, target?.firstName || target?.username || String(targetUserId))}.`,
+        { parse_mode: 'HTML' }
+      );
+    } catch (_error) {
+      return ctx.reply('❌ فشل إلغاء التقييد. تأكد من صلاحيات البوت.');
     }
   }
 
@@ -2988,9 +3130,31 @@ class GroupAdminHandler {
       await this.handlePremiumMemberCommand(ctx);
       return true;
     }
-    if (/^(المنشئين|المالكين الاساسيين|المالكين|المدراء|الادمنية|الأدمنية|المميزين)$/i.test(rawText)) {
+    if (/^(المنشئين|المالكين الاساسيين|المالكين|المدراء|الادمنية|الأدمنية|المميزين|رتبتي)$/i.test(rawText)) {
+      if (/^رتبتي$/i.test(rawText)) {
+        await this.handleMyRankCommand(ctx);
+        return true;
+      }
       await this.handleRankListCommand(ctx);
       return true;
+    }
+    if (/^(كتم|الغاء الكتم|إلغاء الكتم|فك الكتم|تقييد|الغاء التقييد|إلغاء التقييد|فك التقييد)(?:\s+.+)?$/i.test(rawText)) {
+      if (/^كتم(?:\s+.+)?$/i.test(rawText)) {
+        await this.handleMuteCommand(ctx);
+        return true;
+      }
+      if (/^(الغاء الكتم|إلغاء الكتم|فك الكتم)(?:\s+.+)?$/i.test(rawText)) {
+        await this.handleUnmuteCommand(ctx);
+        return true;
+      }
+      if (/^تقييد(?:\s+.+)?$/i.test(rawText)) {
+        await this.handleRestrictCommand(ctx);
+        return true;
+      }
+      if (/^(الغاء التقييد|إلغاء التقييد|فك التقييد)(?:\s+.+)?$/i.test(rawText)) {
+        await this.handleUnrestrictCommand(ctx);
+        return true;
+      }
     }
     if (
       /^(رفع استثناء|تنزيل استثناء|المستثنئين|مسح الاستثناءات|تنزيل الاستثناءات|\/gexceptions\b)/i.test(rawText)
