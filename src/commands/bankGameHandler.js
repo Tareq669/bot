@@ -5,11 +5,11 @@ const GROUP_TYPES = new Set(['group', 'supergroup']);
 
 const ASSETS = {
   car: { name: 'سيارة', aliases: ['سيارة', 'سياره', 'السيارة', 'السياره'], buy: 35, sellFactor: 0.7 },
-  diamond: { name: 'ماسة', aliases: ['ماسة', 'ماسه', 'الماسة', 'الماسه'], buy: 220000, sellFactor: 0.7 },
-  house: { name: 'بيت', aliases: ['بيت', 'البيت'], buy: 380000, sellFactor: 0.7 },
+  diamond: { name: 'ماسة', aliases: ['ماسة', 'ماسه', 'الماسة', 'الماسه'], buy: 75, sellFactor: 0.7 },
+  house: { name: 'بيت', aliases: ['بيت', 'البيت'], buy: 45, sellFactor: 0.7 },
   palace: { name: 'قصر', aliases: ['قصر', 'القصر'], buy: 120, sellFactor: 0.7 },
   villa: { name: 'فيلا', aliases: ['فيلا', 'الفيلا'], buy: 70, sellFactor: 0.7 },
-  rose: { name: 'وردة', aliases: ['وردة', 'ورده', 'ورود', 'وردة'], buy: 25000, sellFactor: 0.7 }
+  rose: { name: 'وردة', aliases: ['وردة', 'ورده', 'ورود', 'وردة'], buy: 2, sellFactor: 0.7 }
 };
 
 class BankGameHandler {
@@ -915,10 +915,19 @@ class BankGameHandler {
     await Promise.all([sender.save(), receiver.save()]);
     await this.adjustGroupGiftInventory(ctx.chat.id, target, assetKey, qty);
     await this.syncBankBalanceToGameWallet(ctx.chat.id, sender, ctx.from, sp.balance);
+    const senderMention = `<a href="tg://user?id=${Number(ctx.from?.id || 0)}">${String(ctx.from?.first_name || ctx.from?.username || 'عضو').replace(/[<&>]/g, '')}</a>`;
+    const receiverMention = `<a href="tg://user?id=${Number(target.id || 0)}">${String(target.first_name || target.username || 'عضو').replace(/[<&>]/g, '')}</a>`;
     await ctx.reply(
-      `🎁 تم اهداء ${qty} ${asset.name} بنجاح.\n` +
-      `• التكلفة ↤︎ ${this.fmt(cost)}\n` +
-      `• فلوسك الآن ↤︎ ${this.fmt(sp.balance)}`
+      '🎁 <b>عملية اهداء</b>\n\n' +
+      `• الاهداء من : ${senderMention}\n` +
+      `• نوع الهدية : ${asset.name}\n` +
+      `• عدد : ${qty}\n` +
+      `• المستلم : ${receiverMention}\n` +
+      `• تكلفة الاهداء : ${this.fmt(cost)}`,
+      {
+        parse_mode: 'HTML',
+        reply_to_message_id: ctx.message?.message_id
+      }
     );
     return true;
   }
