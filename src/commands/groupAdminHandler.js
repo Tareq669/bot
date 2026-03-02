@@ -344,6 +344,37 @@ class GroupAdminHandler {
     );
   }
 
+  static async handleInspectCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const isAdmin = await this.isAdminOrHigher(ctx);
+    if (!isAdmin) return ctx.reply('❌ هذا الأمر للمشرفين فقط.');
+
+    const { target } = await this.resolveModerationTarget(ctx);
+    if (!target?.id) return ctx.reply('❌ استخدم فحص بالرد أو @user أو ID.');
+
+    const group = await this.ensureGroupRecord(ctx);
+    const member = await this.getChatMemberSafe(ctx, target.id);
+    const warning = (group.warnings || []).find((w) => Number(w.userId) === Number(target.id));
+    const bannedEntry = (group.bannedUsers || []).find((u) => Number(u.userId) === Number(target.id));
+    const logs = (group.moderationLogs || []).filter((log) => Number(log.targetId) === Number(target.id)).slice(0, 5);
+
+    const records = [];
+    if (Number(warning?.count || 0) > 0) records.push(`تحذيرات: ${warning.count}`);
+    if (bannedEntry) records.push(`حظر${bannedEntry.reason ? ` (${bannedEntry.reason})` : ''}`);
+    logs.forEach((log) => {
+      if (log?.action) records.push(String(log.action));
+    });
+
+    const oldName = target.username ? `@${target.username}` : 'غير محفوظ';
+    return ctx.reply(
+      `• فحص : ${this.mentionUser(target.id, target.firstName || target.username || String(target.id))}\n` +
+      `• الايدي : <code>${target.id}</code>\n\n` +
+      `• الاسم القديم : ${this.escapeHtml(oldName)}\n` +
+      `• سوابقة :\n${records.length ? records.map((item) => `- ${this.escapeHtml(item)}`).join('\n') : 'لا توجد سوابق'}`,
+      { parse_mode: 'HTML' }
+    );
+  }
+
   static parseReasonFromArgs(args, mode = 'text') {
     const list = Array.isArray(args) ? args : [];
     if (mode === 'mute') {
@@ -375,6 +406,7 @@ class GroupAdminHandler {
     if (!group.settings) group.settings = {};
     if (typeof group.settings.lockLinks !== 'boolean') group.settings.lockLinks = false;
     if (typeof group.settings.lockStickers !== 'boolean') group.settings.lockStickers = false;
+    if (typeof group.settings.blockForwards !== 'boolean') group.settings.blockForwards = false;
     if (typeof group.settings.filterBadWords !== 'boolean') group.settings.filterBadWords = true;
     if (typeof group.settings.blockExplicitContent !== 'boolean') group.settings.blockExplicitContent = true;
     if (typeof group.settings.floodProtection !== 'boolean') group.settings.floodProtection = true;
@@ -492,6 +524,7 @@ class GroupAdminHandler {
       `• فلتر الكلمات ↤︎ ${settings.filterBadWords ? '✅' : '❌'}\n` +
       `• منع الاباحيه ↤︎ ${settings.blockExplicitContent ? '✅' : '❌'}\n` +
       `• منع الرسائل الطويله ↤︎ ${settings.blockLongMessages ? '✅' : '❌'}\n` +
+      `• منع التوجيه ↤︎ ${settings.blockForwards ? '✅' : '❌'}\n` +
       `• قفل الروابط ↤︎ ${settings.lockLinks ? '✅' : '❌'}\n` +
       `• قفل الملصقات ↤︎ ${settings.lockStickers ? '✅' : '❌'}\n` +
       `• العقوبات التلقائيه ↤︎ ${policy.enabled ? '✅' : '❌'}\n` +
@@ -531,6 +564,7 @@ class GroupAdminHandler {
       `• منع الإباحي: ${settings.blockExplicitContent ? '✅' : '❌'}\n` +
       `• حماية التكرار: ${settings.floodProtection ? '✅' : '❌'}\n` +
       `• منع الرسائل الطويلة: ${settings.blockLongMessages ? '✅' : '❌'} (الحد: ${settings.maxMessageLength})\n` +
+      `• منع التوجيه: ${settings.blockForwards ? '✅' : '❌'}\n` +
       `• استثناء المشرفين من الحماية: ${settings.exemptAdminsFromProtection ? '✅' : '❌'}\n` +
       `• سياسة العقوبات: ${this.formatPolicy(policy)}\n\n` +
       '<b>أوامر الإدارة:</b>\n' +
@@ -695,6 +729,7 @@ class GroupAdminHandler {
       '🛡️ <b>حالة الحماية الحالية</b>\n\n' +
       `• الروابط: ${group.settings?.lockLinks ? '✅ مقفلة' : '❌ مفتوحة'}\n` +
       `• الملصقات: ${group.settings?.lockStickers ? '✅ مقفلة' : '❌ مفتوحة'}\n` +
+      `• التوجيه: ${group.settings?.blockForwards ? '✅ مفعّل' : '❌ معطّل'}\n` +
       `• الكلمات: ${group.settings?.filterBadWords ? '✅ مفعلة' : '❌ معطلة'}\n` +
       `• الإباحي: ${group.settings?.blockExplicitContent ? '✅ مفعلة' : '❌ معطلة'}\n` +
       `• التكرار: ${group.settings?.floodProtection ? '✅ مفعلة' : '❌ معطلة'}\n` +
@@ -703,6 +738,7 @@ class GroupAdminHandler {
       '<b>أوامر سريعة:</b>\n' +
       '• قفل الروابط | فتح الروابط\n' +
       '• قفل الملصقات | فتح الملصقات\n' +
+      '• تفعيل منع التوجيه | تعطيل منع التوجيه\n' +
       '• تفعيل الكلمات | تعطيل الكلمات\n' +
       '• تفعيل التكرار | تعطيل التكرار\n' +
       '• تفعيل منع الاباحية | تعطيل منع الاباحية\n' +
@@ -710,6 +746,7 @@ class GroupAdminHandler {
       '• استثناء المشرفين من الحماية | الغاء استثناء المشرفين من الحماية\n' +
       '• /gprotect links on|off\n' +
       '• /gprotect stickers on|off\n' +
+      '• /gprotect forwards on|off\n' +
       '• /gprotect words on|off\n' +
       '• /gprotect flood on|off\n' +
       '• /gprotect nsfw on|off\n' +
@@ -780,6 +817,7 @@ class GroupAdminHandler {
     const keyMap = {
       links: 'lockLinks',
       stickers: 'lockStickers',
+      forwards: 'blockForwards',
       words: 'filterBadWords',
       flood: 'floodProtection',
       nsfw: 'blockExplicitContent',
@@ -788,7 +826,7 @@ class GroupAdminHandler {
     };
     const key = keyMap[target];
     if (!key) {
-      return ctx.reply('❌ الخيار غير معروف. استخدم: links أو stickers أو words أو flood أو nsfw أو long أو maxlen أو admins');
+      return ctx.reply('❌ الخيار غير معروف. استخدم: links أو stickers أو forwards أو words أو flood أو nsfw أو long أو maxlen أو admins');
     }
 
     const result = await this.setProtectionSetting(ctx, key, switchValue, 'gprotect');
@@ -831,6 +869,7 @@ class GroupAdminHandler {
       'floodProtection',
       'blockExplicitContent',
       'blockLongMessages',
+      'blockForwards',
       'exemptAdminsFromProtection'
     ]);
     if (!allowedKeys.has(key)) {
@@ -3084,7 +3123,7 @@ class GroupAdminHandler {
 
   static async processGroupMessage(ctx) {
     if (!this.isGroupChat(ctx)) return false;
-    if (!ctx.message?.text) return false;
+    if (!ctx.message) return false;
 
     const group = await this.ensureGroupRecord(ctx);
     const rawText = String(ctx.message.text || '').trim();
@@ -3136,6 +3175,10 @@ class GroupAdminHandler {
         return true;
       }
       await this.handleRankListCommand(ctx);
+      return true;
+    }
+    if (/^(فحص|\/ginspect\b)(?:\s+.+)?$/i.test(rawText)) {
+      await this.handleInspectCommand(ctx);
       return true;
     }
     if (/^(كتم|الغاء الكتم|إلغاء الكتم|فك الكتم|تقييد|الغاء التقييد|إلغاء التقييد|فك التقييد)(?:\s+.+)?$/i.test(rawText)) {
@@ -3199,7 +3242,7 @@ class GroupAdminHandler {
       return true;
     }
     if (
-      /^(قفل الروابط|فتح الروابط|قفل الملصقات|فتح الملصقات|تفعيل الكلمات|تعطيل الكلمات|تفعيل التكرار|تعطيل التكرار|تفعيل منع الاباحية|تعطيل منع الاباحية|تفعيل منع الرسائل الطويلة|تعطيل منع الرسائل الطويلة|استثناء المشرفين من الحماية|الغاء استثناء المشرفين من الحماية|إلغاء استثناء المشرفين من الحماية|الحماية|\/gprotect\b)/i.test(rawText)
+      /^(قفل الروابط|فتح الروابط|قفل الملصقات|فتح الملصقات|تفعيل منع التوجيه|تعطيل منع التوجيه|تفعيل الكلمات|تعطيل الكلمات|تفعيل التكرار|تعطيل التكرار|تفعيل منع الاباحية|تعطيل منع الاباحية|تفعيل منع الرسائل الطويلة|تعطيل منع الرسائل الطويلة|استثناء المشرفين من الحماية|الغاء استثناء المشرفين من الحماية|إلغاء استثناء المشرفين من الحماية|الحماية|\/gprotect\b)/i.test(rawText)
     ) {
       if (/^قفل الروابط$/i.test(rawText)) {
         const result = await this.setProtectionSetting(ctx, 'lockLinks', true, 'text');
@@ -3223,6 +3266,18 @@ class GroupAdminHandler {
         const result = await this.setProtectionSetting(ctx, 'lockStickers', false, 'text');
         if (!result?.ok) return true;
         await ctx.reply('✅ تم فتح الملصقات.');
+        return true;
+      }
+      if (/^تفعيل منع التوجيه$/i.test(rawText)) {
+        const result = await this.setProtectionSetting(ctx, 'blockForwards', true, 'text');
+        if (!result?.ok) return true;
+        await ctx.reply('✅ تم تفعيل منع التوجيه.');
+        return true;
+      }
+      if (/^تعطيل منع التوجيه$/i.test(rawText)) {
+        const result = await this.setProtectionSetting(ctx, 'blockForwards', false, 'text');
+        if (!result?.ok) return true;
+        await ctx.reply('✅ تم تعطيل منع التوجيه.');
         return true;
       }
       if (/^تفعيل الكلمات$/i.test(rawText)) {
@@ -3331,6 +3386,28 @@ class GroupAdminHandler {
 
     const text = lowered;
     const hasSticker = Boolean(ctx.message?.sticker);
+    const isForwarded = Boolean(
+      ctx.message?.forward_origin
+      || ctx.message?.forward_from
+      || ctx.message?.forward_from_chat
+      || ctx.message?.is_automatic_forward
+    );
+
+    if (group.settings?.blockForwards && isForwarded) {
+      try {
+        await ctx.telegram.deleteMessage(ctx.chat.id, ctx.message.message_id);
+        await this.addModerationLog(group, 'delete_forward_message', ctx.botInfo.id, ctx.from.id, 'forward blocked');
+        await group.save();
+        await ctx.reply(
+          `• عذراً عزيزي ↤︎「 ${this.mentionUser(ctx.from.id, ctx.from.first_name || ctx.from.username || String(ctx.from.id))} 」\n` +
+          '• ممنوع التوجيه هنا .',
+          { parse_mode: 'HTML' }
+        );
+      } catch (_error) {
+        await ctx.reply('⚠️ تم اكتشاف توجيه لكن لا يمكن حذفه. فعّل صلاحية حذف الرسائل للبوت.');
+      }
+      return true;
+    }
 
     if (group.settings?.lockStickers && hasSticker) {
       try {

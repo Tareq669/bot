@@ -390,6 +390,7 @@ bot.command('gprotectionlevel', (ctx) => GroupAdminHandler.handleProtectionPrese
 bot.command('gprotectionsettings', (ctx) => GroupAdminHandler.handleProtectionSettingsCommand(ctx));
 bot.command('gfaq', (ctx) => GroupAdminHandler.handleFaqCommand(ctx));
 bot.command('gadminstats', (ctx) => GroupAdminHandler.handleAdminInteractionCommand(ctx));
+bot.command('ginspect', (ctx) => GroupAdminHandler.handleInspectCommand(ctx));
 bot.command('gprint', (ctx) => GroupAdminHandler.handlePrintCommand(ctx));
 bot.command('greasons', (ctx) => GroupAdminHandler.handleReasonsToggle(ctx));
 bot.command('gbasic', (ctx) => GroupAdminHandler.handleBasicOwnerCommand(ctx));
@@ -2699,6 +2700,7 @@ bot.hears(/^(?:اسبوعي|سباق\s*الأسبوع|سباق\s*الاسبوع)
 // Group Arabic slash aliases
 bot.hears(/^\/(?:انشاء_حساب_بنكي|حساب_بنكي|gbank)$/i, (ctx) => BankGameHandler.handleCreateAccount(ctx));
 bot.hears(/^\/(?:رتبتي|gmyrank)$/i, (ctx) => GroupAdminHandler.handleMyRankCommand(ctx));
+bot.hears(/^\/(?:فحص|ginspect)(?:\s+.+)?$/i, (ctx) => GroupAdminHandler.handleInspectCommand(ctx));
 bot.hears(/^\/(?:راتب|gsalary)$/i, (ctx) => BankGameHandler.handleSalary(ctx));
 bot.hears(/^\/(?:حسابي|gaccount)$/i, (ctx) => BankGameHandler.handleAccountInfo(ctx));
 bot.hears(/^\/(?:بخشيش|gtip)$/i, (ctx) => BankGameHandler.handleTip(ctx));
