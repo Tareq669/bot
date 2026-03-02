@@ -235,15 +235,6 @@ Promise.all([
       { command: 'gadminleave', description: 'تنبيه مغادرة المشرفين' },
       { command: 'gwelcome', description: 'إعداد رسالة الترحيب' },
       { command: 'gsuggest', description: 'نظام الاقتراحات' },
-      { command: 'gsuggestmenu', description: 'لوحة الاقتراحات' },
-      { command: 'gsuggeststats', description: 'إحصائيات الاقتراحات' },
-      { command: 'gsuggesttop', description: 'ترتيب الاقتراحات الشهري' },
-      { command: 'gtemplate_member', description: 'إعداد كليشة عضو مثالي' },
-      { command: 'gtemplate_admin', description: 'إعداد كليشة مشرف مثالي' },
-      { command: 'gideal_member', description: 'رفع عضو مثالي' },
-      { command: 'gideal_admin', description: 'رفع مشرف مثالي' },
-      { command: 'gshow_ideal_member', description: 'عرض العضو المثالي' },
-      { command: 'gshow_ideal_admin', description: 'عرض المشرف المثالي' },
       { command: 'g', description: 'القائمة السريعة' },
       { command: 'gquiz', description: 'سؤال سريع للجروب' },
       { command: 'gmath', description: 'تحدي حساب ذهني' },
@@ -286,9 +277,7 @@ Promise.all([
       { command: 'glounge', description: 'لاونج الجروب (دخان/أرجيلة)' },
       { command: 'gcafework', description: 'عمل بالكافيتيريا' },
       { command: 'gcafereq', description: 'فتح طلب كافيتيريا' },
-      { command: 'gcafedeliver', description: 'تسليم الطلب' },
       { command: 'gmood', description: 'مزاجك الحالي' },
-      { command: 'gtopcafe', description: 'توب الكافيتيريا' },
       { command: 'gcastle', description: 'إنشاء قلعة' },
       { command: 'gmycastle', description: 'تفاصيل قلعتي' },
       { command: 'gresstore', description: 'متجر الموارد' },
@@ -306,11 +295,8 @@ Promise.all([
       { command: 'gfighters', description: 'المبارزين' },
       { command: 'grulers', description: 'توب الحكام' },
       { command: 'gally', description: 'طلب تحالف' },
-      { command: 'gallyreq', description: 'طلبات التحالف' },
-      { command: 'gteam', description: 'إدارة فريقك' },
-      { command: 'gteams', description: 'ترتيب الفرق' },
-      { command: 'gtour', description: 'إدارة البطولة الأسبوعية' }
-    ],
+      { command: 'gallyreq', description: 'طلبات التحالف' }
+    ].slice(0, 95),
     { scope: { type: 'all_group_chats' } }
   )
 ])

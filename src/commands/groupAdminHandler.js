@@ -4,6 +4,18 @@ const { Group } = require('../database/models');
 const GROUP_TYPES = new Set(['group', 'supergroup']);
 
 class GroupAdminHandler {
+  static async saveGroupQuietly(group) {
+    try {
+      await group.save();
+      return true;
+    } catch (error) {
+      if (error?.name === 'VersionError') {
+        return false;
+      }
+      throw error;
+    }
+  }
+
   static pendingAdminStats = new Map();
   static INTERNAL_ROLE_KEYS = ['basicOwnerIds', 'ownerIds', 'managerIds', 'adminIds', 'premiumMemberIds'];
 
@@ -3374,10 +3386,16 @@ class GroupAdminHandler {
       return true;
     }
 
+    await Group.updateOne(
+      { _id: group._id },
+      {
+        $inc: { 'statistics.messagesCount': 1 },
+        $set: { updatedAt: new Date() }
+      }
+    ).catch(() => {});
     group.statistics = group.statistics || {};
     group.statistics.messagesCount = (group.statistics.messagesCount || 0) + 1;
     group.updatedAt = new Date();
-    await group.save();
 
     const isAdmin = await this.isGroupAdmin(ctx);
     if (isAdmin && group.settings?.exemptAdminsFromProtection) {
@@ -3397,7 +3415,7 @@ class GroupAdminHandler {
       try {
         await ctx.telegram.deleteMessage(ctx.chat.id, ctx.message.message_id);
         await this.addModerationLog(group, 'delete_forward_message', ctx.botInfo.id, ctx.from.id, 'forward blocked');
-        await group.save();
+        await this.saveGroupQuietly(group);
         await ctx.reply(
           `• عذراً عزيزي ↤︎「 ${this.mentionUser(ctx.from.id, ctx.from.first_name || ctx.from.username || String(ctx.from.id))} 」\n` +
           '• ممنوع التوجيه هنا .',
@@ -3419,7 +3437,7 @@ class GroupAdminHandler {
           ctx.from.id,
           ctx.message?.sticker?.is_video ? 'video sticker blocked' : (ctx.message?.sticker?.premium_animation ? 'premium sticker blocked' : 'sticker blocked')
         );
-        await group.save();
+        await this.saveGroupQuietly(group);
       } catch (_error) {
         await ctx.reply('⚠️ تم اكتشاف ملصق لكن لا يمكن حذفه. فعّل صلاحية حذف الرسائل للبوت.');
       }
@@ -3432,7 +3450,7 @@ class GroupAdminHandler {
         try {
           await ctx.telegram.deleteMessage(ctx.chat.id, ctx.message.message_id);
           await this.addModerationLog(group, 'delete_long_message', ctx.botInfo.id, ctx.from.id, `len=${rawText.length}, max=${maxLength}`);
-          await group.save();
+          await this.saveGroupQuietly(group);
           await ctx.reply(`📏 تم حذف رسالة طويلة (الحد المسموح: ${maxLength} حرف).`);
         } catch (_error) {
           await ctx.reply('⚠️ تم اكتشاف رسالة طويلة لكن لا يمكن حذفها. فعّل صلاحية حذف الرسائل للبوت.');
@@ -3447,7 +3465,7 @@ class GroupAdminHandler {
         try {
           await ctx.telegram.deleteMessage(ctx.chat.id, ctx.message.message_id);
           await this.addModerationLog(group, 'delete_link_message', ctx.botInfo.id, ctx.from.id, 'link blocked');
-          await group.save();
+          await this.saveGroupQuietly(group);
           await ctx.reply('🔒 الروابط ممنوعة في هذا الجروب.');
         } catch (_error) {
           await ctx.reply('⚠️ تم اكتشاف رابط لكن لا يمكن حذفه. فعّل صلاحية حذف الرسائل للبوت.');
@@ -3462,7 +3480,7 @@ class GroupAdminHandler {
         try {
           await ctx.telegram.deleteMessage(ctx.chat.id, ctx.message.message_id);
           await this.addModerationLog(group, 'delete_explicit_message', ctx.botInfo.id, ctx.from.id, 'explicit content blocked');
-          await group.save();
+          await this.saveGroupQuietly(group);
           await ctx.reply('🚫 تم حذف رسالة تحتوي على محتوى إباحي.');
         } catch (_error) {
           await ctx.reply('⚠️ تم اكتشاف محتوى إباحي لكن لا يمكن حذفه. فعّل صلاحية حذف الرسائل للبوت.');
@@ -3478,7 +3496,7 @@ class GroupAdminHandler {
         try {
           await ctx.telegram.deleteMessage(ctx.chat.id, ctx.message.message_id);
           await this.addModerationLog(group, 'delete_badword_message', ctx.botInfo.id, ctx.from.id, 'blocked word');
-          await group.save();
+          await this.saveGroupQuietly(group);
           await ctx.reply('⚠️ تم حذف رسالة تحتوي على ألفاظ غير مسموحة.');
         } catch (_error) {
           await ctx.reply('⚠️ تم اكتشاف لفظ غير مسموح لكن لا يمكن الحذف. فعّل صلاحية حذف الرسائل للبوت.');
