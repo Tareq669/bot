@@ -3242,7 +3242,7 @@ class GroupAdminHandler {
       return true;
     }
     if (
-      /^(قفل الروابط|فتح الروابط|قفل الملصقات|فتح الملصقات|تفعيل منع التوجيه|تعطيل منع التوجيه|تفعيل الكلمات|تعطيل الكلمات|تفعيل التكرار|تعطيل التكرار|تفعيل منع الاباحية|تعطيل منع الاباحية|تفعيل منع الرسائل الطويلة|تعطيل منع الرسائل الطويلة|استثناء المشرفين من الحماية|الغاء استثناء المشرفين من الحماية|إلغاء استثناء المشرفين من الحماية|الحماية|\/gprotect\b)/i.test(rawText)
+      /^(قفل الروابط|فتح الروابط|قفل الملصقات|فتح الملصقات|تفعيل منع التوجيه|تعطيل منع التوجيه|تفعيل الكلمات|تعطيل الكلمات|تفعيل التكرار|تعطيل التكرار|تفعيل منع الاباحية|تعطيل منع الاباحية|تفعيل منع الرسائل الطويل(?:ة|ه)|تعطيل منع الرسائل الطويل(?:ة|ه)|استثناء المشرفين من الحماية|الغاء استثناء المشرفين من الحماية|إلغاء استثناء المشرفين من الحماية|الحماية|\/gprotect\b)/i.test(rawText)
     ) {
       if (/^قفل الروابط$/i.test(rawText)) {
         const result = await this.setProtectionSetting(ctx, 'lockLinks', true, 'text');
@@ -3316,13 +3316,13 @@ class GroupAdminHandler {
         await ctx.reply('✅ تم تعطيل منع المحتوى الإباحي.');
         return true;
       }
-      if (/^تفعيل منع الرسائل الطويلة$/i.test(rawText)) {
+      if (/^تفعيل منع الرسائل الطويل(?:ة|ه)$/i.test(rawText)) {
         const result = await this.setProtectionSetting(ctx, 'blockLongMessages', true, 'text');
         if (!result?.ok) return true;
         await ctx.reply(`✅ تم تفعيل منع الرسائل الطويلة (الحد الحالي: ${group.settings?.maxMessageLength || 700}).`);
         return true;
       }
-      if (/^تعطيل منع الرسائل الطويلة$/i.test(rawText)) {
+      if (/^تعطيل منع الرسائل الطويل(?:ة|ه)$/i.test(rawText)) {
         const result = await this.setProtectionSetting(ctx, 'blockLongMessages', false, 'text');
         if (!result?.ok) return true;
         await ctx.reply('✅ تم تعطيل منع الرسائل الطويلة.');
