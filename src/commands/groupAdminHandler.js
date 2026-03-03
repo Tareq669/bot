@@ -280,6 +280,72 @@ class GroupAdminHandler {
     return `• ${actionText}\n• المستخدم ↤︎ ${targetMention}`;
   }
 
+  static collectMentionableMembers(group, botId = null) {
+    const people = new Map();
+    const addPerson = (userId, label = '') => {
+      const id = Number(userId || 0);
+      if (!id || id === Number(botId || 0)) return;
+      if (!people.has(id)) {
+        people.set(id, label ? String(label) : `عضو ${id}`);
+        return;
+      }
+      const current = String(people.get(id) || '');
+      if ((!current || /^عضو \d+$/.test(current)) && label) {
+        people.set(id, String(label));
+      }
+    };
+
+    this.getRoleIds(group, 'basicOwnerIds').forEach((id) => addPerson(id));
+    this.getRoleIds(group, 'ownerIds').forEach((id) => addPerson(id));
+    this.getRoleIds(group, 'managerIds').forEach((id) => addPerson(id));
+    this.getRoleIds(group, 'adminIds').forEach((id) => addPerson(id));
+    this.getRoleIds(group, 'premiumMemberIds').forEach((id) => addPerson(id));
+
+    (Array.isArray(group?.admins) ? group.admins : []).forEach((row) => addPerson(row?.userId, row?.username || ''));
+    (Array.isArray(group?.gameSystem?.scores) ? group.gameSystem.scores : []).forEach((row) => addPerson(row?.userId, row?.username || ''));
+    (Array.isArray(group?.warnings) ? group.warnings : []).forEach((row) => addPerson(row?.userId));
+    (Array.isArray(group?.bannedUsers) ? group.bannedUsers : []).forEach((row) => addPerson(row?.userId));
+    (Array.isArray(group?.moderationLogs) ? group.moderationLogs : []).forEach((row) => {
+      addPerson(row?.actorId);
+      addPerson(row?.targetId);
+    });
+
+    return [...people.entries()].map(([id, label]) => ({ id, label: String(label || `عضو ${id}`) }));
+  }
+
+  static async handleAllMentionCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const isAdmin = await this.isAdminOrHigher(ctx);
+    if (!isAdmin) {
+      await ctx.reply('❌ هذا الأمر للمشرفين فقط.');
+      return;
+    }
+
+    const group = await this.ensureGroupRecord(ctx);
+    const rawText = String(ctx.message?.text || '').trim();
+    const note = rawText.replace(/^\/?all\b/i, '').trim();
+    const members = this.collectMentionableMembers(group, ctx.botInfo?.id)
+      .filter((member) => Number(member.id) !== Number(ctx.from?.id || 0));
+
+    if (!members.length) {
+      await ctx.reply('❌ ما عندي أعضاء معروفين كفاية داخل بيانات الجروب حتى أعمل إشارة جماعية.');
+      return;
+    }
+
+    for (let index = 0; index < members.length; index += 8) {
+      const chunk = members.slice(index, index + 8);
+      const mentions = chunk.map((member) => this.mentionUser(member.id, member.label)).join(' | ');
+      const prefix = index === 0
+        ? `📢 ${note || 'نداء لجميع الأعضاء'}\n\n`
+        : '📢 متابعة النداء\n\n';
+      await ctx.reply(prefix + mentions, {
+        parse_mode: 'HTML',
+        disable_web_page_preview: true,
+        reply_to_message_id: index === 0 ? ctx.message?.message_id : undefined
+      });
+    }
+  }
+
   static getInternalRoleLabel(group, userId) {
     const targetUserId = Number(userId || 0);
     if (!targetUserId) return null;
@@ -3191,6 +3257,10 @@ class GroupAdminHandler {
     }
     if (/^(فحص|\/ginspect\b)(?:\s+.+)?$/i.test(rawText)) {
       await this.handleInspectCommand(ctx);
+      return true;
+    }
+    if (/^(all|\/gall\b)(?:\s+.+)?$/i.test(rawText)) {
+      await this.handleAllMentionCommand(ctx);
       return true;
     }
     if (/^(كتم|الغاء الكتم|إلغاء الكتم|فك الكتم|تقييد|الغاء التقييد|إلغاء التقييد|فك التقييد)(?:\s+.+)?$/i.test(rawText)) {
