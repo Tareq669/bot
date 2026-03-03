@@ -3028,7 +3028,7 @@ class GroupGamesHandler {
     const luckKey = `${String(ctx.chat.id)}:${Number(ctx.from?.id || 0)}`;
     if (this.pendingLuckInputs.has(luckKey)) {
       const normalized = this.normalizeArabicDigits(String(text || '').trim());
-      const isKnownCommandLike = /^(شراء|بيع|اهداء|إهداء|ارسال|إرسال|متجر|هدايا|ممتلكاتي|حظ|كرسي|انهاء|إنهاء|سؤال|لاونج|كافيتيريا|قائمة|مزاجي|طلب|سلم|ولع|هف|انضم|نفس|تحديد|جنسي|جنسه|اضف|حذف|عدد|كلمات|ردود|سوالفكم)\b/i.test(normalized);
+      const isKnownCommandLike = /^(شراء|بيع|اهداء|إهداء|ارسال|إرسال|متجر|هدايا|ممتلكاتي|حظ|كرسي|انهاء|إنهاء|سؤال|لاونج|كافيتيريا|قائمة|مزاجي|طلب|سلم|ولع|هف|انضم|نفس|تحديد|جنسي|جنسه|اضف|أضف|حذف|عدد|كلمات|ردود|سوالفكم|فحص|رتبتي|كتم|تقييد|حظر|الغاء|إلغاء|فك|رفع|تنزيل|المنشئين|المالكين|المدراء|الادمنية|الأدمنية|المميزين|تفعيل|تعطيل|الحماية|اعدادات|إعدادات|برنت|تفاعل)\b/i.test(normalized);
       if (isKnownCommandLike) {
         // Do not let pending luck block normal group commands.
         this.pendingLuckInputs.delete(luckKey);
