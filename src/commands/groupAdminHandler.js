@@ -1910,6 +1910,8 @@ class GroupAdminHandler {
       `أوامر سريعة:\n` +
       `• اضف رد مرحبا | أهلًا وسهلًا\n` +
       `• اضف رد سبشل\n` +
+      `• حذف رد سبشل مرحبا\n` +
+      `• ردود سبشل\n` +
       `• حذف رد مرحبا\n` +
       `• الردود\n` +
       `• مسح الردود\n` +
@@ -2055,6 +2057,19 @@ class GroupAdminHandler {
       return true;
     }
 
+    if (/^(ردود سبشل|عرض الردود السبشل|الردود السبشل)$/i.test(rawText)) {
+      const specialTriggers = triggers.filter((item) => item.isSpecial);
+      if (specialTriggers.length === 0) {
+        await ctx.reply('ℹ️ لا يوجد ردود سبشل مضافة بعد.');
+        return true;
+      }
+      const rows = specialTriggers
+        .slice(0, 50)
+        .map((item, i) => `${i + 1}. <b>${item.trigger}</b>\n↳ ${item.response || item.responseType}`);
+      await ctx.reply(`📚 قائمة الردود السبشل (${specialTriggers.length})\n\n${rows.join('\n\n')}`, { parse_mode: 'HTML' });
+      return true;
+    }
+
     const modeArabic = rawText.match(/^وضع الردود\s+(حرفي)$/i);
     const modeSlash = slashMatch && /^(mode|match)\s+(\S+)$/i.test(String(slashMatch[1] || '').trim())
       ? String(slashMatch[1] || '').trim().replace(/^(mode|match)\s+/i, '').trim()
@@ -2094,6 +2109,25 @@ class GroupAdminHandler {
     }
 
     const removeArabic = rawText.match(/^حذف رد\s+(.+)$/i);
+    const removeSpecialArabic = rawText.match(/^حذف رد سبشل\s+(.+)$/i);
+    if (removeSpecialArabic) {
+      const triggerText = String(removeSpecialArabic[1] || '').trim();
+      const key = this.normalizePlainText(triggerText);
+      const before = group.settings.faqTriggers.length;
+      group.settings.faqTriggers = group.settings.faqTriggers.filter((item) => {
+        if (!item.isSpecial) return true;
+        return this.normalizePlainText(item.trigger) !== key;
+      });
+      if (group.settings.faqTriggers.length === before) {
+        await ctx.reply('❌ لم أجد هذا المفتاح في الردود السبشل.');
+        return true;
+      }
+      await this.addModerationLog(group, 'faq_special_remove', ctx.from.id, null, triggerText);
+      await group.save();
+      await ctx.reply(`✅ تم حذف الرد السبشل: ${triggerText}`);
+      return true;
+    }
+
     if (removeArabic || (slashMatch && /^(remove|del|delete)\s+(.+)$/i.test(String(slashMatch[1] || '').trim()))) {
       const triggerText = removeArabic
         ? String(removeArabic[1] || '').trim()
