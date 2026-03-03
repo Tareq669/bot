@@ -1,5 +1,5 @@
 ﻿const Markup = require('telegraf/markup');
-const { Group } = require('../database/models');
+const { Group, User } = require('../database/models');
 
 const GROUP_TYPES = new Set(['group', 'supergroup']);
 
@@ -432,6 +432,7 @@ class GroupAdminHandler {
     if (!target?.id) return ctx.reply('❌ استخدم فحص بالرد أو @user أو ID.');
 
     const group = await this.ensureGroupRecord(ctx);
+    const userDoc = await User.findOne({ userId: Number(target.id) });
     const member = await this.getChatMemberSafe(ctx, target.id);
     const warning = (group.warnings || []).find((w) => Number(w.userId) === Number(target.id));
     const bannedEntry = (group.bannedUsers || []).find((u) => Number(u.userId) === Number(target.id));
@@ -444,7 +445,10 @@ class GroupAdminHandler {
       if (log?.action) records.push(String(log.action));
     });
 
-    const oldName = target.username ? `@${target.username}` : 'غير محفوظ';
+    const historyEntry = Array.isArray(userDoc?.nameHistory) ? userDoc.nameHistory[0] : null;
+    const oldName = historyEntry
+      ? (historyEntry.username ? `@${historyEntry.username}` : (historyEntry.firstName || 'غير محفوظ'))
+      : 'غير محفوظ';
     return ctx.reply(
       `• فحص : ${this.mentionUser(target.id, target.firstName || target.username || String(target.id))}\n` +
       `• الايدي : <code>${target.id}</code>\n\n` +

@@ -34,6 +34,7 @@ const ReconnectManager = require('./utils/reconnect');
 const connectionMonitor = require('./utils/connectionMonitor');
 const healthMonitor = require('./utils/healthMonitor');
 const Formatter = require('./utils/formatter');
+const { User } = require('./database/models');
 
 const normalizeEnvValue = (value) => {
   if (typeof value !== 'string') {
@@ -55,6 +56,52 @@ const isMissingRequiredEnv = (value) => {
     'your_telegram_bot_token_here'
   ]);
   return invalidLiterals.has(normalized.toLowerCase());
+};
+
+const trackUserIdentity = async (ctx) => {
+  const from = ctx?.from;
+  if (!from?.id) return;
+
+  const nextFirstName = String(from.first_name || '').trim();
+  const nextUsername = String(from.username || '').trim();
+  const user = await User.findOne({ userId: Number(from.id) });
+
+  if (!user) {
+    await User.create({
+      userId: Number(from.id),
+      firstName: nextFirstName || nextUsername || `user_${from.id}`,
+      username: nextUsername,
+      joinDate: new Date(),
+      lastActive: new Date(),
+      nameHistory: []
+    }).catch(() => {});
+    return;
+  }
+
+  const currentFirstName = String(user.firstName || '').trim();
+  const currentUsername = String(user.username || '').trim();
+  const changed = currentFirstName !== nextFirstName || currentUsername !== nextUsername;
+  user.nameHistory = Array.isArray(user.nameHistory) ? user.nameHistory : [];
+
+  if (changed && (currentFirstName || currentUsername)) {
+    const alreadyStored = user.nameHistory.some((entry) =>
+      String(entry?.firstName || '').trim() === currentFirstName &&
+      String(entry?.username || '').trim() === currentUsername
+    );
+    if (!alreadyStored) {
+      user.nameHistory.unshift({
+        firstName: currentFirstName,
+        username: currentUsername,
+        changedAt: new Date()
+      });
+      user.nameHistory = user.nameHistory.slice(0, 10);
+    }
+  }
+
+  user.firstName = nextFirstName || currentFirstName || nextUsername || `user_${from.id}`;
+  user.username = nextUsername;
+  user.lastActive = new Date();
+  await user.save().catch(() => {});
 };
 
 const parseOwnerIds = () =>
@@ -106,6 +153,10 @@ const bot = new Telegraf(process.env.BOT_TOKEN, {
 
 // Initialize session middleware
 bot.use(session());
+bot.use(async (ctx, next) => {
+  await trackUserIdentity(ctx);
+  return next();
+});
 GroupGamesHandler.setup(bot);
 TournamentChallengeHandler.setup(bot);
 

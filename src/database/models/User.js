@@ -297,6 +297,15 @@ const userSchema = new mongoose.Schema({
     default: 0
   },
 
+  nameHistory: [{
+    firstName: String,
+    username: String,
+    changedAt: {
+      type: Date,
+      default: Date.now
+    }
+  }],
+
   // Global group-game economy/profile (shared across all groups)
   globalGameProfile: mongoose.Schema.Types.Mixed,
   // Shared global bank profile (can be reused across groups/bots on same DB)
