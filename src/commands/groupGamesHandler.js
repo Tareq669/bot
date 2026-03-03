@@ -2419,7 +2419,7 @@ class GroupGamesHandler {
     }
 
     const expectedLetter = this.pickRandom(STORY_LETTERS);
-    group.gameSystem.state.storySession = this.normalizeStorySession({
+    const nextSession = this.normalizeStorySession({
       active: true,
       hostUserId: Number(ctx.from.id),
       hostName: ctx.from.first_name || ctx.from.username || String(ctx.from.id),
@@ -2431,7 +2431,16 @@ class GroupGamesHandler {
       entries: [],
       participantIds: []
     });
-    await group.save();
+    await Group.updateOne(
+      { _id: group._id },
+      {
+        $set: {
+          'gameSystem.state.storySession': nextSession,
+          updatedAt: new Date()
+        }
+      }
+    );
+    group.gameSystem.state.storySession = nextSession;
     return ctx.reply(
       `🗣️ <b>بدأت لعبة سوالفكم</b>\n\n` +
       `• ابدأوا السالفة بالحرف ↤︎ <b>${expectedLetter}</b>\n` +
@@ -2457,8 +2466,17 @@ class GroupGamesHandler {
       ? `• أكثر واحد سوالف ↤︎ ${this.mentionUser(topPlayer[0], session.entries.find((x) => Number(x.userId) === Number(topPlayer[0]))?.username || String(topPlayer[0]))} (${topPlayer[1]})\n`
       : '';
 
-    group.gameSystem.state.storySession = this.defaultStorySession();
-    await group.save();
+    const clearedSession = this.defaultStorySession();
+    await Group.updateOne(
+      { _id: group._id },
+      {
+        $set: {
+          'gameSystem.state.storySession': clearedSession,
+          updatedAt: new Date()
+        }
+      }
+    );
+    group.gameSystem.state.storySession = clearedSession;
     await ctx.reply(
       `🛑 <b>انتهت سوالفكم</b>\n\n` +
       `• السبب ↤︎ ${reason === 'timeout' ? 'انتهى الوقت' : 'تم إنهاؤها'}\n` +
@@ -2512,10 +2530,19 @@ class GroupGamesHandler {
     session.endsAt = new Date(Date.now() + 2 * 60 * 1000);
     session.expectedLetter = edges.last;
     session.participantIds = [...new Set([...(session.participantIds || []), Number(ctx.from.id)])];
-    group.gameSystem.state.storySession = this.normalizeStorySession(session);
-    await group.save();
+    const nextSession = this.normalizeStorySession(session);
+    await Group.updateOne(
+      { _id: group._id },
+      {
+        $set: {
+          'gameSystem.state.storySession': nextSession,
+          updatedAt: new Date()
+        }
+      }
+    );
+    group.gameSystem.state.storySession = nextSession;
 
-    if (session.entries.length >= 20) {
+    if (nextSession.entries.length >= 20) {
       await this.finishStoryTalkSession(ctx, group, 'timeout');
       return true;
     }
@@ -2523,7 +2550,7 @@ class GroupGamesHandler {
     await ctx.reply(
       `✅ ${this.mentionUser(ctx.from.id, ctx.from.first_name || ctx.from.username || 'عضو')}\n` +
       `• تم قبول السالفة\n` +
-      `• الحرف اللي بعده ↤︎ ${session.expectedLetter}`,
+      `• الحرف اللي بعده ↤︎ ${nextSession.expectedLetter}`,
       { parse_mode: 'HTML', reply_to_message_id: ctx.message?.message_id }
     );
     return true;
