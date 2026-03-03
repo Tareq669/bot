@@ -2,9 +2,6 @@
 const { Group, User } = require('../database/models');
 
 const GROUP_TYPES = new Set(['group', 'supergroup']);
-const NEWS_CHANNEL_USERNAME = 'KnowSpark';
-const NEWS_CHANNEL_TITLE = 'رؤية 𓂆 إخبارية 🇵🇸';
-const NEWS_CHANNEL_URL = 'https://t.me/KnowSpark';
 
 class GroupAdminHandler {
   static async saveGroupQuietly(group) {
@@ -672,6 +669,7 @@ class GroupAdminHandler {
   static buildProtectionSettingsText(group) {
     const settings = group?.settings || {};
     const policy = this.getWarningPolicy(group);
+    const subscriptionChannel = this.getRequiredSubscriptionChannel(group);
     return (
       '🛡️ <b>اعدادات الحمايه</b>\n\n' +
       `• مستوى الحمايه ↤︎ ${this.getProtectionPresetLabel(settings.protectionPresetLevel)}\n` +
@@ -682,6 +680,7 @@ class GroupAdminHandler {
       `• منع التوجيه ↤︎ ${settings.blockForwards ? '✅' : '❌'}\n` +
       `• حماية التعديل ↤︎ ${settings.blockChannelEdits ? '✅' : '❌'}\n` +
       `• الاشتراك الاجباري ↤︎ ${settings.requireNewsSubscription ? '✅' : '❌'}\n` +
+      `• قناة الاشتراك ↤︎ ${this.escapeHtml(subscriptionChannel?.title || 'غير محددة')}\n` +
       `• قفل الروابط ↤︎ ${settings.lockLinks ? '✅' : '❌'}\n` +
       `• قفل الملصقات ↤︎ ${settings.lockStickers ? '✅' : '❌'}\n` +
       `• العقوبات التلقائيه ↤︎ ${policy.enabled ? '✅' : '❌'}\n` +
@@ -710,6 +709,7 @@ class GroupAdminHandler {
   static formatGroupPanel(group) {
     const settings = group?.settings || {};
     const policy = this.getWarningPolicy(group);
+    const subscriptionChannel = this.getRequiredSubscriptionChannel(group);
     return (
       '🛡️ <b>لوحة إدارة الجروب</b>\n\n' +
       `👥 المجموعة: <b>${group?.groupTitle || 'Unknown'}</b>\n` +
@@ -724,6 +724,7 @@ class GroupAdminHandler {
       `• منع التوجيه: ${settings.blockForwards ? '✅' : '❌'}\n` +
       `• حماية التعديل: ${settings.blockChannelEdits ? '✅' : '❌'}\n` +
       `• الاشتراك الاجباري: ${settings.requireNewsSubscription ? '✅' : '❌'}\n` +
+      `• قناة الاشتراك: ${this.escapeHtml(subscriptionChannel?.title || 'غير محددة')}\n` +
       `• استثناء المشرفين من الحماية: ${settings.exemptAdminsFromProtection ? '✅' : '❌'}\n` +
       `• سياسة العقوبات: ${this.formatPolicy(policy)}\n\n` +
       '<b>أوامر الإدارة:</b>\n' +
@@ -842,6 +843,9 @@ class GroupAdminHandler {
       '• /gresetwarn تصفير التحذيرات (بالرد)\n' +
       '• /gpolicy عرض/تعديل سياسة العقوبات\n' +
       '• /gprotect إعدادات الحماية السريعة\n' +
+      '• ضبط قناة الاشتراك @channel\n' +
+      '• قناة الاشتراك\n' +
+      '• حذف قناة الاشتراك\n' +
       '• /glogs عرض سجل الإدارة\n' +
       '• /gclear حذف رسالة بالرد\n' +
       '• تفاعل مشرف /gadminstats\n' +
@@ -886,6 +890,7 @@ class GroupAdminHandler {
   }
 
   static getProtectionStatusText(group) {
+    const subscriptionChannel = this.getRequiredSubscriptionChannel(group);
     return (
       '🛡️ <b>حالة الحماية الحالية</b>\n\n' +
       `• الروابط: ${group.settings?.lockLinks ? '✅ مقفلة' : '❌ مفتوحة'}\n` +
@@ -893,6 +898,7 @@ class GroupAdminHandler {
       `• التوجيه: ${group.settings?.blockForwards ? '✅ مفعّل' : '❌ معطّل'}\n` +
       `• حماية التعديل: ${group.settings?.blockChannelEdits ? '✅ مفعّلة' : '❌ معطّلة'}\n` +
       `• الاشتراك الاجباري: ${group.settings?.requireNewsSubscription ? '✅ مفعّل' : '❌ معطّل'}\n` +
+      `• قناة الاشتراك: ${this.escapeHtml(subscriptionChannel?.title || 'غير محددة')}\n` +
       `• الكلمات: ${group.settings?.filterBadWords ? '✅ مفعلة' : '❌ معطلة'}\n` +
       `• الإباحي: ${group.settings?.blockExplicitContent ? '✅ مفعلة' : '❌ معطلة'}\n` +
       `• التكرار: ${group.settings?.floodProtection ? '✅ مفعلة' : '❌ معطلة'}\n` +
@@ -904,6 +910,8 @@ class GroupAdminHandler {
       '• تفعيل منع التوجيه | تعطيل منع التوجيه\n' +
       '• تفعيل حماية التعديل | تعطيل حماية التعديل\n' +
       '• تفعيل الاشتراك الاجباري | تعطيل الاشتراك الاجباري\n' +
+      '• ضبط قناة الاشتراك @channel\n' +
+      '• قناة الاشتراك | حذف قناة الاشتراك\n' +
       '• تفعيل الكلمات | تعطيل الكلمات\n' +
       '• تفعيل التكرار | تعطيل التكرار\n' +
       '• تفعيل منع الاباحية | تعطيل منع الاباحية\n' +
@@ -996,6 +1004,13 @@ class GroupAdminHandler {
     const key = keyMap[target];
     if (!key) {
       return ctx.reply('❌ الخيار غير معروف. استخدم: links أو stickers أو forwards أو edits أو subscribe أو words أو flood أو nsfw أو long أو maxlen أو admins');
+    }
+
+    if (target === 'subscribe' && switchValue === true) {
+      const channel = this.getRequiredSubscriptionChannel(group);
+      if (!channel) {
+        return ctx.reply('❌ قبل التفعيل، اضبط القناة أولًا:\n• ضبط قناة الاشتراك @channel');
+      }
     }
 
     const result = await this.setProtectionSetting(ctx, key, switchValue, 'gprotect');
@@ -3631,24 +3646,79 @@ class GroupAdminHandler {
     }
   }
 
-  static async isUserSubscribedToNewsChannel(ctx, userId) {
+  static getRequiredSubscriptionChannel(group) {
+    const channel = group?.settings?.requiredSubscriptionChannel || {};
+    const username = String(channel.username || '').trim().replace(/^@/, '');
+    const title = String(channel.title || '').trim();
+    const url = String(channel.url || '').trim();
+    const chatId = String(channel.chatId || '').trim();
+    if (!username && !chatId) return null;
+    return {
+      username,
+      title: title || (username ? `@${username}` : chatId),
+      url: url || (username ? `https://t.me/${username}` : ''),
+      chatId
+    };
+  }
+
+  static async setRequiredSubscriptionChannel(ctx, group, rawValue) {
+    const value = String(rawValue || '').trim();
+    if (!value) {
+      return { ok: false, message: '❌ ارسل القناة هكذا: ضبط قناة الاشتراك @channel أو https://t.me/channel' };
+    }
+
+    const normalized = value
+      .replace(/^https?:\/\/t\.me\//i, '')
+      .replace(/^@/, '')
+      .replace(/\/+$/, '');
+
+    if (!normalized || /\s/.test(normalized)) {
+      return { ok: false, message: '❌ القناة غير صالحة. استخدم @channel أو رابط t.me مباشر.' };
+    }
+
+    try {
+      const chat = await ctx.telegram.getChat(`@${normalized}`);
+      if (chat?.type !== 'channel') {
+        return { ok: false, message: '❌ هذا المعرف ليس قناة. أضف قناة تيليجرام فقط.' };
+      }
+
+      group.settings.requiredSubscriptionChannel = {
+        username: String(chat.username || normalized),
+        title: String(chat.title || `@${normalized}`),
+        url: `https://t.me/${chat.username || normalized}`,
+        chatId: String(chat.id || '')
+      };
+      group.updatedAt = new Date();
+      await this.addModerationLog(group, 'set_required_subscription_channel', ctx.from.id, null, `@${chat.username || normalized}`);
+      await group.save();
+      return { ok: true, channel: this.getRequiredSubscriptionChannel(group) };
+    } catch (_error) {
+      return { ok: false, message: '❌ تعذر قراءة القناة. تأكد من المعرف وأن البوت يستطيع الوصول إليها.' };
+    }
+  }
+
+  static async isUserSubscribedToNewsChannel(ctx, group, userId) {
     const targetUserId = Number(userId || 0);
     if (!targetUserId) return true;
+    const channel = this.getRequiredSubscriptionChannel(group);
+    if (!channel) return true;
     try {
-      const member = await ctx.telegram.getChatMember(`@${NEWS_CHANNEL_USERNAME}`, targetUserId);
+      const targetChat = channel.username ? `@${channel.username}` : channel.chatId;
+      const member = await ctx.telegram.getChatMember(targetChat, targetUserId);
       return ['member', 'administrator', 'creator'].includes(member?.status);
     } catch (_error) {
       return true;
     }
   }
 
-  static getForcedSubscriptionNotice(user) {
+  static getForcedSubscriptionNotice(user, group) {
+    const channel = this.getRequiredSubscriptionChannel(group);
     const label = this.escapeHtml(
       user?.username ? `@${user.username}` : (user?.first_name || String(user?.id || 'مستخدم'))
     );
     return (
       `↜ عذرا عزيزي ↤︎ ${label}\n` +
-      `↜ يجب الاشتراك في ↤︎ ${this.escapeHtml(NEWS_CHANNEL_TITLE)}\n` +
+      `↜ يجب الاشتراك في ↤︎ ${this.escapeHtml(channel?.title || 'القناة المحددة')}\n` +
       '↜ اضغط الزر واشترك لكي تستطيع إرسال رسائل هنا'
     );
   }
@@ -3679,6 +3749,61 @@ class GroupAdminHandler {
     ) {
       await this.handleReasonsToggle(ctx);
       return true;
+    }
+    if (/^(ضبط قناة الاشتراك|قناة الاشتراك|حذف قناة الاشتراك)(?:\s+.+)?$/i.test(rawText)) {
+      if (/^قناة الاشتراك$/i.test(rawText)) {
+        const channel = this.getRequiredSubscriptionChannel(group);
+        if (!channel) {
+          await ctx.reply('❌ لم يتم ضبط قناة الاشتراك بعد.');
+          return true;
+        }
+        await ctx.reply(
+          `📢 قناة الاشتراك الحالية\n\n` +
+          `• الاسم ↤︎ ${channel.title}\n` +
+          `• المعرف ↤︎ ${channel.username ? `@${channel.username}` : channel.chatId}\n` +
+          `• الرابط ↤︎ ${channel.url || 'غير متوفر'}`
+        );
+        return true;
+      }
+      if (/^حذف قناة الاشتراك$/i.test(rawText)) {
+        const isManager = await this.isManagerOrHigher(ctx);
+        if (!isManager) {
+          await ctx.reply('❌ هذا الأمر للمشرفين فقط.');
+          return true;
+        }
+        group.settings.requiredSubscriptionChannel = {
+          username: '',
+          title: '',
+          url: '',
+          chatId: ''
+        };
+        group.settings.requireNewsSubscription = false;
+        group.updatedAt = new Date();
+        await this.addModerationLog(group, 'clear_required_subscription_channel', ctx.from.id);
+        await group.save();
+        await ctx.reply('✅ تم حذف قناة الاشتراك وتعطيل الاشتراك الاجباري.');
+        return true;
+      }
+      if (/^ضبط قناة الاشتراك(?:\s+.+)?$/i.test(rawText)) {
+        const isManager = await this.isManagerOrHigher(ctx);
+        if (!isManager) {
+          await ctx.reply('❌ هذا الأمر للمشرفين فقط.');
+          return true;
+        }
+        const value = rawText.replace(/^ضبط قناة الاشتراك\s*/i, '').trim();
+        const result = await this.setRequiredSubscriptionChannel(ctx, group, value);
+        if (!result.ok) {
+          await ctx.reply(result.message);
+          return true;
+        }
+        await ctx.reply(
+          `✅ تم ضبط قناة الاشتراك بنجاح.\n` +
+          `• الاسم ↤︎ ${result.channel.title}\n` +
+          `• المعرف ↤︎ @${result.channel.username}\n` +
+          `• الرابط ↤︎ ${result.channel.url}`
+        );
+        return true;
+      }
     }
     if (/^(تعطيل تفاعل الالعاب|تعطيل تقاعل الالعاب|تفعيل تفاعل الالعاب)$/i.test(rawText)) {
       await this.handleGameEngagementToggle(ctx);
@@ -3832,9 +3957,14 @@ class GroupAdminHandler {
         return true;
       }
       if (/^(تفعيل الاشتراك الاجباري|تفعيل الاشتراك الإجباري)$/i.test(rawText)) {
+        const channel = this.getRequiredSubscriptionChannel(group);
+        if (!channel) {
+          await ctx.reply('❌ قبل التفعيل، اضبط القناة أولًا:\n• ضبط قناة الاشتراك @channel');
+          return true;
+        }
         const result = await this.setProtectionSetting(ctx, 'requireNewsSubscription', true, 'text');
         if (!result?.ok) return true;
-        await ctx.reply(`✅ تم تفعيل الاشتراك الاجباري.\n• القناة ↤︎ ${NEWS_CHANNEL_TITLE}\n• الرابط ↤︎ ${NEWS_CHANNEL_URL}`);
+        await ctx.reply(`✅ تم تفعيل الاشتراك الاجباري.\n• القناة ↤︎ ${channel.title}\n• الرابط ↤︎ ${channel.url || 'غير متوفر'}`);
         return true;
       }
       if (/^(تعطيل الاشتراك الاجباري|تعطيل الاشتراك الإجباري)$/i.test(rawText)) {
@@ -3961,16 +4091,17 @@ class GroupAdminHandler {
     }
 
     if (!isAdmin && group.settings?.requireNewsSubscription) {
-      const subscribed = await this.isUserSubscribedToNewsChannel(ctx, ctx.from?.id);
+      const subscribed = await this.isUserSubscribedToNewsChannel(ctx, group, ctx.from?.id);
       if (!subscribed) {
+        const channel = this.getRequiredSubscriptionChannel(group);
         try {
           await ctx.telegram.deleteMessage(ctx.chat.id, ctx.message.message_id);
         } catch (_error) {
           // ignore delete errors
         }
-        await ctx.reply(this.getForcedSubscriptionNotice(ctx.from), {
+        await ctx.reply(this.getForcedSubscriptionNotice(ctx.from, group), {
           reply_markup: Markup.inlineKeyboard([
-            [Markup.button.url(NEWS_CHANNEL_TITLE, NEWS_CHANNEL_URL)]
+            [Markup.button.url(channel?.title || 'اشترك الآن', channel?.url || 'https://t.me')]
           ]).reply_markup,
           disable_web_page_preview: true
         }).catch(() => null);

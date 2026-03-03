@@ -76,6 +76,24 @@ const groupSchema = new mongoose.Schema({
       type: Boolean,
       default: false
     },
+    requiredSubscriptionChannel: {
+      username: {
+        type: String,
+        default: ''
+      },
+      title: {
+        type: String,
+        default: ''
+      },
+      url: {
+        type: String,
+        default: ''
+      },
+      chatId: {
+        type: String,
+        default: ''
+      }
+    },
     tournamentEnabled: {
       type: Boolean,
       default: true
