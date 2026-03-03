@@ -3416,8 +3416,11 @@ class GroupAdminHandler {
         await ctx.telegram.deleteMessage(ctx.chat.id, ctx.message.message_id);
         await this.addModerationLog(group, 'delete_forward_message', ctx.botInfo.id, ctx.from.id, 'forward blocked');
         await this.saveGroupQuietly(group);
+        const forwardedName = this.escapeHtml(
+          ctx.from.username ? `@${ctx.from.username}` : (ctx.from.first_name || String(ctx.from.id))
+        );
         await ctx.reply(
-          `• عذراً عزيزي ↤︎「 ${this.mentionUser(ctx.from.id, ctx.from.first_name || ctx.from.username || String(ctx.from.id))} 」\n` +
+          `• عذراً عزيزي ↤︎「 ${forwardedName} 」\n` +
           '• ممنوع التوجيه هنا .',
           { parse_mode: 'HTML' }
         );
