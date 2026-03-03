@@ -17,6 +17,7 @@ class GroupAdminHandler {
   }
 
   static pendingAdminStats = new Map();
+  static pendingSpecialFaq = new Map();
   static INTERNAL_ROLE_KEYS = ['basicOwnerIds', 'ownerIds', 'managerIds', 'adminIds', 'premiumMemberIds'];
 
   static isGroupChat(ctx) {
@@ -539,10 +540,13 @@ class GroupAdminHandler {
       .map((item) => ({
         trigger: String(item?.trigger || '').trim(),
         response: String(item?.response || '').trim(),
+        isSpecial: Boolean(item?.isSpecial),
+        responseType: String(item?.responseType || 'text').trim() || 'text',
+        fileId: String(item?.fileId || '').trim(),
         createdBy: Number.isInteger(item?.createdBy) ? Number(item.createdBy) : null,
         createdAt: item?.createdAt || new Date()
       }))
-      .filter((item) => item.trigger && item.response);
+      .filter((item) => item.trigger && (item.response || item.fileId));
     if (!Number.isInteger(group.settings.idealMemberId)) group.settings.idealMemberId = null;
     if (!Number.isInteger(group.settings.idealAdminId)) group.settings.idealAdminId = null;
 
@@ -1905,6 +1909,7 @@ class GroupAdminHandler {
       `• وضع المطابقة: ${modeLabel}\n\n` +
       `أوامر سريعة:\n` +
       `• اضف رد مرحبا | أهلًا وسهلًا\n` +
+      `• اضف رد سبشل\n` +
       `• حذف رد مرحبا\n` +
       `• الردود\n` +
       `• مسح الردود\n` +
@@ -1916,6 +1921,109 @@ class GroupAdminHandler {
       `• /gfaq clear\n` +
       `• /gfaq mode exact`
     );
+  }
+
+  static getSpecialFaqKey(ctx) {
+    return `${String(ctx.chat?.id || '')}:${Number(ctx.from?.id || 0)}`;
+  }
+
+  static setPendingSpecialFaq(ctx, state) {
+    this.pendingSpecialFaq.set(this.getSpecialFaqKey(ctx), state);
+  }
+
+  static getPendingSpecialFaq(ctx) {
+    return this.pendingSpecialFaq.get(this.getSpecialFaqKey(ctx)) || null;
+  }
+
+  static clearPendingSpecialFaq(ctx) {
+    this.pendingSpecialFaq.delete(this.getSpecialFaqKey(ctx));
+  }
+
+  static async startSpecialFaqFlow(ctx) {
+    this.setPendingSpecialFaq(ctx, {
+      active: true,
+      step: 'trigger',
+      chatId: String(ctx.chat?.id || ''),
+      userId: Number(ctx.from?.id || 0)
+    });
+    await ctx.reply(
+      '• حسناً ـ الان ارسل كلمه الرد \n-',
+      { reply_to_message_id: ctx.message?.message_id }
+    );
+  }
+
+  static async saveSpecialFaqEntry(ctx, group, state, payload) {
+    const trigger = String(state?.trigger || '').trim().slice(0, 80);
+    if (!trigger) {
+      this.clearPendingSpecialFaq(ctx);
+      await ctx.reply('❌ تعذر حفظ الرد السبشل لأن كلمة الرد غير موجودة.');
+      return true;
+    }
+
+    const key = this.normalizePlainText(trigger);
+    const existingIndex = group.settings.faqTriggers.findIndex((item) => this.normalizePlainText(item.trigger) === key);
+    const row = {
+      trigger,
+      response: String(payload?.response || '').trim().slice(0, 1500),
+      isSpecial: true,
+      responseType: String(payload?.responseType || 'text'),
+      fileId: String(payload?.fileId || ''),
+      createdBy: Number(ctx.from?.id || 0) || null,
+      createdAt: new Date()
+    };
+    if (existingIndex >= 0) {
+      group.settings.faqTriggers[existingIndex] = row;
+    } else {
+      group.settings.faqTriggers.push(row);
+    }
+
+    await this.addModerationLog(group, existingIndex >= 0 ? 'faq_special_update' : 'faq_special_add', ctx.from.id, null, trigger);
+    await group.save();
+    this.clearPendingSpecialFaq(ctx);
+    await ctx.reply(`✅ تم حفظ الرد السبشل.\n• كلمة الرد ↤︎ ${trigger}\n• النوع ↤︎ ${row.responseType}`);
+    return true;
+  }
+
+  static async handlePendingSpecialFaqText(ctx, group, rawText) {
+    const state = this.getPendingSpecialFaq(ctx);
+    if (!state?.active) return false;
+
+    const normalized = String(rawText || '').trim();
+    if (!normalized) return false;
+    if (/^(الغاء|إلغاء|كنسل|cancel)$/i.test(normalized)) {
+      this.clearPendingSpecialFaq(ctx);
+      await ctx.reply('✅ تم إلغاء إضافة الرد السبشل.');
+      return true;
+    }
+
+    if (state.step === 'trigger') {
+      state.trigger = normalized;
+      state.step = 'content';
+      this.setPendingSpecialFaq(ctx, state);
+      await ctx.reply(
+        '• حسناً يمكنك اضافة { نص←صوره←فيديو←متحركه←بصمه←اغنيه←ملف }\n' +
+        'ويمكنك اضافة الرد بتلك الطريقة :\n' +
+        '▹ #الاسم -  اسم العضو .\n' +
+        '▹ #يوزره -  يوزر الرد .\n' +
+        '▹ #اليوزر -  يوزر مرسل الرساله .\n' +
+        '▹ #الرسائل -  عدد رسائل المستخدم .\n' +
+        '▹ #الايدي -  ايدي المستخدم .\n' +
+        '▹ #الرتبه -  رتبة المستخدم .\n' +
+        '▹ #التعديل - عدد تعديلات .\n' +
+        '▹ #النقاط - نقاط المستخدم .',
+        { reply_to_message_id: ctx.message?.message_id }
+      );
+      return true;
+    }
+
+    if (state.step === 'content') {
+      return this.saveSpecialFaqEntry(ctx, group, state, {
+        responseType: 'text',
+        response: normalized
+      });
+    }
+
+    return false;
   }
 
   static parseFaqPayload(payload = '') {
@@ -1942,6 +2050,11 @@ class GroupAdminHandler {
     const lowered = rawText.toLowerCase();
     const triggers = Array.isArray(group.settings?.faqTriggers) ? group.settings.faqTriggers : [];
 
+    if (/^(?:اضف|أضف) رد سبشل$/i.test(rawText)) {
+      await this.startSpecialFaqFlow(ctx);
+      return true;
+    }
+
     const modeArabic = rawText.match(/^وضع الردود\s+(حرفي)$/i);
     const modeSlash = slashMatch && /^(mode|match)\s+(\S+)$/i.test(String(slashMatch[1] || '').trim())
       ? String(slashMatch[1] || '').trim().replace(/^(mode|match)\s+/i, '').trim()
@@ -1967,7 +2080,7 @@ class GroupAdminHandler {
         await ctx.reply('ℹ️ لا يوجد ردود تلقائية مضافة بعد.');
         return true;
       }
-      const rows = triggers.slice(0, 50).map((item, i) => `${i + 1}. <b>${item.trigger}</b>\n↳ ${item.response}`);
+      const rows = triggers.slice(0, 50).map((item, i) => `${i + 1}. <b>${item.trigger}</b>${item.isSpecial ? ' <code>[سبشل]</code>' : ''}\n↳ ${item.response || item.responseType}`);
       await ctx.reply(`📚 قائمة الردود (${triggers.length})\n\n${rows.join('\n\n')}`, { parse_mode: 'HTML' });
       return true;
     }
@@ -2054,10 +2167,118 @@ class GroupAdminHandler {
     });
 
     if (!matched) return false;
+    if (matched.isSpecial) {
+      await this.sendSpecialFaqResponse(ctx, group, matched);
+      return true;
+    }
     await ctx.reply(String(matched.response || '').trim(), {
       reply_to_message_id: ctx.message?.message_id
     });
     return true;
+  }
+
+  static async getUserReplyStats(ctx, group, userId) {
+    const safeUserId = Number(userId || 0);
+    const row = Array.isArray(group?.gameSystem?.scores)
+      ? group.gameSystem.scores.find((item) => Number(item.userId) === safeUserId)
+      : null;
+    return {
+      points: Number(row?.points || 0),
+      messages: Number(row?.messageCount || 0),
+      edits: Number(row?.editCount || 0)
+    };
+  }
+
+  static async resolveRolePlaceholder(ctx, group, userId) {
+    const targetUserId = Number(userId || 0);
+    if (!targetUserId) return 'عضو';
+    if (await this.isPrimaryOwner(ctx, targetUserId)) return 'المالك الأساسي';
+    const internal = this.getInternalRoleLabel(group, targetUserId);
+    if (internal) return internal;
+    const member = await this.getChatMemberSafe(ctx, targetUserId);
+    if (member?.status === 'creator') return 'منشئ';
+    if (member?.status === 'administrator') return 'مشرف';
+    return 'عضو';
+  }
+
+  static async renderSpecialFaqContent(ctx, group, item) {
+    const sender = ctx.from || {};
+    const replied = ctx.message?.reply_to_message?.from || null;
+    const stats = await this.getUserReplyStats(ctx, group, sender.id);
+    const role = await this.resolveRolePlaceholder(ctx, group, sender.id);
+    const vars = {
+      '#الاسم': sender.first_name || sender.username || String(sender.id || 'عضو'),
+      '#يوزره': replied?.username ? `@${replied.username}` : (replied?.first_name || 'غير متوفر'),
+      '#اليوزر': sender.username ? `@${sender.username}` : 'غير متوفر',
+      '#الرسائل': String(stats.messages || 0),
+      '#الايدي': String(sender.id || ''),
+      '#الرتبه': role,
+      '#التعديل': String(stats.edits || 0),
+      '#النقاط': String(stats.points || 0)
+    };
+
+    let rendered = String(item?.response || '');
+    Object.entries(vars).forEach(([key, value]) => {
+      rendered = rendered.split(key).join(String(value));
+    });
+    return rendered.trim();
+  }
+
+  static async sendSpecialFaqResponse(ctx, group, item) {
+    const responseType = String(item?.responseType || 'text');
+    const rendered = await this.renderSpecialFaqContent(ctx, group, item);
+    const options = {
+      reply_to_message_id: ctx.message?.message_id
+    };
+
+    if (responseType === 'photo') return ctx.replyWithPhoto(item.fileId, { ...options, caption: rendered || undefined });
+    if (responseType === 'video') return ctx.replyWithVideo(item.fileId, { ...options, caption: rendered || undefined });
+    if (responseType === 'animation') return ctx.replyWithAnimation(item.fileId, { ...options, caption: rendered || undefined });
+    if (responseType === 'voice') return ctx.replyWithVoice(item.fileId, { ...options, caption: rendered || undefined });
+    if (responseType === 'audio') return ctx.replyWithAudio(item.fileId, { ...options, caption: rendered || undefined });
+    if (responseType === 'document') return ctx.replyWithDocument(item.fileId, { ...options, caption: rendered || undefined });
+    if (responseType === 'sticker') return ctx.replyWithSticker(item.fileId, options);
+    return ctx.reply(rendered || 'ℹ️ الرد السبشل فارغ.', options);
+  }
+
+  static extractSpecialFaqMediaPayload(ctx) {
+    const caption = String(ctx.message?.caption || '').trim();
+    const photos = Array.isArray(ctx.message?.photo) ? ctx.message.photo : [];
+    if (photos.length > 0) {
+      return { responseType: 'photo', fileId: photos[photos.length - 1]?.file_id, response: caption };
+    }
+    if (ctx.message?.video?.file_id) {
+      return { responseType: 'video', fileId: ctx.message.video.file_id, response: caption };
+    }
+    if (ctx.message?.animation?.file_id) {
+      return { responseType: 'animation', fileId: ctx.message.animation.file_id, response: caption };
+    }
+    if (ctx.message?.sticker?.file_id) {
+      return { responseType: 'sticker', fileId: ctx.message.sticker.file_id, response: '' };
+    }
+    if (ctx.message?.audio?.file_id) {
+      return { responseType: 'audio', fileId: ctx.message.audio.file_id, response: caption };
+    }
+    if (ctx.message?.voice?.file_id) {
+      return { responseType: 'voice', fileId: ctx.message.voice.file_id, response: caption };
+    }
+    if (ctx.message?.document?.file_id) {
+      return { responseType: 'document', fileId: ctx.message.document.file_id, response: caption };
+    }
+    return null;
+  }
+
+  static async handleSpecialFaqMedia(ctx) {
+    if (!this.isGroupChat(ctx)) return false;
+    const state = this.getPendingSpecialFaq(ctx);
+    if (!state?.active || state.step !== 'content') return false;
+    const group = await this.ensureGroupRecord(ctx);
+    const payload = this.extractSpecialFaqMediaPayload(ctx);
+    if (!payload?.fileId) {
+      await ctx.reply('❌ هذا النوع غير مدعوم في الرد السبشل.');
+      return true;
+    }
+    return this.saveSpecialFaqEntry(ctx, group, state, payload);
   }
 
   static renderWelcomeTemplate(template, user, chat) {
@@ -3207,6 +3428,9 @@ class GroupAdminHandler {
     const rawText = String(ctx.message.text || '').trim();
     const lowered = rawText.toLowerCase();
 
+    const handledPendingSpecialFaq = await this.handlePendingSpecialFaqText(ctx, group, rawText);
+    if (handledPendingSpecialFaq) return true;
+
     if (
       /^(تفاعل مشرف|\/gadminstats\b)/i.test(rawText)
     ) {
@@ -3460,6 +3684,13 @@ class GroupAdminHandler {
       { _id: group._id },
       {
         $inc: { 'statistics.messagesCount': 1 },
+        $set: { updatedAt: new Date() }
+      }
+    ).catch(() => {});
+    await Group.updateOne(
+      { _id: group._id, 'gameSystem.scores.userId': Number(ctx.from?.id || 0) },
+      {
+        $inc: { 'gameSystem.scores.$.messageCount': 1 },
         $set: { updatedAt: new Date() }
       }
     ).catch(() => {});

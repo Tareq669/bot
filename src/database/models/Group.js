@@ -197,6 +197,18 @@ const groupSchema = new mongoose.Schema({
           type: String,
           default: ''
         },
+        isSpecial: {
+          type: Boolean,
+          default: false
+        },
+        responseType: {
+          type: String,
+          default: 'text'
+        },
+        fileId: {
+          type: String,
+          default: ''
+        },
         createdBy: {
           type: Number,
           default: null
