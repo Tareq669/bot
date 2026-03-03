@@ -273,12 +273,78 @@ class GroupAdminHandler {
     return owners;
   }
 
+  static async collectPrimaryOwnerRecipients(ctx, group, chatId) {
+    const owners = new Set();
+    if (Number.isInteger(group?.settings?.primaryOwnerId)) owners.add(Number(group.settings.primaryOwnerId));
+    this.getRoleIds(group, 'basicOwnerIds').forEach((id) => owners.add(id));
+
+    try {
+      const admins = await ctx.telegram.getChatAdministrators(chatId);
+      const creator = admins.find((m) => m.status === 'creator');
+      if (creator?.user?.id) owners.add(Number(creator.user.id));
+    } catch (_error) {
+      // ignore
+    }
+
+    return owners;
+  }
+
   static formatRoleActionMessage(actionText, target) {
     const targetMention = this.mentionUser(
       target.id,
       target.firstName || target.username || String(target.id)
     );
     return `• ${actionText}\n• المستخدم ↤︎ ${targetMention}`;
+  }
+
+  static formatProtectionTimestamp(unixSeconds) {
+    if (!Number.isFinite(Number(unixSeconds))) return 'غير متوفر';
+    return new Date(Number(unixSeconds) * 1000).toLocaleString('ar-EG', {
+      timeZone: 'Asia/Hebron',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  }
+
+  static getMessageTypeLabel(message) {
+    if (message?.photo?.length) return 'صورة';
+    if (message?.video) return 'فيديو';
+    if (message?.animation) return 'متحركة';
+    if (message?.sticker) return 'ملصق';
+    if (message?.voice) return 'بصمة';
+    if (message?.audio) return 'أغنية';
+    if (message?.document) return 'ملف';
+    if (message?.poll) return 'تصويت';
+    if (message?.contact) return 'جهة اتصال';
+    if (message?.location) return 'موقع';
+    if (message?.text || message?.caption) return 'نص';
+    return 'غير معروف';
+  }
+
+  static buildMessageLink(chat, messageId) {
+    const id = Number(messageId || 0);
+    if (!id) return '';
+    if (chat?.username) return `https://t.me/${chat.username}/${id}`;
+    const rawChatId = String(chat?.id || '');
+    if (rawChatId.startsWith('-100')) {
+      return `https://t.me/c/${rawChatId.slice(4)}/${id}`;
+    }
+    return '';
+  }
+
+  static formatProtectionLink(chat, messageId) {
+    const link = this.buildMessageLink(chat, messageId);
+    if (!link) return 'غير متوفر';
+    return `<a href="${this.escapeHtml(link)}">أضغط هنا</a>`;
+  }
+
+  static getSenderChatLabel(senderChat) {
+    return this.escapeHtml(
+      senderChat?.username ? `@${senderChat.username}` : (senderChat?.title || 'غير معروف')
+    );
   }
 
   static collectMentionableMembers(group, botId = null) {
@@ -611,6 +677,7 @@ class GroupAdminHandler {
       `• منع الاباحيه ↤︎ ${settings.blockExplicitContent ? '✅' : '❌'}\n` +
       `• منع الرسائل الطويله ↤︎ ${settings.blockLongMessages ? '✅' : '❌'}\n` +
       `• منع التوجيه ↤︎ ${settings.blockForwards ? '✅' : '❌'}\n` +
+      `• حماية التعديل ↤︎ ${settings.blockChannelEdits ? '✅' : '❌'}\n` +
       `• قفل الروابط ↤︎ ${settings.lockLinks ? '✅' : '❌'}\n` +
       `• قفل الملصقات ↤︎ ${settings.lockStickers ? '✅' : '❌'}\n` +
       `• العقوبات التلقائيه ↤︎ ${policy.enabled ? '✅' : '❌'}\n` +
@@ -651,6 +718,7 @@ class GroupAdminHandler {
       `• حماية التكرار: ${settings.floodProtection ? '✅' : '❌'}\n` +
       `• منع الرسائل الطويلة: ${settings.blockLongMessages ? '✅' : '❌'} (الحد: ${settings.maxMessageLength})\n` +
       `• منع التوجيه: ${settings.blockForwards ? '✅' : '❌'}\n` +
+      `• حماية التعديل: ${settings.blockChannelEdits ? '✅' : '❌'}\n` +
       `• استثناء المشرفين من الحماية: ${settings.exemptAdminsFromProtection ? '✅' : '❌'}\n` +
       `• سياسة العقوبات: ${this.formatPolicy(policy)}\n\n` +
       '<b>أوامر الإدارة:</b>\n' +
@@ -667,6 +735,7 @@ class GroupAdminHandler {
       '• /gprotect\n' +
       '• /gprotect links on|off\n' +
       '• /gprotect stickers on|off\n' +
+      '• /gprotect edits on|off\n' +
       '• /gprotect words on|off\n' +
       '• /gprotect flood on|off\n' +
       '• /gprotect nsfw on|off\n' +
@@ -816,6 +885,7 @@ class GroupAdminHandler {
       `• الروابط: ${group.settings?.lockLinks ? '✅ مقفلة' : '❌ مفتوحة'}\n` +
       `• الملصقات: ${group.settings?.lockStickers ? '✅ مقفلة' : '❌ مفتوحة'}\n` +
       `• التوجيه: ${group.settings?.blockForwards ? '✅ مفعّل' : '❌ معطّل'}\n` +
+      `• حماية التعديل: ${group.settings?.blockChannelEdits ? '✅ مفعّلة' : '❌ معطّلة'}\n` +
       `• الكلمات: ${group.settings?.filterBadWords ? '✅ مفعلة' : '❌ معطلة'}\n` +
       `• الإباحي: ${group.settings?.blockExplicitContent ? '✅ مفعلة' : '❌ معطلة'}\n` +
       `• التكرار: ${group.settings?.floodProtection ? '✅ مفعلة' : '❌ معطلة'}\n` +
@@ -825,6 +895,7 @@ class GroupAdminHandler {
       '• قفل الروابط | فتح الروابط\n' +
       '• قفل الملصقات | فتح الملصقات\n' +
       '• تفعيل منع التوجيه | تعطيل منع التوجيه\n' +
+      '• تفعيل حماية التعديل | تعطيل حماية التعديل\n' +
       '• تفعيل الكلمات | تعطيل الكلمات\n' +
       '• تفعيل التكرار | تعطيل التكرار\n' +
       '• تفعيل منع الاباحية | تعطيل منع الاباحية\n' +
@@ -833,6 +904,7 @@ class GroupAdminHandler {
       '• /gprotect links on|off\n' +
       '• /gprotect stickers on|off\n' +
       '• /gprotect forwards on|off\n' +
+      '• /gprotect edits on|off\n' +
       '• /gprotect words on|off\n' +
       '• /gprotect flood on|off\n' +
       '• /gprotect nsfw on|off\n' +
@@ -904,6 +976,7 @@ class GroupAdminHandler {
       links: 'lockLinks',
       stickers: 'lockStickers',
       forwards: 'blockForwards',
+      edits: 'blockChannelEdits',
       words: 'filterBadWords',
       flood: 'floodProtection',
       nsfw: 'blockExplicitContent',
@@ -912,7 +985,7 @@ class GroupAdminHandler {
     };
     const key = keyMap[target];
     if (!key) {
-      return ctx.reply('❌ الخيار غير معروف. استخدم: links أو stickers أو forwards أو words أو flood أو nsfw أو long أو maxlen أو admins');
+      return ctx.reply('❌ الخيار غير معروف. استخدم: links أو stickers أو forwards أو edits أو words أو flood أو nsfw أو long أو maxlen أو admins');
     }
 
     const result = await this.setProtectionSetting(ctx, key, switchValue, 'gprotect');
@@ -956,6 +1029,7 @@ class GroupAdminHandler {
       'blockExplicitContent',
       'blockLongMessages',
       'blockForwards',
+      'blockChannelEdits',
       'exemptAdminsFromProtection'
     ]);
     if (!allowedKeys.has(key)) {
@@ -3458,6 +3532,94 @@ class GroupAdminHandler {
     }
   }
 
+  static async handleEditedMessage(ctx) {
+    try {
+      const message = ctx.update?.edited_message;
+      const chat = message?.chat;
+      if (!GROUP_TYPES.has(chat?.type)) return;
+
+      const senderChat = message?.sender_chat;
+      if (!senderChat || senderChat.type !== 'channel') return;
+
+      const group = await Group.findOneAndUpdate(
+        { groupId: String(chat.id) },
+        {
+          $set: {
+            groupTitle: chat.title || 'Unknown Group',
+            groupType: chat.type || 'group',
+            updatedAt: new Date()
+          },
+          $setOnInsert: { createdAt: new Date() }
+        },
+        { upsert: true, new: true }
+      );
+      if (!group) return;
+      this.normalizeGroupState(group);
+      if (!group.settings?.blockChannelEdits) return;
+
+      const owners = await this.collectPrimaryOwnerRecipients(ctx, group, chat.id);
+      if (!owners.size) return;
+
+      const sentAt = this.formatProtectionTimestamp(message.edit_date || message.date);
+      const messageType = this.getMessageTypeLabel(message);
+      const linkHtml = this.formatProtectionLink(chat, message.message_id);
+      const channelName = this.getSenderChatLabel(senderChat);
+      const channelId = Number(senderChat.id || 0);
+
+      const detectionNote =
+        '• حماية التعديل\n' +
+        '• لقد قام شخص بالتعديل عبر قناة\n' +
+        `• اسمها ↤︎ 「 ${channelName} 」\n` +
+        `• ايديها ↤︎ <code>${channelId || '-'}</code>\n` +
+        `• تاريخ الرسالة ↤︎ ${this.escapeHtml(sentAt)}\n` +
+        `• النوع ↤︎ ${this.escapeHtml(messageType)}\n` +
+        `• رابط الرسالة ↤︎ ${linkHtml}\n\n` +
+        '- الرجاء حذف الرسالة في اقرب وقت ممكن \n-';
+
+      await Promise.all(
+        [...owners].map((ownerId) => ctx.telegram.sendMessage(ownerId, detectionNote, {
+          parse_mode: 'HTML',
+          disable_web_page_preview: true
+        }).catch(() => null))
+      );
+
+      try {
+        await ctx.telegram.deleteMessage(chat.id, message.message_id);
+        await this.addModerationLog(
+          group,
+          'delete_edited_channel_message',
+          ctx.botInfo?.id || 0,
+          null,
+          `edited message removed from sender chat ${channelId || '-'}`
+        );
+        await this.saveGroupQuietly(group);
+
+        const deletedByLabel = this.escapeHtml(
+          ctx.from?.username ? `@${ctx.from.username}` : (ctx.from?.first_name || senderChat?.title || 'غير معروف')
+        );
+        const deletedNote =
+          '• حماية التعديل\n' +
+          '• لقد قام شخص بالتعديل وحذفتها\n' +
+          `• اسمه ↤︎ 「 ${deletedByLabel} 」\n` +
+          `• إيديه ↤︎ <code>${channelId || '-'}</code>\n` +
+          `• تاريخ الرسالة ↤︎ ${this.escapeHtml(sentAt)}\n` +
+          `• النوع ↤︎ ${this.escapeHtml(messageType)}\n` +
+          `• رابط الرسالة ↤︎ ${linkHtml}\n-`;
+
+        await Promise.all(
+          [...owners].map((ownerId) => ctx.telegram.sendMessage(ownerId, deletedNote, {
+            parse_mode: 'HTML',
+            disable_web_page_preview: true
+          }).catch(() => null))
+        );
+      } catch (_error) {
+        // ignore delete failures; the first alert was already sent
+      }
+    } catch (_error) {
+      // ignore edited message protection failures
+    }
+  }
+
   static async processGroupMessage(ctx) {
     if (!this.isGroupChat(ctx)) return false;
     if (!ctx.message) return false;
@@ -3586,7 +3748,7 @@ class GroupAdminHandler {
       return true;
     }
     if (
-      /^(قفل الروابط|فتح الروابط|قفل الملصقات|فتح الملصقات|تفعيل منع التوجيه|تعطيل منع التوجيه|تفعيل الكلمات|تعطيل الكلمات|تفعيل التكرار|تعطيل التكرار|تفعيل منع الاباحية|تعطيل منع الاباحية|تفعيل منع الرسائل الطويل(?:ة|ه)|تعطيل منع الرسائل الطويل(?:ة|ه)|استثناء المشرفين من الحماية|الغاء استثناء المشرفين من الحماية|إلغاء استثناء المشرفين من الحماية|الحماية|\/gprotect\b)/i.test(rawText)
+      /^(قفل الروابط|فتح الروابط|قفل الملصقات|فتح الملصقات|تفعيل منع التوجيه|تعطيل منع التوجيه|تفعيل حماية التعديل|تعطيل حماية التعديل|تفعيل الكلمات|تعطيل الكلمات|تفعيل التكرار|تعطيل التكرار|تفعيل منع الاباحية|تعطيل منع الاباحية|تفعيل منع الرسائل الطويل(?:ة|ه)|تعطيل منع الرسائل الطويل(?:ة|ه)|استثناء المشرفين من الحماية|الغاء استثناء المشرفين من الحماية|إلغاء استثناء المشرفين من الحماية|الحماية|\/gprotect\b)/i.test(rawText)
     ) {
       if (/^قفل الروابط$/i.test(rawText)) {
         const result = await this.setProtectionSetting(ctx, 'lockLinks', true, 'text');
@@ -3622,6 +3784,18 @@ class GroupAdminHandler {
         const result = await this.setProtectionSetting(ctx, 'blockForwards', false, 'text');
         if (!result?.ok) return true;
         await ctx.reply('✅ تم تعطيل منع التوجيه.');
+        return true;
+      }
+      if (/^تفعيل حماية التعديل$/i.test(rawText)) {
+        const result = await this.setProtectionSetting(ctx, 'blockChannelEdits', true, 'text');
+        if (!result?.ok) return true;
+        await ctx.reply('✅ تم تفعيل حماية التعديل.');
+        return true;
+      }
+      if (/^تعطيل حماية التعديل$/i.test(rawText)) {
+        const result = await this.setProtectionSetting(ctx, 'blockChannelEdits', false, 'text');
+        if (!result?.ok) return true;
+        await ctx.reply('✅ تم تعطيل حماية التعديل.');
         return true;
       }
       if (/^تفعيل الكلمات$/i.test(rawText)) {

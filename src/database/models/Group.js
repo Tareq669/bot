@@ -68,6 +68,10 @@ const groupSchema = new mongoose.Schema({
       type: Boolean,
       default: false
     },
+    blockChannelEdits: {
+      type: Boolean,
+      default: false
+    },
     tournamentEnabled: {
       type: Boolean,
       default: true

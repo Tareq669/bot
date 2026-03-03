@@ -147,7 +147,7 @@ const bot = new Telegraf(process.env.BOT_TOKEN, {
   polling: {
     timeout: 30,
     limit: 100,
-    allowedUpdates: ['message', 'callback_query', 'inline_query', 'poll_answer', 'chat_member']
+    allowedUpdates: ['message', 'edited_message', 'callback_query', 'inline_query', 'poll_answer', 'chat_member']
   }
 });
 
@@ -1582,6 +1582,7 @@ bot.action(/^group:levels:(bronze|silver|gold|platinum|diamond)$/i, (ctx) => Gro
 bot.action(/^group:(?!whisper:).+$/, (ctx) => GroupAdminHandler.handleGroupCallback(ctx));
 bot.on('poll_answer', (ctx) => GroupGamesHandler.handlePollAnswer(ctx));
 bot.on('chat_member', (ctx) => GroupAdminHandler.handleChatMemberUpdate(ctx));
+bot.on('edited_message', (ctx) => GroupAdminHandler.handleEditedMessage(ctx));
 bot.on('photo', async (ctx) => {
   try {
     const handledSpecialFaq = await GroupAdminHandler.handleSpecialFaqMedia(ctx);
@@ -4625,7 +4626,7 @@ const botStart = async () => {
       // Launch bot with explicit update types so quiz poll answers are always received.
       bot
         .launch({
-          allowedUpdates: ['message', 'callback_query', 'inline_query', 'poll_answer', 'chat_member']
+          allowedUpdates: ['message', 'edited_message', 'callback_query', 'inline_query', 'poll_answer', 'chat_member']
         })
         .then(() => {
           reconnectManager.isConnected = true;
