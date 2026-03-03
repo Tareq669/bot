@@ -2,6 +2,9 @@
 const { Group, User } = require('../database/models');
 
 const GROUP_TYPES = new Set(['group', 'supergroup']);
+const NEWS_CHANNEL_USERNAME = 'KnowSpark';
+const NEWS_CHANNEL_TITLE = 'رؤية 𓂆 إخبارية 🇵🇸';
+const NEWS_CHANNEL_URL = 'https://t.me/KnowSpark';
 
 class GroupAdminHandler {
   static async saveGroupQuietly(group) {
@@ -678,6 +681,7 @@ class GroupAdminHandler {
       `• منع الرسائل الطويله ↤︎ ${settings.blockLongMessages ? '✅' : '❌'}\n` +
       `• منع التوجيه ↤︎ ${settings.blockForwards ? '✅' : '❌'}\n` +
       `• حماية التعديل ↤︎ ${settings.blockChannelEdits ? '✅' : '❌'}\n` +
+      `• الاشتراك الاجباري ↤︎ ${settings.requireNewsSubscription ? '✅' : '❌'}\n` +
       `• قفل الروابط ↤︎ ${settings.lockLinks ? '✅' : '❌'}\n` +
       `• قفل الملصقات ↤︎ ${settings.lockStickers ? '✅' : '❌'}\n` +
       `• العقوبات التلقائيه ↤︎ ${policy.enabled ? '✅' : '❌'}\n` +
@@ -719,6 +723,7 @@ class GroupAdminHandler {
       `• منع الرسائل الطويلة: ${settings.blockLongMessages ? '✅' : '❌'} (الحد: ${settings.maxMessageLength})\n` +
       `• منع التوجيه: ${settings.blockForwards ? '✅' : '❌'}\n` +
       `• حماية التعديل: ${settings.blockChannelEdits ? '✅' : '❌'}\n` +
+      `• الاشتراك الاجباري: ${settings.requireNewsSubscription ? '✅' : '❌'}\n` +
       `• استثناء المشرفين من الحماية: ${settings.exemptAdminsFromProtection ? '✅' : '❌'}\n` +
       `• سياسة العقوبات: ${this.formatPolicy(policy)}\n\n` +
       '<b>أوامر الإدارة:</b>\n' +
@@ -736,6 +741,7 @@ class GroupAdminHandler {
       '• /gprotect links on|off\n' +
       '• /gprotect stickers on|off\n' +
       '• /gprotect edits on|off\n' +
+      '• /gprotect subscribe on|off\n' +
       '• /gprotect words on|off\n' +
       '• /gprotect flood on|off\n' +
       '• /gprotect nsfw on|off\n' +
@@ -886,6 +892,7 @@ class GroupAdminHandler {
       `• الملصقات: ${group.settings?.lockStickers ? '✅ مقفلة' : '❌ مفتوحة'}\n` +
       `• التوجيه: ${group.settings?.blockForwards ? '✅ مفعّل' : '❌ معطّل'}\n` +
       `• حماية التعديل: ${group.settings?.blockChannelEdits ? '✅ مفعّلة' : '❌ معطّلة'}\n` +
+      `• الاشتراك الاجباري: ${group.settings?.requireNewsSubscription ? '✅ مفعّل' : '❌ معطّل'}\n` +
       `• الكلمات: ${group.settings?.filterBadWords ? '✅ مفعلة' : '❌ معطلة'}\n` +
       `• الإباحي: ${group.settings?.blockExplicitContent ? '✅ مفعلة' : '❌ معطلة'}\n` +
       `• التكرار: ${group.settings?.floodProtection ? '✅ مفعلة' : '❌ معطلة'}\n` +
@@ -896,6 +903,7 @@ class GroupAdminHandler {
       '• قفل الملصقات | فتح الملصقات\n' +
       '• تفعيل منع التوجيه | تعطيل منع التوجيه\n' +
       '• تفعيل حماية التعديل | تعطيل حماية التعديل\n' +
+      '• تفعيل الاشتراك الاجباري | تعطيل الاشتراك الاجباري\n' +
       '• تفعيل الكلمات | تعطيل الكلمات\n' +
       '• تفعيل التكرار | تعطيل التكرار\n' +
       '• تفعيل منع الاباحية | تعطيل منع الاباحية\n' +
@@ -905,6 +913,7 @@ class GroupAdminHandler {
       '• /gprotect stickers on|off\n' +
       '• /gprotect forwards on|off\n' +
       '• /gprotect edits on|off\n' +
+      '• /gprotect subscribe on|off\n' +
       '• /gprotect words on|off\n' +
       '• /gprotect flood on|off\n' +
       '• /gprotect nsfw on|off\n' +
@@ -977,6 +986,7 @@ class GroupAdminHandler {
       stickers: 'lockStickers',
       forwards: 'blockForwards',
       edits: 'blockChannelEdits',
+      subscribe: 'requireNewsSubscription',
       words: 'filterBadWords',
       flood: 'floodProtection',
       nsfw: 'blockExplicitContent',
@@ -985,7 +995,7 @@ class GroupAdminHandler {
     };
     const key = keyMap[target];
     if (!key) {
-      return ctx.reply('❌ الخيار غير معروف. استخدم: links أو stickers أو forwards أو edits أو words أو flood أو nsfw أو long أو maxlen أو admins');
+      return ctx.reply('❌ الخيار غير معروف. استخدم: links أو stickers أو forwards أو edits أو subscribe أو words أو flood أو nsfw أو long أو maxlen أو admins');
     }
 
     const result = await this.setProtectionSetting(ctx, key, switchValue, 'gprotect');
@@ -1030,6 +1040,7 @@ class GroupAdminHandler {
       'blockLongMessages',
       'blockForwards',
       'blockChannelEdits',
+      'requireNewsSubscription',
       'exemptAdminsFromProtection'
     ]);
     if (!allowedKeys.has(key)) {
@@ -3620,6 +3631,28 @@ class GroupAdminHandler {
     }
   }
 
+  static async isUserSubscribedToNewsChannel(ctx, userId) {
+    const targetUserId = Number(userId || 0);
+    if (!targetUserId) return true;
+    try {
+      const member = await ctx.telegram.getChatMember(`@${NEWS_CHANNEL_USERNAME}`, targetUserId);
+      return ['member', 'administrator', 'creator'].includes(member?.status);
+    } catch (_error) {
+      return true;
+    }
+  }
+
+  static getForcedSubscriptionNotice(user) {
+    const label = this.escapeHtml(
+      user?.username ? `@${user.username}` : (user?.first_name || String(user?.id || 'مستخدم'))
+    );
+    return (
+      `↜ عذرا عزيزي ↤︎ ${label}\n` +
+      `↜ يجب الاشتراك في ↤︎ ${this.escapeHtml(NEWS_CHANNEL_TITLE)}\n` +
+      '↜ اضغط الزر واشترك لكي تستطيع إرسال رسائل هنا'
+    );
+  }
+
   static async processGroupMessage(ctx) {
     if (!this.isGroupChat(ctx)) return false;
     if (!ctx.message) return false;
@@ -3748,7 +3781,7 @@ class GroupAdminHandler {
       return true;
     }
     if (
-      /^(قفل الروابط|فتح الروابط|قفل الملصقات|فتح الملصقات|تفعيل منع التوجيه|تعطيل منع التوجيه|تفعيل حماية التعديل|تعطيل حماية التعديل|تفعيل الكلمات|تعطيل الكلمات|تفعيل التكرار|تعطيل التكرار|تفعيل منع الاباحية|تعطيل منع الاباحية|تفعيل منع الرسائل الطويل(?:ة|ه)|تعطيل منع الرسائل الطويل(?:ة|ه)|استثناء المشرفين من الحماية|الغاء استثناء المشرفين من الحماية|إلغاء استثناء المشرفين من الحماية|الحماية|\/gprotect\b)/i.test(rawText)
+      /^(قفل الروابط|فتح الروابط|قفل الملصقات|فتح الملصقات|تفعيل منع التوجيه|تعطيل منع التوجيه|تفعيل حماية التعديل|تعطيل حماية التعديل|تفعيل الاشتراك الاجباري|تعطيل الاشتراك الاجباري|تفعيل الاشتراك الإجباري|تعطيل الاشتراك الإجباري|تفعيل الكلمات|تعطيل الكلمات|تفعيل التكرار|تعطيل التكرار|تفعيل منع الاباحية|تعطيل منع الاباحية|تفعيل منع الرسائل الطويل(?:ة|ه)|تعطيل منع الرسائل الطويل(?:ة|ه)|استثناء المشرفين من الحماية|الغاء استثناء المشرفين من الحماية|إلغاء استثناء المشرفين من الحماية|الحماية|\/gprotect\b)/i.test(rawText)
     ) {
       if (/^قفل الروابط$/i.test(rawText)) {
         const result = await this.setProtectionSetting(ctx, 'lockLinks', true, 'text');
@@ -3796,6 +3829,18 @@ class GroupAdminHandler {
         const result = await this.setProtectionSetting(ctx, 'blockChannelEdits', false, 'text');
         if (!result?.ok) return true;
         await ctx.reply('✅ تم تعطيل حماية التعديل.');
+        return true;
+      }
+      if (/^(تفعيل الاشتراك الاجباري|تفعيل الاشتراك الإجباري)$/i.test(rawText)) {
+        const result = await this.setProtectionSetting(ctx, 'requireNewsSubscription', true, 'text');
+        if (!result?.ok) return true;
+        await ctx.reply(`✅ تم تفعيل الاشتراك الاجباري.\n• القناة ↤︎ ${NEWS_CHANNEL_TITLE}\n• الرابط ↤︎ ${NEWS_CHANNEL_URL}`);
+        return true;
+      }
+      if (/^(تعطيل الاشتراك الاجباري|تعطيل الاشتراك الإجباري)$/i.test(rawText)) {
+        const result = await this.setProtectionSetting(ctx, 'requireNewsSubscription', false, 'text');
+        if (!result?.ok) return true;
+        await ctx.reply('✅ تم تعطيل الاشتراك الاجباري.');
         return true;
       }
       if (/^تفعيل الكلمات$/i.test(rawText)) {
@@ -3913,6 +3958,24 @@ class GroupAdminHandler {
     const isAdmin = await this.isGroupAdmin(ctx);
     if (isAdmin && group.settings?.exemptAdminsFromProtection) {
       return false;
+    }
+
+    if (!isAdmin && group.settings?.requireNewsSubscription) {
+      const subscribed = await this.isUserSubscribedToNewsChannel(ctx, ctx.from?.id);
+      if (!subscribed) {
+        try {
+          await ctx.telegram.deleteMessage(ctx.chat.id, ctx.message.message_id);
+        } catch (_error) {
+          // ignore delete errors
+        }
+        await ctx.reply(this.getForcedSubscriptionNotice(ctx.from), {
+          reply_markup: Markup.inlineKeyboard([
+            [Markup.button.url(NEWS_CHANNEL_TITLE, NEWS_CHANNEL_URL)]
+          ]).reply_markup,
+          disable_web_page_preview: true
+        }).catch(() => null);
+        return true;
+      }
     }
 
     const text = lowered;
