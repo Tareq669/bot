@@ -3407,6 +3407,39 @@ class GroupAdminHandler {
       return this.handleToggleSetting(ctx, key);
     }
 
+    if (data === 'group:subscribe:verify') {
+      const group = await this.ensureGroupRecord(ctx);
+      const channel = this.getRequiredSubscriptionChannel(group);
+      if (!group.settings?.requireNewsSubscription || !channel) {
+        return ctx.answerCbQuery('❌ الاشتراك الإجباري غير مفعل هنا', { show_alert: false }).catch(() => {});
+      }
+
+      const subscribed = await this.isUserSubscribedToNewsChannel(ctx, group, ctx.from?.id);
+      if (!subscribed) {
+        await ctx.answerCbQuery('❌ ما زلت غير مشترك بالقناة', { show_alert: false }).catch(() => {});
+        try {
+          await ctx.editMessageText(this.getForcedSubscriptionNotice(ctx.from, group), {
+            reply_markup: this.forcedSubscriptionKeyboard(channel).reply_markup,
+            disable_web_page_preview: true
+          });
+        } catch (_error) {
+          // ignore
+        }
+        return;
+      }
+
+      await ctx.answerCbQuery('✅ تم التأكد من اشتراكك', { show_alert: false }).catch(() => {});
+      const confirmation =
+        `✅ تم التأكد من اشتراكك يا ${this.escapeHtml(ctx.from?.first_name || ctx.from?.username || 'عزيزي')}.\n` +
+        'يمكنك الآن الكتابة في المجموعة.';
+      try {
+        await ctx.editMessageText(confirmation, { parse_mode: 'HTML' });
+      } catch (_error) {
+        await ctx.reply(confirmation, { parse_mode: 'HTML' }).catch(() => {});
+      }
+      return;
+    }
+
     if (data.startsWith('group:adminstats:show:')) {
       const token = data.split(':')[4];
       return this.handleAdminStatsReveal(ctx, token);
@@ -3721,6 +3754,13 @@ class GroupAdminHandler {
       `↜ يجب الاشتراك في ↤︎ ${this.escapeHtml(channel?.title || 'القناة المحددة')}\n` +
       '↜ اضغط الزر واشترك لكي تستطيع إرسال رسائل هنا'
     );
+  }
+
+  static forcedSubscriptionKeyboard(channel) {
+    return Markup.inlineKeyboard([
+      [Markup.button.url(channel?.title || 'اشترك الآن', channel?.url || 'https://t.me')],
+      [Markup.button.callback('✅ تحقق من الاشتراك', 'group:subscribe:verify')]
+    ]);
   }
 
   static async processGroupMessage(ctx) {
@@ -4100,9 +4140,7 @@ class GroupAdminHandler {
           // ignore delete errors
         }
         await ctx.reply(this.getForcedSubscriptionNotice(ctx.from, group), {
-          reply_markup: Markup.inlineKeyboard([
-            [Markup.button.url(channel?.title || 'اشترك الآن', channel?.url || 'https://t.me')]
-          ]).reply_markup,
+          reply_markup: this.forcedSubscriptionKeyboard(channel).reply_markup,
           disable_web_page_preview: true
         }).catch(() => null);
         return true;
