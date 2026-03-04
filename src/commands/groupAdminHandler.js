@@ -4258,6 +4258,7 @@ class GroupAdminHandler {
           // ignore delete errors
         }
         await ctx.reply(this.getForcedSubscriptionNotice(ctx.from, group), {
+          parse_mode: 'HTML',
           reply_markup: this.forcedSubscriptionKeyboard(channel).reply_markup,
           disable_web_page_preview: true
         }).catch(() => null);
