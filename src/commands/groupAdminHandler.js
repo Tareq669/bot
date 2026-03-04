@@ -347,6 +347,38 @@ class GroupAdminHandler {
     );
   }
 
+  static getEditedActorInfo(message, chat) {
+    const senderChat = message?.sender_chat;
+    if (senderChat?.type === 'channel') {
+      return {
+        name: this.getSenderChatLabel(senderChat),
+        id: Number(senderChat.id || 0),
+        detectionFieldLabel: 'اسمها',
+        deleteFieldLabel: 'اسمه',
+        actionLine: '• لقد قام شخص بالتعديل عبر قناة'
+      };
+    }
+
+    if (senderChat && Number(senderChat.id) === Number(chat?.id || 0)) {
+      return {
+        name: this.escapeHtml(senderChat.title || 'الأدمن المجهول'),
+        id: Number(senderChat.id || 0),
+        detectionFieldLabel: 'اسمه',
+        deleteFieldLabel: 'اسمه',
+        actionLine: '• لقد قام الأدمن المجهول بالتعديل'
+      };
+    }
+
+    const from = message?.from;
+    return {
+      name: this.escapeHtml(from?.username ? `@${from.username}` : (from?.first_name || 'غير معروف')),
+      id: Number(from?.id || 0),
+      detectionFieldLabel: 'اسمه',
+      deleteFieldLabel: 'اسمه',
+      actionLine: '• لقد قام شخص بالتعديل'
+    };
+  }
+
   static isEditedMediaMessage(message) {
     return Boolean(
       message?.photo?.length ||
@@ -3667,14 +3699,13 @@ class GroupAdminHandler {
       const sentAt = this.formatProtectionTimestamp(message.edit_date || message.date);
       const messageType = this.getMessageTypeLabel(message);
       const linkHtml = this.formatProtectionLink(chat, message.message_id);
-      const actorName = this.getSenderChatLabel(senderChat);
-      const actorId = Number(senderChat?.id || 0);
+      const actor = this.getEditedActorInfo(message, chat);
 
       const detectionNote =
         '• حماية التعديل\n' +
-        `• لقد قام شخص بالتعديل (${this.escapeHtml(modeLabel)})\n` +
-        `• اسمها ↤︎ 「 ${actorName} 」\n` +
-        `• ايديها ↤︎ <code>${actorId || '-'}</code>\n` +
+        `${actor.actionLine}\n` +
+        `• ${actor.detectionFieldLabel} ↤︎ 「 ${actor.name} 」\n` +
+        `• ايديها ↤︎ <code>${actor.id || '-'}</code>\n` +
         `• تاريخ الرسالة ↤︎ ${this.escapeHtml(sentAt)}\n` +
         `• النوع ↤︎ ${this.escapeHtml(messageType)}\n` +
         `• رابط الرسالة ↤︎ ${linkHtml}\n\n` +
@@ -3694,15 +3725,15 @@ class GroupAdminHandler {
           'delete_edited_channel_message',
           ctx.botInfo?.id || 0,
           null,
-          `edited message removed (${modeLabel}) from sender chat ${actorId || '-'}`
+          `edited message removed (${modeLabel}) from sender chat ${actor.id || '-'}`
         );
         await this.saveGroupQuietly(group);
 
         const deletedNote =
           '• حماية التعديل\n' +
           '• لقد قام شخص بالتعديل وحذفتها\n' +
-          `• اسمه ↤︎ 「 ${actorName} 」\n` +
-          `• إيديه ↤︎ <code>${actorId || '-'}</code>\n` +
+          `• ${actor.deleteFieldLabel} ↤︎ 「 ${actor.name} 」\n` +
+          `• إيديه ↤︎ <code>${actor.id || '-'}</code>\n` +
           `• تاريخ الرسالة ↤︎ ${this.escapeHtml(sentAt)}\n` +
           `• النوع ↤︎ ${this.escapeHtml(messageType)}\n` +
           `• رابط الرسالة ↤︎ ${linkHtml}\n-`;
