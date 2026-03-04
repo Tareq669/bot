@@ -561,6 +561,7 @@ class GroupAdminHandler {
     if (typeof group.settings.floodProtection !== 'boolean') group.settings.floodProtection = true;
     if (typeof group.settings.exemptAdminsFromProtection !== 'boolean') group.settings.exemptAdminsFromProtection = false;
     if (typeof group.settings.blockLongMessages !== 'boolean') group.settings.blockLongMessages = true;
+    if (typeof group.settings.notifyLongMessageBlock !== 'boolean') group.settings.notifyLongMessageBlock = true;
     if (!Number.isInteger(group.settings.maxMessageLength)) group.settings.maxMessageLength = 700;
     group.settings.maxMessageLength = Math.max(100, Math.min(4000, group.settings.maxMessageLength));
 
@@ -677,6 +678,7 @@ class GroupAdminHandler {
       `• فلتر الكلمات ↤︎ ${settings.filterBadWords ? '✅' : '❌'}\n` +
       `• منع الاباحيه ↤︎ ${settings.blockExplicitContent ? '✅' : '❌'}\n` +
       `• منع الرسائل الطويله ↤︎ ${settings.blockLongMessages ? '✅' : '❌'}\n` +
+      `• اشعار الرسائل الطويله ↤︎ ${settings.notifyLongMessageBlock ? '✅' : '❌'}\n` +
       `• منع التوجيه ↤︎ ${settings.blockForwards ? '✅' : '❌'}\n` +
       `• حماية التعديل ↤︎ ${settings.blockChannelEdits ? '✅' : '❌'}\n` +
       `• الاشتراك الاجباري ↤︎ ${settings.requireNewsSubscription ? '✅' : '❌'}\n` +
@@ -721,6 +723,7 @@ class GroupAdminHandler {
       `• منع الإباحي: ${settings.blockExplicitContent ? '✅' : '❌'}\n` +
       `• حماية التكرار: ${settings.floodProtection ? '✅' : '❌'}\n` +
       `• منع الرسائل الطويلة: ${settings.blockLongMessages ? '✅' : '❌'} (الحد: ${settings.maxMessageLength})\n` +
+      `• اشعار الرسائل الطويلة: ${settings.notifyLongMessageBlock ? '✅' : '❌'}\n` +
       `• منع التوجيه: ${settings.blockForwards ? '✅' : '❌'}\n` +
       `• حماية التعديل: ${settings.blockChannelEdits ? '✅' : '❌'}\n` +
       `• الاشتراك الاجباري: ${settings.requireNewsSubscription ? '✅' : '❌'}\n` +
@@ -903,6 +906,7 @@ class GroupAdminHandler {
       `• الإباحي: ${group.settings?.blockExplicitContent ? '✅ مفعلة' : '❌ معطلة'}\n` +
       `• التكرار: ${group.settings?.floodProtection ? '✅ مفعلة' : '❌ معطلة'}\n` +
       `• الرسائل الطويلة: ${group.settings?.blockLongMessages ? '✅ مفعلة' : '❌ معطلة'} (الحد: ${group.settings?.maxMessageLength || 700})\n` +
+      `• اشعار الرسائل الطويلة: ${group.settings?.notifyLongMessageBlock ? '✅ مفعّل' : '❌ معطّل'}\n` +
       `• استثناء المشرفين: ${group.settings?.exemptAdminsFromProtection ? '✅ مفعل' : '❌ معطل'}\n\n` +
       '<b>أوامر سريعة:</b>\n' +
       '• قفل الروابط | فتح الروابط\n' +
@@ -916,6 +920,7 @@ class GroupAdminHandler {
       '• تفعيل التكرار | تعطيل التكرار\n' +
       '• تفعيل منع الاباحية | تعطيل منع الاباحية\n' +
       '• تفعيل منع الرسائل الطويلة | تعطيل منع الرسائل الطويلة\n' +
+      '• تفعيل اشعار منع الرسائل الطويلة | تعطيل اشعار منع الرسائل الطويلة\n' +
       '• استثناء المشرفين من الحماية | الغاء استثناء المشرفين من الحماية\n' +
       '• /gprotect links on|off\n' +
       '• /gprotect stickers on|off\n' +
@@ -999,11 +1004,12 @@ class GroupAdminHandler {
       flood: 'floodProtection',
       nsfw: 'blockExplicitContent',
       long: 'blockLongMessages',
+      longnotify: 'notifyLongMessageBlock',
       admins: 'exemptAdminsFromProtection'
     };
     const key = keyMap[target];
     if (!key) {
-      return ctx.reply('❌ الخيار غير معروف. استخدم: links أو stickers أو forwards أو edits أو subscribe أو words أو flood أو nsfw أو long أو maxlen أو admins');
+      return ctx.reply('❌ الخيار غير معروف. استخدم: links أو stickers أو forwards أو edits أو subscribe أو words أو flood أو nsfw أو long أو longnotify أو maxlen أو admins');
     }
 
     if (target === 'subscribe' && switchValue === true) {
@@ -1053,6 +1059,7 @@ class GroupAdminHandler {
       'floodProtection',
       'blockExplicitContent',
       'blockLongMessages',
+      'notifyLongMessageBlock',
       'blockForwards',
       'blockChannelEdits',
       'requireNewsSubscription',
@@ -3946,7 +3953,7 @@ class GroupAdminHandler {
       return true;
     }
     if (
-      /^(قفل الروابط|فتح الروابط|قفل الملصقات|فتح الملصقات|تفعيل منع التوجيه|تعطيل منع التوجيه|تفعيل حماية التعديل|تعطيل حماية التعديل|تفعيل الاشتراك الاجباري|تعطيل الاشتراك الاجباري|تفعيل الاشتراك الإجباري|تعطيل الاشتراك الإجباري|تفعيل الكلمات|تعطيل الكلمات|تفعيل التكرار|تعطيل التكرار|تفعيل منع الاباحية|تعطيل منع الاباحية|تفعيل منع الرسائل الطويل(?:ة|ه)|تعطيل منع الرسائل الطويل(?:ة|ه)|استثناء المشرفين من الحماية|الغاء استثناء المشرفين من الحماية|إلغاء استثناء المشرفين من الحماية|الحماية|\/gprotect\b)/i.test(rawText)
+      /^(قفل الروابط|فتح الروابط|قفل الملصقات|فتح الملصقات|تفعيل منع التوجيه|تعطيل منع التوجيه|تفعيل حماية التعديل|تعطيل حماية التعديل|تفعيل الاشتراك الاجباري|تعطيل الاشتراك الاجباري|تفعيل الاشتراك الإجباري|تعطيل الاشتراك الإجباري|تفعيل الكلمات|تعطيل الكلمات|تفعيل التكرار|تعطيل التكرار|تفعيل منع الاباحية|تعطيل منع الاباحية|تفعيل منع الرسائل الطويل(?:ة|ه)|تعطيل منع الرسائل الطويل(?:ة|ه)|تفعيل اشعار منع الرسائل الطويل(?:ة|ه)|تعطيل اشعار منع الرسائل الطويل(?:ة|ه)|استثناء المشرفين من الحماية|الغاء استثناء المشرفين من الحماية|إلغاء استثناء المشرفين من الحماية|الحماية|\/gprotect\b)/i.test(rawText)
     ) {
       if (/^قفل الروابط$/i.test(rawText)) {
         const result = await this.setProtectionSetting(ctx, 'lockLinks', true, 'text');
@@ -4059,6 +4066,18 @@ class GroupAdminHandler {
         const result = await this.setProtectionSetting(ctx, 'blockLongMessages', false, 'text');
         if (!result?.ok) return true;
         await ctx.reply('✅ تم تعطيل منع الرسائل الطويلة.');
+        return true;
+      }
+      if (/^تفعيل اشعار منع الرسائل الطويل(?:ة|ه)$/i.test(rawText)) {
+        const result = await this.setProtectionSetting(ctx, 'notifyLongMessageBlock', true, 'text');
+        if (!result?.ok) return true;
+        await ctx.reply('✅ تم تفعيل اشعار منع الرسائل الطويلة.');
+        return true;
+      }
+      if (/^تعطيل اشعار منع الرسائل الطويل(?:ة|ه)$/i.test(rawText)) {
+        const result = await this.setProtectionSetting(ctx, 'notifyLongMessageBlock', false, 'text');
+        if (!result?.ok) return true;
+        await ctx.reply('✅ تم تعطيل اشعار منع الرسائل الطويلة.');
         return true;
       }
       if (/^استثناء المشرفين من الحماية$/i.test(rawText)) {
@@ -4199,7 +4218,16 @@ class GroupAdminHandler {
           await ctx.telegram.deleteMessage(ctx.chat.id, ctx.message.message_id);
           await this.addModerationLog(group, 'delete_long_message', ctx.botInfo.id, ctx.from.id, `len=${rawText.length}, max=${maxLength}`);
           await this.saveGroupQuietly(group);
-          await ctx.reply(`📏 تم حذف رسالة طويلة (الحد المسموح: ${maxLength} حرف).`);
+          if (group.settings?.notifyLongMessageBlock) {
+            const longMessageName = this.escapeHtml(
+              ctx.from.username ? `@${ctx.from.username}` : (ctx.from.first_name || String(ctx.from.id))
+            );
+            await ctx.reply(
+              `• عذراً عزيزي ~»「 ${longMessageName} 」\n` +
+              '• ممنوع الرسائل الطويلة هنا .',
+              { parse_mode: 'HTML' }
+            );
+          }
         } catch (_error) {
           await ctx.reply('⚠️ تم اكتشاف رسالة طويلة لكن لا يمكن حذفها. فعّل صلاحية حذف الرسائل للبوت.');
         }

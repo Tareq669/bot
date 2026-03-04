@@ -106,6 +106,10 @@ const groupSchema = new mongoose.Schema({
       type: Boolean,
       default: true
     },
+    notifyLongMessageBlock: {
+      type: Boolean,
+      default: true
+    },
     tierUpRewards: {
       silver: {
         type: Number,
