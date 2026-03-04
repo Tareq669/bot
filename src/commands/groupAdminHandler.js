@@ -3495,7 +3495,7 @@ class GroupAdminHandler {
 
       await ctx.answerCbQuery('✅ تم التأكد من اشتراكك', { show_alert: false }).catch(() => {});
       const confirmation =
-        `✅ تم التأكد من اشتراكك يا ${this.escapeHtml(ctx.from?.first_name || ctx.from?.username || 'عزيزي')}.\n` +
+        `✅ تم التأكد من اشتراكك يا ${this.escapeHtml(ctx.from?.first_name || 'عزيزي')}.\n` +
         'يمكنك الآن الكتابة في المجموعة.';
       try {
         await ctx.editMessageText(confirmation, { parse_mode: 'HTML' });
@@ -3821,7 +3821,7 @@ class GroupAdminHandler {
     const channel = this.getRequiredSubscriptionChannel(group);
     const label = this.mentionUser(
       user?.id,
-      user?.username ? `@${user.username}` : (user?.first_name || String(user?.id || 'مستخدم'))
+      user?.first_name || String(user?.id || 'مستخدم')
     );
     return (
       `↜ عذرا عزيزي ↤︎ ${label}\n` +
@@ -4389,3 +4389,4 @@ class GroupAdminHandler {
 }
 
 module.exports = GroupAdminHandler;
+
