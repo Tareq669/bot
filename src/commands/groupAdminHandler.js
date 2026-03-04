@@ -3819,7 +3819,8 @@ class GroupAdminHandler {
 
   static getForcedSubscriptionNotice(user, group) {
     const channel = this.getRequiredSubscriptionChannel(group);
-    const label = this.escapeHtml(
+    const label = this.mentionUser(
+      user?.id,
       user?.username ? `@${user.username}` : (user?.first_name || String(user?.id || 'مستخدم'))
     );
     return (
