@@ -72,6 +72,14 @@ const groupSchema = new mongoose.Schema({
       type: Boolean,
       default: false
     },
+    blockMediaOnlyEdits: {
+      type: Boolean,
+      default: false
+    },
+    blockChannelAnonymousEdits: {
+      type: Boolean,
+      default: false
+    },
     requireNewsSubscription: {
       type: Boolean,
       default: false
