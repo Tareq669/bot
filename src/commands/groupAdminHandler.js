@@ -2355,12 +2355,12 @@ class GroupAdminHandler {
     const handledPending = await this.handlePendingGlobalSpecialFaqText(ctx, rawText);
     if (handledPending) return true;
 
-    if (/^(?:اضف|أضف) رد سبشل(?: عام)?$/i.test(rawText)) {
+    if (/^(?:اضف|أضف) رد (?:سبشل(?: عام)?|عام)$/i.test(rawText)) {
       await this.startGlobalSpecialFaqFlow(ctx);
       return true;
     }
 
-    if (/^(ردود سبشل(?: عام)?|عرض الردود السبشل(?: العام)?|الردود السبشل(?: العام)?)$/i.test(rawText)) {
+    if (/^(ردود سبشل(?: عام)?|عرض الردود السبشل(?: العام)?|الردود السبشل(?: العام)?|الردود العامة|عرض الردود العامة)$/i.test(rawText)) {
       const list = await this.getGlobalSpecialFaqTriggers();
       if (list.length === 0) {
         await ctx.reply('ℹ️ لا يوجد ردود سبشل عامة مضافة بعد.');
@@ -2373,7 +2373,7 @@ class GroupAdminHandler {
       return true;
     }
 
-    const removeGlobal = rawText.match(/^حذف رد سبشل(?: عام)?\s+(.+)$/i);
+    const removeGlobal = rawText.match(/^حذف رد (?:سبشل(?: عام)?|عام)\s+(.+)$/i);
     if (removeGlobal) {
       const trigger = String(removeGlobal[1] || '').trim();
       const key = this.normalizePlainText(trigger);
