@@ -4359,14 +4359,16 @@ class GroupAdminHandler {
 
     const text = lowered;
     const hasSticker = Boolean(ctx.message?.sticker);
+    const isAutomaticForward = Boolean(ctx.message?.is_automatic_forward);
     const isForwarded = Boolean(
       ctx.message?.forward_origin
       || ctx.message?.forward_from
       || ctx.message?.forward_from_chat
-      || ctx.message?.is_automatic_forward
+      || isAutomaticForward
     );
 
-    if (group.settings?.blockForwards && isForwarded) {
+    // Keep linked-channel auto posts untouched; only block manual user forwards.
+    if (group.settings?.blockForwards && isForwarded && !isAutomaticForward) {
       try {
         await ctx.telegram.deleteMessage(ctx.chat.id, ctx.message.message_id);
         await this.addModerationLog(group, 'delete_forward_message', ctx.botInfo.id, ctx.from.id, 'forward blocked');
