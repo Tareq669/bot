@@ -4565,6 +4565,27 @@ class GroupAdminHandler {
     group.statistics.messagesCount = (group.statistics.messagesCount || 0) + 1;
     group.updatedAt = new Date();
 
+    const requiredChannel = this.getRequiredSubscriptionChannel(group);
+    const requiredChatId = String(requiredChannel?.chatId || '');
+    const requiredUsername = String(requiredChannel?.username || '').toLowerCase();
+    const senderChatId = String(ctx.message?.sender_chat?.id || '');
+    const senderChatUsername = String(ctx.message?.sender_chat?.username || '').toLowerCase();
+    const forwardFromChatId = String(ctx.message?.forward_from_chat?.id || '');
+    const forwardFromChatUsername = String(ctx.message?.forward_from_chat?.username || '').toLowerCase();
+    const isLinkedChannelAutoPost = Boolean(ctx.message?.is_automatic_forward);
+    const isRequiredNewsChannelPost = Boolean(
+      (requiredChatId && (senderChatId === requiredChatId || forwardFromChatId === requiredChatId))
+      || (requiredUsername && (
+        senderChatUsername === requiredUsername
+        || forwardFromChatUsername === requiredUsername
+      ))
+    );
+
+    // Never moderate/delete posts published by the configured news channel (or linked-channel auto posts).
+    if (isLinkedChannelAutoPost || isRequiredNewsChannelPost) {
+      return false;
+    }
+
     const isAdmin = await this.isGroupAdmin(ctx);
     if (isAdmin && group.settings?.exemptAdminsFromProtection) {
       return false;
