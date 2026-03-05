@@ -532,6 +532,84 @@ class GroupAdminHandler {
     );
   }
 
+  static mapMyStatusLabel(memberStatus, isPrimaryOwner, internalRoleLabel) {
+    if (memberStatus === 'creator') return 'المنشئ';
+    if (isPrimaryOwner) return 'المالك الاساسي';
+    if (internalRoleLabel) return internalRoleLabel;
+    if (memberStatus === 'administrator') return 'مشرف';
+    return 'عضو';
+  }
+
+  static async handleMyInfoCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+
+    const group = await this.ensureGroupRecord(ctx);
+    if (!group.settings?.enableMyInfoCommand) {
+      return ctx.reply('❌ أمر my معطل في هذا الجروب.');
+    }
+
+    const userId = Number(ctx.from?.id || 0);
+    const scoreRow = (group.gameSystem?.scores || []).find((row) => Number(row?.userId) === userId);
+    const messageCount = Number(scoreRow?.messageCount || 0);
+    const member = await this.getChatMemberSafe(ctx, userId);
+    const internalRoleLabel = this.getInternalRoleLabel(group, userId);
+    const isPrimaryOwner = await this.isPrimaryOwner(ctx, userId);
+    const statusLabel = this.mapMyStatusLabel(member?.status, isPrimaryOwner, internalRoleLabel);
+    const titleLabel = member?.custom_title || statusLabel || 'لا يوجد';
+
+    let bioText = 'لا يوجد';
+    try {
+      const privateProfile = await ctx.telegram.getChat(userId);
+      bioText = String(privateProfile?.bio || 'لا يوجد');
+    } catch (_error) {
+      bioText = 'لا يوجد';
+    }
+
+    const name = this.escapeHtml(String(ctx.from?.first_name || 'غير معروف'));
+    const username = this.escapeHtml(ctx.from?.username ? `@${ctx.from.username}` : 'لا يوجد');
+    const status = this.escapeHtml(statusLabel || 'عضو');
+    const title = this.escapeHtml(titleLabel || 'لا يوجد');
+    const bio = this.escapeHtml(bioText || 'لا يوجد');
+
+    const card =
+      'احلا حدا بكتب ايدي🥺🖤\n' +
+      `𝑁𝐴𝑀𝐸 ⌯ ${name}\n` +
+      `𝑈𝑆𝐸 ⌯ ${username}\n` +
+      `𝑆𝑇𝐴 ⌯ ${status}\n` +
+      `𝑀𝑆𝐺 ⌯ ${messageCount}\n` +
+      `𝐼𝐷 ⌯ <code>${userId}</code>\n` +
+      `𝑇𝐼𝑇𝐿𝐸 ⌯ ${title}\n` +
+      `b𝐼𝑂 ⌯ ${bio}`;
+
+    return ctx.reply(card, { parse_mode: 'HTML' });
+  }
+
+  static async handleMyCommandToggle(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const isManager = await this.isManagerOrHigher(ctx);
+    if (!isManager) return ctx.reply('❌ هذا الأمر للمشرفين فقط.');
+
+    const group = await this.ensureGroupRecord(ctx);
+    const text = String(ctx.message?.text || '').trim();
+
+    if (/^(تفعيل امر my|تفعيل my)$/i.test(text)) {
+      group.settings.enableMyInfoCommand = true;
+      group.updatedAt = new Date();
+      await this.addModerationLog(group, 'toggle_setting', ctx.from.id, null, 'enableMyInfoCommand => on');
+      await group.save();
+      return ctx.reply('✅ تم تفعيل أمر my.');
+    }
+    if (/^(تعطيل امر my|تعطيل my)$/i.test(text)) {
+      group.settings.enableMyInfoCommand = false;
+      group.updatedAt = new Date();
+      await this.addModerationLog(group, 'toggle_setting', ctx.from.id, null, 'enableMyInfoCommand => off');
+      await group.save();
+      return ctx.reply('✅ تم تعطيل أمر my.');
+    }
+
+    return ctx.reply('❌ الصيغة:\n• تفعيل امر my\n• تعطيل امر my');
+  }
+
   static async handleInspectCommand(ctx) {
     if (!this.isGroupChat(ctx)) return;
     const isAdmin = await this.isAdminOrHigher(ctx);
@@ -605,6 +683,7 @@ class GroupAdminHandler {
     if (typeof group.settings.exemptAdminsFromProtection !== 'boolean') group.settings.exemptAdminsFromProtection = false;
     if (typeof group.settings.blockLongMessages !== 'boolean') group.settings.blockLongMessages = true;
     if (typeof group.settings.notifyLongMessageBlock !== 'boolean') group.settings.notifyLongMessageBlock = true;
+    if (typeof group.settings.enableMyInfoCommand !== 'boolean') group.settings.enableMyInfoCommand = true;
     if (typeof group.settings.blockMediaOnlyEdits !== 'boolean') group.settings.blockMediaOnlyEdits = false;
     if (typeof group.settings.blockChannelAnonymousEdits !== 'boolean') group.settings.blockChannelAnonymousEdits = false;
     if (!Number.isInteger(group.settings.maxMessageLength)) group.settings.maxMessageLength = 700;
@@ -724,6 +803,7 @@ class GroupAdminHandler {
       `• منع الاباحيه ↤︎ ${settings.blockExplicitContent ? '✅' : '❌'}\n` +
       `• منع الرسائل الطويله ↤︎ ${settings.blockLongMessages ? '✅' : '❌'}\n` +
       `• اشعار الرسائل الطويله ↤︎ ${settings.notifyLongMessageBlock ? '✅' : '❌'}\n` +
+      `• امر my ↤︎ ${settings.enableMyInfoCommand ? '✅' : '❌'}\n` +
       `• منع التوجيه ↤︎ ${settings.blockForwards ? '✅' : '❌'}\n` +
       `• حماية التعديل ↤︎ ${settings.blockChannelEdits ? '✅' : '❌'}\n` +
       `• حماية تعديل الوسائط ↤︎ ${settings.blockMediaOnlyEdits ? '✅' : '❌'}\n` +
@@ -771,6 +851,7 @@ class GroupAdminHandler {
       `• حماية التكرار: ${settings.floodProtection ? '✅' : '❌'}\n` +
       `• منع الرسائل الطويلة: ${settings.blockLongMessages ? '✅' : '❌'} (الحد: ${settings.maxMessageLength})\n` +
       `• اشعار الرسائل الطويلة: ${settings.notifyLongMessageBlock ? '✅' : '❌'}\n` +
+      `• أمر my: ${settings.enableMyInfoCommand ? '✅' : '❌'}\n` +
       `• منع التوجيه: ${settings.blockForwards ? '✅' : '❌'}\n` +
       `• حماية التعديل: ${settings.blockChannelEdits ? '✅' : '❌'}\n` +
       `• حماية تعديل الوسائط: ${settings.blockMediaOnlyEdits ? '✅' : '❌'}\n` +
@@ -958,6 +1039,7 @@ class GroupAdminHandler {
       `• التكرار: ${group.settings?.floodProtection ? '✅ مفعلة' : '❌ معطلة'}\n` +
       `• الرسائل الطويلة: ${group.settings?.blockLongMessages ? '✅ مفعلة' : '❌ معطلة'} (الحد: ${group.settings?.maxMessageLength || 700})\n` +
       `• اشعار الرسائل الطويلة: ${group.settings?.notifyLongMessageBlock ? '✅ مفعّل' : '❌ معطّل'}\n` +
+      `• أمر my: ${group.settings?.enableMyInfoCommand ? '✅ مفعّل' : '❌ معطّل'}\n` +
       `• استثناء المشرفين: ${group.settings?.exemptAdminsFromProtection ? '✅ مفعل' : '❌ معطل'}\n\n` +
       '<b>أوامر سريعة:</b>\n' +
       '• قفل الروابط | فتح الروابط\n' +
@@ -975,6 +1057,7 @@ class GroupAdminHandler {
       '• تفعيل منع الاباحية | تعطيل منع الاباحية\n' +
       '• تفعيل منع الرسائل الطويلة | تعطيل منع الرسائل الطويلة\n' +
       '• تفعيل اشعار منع الرسائل الطويلة | تعطيل اشعار منع الرسائل الطويلة\n' +
+      '• تفعيل امر my | تعطيل امر my\n' +
       '• استثناء المشرفين من الحماية | الغاء استثناء المشرفين من الحماية\n' +
       '• /gprotect links on|off\n' +
       '• /gprotect stickers on|off\n' +
@@ -3957,6 +4040,14 @@ class GroupAdminHandler {
     }
     if (/^(all|\/gall\b)(?:\s+.+)?$/i.test(rawText)) {
       await this.handleAllMentionCommand(ctx);
+      return true;
+    }
+    if (/^(my)$/i.test(rawText)) {
+      await this.handleMyInfoCommand(ctx);
+      return true;
+    }
+    if (/^(تفعيل امر my|تعطيل امر my|تفعيل my|تعطيل my)$/i.test(rawText)) {
+      await this.handleMyCommandToggle(ctx);
       return true;
     }
     if (/^(كتم|الغاء الكتم|إلغاء الكتم|فك الكتم|تقييد|الغاء التقييد|إلغاء التقييد|فك التقييد)(?:\s+.+)?$/i.test(rawText)) {
