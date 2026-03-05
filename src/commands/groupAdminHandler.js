@@ -392,7 +392,7 @@ class GroupAdminHandler {
     );
   }
 
-  static collectMentionableMembers(group, botId = null) {
+  static async collectMentionableMembers(group, botId = null) {
     const people = new Map();
     const addPerson = (userId, label = '') => {
       const id = Number(userId || 0);
@@ -413,8 +413,8 @@ class GroupAdminHandler {
     this.getRoleIds(group, 'adminIds').forEach((id) => addPerson(id));
     this.getRoleIds(group, 'premiumMemberIds').forEach((id) => addPerson(id));
 
-    (Array.isArray(group?.admins) ? group.admins : []).forEach((row) => addPerson(row?.userId, row?.username || ''));
-    (Array.isArray(group?.gameSystem?.scores) ? group.gameSystem.scores : []).forEach((row) => addPerson(row?.userId, row?.username || ''));
+    (Array.isArray(group?.admins) ? group.admins : []).forEach((row) => addPerson(row?.userId));
+    (Array.isArray(group?.gameSystem?.scores) ? group.gameSystem.scores : []).forEach((row) => addPerson(row?.userId));
     (Array.isArray(group?.warnings) ? group.warnings : []).forEach((row) => addPerson(row?.userId));
     (Array.isArray(group?.bannedUsers) ? group.bannedUsers : []).forEach((row) => addPerson(row?.userId));
     (Array.isArray(group?.moderationLogs) ? group.moderationLogs : []).forEach((row) => {
@@ -422,7 +422,21 @@ class GroupAdminHandler {
       addPerson(row?.targetId);
     });
 
-    return [...people.entries()].map(([id, label]) => ({ id, label: String(label || `عضو ${id}`) }));
+    const members = [...people.entries()].map(([id, label]) => ({ id, label: String(label || `عضو ${id}`) }));
+    const ids = members.map((row) => Number(row.id)).filter((id) => Number.isInteger(id) && id > 0);
+
+    if (!ids.length) return members;
+
+    const profiles = await User.find({ userId: { $in: ids } })
+      .select('userId firstName')
+      .lean();
+    const nameMap = new Map(profiles.map((profile) => [Number(profile.userId), String(profile.firstName || '').trim()]));
+
+    return members.map((member) => {
+      const preferred = String(nameMap.get(Number(member.id)) || '').trim();
+      if (preferred) return { ...member, label: preferred };
+      return { ...member, label: `عضو ${member.id}` };
+    });
   }
 
   static async handleAllMentionCommand(ctx) {
@@ -436,7 +450,7 @@ class GroupAdminHandler {
     const group = await this.ensureGroupRecord(ctx);
     const rawText = String(ctx.message?.text || '').trim();
     const note = rawText.replace(/^\/?all\b/i, '').trim();
-    const members = this.collectMentionableMembers(group, ctx.botInfo?.id)
+    const members = (await this.collectMentionableMembers(group, ctx.botInfo?.id))
       .filter((member) => Number(member.id) !== Number(ctx.from?.id || 0));
 
     if (!members.length) {
