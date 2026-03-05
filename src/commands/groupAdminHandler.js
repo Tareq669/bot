@@ -1,5 +1,6 @@
 ﻿const Markup = require('telegraf/markup');
 const { Group, User } = require('../database/models');
+const Config = require('../database/models/Config');
 
 const GROUP_TYPES = new Set(['group', 'supergroup']);
 
@@ -18,6 +19,7 @@ class GroupAdminHandler {
 
   static pendingAdminStats = new Map();
   static pendingSpecialFaq = new Map();
+  static pendingGlobalSpecialFaq = new Map();
   static INTERNAL_ROLE_KEYS = ['basicOwnerIds', 'ownerIds', 'managerIds', 'adminIds', 'premiumMemberIds'];
 
   static isGroupChat(ctx) {
@@ -525,7 +527,7 @@ class GroupAdminHandler {
     const isPrimaryOwner = await this.isPrimaryOwner(ctx);
     const roleLabel = this.getRoleLabel(member?.status, isPrimaryOwner, internalRoleLabel);
     return ctx.reply(
-      `🏷️ <b>رتبتي</b>\n\n` +
+      '🏷️ <b>رتبتي</b>\n\n' +
       `• المستخدم ↤︎ ${this.mentionUser(ctx.from?.id, ctx.from?.first_name || ctx.from?.username || String(ctx.from?.id || 'عضو'))}\n` +
       `• رتبتك ↤︎ ${roleLabel}`,
       { parse_mode: 'HTML' }
@@ -1670,7 +1672,7 @@ class GroupAdminHandler {
     await group.save();
 
     return ctx.reply(
-      `✅ تم تحديث السياسة:\n` +
+      '✅ تم تحديث السياسة:\n' +
         `• الكتم عند ${muteAt}\n` +
         `• الحظر عند ${banAt}\n` +
         `• مدة الكتم ${muteMinutes} دقيقة`
@@ -2156,24 +2158,24 @@ class GroupAdminHandler {
     const mode = 'exact';
     const modeLabel = 'حرفي';
     return (
-      `🤖 الردود التلقائية (FAQ)\n\n` +
+      '🤖 الردود التلقائية (FAQ)\n\n' +
       `• العدد الحالي: ${count}\n\n` +
       `• وضع المطابقة: ${modeLabel}\n\n` +
-      `أوامر سريعة:\n` +
-      `• اضف رد مرحبا | أهلًا وسهلًا\n` +
-      `• اضف رد سبشل\n` +
-      `• حذف رد سبشل مرحبا\n` +
-      `• ردود سبشل\n` +
-      `• حذف رد مرحبا\n` +
-      `• الردود\n` +
-      `• مسح الردود\n` +
-      `• وضع الردود حرفي\n\n` +
-      `أوامر سلاش:\n` +
-      `• /gfaq add مرحبا | أهلًا وسهلًا\n` +
-      `• /gfaq remove مرحبا\n` +
-      `• /gfaq list\n` +
-      `• /gfaq clear\n` +
-      `• /gfaq mode exact`
+      'أوامر سريعة:\n' +
+      '• اضف رد مرحبا | أهلًا وسهلًا\n' +
+      '• اضف رد سبشل\n' +
+      '• حذف رد سبشل مرحبا\n' +
+      '• ردود سبشل\n' +
+      '• حذف رد مرحبا\n' +
+      '• الردود\n' +
+      '• مسح الردود\n' +
+      '• وضع الردود حرفي\n\n' +
+      'أوامر سلاش:\n' +
+      '• /gfaq add مرحبا | أهلًا وسهلًا\n' +
+      '• /gfaq remove مرحبا\n' +
+      '• /gfaq list\n' +
+      '• /gfaq clear\n' +
+      '• /gfaq mode exact'
     );
   }
 
@@ -2191,6 +2193,215 @@ class GroupAdminHandler {
 
   static clearPendingSpecialFaq(ctx) {
     this.pendingSpecialFaq.delete(this.getSpecialFaqKey(ctx));
+  }
+
+  static parseBotOwnerIds() {
+    return String(process.env.BOT_OWNERS || '')
+      .split(',')
+      .map((id) => Number(String(id || '').trim()))
+      .filter((id) => Number.isInteger(id) && id > 0);
+  }
+
+  static isBotOwner(userId) {
+    const uid = Number(userId || 0);
+    if (!uid) return false;
+    return this.parseBotOwnerIds().includes(uid);
+  }
+
+  static getGlobalSpecialFaqKey(ctx) {
+    return `global:${Number(ctx.from?.id || 0)}`;
+  }
+
+  static setPendingGlobalSpecialFaq(ctx, state) {
+    this.pendingGlobalSpecialFaq.set(this.getGlobalSpecialFaqKey(ctx), state);
+  }
+
+  static getPendingGlobalSpecialFaq(ctx) {
+    return this.pendingGlobalSpecialFaq.get(this.getGlobalSpecialFaqKey(ctx)) || null;
+  }
+
+  static clearPendingGlobalSpecialFaq(ctx) {
+    this.pendingGlobalSpecialFaq.delete(this.getGlobalSpecialFaqKey(ctx));
+  }
+
+  static normalizeSpecialFaqRow(item = {}) {
+    return {
+      trigger: String(item.trigger || '').trim().slice(0, 80),
+      response: String(item.response || '').trim().slice(0, 1500),
+      isSpecial: true,
+      responseType: String(item.responseType || 'text'),
+      fileId: String(item.fileId || ''),
+      createdBy: Number(item.createdBy || 0) || null,
+      createdAt: item.createdAt ? new Date(item.createdAt) : new Date()
+    };
+  }
+
+  static async getGlobalSpecialFaqTriggers() {
+    const row = await Config.findOne({ key: 'globalSpecialFaqTriggers' });
+    const list = Array.isArray(row?.value) ? row.value : [];
+    return list
+      .map((item) => this.normalizeSpecialFaqRow(item))
+      .filter((item) => item.trigger);
+  }
+
+  static async saveGlobalSpecialFaqTriggers(triggers, updatedBy = null) {
+    const normalized = Array.isArray(triggers)
+      ? triggers.map((item) => this.normalizeSpecialFaqRow(item)).filter((item) => item.trigger)
+      : [];
+    await Config.findOneAndUpdate(
+      { key: 'globalSpecialFaqTriggers' },
+      {
+        $set: {
+          value: normalized,
+          description: 'Global special FAQ triggers managed by bot owners in private chat.',
+          category: 'faq',
+          updatedBy: Number(updatedBy || 0) || null,
+          updatedAt: new Date()
+        },
+        $setOnInsert: {
+          key: 'globalSpecialFaqTriggers'
+        }
+      },
+      { upsert: true, new: true }
+    );
+  }
+
+  static async startGlobalSpecialFaqFlow(ctx) {
+    this.setPendingGlobalSpecialFaq(ctx, {
+      active: true,
+      step: 'trigger',
+      userId: Number(ctx.from?.id || 0)
+    });
+    await ctx.reply('• حسناً ـ الان ارسل كلمه الرد \n-');
+  }
+
+  static async saveGlobalSpecialFaqEntry(ctx, state, payload) {
+    const trigger = String(state?.trigger || '').trim().slice(0, 80);
+    if (!trigger) {
+      this.clearPendingGlobalSpecialFaq(ctx);
+      await ctx.reply('❌ تعذر حفظ الرد السبشل العام لأن كلمة الرد غير موجودة.');
+      return true;
+    }
+
+    const list = await this.getGlobalSpecialFaqTriggers();
+    const key = this.normalizePlainText(trigger);
+    const existingIndex = list.findIndex((item) => this.normalizePlainText(item.trigger) === key);
+    const row = this.normalizeSpecialFaqRow({
+      trigger,
+      response: payload?.response,
+      responseType: payload?.responseType,
+      fileId: payload?.fileId,
+      createdBy: Number(ctx.from?.id || 0) || null,
+      createdAt: new Date()
+    });
+
+    if (existingIndex >= 0) {
+      list[existingIndex] = row;
+    } else {
+      list.push(row);
+    }
+
+    await this.saveGlobalSpecialFaqTriggers(list, ctx.from?.id);
+    this.clearPendingGlobalSpecialFaq(ctx);
+    await ctx.reply(`✅ تم حفظ الرد السبشل العام.\n• كلمة الرد ↤︎ ${trigger}\n• النوع ↤︎ ${row.responseType}`);
+    return true;
+  }
+
+  static async handlePendingGlobalSpecialFaqText(ctx, rawText) {
+    const state = this.getPendingGlobalSpecialFaq(ctx);
+    if (!state?.active) return false;
+
+    const normalized = String(rawText || '').trim();
+    if (!normalized) return false;
+    if (/^(الغاء|إلغاء|كنسل|cancel)$/i.test(normalized)) {
+      this.clearPendingGlobalSpecialFaq(ctx);
+      await ctx.reply('✅ تم إلغاء إضافة الرد السبشل العام.');
+      return true;
+    }
+
+    if (state.step === 'trigger') {
+      state.trigger = normalized;
+      state.step = 'content';
+      this.setPendingGlobalSpecialFaq(ctx, state);
+      await ctx.reply(
+        '• حسناً يمكنك اضافة { نص←صوره←فيديو←متحركه←بصمه←اغنيه←ملف }\n' +
+        'ويمكنك اضافة الرد بتلك الطريقة :\n' +
+        '▹ #الاسم -  اسم العضو .\n' +
+        '▹ #يوزره -  يوزر الرد .\n' +
+        '▹ #اليوزر -  يوزر مرسل الرساله .\n' +
+        '▹ #الرسائل -  عدد رسائل المستخدم .\n' +
+        '▹ #الايدي -  ايدي المستخدم .\n' +
+        '▹ #الرتبه -  رتبة المستخدم .\n' +
+        '▹ #التعديل - عدد تعديلات .\n' +
+        '▹ #النقاط - نقاط المستخدم .'
+      );
+      return true;
+    }
+
+    if (state.step === 'content') {
+      return this.saveGlobalSpecialFaqEntry(ctx, state, {
+        responseType: 'text',
+        response: normalized
+      });
+    }
+
+    return false;
+  }
+
+  static async handleOwnerPrivateSpecialFaqText(ctx, rawText) {
+    if (ctx.chat?.type !== 'private') return false;
+    if (!this.isBotOwner(ctx.from?.id)) return false;
+
+    const handledPending = await this.handlePendingGlobalSpecialFaqText(ctx, rawText);
+    if (handledPending) return true;
+
+    if (/^(?:اضف|أضف) رد سبشل(?: عام)?$/i.test(rawText)) {
+      await this.startGlobalSpecialFaqFlow(ctx);
+      return true;
+    }
+
+    if (/^(ردود سبشل(?: عام)?|عرض الردود السبشل(?: العام)?|الردود السبشل(?: العام)?)$/i.test(rawText)) {
+      const list = await this.getGlobalSpecialFaqTriggers();
+      if (list.length === 0) {
+        await ctx.reply('ℹ️ لا يوجد ردود سبشل عامة مضافة بعد.');
+        return true;
+      }
+      const rows = list
+        .slice(0, 50)
+        .map((item, i) => `${i + 1}. <b>${this.escapeHtml(item.trigger)}</b>\n↳ ${this.escapeHtml(item.response || item.responseType)}`);
+      await ctx.reply(`📚 قائمة الردود السبشل العامة (${list.length})\n\n${rows.join('\n\n')}`, { parse_mode: 'HTML' });
+      return true;
+    }
+
+    const removeGlobal = rawText.match(/^حذف رد سبشل(?: عام)?\s+(.+)$/i);
+    if (removeGlobal) {
+      const trigger = String(removeGlobal[1] || '').trim();
+      const key = this.normalizePlainText(trigger);
+      const list = await this.getGlobalSpecialFaqTriggers();
+      const next = list.filter((item) => this.normalizePlainText(item.trigger) !== key);
+      if (next.length === list.length) {
+        await ctx.reply('❌ لم أجد هذا المفتاح في الردود السبشل العامة.');
+        return true;
+      }
+      await this.saveGlobalSpecialFaqTriggers(next, ctx.from?.id);
+      await ctx.reply(`✅ تم حذف الرد السبشل العام: ${trigger}`);
+      return true;
+    }
+
+    return false;
+  }
+
+  static async handleOwnerPrivateSpecialFaqMedia(ctx) {
+    if (ctx.chat?.type !== 'private') return false;
+    if (!this.isBotOwner(ctx.from?.id)) return false;
+    const state = this.getPendingGlobalSpecialFaq(ctx);
+    if (!state?.active || state.step !== 'content') return false;
+    const payload = this.extractSpecialFaqMediaPayload(ctx);
+    if (!payload?.fileId) {
+      await ctx.reply('❌ هذا النوع غير مدعوم في الرد السبشل العام.');
+      return true;
+    }
+    return this.saveGlobalSpecialFaqEntry(ctx, state, payload);
   }
 
   static async startSpecialFaqFlow(ctx) {
@@ -2460,6 +2671,26 @@ class GroupAdminHandler {
     await ctx.reply(String(matched.response || '').trim(), {
       reply_to_message_id: ctx.message?.message_id
     });
+    return true;
+  }
+
+  static async maybeReplyGlobalSpecialFaqTrigger(ctx, group, rawText) {
+    if (!this.isGroupChat(ctx)) return false;
+    const text = String(rawText || '').trim();
+    if (!text || text.startsWith('/')) return false;
+
+    const list = await this.getGlobalSpecialFaqTriggers();
+    if (!list.length) return false;
+
+    const normalizedText = this.normalizePlainText(text);
+    const sorted = [...list].sort((a, b) => b.trigger.length - a.trigger.length);
+    const matched = sorted.find((item) => {
+      const key = this.normalizePlainText(item.trigger);
+      if (!key) return false;
+      return normalizedText === key;
+    });
+    if (!matched) return false;
+    await this.sendSpecialFaqResponse(ctx, group, matched);
     return true;
   }
 
@@ -2883,7 +3114,7 @@ class GroupAdminHandler {
     });
 
     await ctx.reply(
-      `🏆 <b>أفضل 10 أعضاء - الاقتراحات والتصويت (شهري)</b>\n\n` +
+      '🏆 <b>أفضل 10 أعضاء - الاقتراحات والتصويت (شهري)</b>\n\n' +
         `📦 إجمالي الاقتراحات هذا الشهر: ${data.monthlyCount}\n\n` +
         `${rows.join('\n\n')}`,
       { parse_mode: 'HTML' }
@@ -3955,7 +4186,7 @@ class GroupAdminHandler {
           return true;
         }
         await ctx.reply(
-          `📢 قناة الاشتراك الحالية\n\n` +
+          '📢 قناة الاشتراك الحالية\n\n' +
           `• الاسم ↤︎ ${channel.title}\n` +
           `• المعرف ↤︎ ${channel.username ? `@${channel.username}` : channel.chatId}\n` +
           `• الرابط ↤︎ ${channel.url || 'غير متوفر'}`
@@ -3994,7 +4225,7 @@ class GroupAdminHandler {
           return true;
         }
         await ctx.reply(
-          `✅ تم ضبط قناة الاشتراك بنجاح.\n` +
+          '✅ تم ضبط قناة الاشتراك بنجاح.\n' +
           `• الاسم ↤︎ ${result.channel.title}\n` +
           `• المعرف ↤︎ @${result.channel.username}\n` +
           `• الرابط ↤︎ ${result.channel.url}`
@@ -4476,6 +4707,9 @@ class GroupAdminHandler {
 
     const faqHandled = await this.maybeReplyFaqTrigger(ctx, group, rawText);
     if (faqHandled) return true;
+
+    const globalFaqHandled = await this.maybeReplyGlobalSpecialFaqTrigger(ctx, group, rawText);
+    if (globalFaqHandled) return true;
 
     return false;
   }

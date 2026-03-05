@@ -1587,6 +1587,8 @@ bot.on('photo', async (ctx) => {
   try {
     const handledSpecialFaq = await GroupAdminHandler.handleSpecialFaqMedia(ctx);
     if (handledSpecialFaq) return;
+    const handledGlobalSpecialFaq = await GroupAdminHandler.handleOwnerPrivateSpecialFaqMedia(ctx);
+    if (handledGlobalSpecialFaq) return;
     const handledTemplate = await GroupAdminHandler.handlePrivateTemplatePhoto(ctx);
     if (handledTemplate) return;
   } catch (error) {
@@ -1597,6 +1599,8 @@ bot.on('video', async (ctx) => {
   try {
     const handledSpecialFaq = await GroupAdminHandler.handleSpecialFaqMedia(ctx);
     if (handledSpecialFaq) return;
+    const handledGlobalSpecialFaq = await GroupAdminHandler.handleOwnerPrivateSpecialFaqMedia(ctx);
+    if (handledGlobalSpecialFaq) return;
   } catch (error) {
     logger.error('Video handler error:', error.message);
   }
@@ -1605,6 +1609,8 @@ bot.on('animation', async (ctx) => {
   try {
     const handledSpecialFaq = await GroupAdminHandler.handleSpecialFaqMedia(ctx);
     if (handledSpecialFaq) return;
+    const handledGlobalSpecialFaq = await GroupAdminHandler.handleOwnerPrivateSpecialFaqMedia(ctx);
+    if (handledGlobalSpecialFaq) return;
   } catch (error) {
     logger.error('Animation handler error:', error.message);
   }
@@ -1613,6 +1619,8 @@ bot.on('voice', async (ctx) => {
   try {
     const handledSpecialFaq = await GroupAdminHandler.handleSpecialFaqMedia(ctx);
     if (handledSpecialFaq) return;
+    const handledGlobalSpecialFaq = await GroupAdminHandler.handleOwnerPrivateSpecialFaqMedia(ctx);
+    if (handledGlobalSpecialFaq) return;
   } catch (error) {
     logger.error('Voice handler error:', error.message);
   }
@@ -1621,6 +1629,8 @@ bot.on('audio', async (ctx) => {
   try {
     const handledSpecialFaq = await GroupAdminHandler.handleSpecialFaqMedia(ctx);
     if (handledSpecialFaq) return;
+    const handledGlobalSpecialFaq = await GroupAdminHandler.handleOwnerPrivateSpecialFaqMedia(ctx);
+    if (handledGlobalSpecialFaq) return;
   } catch (error) {
     logger.error('Audio handler error:', error.message);
   }
@@ -1629,6 +1639,8 @@ bot.on('document', async (ctx) => {
   try {
     const handledSpecialFaq = await GroupAdminHandler.handleSpecialFaqMedia(ctx);
     if (handledSpecialFaq) return;
+    const handledGlobalSpecialFaq = await GroupAdminHandler.handleOwnerPrivateSpecialFaqMedia(ctx);
+    if (handledGlobalSpecialFaq) return;
   } catch (error) {
     logger.error('Document handler error:', error.message);
   }
@@ -1637,6 +1649,8 @@ bot.on('sticker', async (ctx) => {
   try {
     const handledSpecialFaq = await GroupAdminHandler.handleSpecialFaqMedia(ctx);
     if (handledSpecialFaq) return;
+    const handledGlobalSpecialFaq = await GroupAdminHandler.handleOwnerPrivateSpecialFaqMedia(ctx);
+    if (handledGlobalSpecialFaq) return;
   } catch (error) {
     logger.error('Sticker handler error:', error.message);
   }
@@ -3744,6 +3758,9 @@ bot.on('text', async (ctx) => {
 
     const handledTournamentPrivate = await TournamentChallengeHandler.handlePrivateText(ctx, message);
     if (handledTournamentPrivate) return;
+
+    const handledOwnerGlobalSpecialFaq = await GroupAdminHandler.handleOwnerPrivateSpecialFaqText(ctx, message);
+    if (handledOwnerGlobalSpecialFaq) return;
 
     // Handle feature awaiting input
     if (ctx.session && ctx.session.featureAwait) {
