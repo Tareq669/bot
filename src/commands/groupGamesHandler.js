@@ -49,35 +49,139 @@ const MCQ_QUESTIONS = [
   { question: 'عاصمة ألمانيا؟', options: ['برلين', 'ميونخ', 'فرانكفورت', 'هامبورغ'], answerIndex: 0, reward: 1, category: 'culture' }
 ];
 
-const RELIGIOUS_MCQ_QUESTIONS = [
-  { question: 'كم عدد أركان الإسلام؟', options: ['4', '5', '6', '7'], answerIndex: 1, reward: 1, category: 'religious' },
-  { question: 'كم عدد الصلوات المفروضة يوميًا؟', options: ['3', '4', '5', '6'], answerIndex: 2, reward: 1, category: 'religious' },
-  { question: 'ما أول سورة في القرآن؟', options: ['البقرة', 'الفاتحة', 'الإخلاص', 'يس'], answerIndex: 1, reward: 1, category: 'religious' },
-  { question: 'في أي شهر يصوم المسلمون؟', options: ['شعبان', 'رمضان', 'محرم', 'رجب'], answerIndex: 1, reward: 1, category: 'religious' },
-  { question: 'القبلة للمسلمين هي:', options: ['المسجد الأقصى', 'الكعبة', 'المسجد النبوي', 'مسجد قباء'], answerIndex: 1, reward: 1, category: 'religious' },
-  { question: 'كم عدد أجزاء القرآن الكريم؟', options: ['20', '25', '30', '40'], answerIndex: 2, reward: 1, category: 'religious' },
-  { question: 'كم عدد سور القرآن؟', options: ['110', '112', '114', '120'], answerIndex: 2, reward: 1, category: 'religious' },
-  { question: 'أول مسجد بُني في الإسلام هو:', options: ['المسجد الحرام', 'مسجد قباء', 'المسجد النبوي', 'المسجد الأقصى'], answerIndex: 1, reward: 1, category: 'religious' },
-  { question: 'ليلة القدر تكون في شهر:', options: ['شعبان', 'رمضان', 'رجب', 'ذو الحجة'], answerIndex: 1, reward: 1, category: 'religious' },
-  { question: 'عدد أيام صيام رمضان غالبًا:', options: ['20', '25', '29 أو 30', '35'], answerIndex: 2, reward: 1, category: 'religious' },
-  { question: 'الزكاة ركن رقم:', options: ['الأول', 'الثاني', 'الثالث', 'الرابع'], answerIndex: 2, reward: 1, category: 'religious' },
-  { question: 'الحج يكون في شهر:', options: ['رمضان', 'ذو الحجة', 'محرم', 'شوال'], answerIndex: 1, reward: 1, category: 'religious' }
+const QUIZ_CATEGORY_LABELS = {
+  culture: 'ثقافي',
+  math: 'رياضي',
+  religious: 'ديني',
+  science: 'علمي',
+  history: 'تاريخي',
+  fiqh: 'فقهي',
+  geography: 'جغرافي'
+};
+
+const QUIZ_VARIANTS = ['سؤال تجميعي', 'مستوى متوسط', 'تمرين ذكي', 'معرفة عامة', 'مفصل', 'اختبار سريع', 'دقيقة فكر', 'أسئلة متنوعة', 'تحدي معرفي', 'مراجعة ذكية'];
+
+const QUIZ_REQUIRED_PER_CATEGORY = 10000;
+
+const RELIGIOUS_BASE_QUESTIONS = [
+  { question: 'كم عدد أركان الإسلام؟', answers: ['4', '5', '6', '7'], correct: 1, reward: 1 },
+  { question: 'كم عدد الصلوات المفروضة يوميًا؟', answers: ['3', '4', '5', '6'], correct: 2, reward: 1 },
+  { question: 'ما أول سورة في القرآن الكريم؟', answers: ['البقرة', 'الفاتحة', 'الإخلاص', 'العلق'], correct: 1, reward: 1 },
+  { question: 'في أي شهر يصوم المسلمون رمضان؟', answers: ['شعبان', 'رمضان', 'محرم', 'رجب'], correct: 1, reward: 1 },
+  { question: 'أي جهة هي القبلة؟', answers: ['الكعبة', 'المسجد الأقصى', 'المدينة المنورة', 'المسجد الحرام'], correct: 0, reward: 1 },
+  { question: 'كم عدد أجزاء القرآن الكريم؟', answers: ['20', '25', '30', '40'], correct: 2, reward: 1 },
+  { question: 'كم عدد سور القرآن؟', answers: ['110', '112', '114', '116'], correct: 2, reward: 1 },
+  { question: 'في أي شهر يبدأ موسم الزكاة؟', answers: ['رمضان', 'ذو الحجة', 'شوال', 'محرم'], correct: 0, reward: 1 },
+  { question: 'كم ركنًا في الصلاة؟', answers: ['3', '4', '5', '6'], correct: 2, reward: 1 },
+  { question: 'عدد الأبواب في باب المسجد النبوي؟', answers: ['5', '6', '7', '8'], correct: 1, reward: 1 },
+  { question: 'أين نزلت سورة البقرة؟', answers: ['مكة', 'المدينة', 'البحرين', 'اليمن'], correct: 1, reward: 1 },
+  { question: 'أطول سورة في القرآن؟', answers: ['يوسف', 'البقرة', 'الرحمن', 'الملك'], correct: 1, reward: 1 }
 ];
 
-const SCIENCE_MCQ_QUESTIONS = [
-  { question: 'ما الكوكب المعروف بالكوكب الأحمر؟', options: ['الزهرة', 'المريخ', 'عطارد', 'زحل'], answerIndex: 1, reward: 1, category: 'science' },
-  { question: 'ما الغاز الأكثر وجودًا في الغلاف الجوي للأرض؟', options: ['الأكسجين', 'الهيدروجين', 'النيتروجين', 'ثاني أكسيد الكربون'], answerIndex: 2, reward: 1, category: 'science' },
-  { question: 'ما الوحدة الأساسية لقياس شدة التيار الكهربائي؟', options: ['فولت', 'أوم', 'واط', 'أمبير'], answerIndex: 3, reward: 1, category: 'science' },
-  { question: 'أي جزء في الخلية يُعد مركز التحكم؟', options: ['الغشاء', 'السيتوبلازم', 'النواة', 'الميتوكوندريا'], answerIndex: 2, reward: 1, category: 'science' },
-  { question: 'ما الرمز الكيميائي للماء؟', options: ['CO2', 'H2O', 'O2', 'NaCl'], answerIndex: 1, reward: 1, category: 'science' },
-  { question: 'كم عدد الكواكب في المجموعة الشمسية؟', options: ['7', '8', '9', '10'], answerIndex: 1, reward: 1, category: 'science' },
-  { question: 'أين يحدث البناء الضوئي في النبات؟', options: ['الجذر', 'الساق', 'الورقة', 'الزهرة'], answerIndex: 2, reward: 1, category: 'science' },
-  { question: 'ما الجهاز المسؤول عن ضخ الدم؟', options: ['الرئتان', 'الكبد', 'القلب', 'الكلى'], answerIndex: 2, reward: 1, category: 'science' },
-  { question: 'أي الكواكب أقرب إلى الشمس؟', options: ['المريخ', 'الزهرة', 'عطارد', 'الأرض'], answerIndex: 2, reward: 1, category: 'science' },
-  { question: 'ما الرمز الكيميائي للذهب؟', options: ['Ag', 'Au', 'Fe', 'Gd'], answerIndex: 1, reward: 1, category: 'science' },
-  { question: 'ما سرعة الضوء تقريبًا؟', options: ['300 ألف كم/ث', '30 ألف كم/ث', '3 آلاف كم/ث', '3 مليون كم/ث'], answerIndex: 0, reward: 1, category: 'science' },
-  { question: 'أي هذه الكواكب غازي عملاق؟', options: ['الأرض', 'المشتري', 'المريخ', 'عطارد'], answerIndex: 1, reward: 1, category: 'science' }
+const RELIGIOUS_MCQ_QUESTIONS = RELIGIOUS_BASE_QUESTIONS.map((q) => ({
+  question: q.question,
+  options: q.answers,
+  answerIndex: q.correct,
+  reward: q.reward,
+  category: 'religious'
+}));
+
+const SCIENCE_BASE_QUESTIONS = [
+  { question: 'ما الكوكب المعروف بالكوكب الأحمر؟', answers: ['الزهرة', 'المريخ', 'عطارد', 'زحل'], correct: 1, reward: 1 },
+  { question: 'ما الغاز الأكثر وجودًا في الغلاف الجوي للأرض؟', answers: ['الأكسجين', 'الهيدروجين', 'النيتروجين', 'ثاني أكسيد الكربون'], correct: 2, reward: 1 },
+  { question: 'ما الوحدة الأساسية لقياس شدة التيار الكهربائي؟', answers: ['فولت', 'أوم', 'واط', 'أمبير'], correct: 3, reward: 1 },
+  { question: 'أي جزء في الخلية يُعد مركز التحكم؟', answers: ['الغشاء', 'السيتوبلازم', 'النواة', 'الميتوكوندريا'], correct: 2, reward: 1 },
+  { question: 'ما الرمز الكيميائي للماء؟', answers: ['CO2', 'H2O', 'O2', 'NaCl'], correct: 1, reward: 1 },
+  { question: 'كم عدد الكواكب في المجموعة الشمسية؟', answers: ['7', '8', '9', '10'], correct: 1, reward: 1 },
+  { question: 'أين يحدث البناء الضوئي في النبات؟', answers: ['الجذر', 'الساق', 'الورقة', 'الزهرة'], correct: 2, reward: 1 },
+  { question: 'ما الجهاز المسؤول عن ضخ الدم؟', answers: ['الرئتان', 'الكبد', 'القلب', 'الكلى'], correct: 2, reward: 1 },
+  { question: 'أي الكواكب أقرب إلى الشمس؟', answers: ['المريخ', 'الزهرة', 'عطارد', 'الأرض'], correct: 2, reward: 1 },
+  { question: 'ما الرمز الكيميائي للذهب؟', answers: ['Ag', 'Au', 'Fe', 'Gd'], correct: 1, reward: 1 },
+  { question: 'ما سرعة الضوء تقريبا؟', answers: ['300000 كم/ث', '3000 كم/ث', '30000 كم/ث', '3000000 كم/ث'], correct: 0, reward: 1 },
+  { question: 'أي هذه الكواكب غازي عملاق؟', answers: ['الأرض', 'المشتري', 'المريخ', 'عطارد'], correct: 1, reward: 1 }
 ];
+
+const SCIENCE_MCQ_QUESTIONS = SCIENCE_BASE_QUESTIONS.map((q) => ({
+  question: q.question,
+  options: q.answers,
+  answerIndex: q.correct,
+  reward: q.reward,
+  category: 'science'
+}));
+
+const HISTORY_BASE_QUESTIONS = [
+  { question: 'أي عام فتح المسلمون الأندلس؟', answers: ['92هـ', '20هـ', '24هـ', '30هـ'], correct: 0, reward: 1 },
+  { question: 'من أول الخلفاء الراشدين؟', answers: ['أبو بكر', 'عمر', 'عثمان', 'علي'], correct: 0, reward: 1 },
+  { question: 'متى وقعت معركة القادسية؟', answers: ['15هـ', '14هـ', '10هـ', '20هـ'], correct: 0, reward: 1 },
+  { question: 'من بنى الأهرامات؟', answers: ['المصريون القدماء', 'الرومان', 'الفرس', 'المايا'], correct: 0, reward: 1 },
+  { question: 'متى سقطت بغداد بيد المغول؟', answers: ['656هـ', '633هـ', '715هـ', '800هـ'], correct: 0, reward: 1 },
+  { question: 'مدينة أول خلافة إسلامية كانت في:', answers: ['المدينة', 'مكة', 'دمشق', 'بغداد'], correct: 0, reward: 1 },
+  { question: 'أقدم حضارة مكتوبة؟', answers: ['المسمارية', 'اليونانية', 'الرومانية', 'الصينية'], correct: 0, reward: 1 },
+  { question: 'أطول إمبراطورية تاريخية هي:', answers: ['الرومانية', 'التركية', 'الفرعونية', 'الروسية'], correct: 0, reward: 1 },
+  { question: 'أشهر جيوش الخوارزمي كانت في:', answers: ['الخلاط', 'القرن الخامس', 'القرن الثاني', 'القرن التاسع'], correct: 1, reward: 1 },
+  { question: 'الوثيقة التي أسست للملاحة الإسلامية كانت:', answers: ['دار الاسلام', 'العهدة العمرية', 'عهدة المدينة', 'رسالة القادسية'], correct: 1, reward: 1 }
+];
+
+const FIQH_BASE_QUESTIONS = [
+  { question: 'بماذا يبدأ الوضوء؟', answers: ['غسل الوجه', 'المضمضة', 'المسح', 'التيمم'], correct: 0, reward: 1 },
+  { question: 'هل الوضوء يبطل بالأكل؟', answers: ['نعم', 'لا'], correct: 1, reward: 1 },
+  { question: 'عدد تكبيرات افتتاحية في صلاة العيدين؟', answers: ['2', '4', '3', '5'], correct: 0, reward: 1 },
+  { question: 'أي يد تطهّر إذا لم يوجد ماء؟', answers: ['يمين', 'يسار', 'أي', 'لا شيء'], correct: 2, reward: 1 },
+  { question: 'أفضل وقت لتطهير الفروض بعد فقدان الطهارة:', answers: ['أول وقت', 'في البيت', 'فوراً', 'إلى الغروب'], correct: 2, reward: 1 },
+  { question: 'في الفقه، "النية" في الطهارة تكون:', answers: ['بالقلب', 'باليد', 'باللسان', 'بالعين'], correct: 0, reward: 1 },
+  { question: 'هل يجوز الجمع بين صلاتين عند المطر؟', answers: ['نعم', 'لا'], correct: 0, reward: 1 },
+  { question: 'الرقبة المفقودة في الصلاة تحتاج:', answers: ['توضيح', 'تعليل', 'تكرار', 'إعادة'], correct: 3, reward: 1 },
+  { question: 'هل الغسل واجب عند الجنابة؟', answers: ['نعم', 'لا'], correct: 0, reward: 1 },
+  { question: 'الطهارة في الفقه تكون بنية + فعل.', answers: ['صحيحة', 'خطأ', 'نصف', 'لا'], correct: 0, reward: 1 }
+];
+
+const GEOGRAPHY_BASE_QUESTIONS = [
+  { question: 'أطول أنهار العالم هو:', answers: ['الأمازون', 'النيل', 'اليانغتسي', 'الميسيسيبي'], correct: 1, reward: 1 },
+  { question: 'أكبر قارة مساحتها:', answers: ['آسيا', 'أفريقيا', 'أوروبا', 'أمريكا'], correct: 0, reward: 1 },
+  { question: 'أكبر محيط في العالم:', answers: ['الهادئ', 'الأطلسي', 'الهندي', 'المتجمد'], correct: 0, reward: 1 },
+  { question: 'أكثر دولة سكانًا:', answers: ['الهند', 'الصين', 'الولايات المتحدة', 'روسيا'], correct: 1, reward: 1 },
+  { question: 'أكبر جزيرة في العالم:', answers: ['جرينلاند', 'بورنيو', 'غرب أفريقيا', 'أستراليا'], correct: 0, reward: 1 },
+  { question: 'أقل القارات سكانًا:', answers: ['أوروبا', 'أستراليا', 'أمريكا الجنوبية', 'أفريقيا'], correct: 1, reward: 1 },
+  { question: 'أطول سلسلة جبال:', answers: ['الهيمالايا', 'الأنديز', 'الألب', 'الروكي'], correct: 0, reward: 1 },
+  { question: 'أكبر جزيرة في البحر المتوسط:', answers: ['صقلية', 'كريت', 'قبرص', 'سردينيا'], correct: 0, reward: 1 },
+  { question: 'أخطر وادٍ في شمال أفريقيا يقع في:', answers: ['وادي النيل', 'الصحراء', 'السنغال', 'المغرب'], correct: 0, reward: 1 },
+  { question: 'أكبر دولة جغرافية من ناحية المساحة:', answers: ['روسيا', 'الصين', 'الولايات المتحدة', 'كندا'], correct: 0, reward: 1 }
+];
+
+const makeQuestionFromTemplate = (template, category, index) => ({
+  question: `${template.question} (${QUIZ_VARIANTS[index % QUIZ_VARIANTS.length]} #${index + 1})`,
+  options: (() => {
+    const candidates = template.answers.map((value) => String(value));
+    const shift = index % Math.max(1, candidates.length);
+    const options = candidates.map((_, idx) => candidates[(idx + shift) % candidates.length]);
+    return options;
+  })(),
+  answerIndex: (() => {
+    const correct = String(template.answers[template.correct]);
+    const shift = index % Math.max(1, template.answers.length);
+    const options = template.answers.map((_, idx) => String(template.answers[(idx + shift) % template.answers.length]));
+    const direct = options.indexOf(correct);
+    return direct >= 0 ? direct : 0;
+  })(),
+  reward: template.reward || 1,
+  category
+});
+
+const buildGeneratedCategoryQuestions = (baseQuestions, category, count) => {
+  const list = [];
+  for (let i = 0; i < count; i += 1) {
+    const template = baseQuestions[i % baseQuestions.length];
+    const question = makeQuestionFromTemplate(template, category, i);
+    list.push(question);
+  }
+  return list;
+};
+
+const RELIGIOUS_MCQ_GENERATED = buildGeneratedCategoryQuestions(RELIGIOUS_BASE_QUESTIONS, 'religious', QUIZ_REQUIRED_PER_CATEGORY);
+const SCIENCE_MCQ_GENERATED = buildGeneratedCategoryQuestions(SCIENCE_BASE_QUESTIONS, 'science', QUIZ_REQUIRED_PER_CATEGORY);
+const HISTORY_MCQ_QUESTIONS = buildGeneratedCategoryQuestions(HISTORY_BASE_QUESTIONS, 'history', QUIZ_REQUIRED_PER_CATEGORY);
+const FIQH_MCQ_QUESTIONS = buildGeneratedCategoryQuestions(FIQH_BASE_QUESTIONS, 'fiqh', QUIZ_REQUIRED_PER_CATEGORY);
+const GEOGRAPHY_MCQ_QUESTIONS = buildGeneratedCategoryQuestions(GEOGRAPHY_BASE_QUESTIONS, 'geography', QUIZ_REQUIRED_PER_CATEGORY);
 
 const CAPITALS_BANK = [
   ['السعودية', 'الرياض'], ['مصر', 'القاهرة'], ['المغرب', 'الرباط'], ['الجزائر', 'الجزائر'],
@@ -151,6 +255,11 @@ const ALL_MCQ_QUESTIONS = [
   ...MCQ_QUESTIONS,
   ...RELIGIOUS_MCQ_QUESTIONS,
   ...SCIENCE_MCQ_QUESTIONS,
+  ...RELIGIOUS_MCQ_GENERATED,
+  ...SCIENCE_MCQ_GENERATED,
+  ...HISTORY_MCQ_QUESTIONS,
+  ...FIQH_MCQ_QUESTIONS,
+  ...GEOGRAPHY_MCQ_QUESTIONS,
   ...buildGeneratedMathMcq(),
   ...buildGeneratedCapitalsMcq()
 ];
@@ -1157,6 +1266,9 @@ class GroupGamesHandler {
     const x = String(arg || '').toLowerCase();
     if (['ثقافي', 'ثقافيه', 'ثقافية', 'culture', 'cultural', 'عام', 'عامة'].includes(x)) return 'culture';
     if (['ديني', 'دينيه', 'دينية', 'religion', 'religious'].includes(x)) return 'religious';
+    if (['تاريخي', 'تاريخ', 'history'].includes(x)) return 'history';
+    if (['فقه', 'فقهي', 'fiqh'].includes(x)) return 'fiqh';
+    if (['جغرافي', 'جغرافيا', 'geography'].includes(x)) return 'geography';
     if (['رياضي', 'رياضيه', 'رياضية', 'math', 'رياضيات'].includes(x)) return 'math';
     if (['علمي', 'علميه', 'علمية', 'science', 'scientific'].includes(x)) return 'science';
     return null;
@@ -2855,12 +2967,15 @@ class GroupGamesHandler {
 
   static async sendQuizPoll(chatId, question, reward, timeoutSec = 25) {
     if (!this.bot) return null;
+    const categoryKey = question?.category || 'culture';
+    const categoryLabel = QUIZ_CATEGORY_LABELS[categoryKey] || QUIZ_CATEGORY_LABELS.culture;
+    const questionText = `• سؤال ${categoryLabel} ~» ${question.question}`;
     const shuffled = this.shuffleArray(question.options.map((opt, idx) => ({ opt, original: idx })));
     const correctOptionId = shuffled.findIndex((x) => x.original === question.answerIndex);
     const options = shuffled.map((x) => x.opt);
     const openPeriod = Math.min(600, Math.max(10, Number(timeoutSec || 25)));
 
-    const sent = await this.bot.telegram.sendPoll(Number(chatId), question.question, options, {
+    const sent = await this.bot.telegram.sendPoll(Number(chatId), questionText, options, {
       type: 'quiz',
       is_anonymous: false,
       allows_multiple_answers: false,
@@ -2878,7 +2993,10 @@ class GroupGamesHandler {
 
     this.activeQuizPolls.set(pollId, {
       chatId: String(chatId),
-      reward: 1,
+      reward: Number(reward || question.reward || 1),
+      category: categoryKey,
+      questionText,
+      askedAt: Date.now(),
       correctOptionId,
       awardedUsers: new Set(),
       cleanup
@@ -2908,13 +3026,13 @@ class GroupGamesHandler {
     group.updatedAt = new Date();
     await group.save();
 
-    const rank = this.getUserRank(group, userId);
-    const boostLine = scoreMeta.boostActive ? '\n🚀 تم تطبيق معزز الدولار' : '';
-    const tierLine = scoreMeta.tier ? `\n🏅 المستوى: ${scoreMeta.tier}` : '';
-    const tierBonusLine = scoreMeta.tierUpBonus > 0 ? `\n🎉 مكافأة ترقية +${scoreMeta.tierUpBonus}` : '';
+    const askedAt = Number(state.askedAt || 0);
+    const seconds = askedAt ? Math.max(1, Math.round((Date.now() - askedAt) / 1000)) : 0;
+    const userName = answer.user?.first_name || answer.user?.username || 'المستخدم';
+    const mention = this.mentionUser(answer.user?.id, userName);
     await this.bot.telegram.sendMessage(
       Number(state.chatId),
-      `✅ ${answer.user?.first_name || 'لاعب'} أجاب صحيحًا!\n💰 +${this.formatCurrency(scoreMeta.finalReward)}${boostLine}${tierBonusLine}${tierLine}\n🏅 الترتيب: #${rank || '-'}`,
+      `• اجابة صحيحة ~» ${mention}\n• عدد الثواني ~» ${seconds}\n• فلوسك ~» ${this.formatCurrency(scoreMeta.finalReward)}`,
       { parse_mode: 'HTML' }
     ).catch(() => {});
   }
@@ -3294,6 +3412,62 @@ class GroupGamesHandler {
     const question = this.pickNonRepeating(source, `mcq:${String(ctx.chat.id)}:${opts.difficulty || 'all'}:${opts.category || 'all'}`);
     const timeoutSec = Math.max(10, opts.timeoutSec || 25);
     await this.sendQuizPoll(ctx.chat.id, question, question.reward, timeoutSec);
+  }
+
+  static async handleReligiousMcqCommand(ctx) {
+    return this.handleMcqByCategoryAlias(ctx, 'religious');
+  }
+
+  static async handleScienceMcqCommand(ctx) {
+    return this.handleMcqByCategoryAlias(ctx, 'science');
+  }
+
+  static async handleHistoryMcqCommand(ctx) {
+    return this.handleMcqByCategoryAlias(ctx, 'history');
+  }
+
+  static async handleFiqhMcqCommand(ctx) {
+    return this.handleMcqByCategoryAlias(ctx, 'fiqh');
+  }
+
+  static async handleGeographyMcqCommand(ctx) {
+    return this.handleMcqByCategoryAlias(ctx, 'geography');
+  }
+
+  static async handleMcqByCategoryAlias(ctx, forcedCategory) {
+    if (!this.isGroupChat(ctx)) return;
+    const status = await this.canStartRound(ctx);
+    if (!status.ok) return;
+
+    const args = this.parseCommandArgs(ctx).filter((value) => String(value || '').trim().length > 0);
+
+    const opts = this.parseQuizOptions(args, status.group.gameSystem.settings.questionTimeoutSec || 25);
+    const finalCategory = forcedCategory || opts.category;
+    const pool = ALL_MCQ_QUESTIONS
+      .filter((q) => this.questionMatchesDifficulty(q, opts.difficulty))
+      .filter((q) => this.questionMatchesCategory(q, finalCategory || opts.category));
+    const source = pool.length > 0 ? pool : ALL_MCQ_QUESTIONS;
+    const key = finalCategory || opts.category || 'all';
+    const question = this.pickNonRepeating(source, `mcq:${String(ctx.chat.id)}:${opts.difficulty || 'all'}:${key}`);
+    const timeoutSec = Math.max(10, opts.timeoutSec || 25);
+    if (finalCategory) {
+      await this.sendCategoryQuizPrompt(ctx, finalCategory);
+    }
+    await this.sendQuizPoll(ctx.chat.id, question, question.reward, timeoutSec);
+  }
+
+  static async sendCategoryQuizPrompt(ctx, categoryKey) {
+    const from = ctx.from || {};
+    const userId = from.id;
+    const displayName = this.escapeHtml(
+      from.first_name || from.username || 'المستخدم'
+    );
+    const mention = userId ? `<a href="tg://user?id=${userId}">${displayName}</a>` : displayName;
+    const categoryLabel = QUIZ_CATEGORY_LABELS[categoryKey] || 'عام';
+    await ctx.reply(
+      `• سؤال ${categoryLabel} ~»\n• اللاعب ~» ${mention}`,
+      { parse_mode: 'HTML' }
+    );
   }
 
   static async dispatchQuizSeries(chatId) {
