@@ -3552,19 +3552,38 @@ class GroupGamesHandler {
       from.first_name || from.username || 'المستخدم'
     );
     const mention = userId ? `<a href="tg://user?id=${userId}">${displayName}</a>` : displayName;
+    const options = Array.isArray(question?.options)
+      ? question.options.map((x) => String(x || '').trim())
+      : [];
+    const answerIndex = Math.max(0, Number(question?.answerIndex) || 0);
     const correctAnswer = String(
       Array.isArray(question?.options)
-        ? question.options[Number(question.answerIndex) || 0]
+        ? question.options[answerIndex]
         : (Array.isArray(question?.answers) ? question.answers[0] : '')
     ).trim();
+    const plainQuestion = String(question?.question || '')
+      .replace(/\s*\([^()]*#\d+\)\s*$/u, '')
+      .trim();
+    const acceptedAnswers = new Set();
+    const pushAnswer = (value) => {
+      const normalized = this.normalizeText(String(value || ''));
+      if (!normalized) return;
+      acceptedAnswers.add(normalized);
+      if (normalized.startsWith('ال') && normalized.length > 2) {
+        acceptedAnswers.add(normalized.slice(2));
+      }
+    };
+    pushAnswer(correctAnswer);
+    pushAnswer(String(answerIndex + 1));
+    if (options[answerIndex]) pushAnswer(options[answerIndex]);
     const reward = Math.max(1, Number(question?.reward || 1));
 
     const askedAt = Date.now();
     this.activeRounds.set(groupId, {
       type: 'category_text',
-      prompt: `• سؤال ${categoryLabel} ~» ${question?.question || ''}`,
+      prompt: `• سؤال ${categoryLabel} ~» ${plainQuestion}`,
       answers: [correctAnswer],
-      answersNorm: [this.normalizeText(correctAnswer)],
+      answersNorm: [...acceptedAnswers],
       reward,
       deadline: Number.MAX_SAFE_INTEGER,
       askedAt
@@ -3572,7 +3591,7 @@ class GroupGamesHandler {
 
     const sent = await this.bot.telegram.sendMessage(
       Number(ctx.chat.id),
-      `${mention}\n• سؤال ${categoryLabel} ~» ${question?.question || ''}`,
+      `${mention}\n• سؤال ${categoryLabel} ~» ${plainQuestion}`,
       {
         parse_mode: 'HTML',
         reply_to_message_id: ctx.message?.message_id
