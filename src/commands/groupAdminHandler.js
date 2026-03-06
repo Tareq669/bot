@@ -408,9 +408,12 @@ class GroupAdminHandler {
   }
 
   static getSenderChatLabel(senderChat) {
-    return this.escapeHtml(
-      senderChat?.username ? `@${senderChat.username}` : (senderChat?.title || 'غير معروف')
-    );
+    return this.escapeHtml(senderChat?.title || 'غير معروف');
+  }
+
+  static getUserDisplayName(user) {
+    const fullName = [user?.first_name, user?.last_name].filter(Boolean).join(' ').trim();
+    return this.escapeHtml(fullName || user?.first_name || 'غير معروف');
   }
 
   static getEditedActorInfo(message, chat) {
@@ -437,7 +440,7 @@ class GroupAdminHandler {
 
     const from = message?.from;
     return {
-      name: this.escapeHtml(from?.username ? `@${from.username}` : (from?.first_name || 'غير معروف')),
+      name: this.getUserDisplayName(from),
       id: Number(from?.id || 0),
       detectionFieldLabel: 'اسمه',
       deleteFieldLabel: 'اسمه',
@@ -4098,8 +4101,14 @@ class GroupAdminHandler {
       const messageType = this.getMessageTypeLabel(message);
       const linkHtml = this.formatProtectionLink(chat, message.message_id);
       const actor = this.getEditedActorInfo(message, chat);
+      const ownersMentions = [...owners]
+        .map((ownerId, idx) => `${idx + 1} - ${this.mentionUser(ownerId, `مالك ${idx + 1}`)}`)
+        .join('\n');
 
       const detectionNote =
+        '• للمالكين الاساسين \n' +
+        '━━━━━━━━━━━━\n' +
+        `${ownersMentions}\n\n` +
         '• حماية التعديل\n' +
         `${actor.actionLine}\n` +
         `• ${actor.detectionFieldLabel} ↤︎ 「 ${actor.name} 」\n` +
@@ -4109,12 +4118,10 @@ class GroupAdminHandler {
         `• رابط الرسالة ↤︎ ${linkHtml}\n\n` +
         '- الرجاء حذف الرسالة في اقرب وقت ممكن \n-';
 
-      await Promise.all(
-        [...owners].map((ownerId) => ctx.telegram.sendMessage(ownerId, detectionNote, {
-          parse_mode: 'HTML',
-          disable_web_page_preview: true
-        }).catch(() => null))
-      );
+      await ctx.telegram.sendMessage(chat.id, detectionNote, {
+        parse_mode: 'HTML',
+        disable_web_page_preview: true
+      }).catch(() => null);
 
       try {
         await ctx.telegram.deleteMessage(chat.id, message.message_id);
