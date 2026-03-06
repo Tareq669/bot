@@ -427,10 +427,20 @@ const UNIQUE_GIFTS = [
   { key: 'cappuccino', name: '☕ كابتشينو', price: 5 },
   { key: 'chai_latte', name: '☕ شاي لاتيه', price: 5 },
   { key: 'hot_chocolate', name: '🍫 هوت شوكليت', price: 6 },
+  { key: 'water', name: '💧 ماء', price: 2 },
+  { key: 'dates', name: '🌴 تمر', price: 3 },
+  { key: 'milk', name: '🥛 حليب', price: 3 },
+  { key: 'laban', name: '🥛 لبن', price: 3 },
+  { key: 'bread', name: '🍞 خبز', price: 2 },
+  { key: 'sweets', name: '🍬 حلويات', price: 4 },
   { key: 'shawarma_meal', name: '🌯 وجبة شاورما', price: 8 },
   { key: 'grilled_chicken', name: '🍗 دجاجة مشوية', price: 14 },
   { key: 'kebab_meal', name: '🍢 وجبة كباب', price: 12 },
   { key: 'mixed_grill', name: '🍖 مشاوي مشكل', price: 16 },
+  { key: 'eid_women', name: '👗 ملابس العيد حريمي', price: 22 },
+  { key: 'eid_men', name: '👔 ملابس العيد رجالي', price: 22 },
+  { key: 'eid_kids', name: '🧒 ملابس العيد أطفال', price: 22 },
+  { key: 'eid_girls', name: '👧 ملابس العيد صبايا', price: 22 },
   { key: 'car', name: '🚗 سيارة', price: 35 },
   { key: 'island', name: '🏝️ جزيرة', price: 90 },
   { key: 'plane', name: '✈️ طيارة', price: 110 },
@@ -626,6 +636,54 @@ const LOUNGE_PRODUCTS = {
     baseStock: 35,
     market: true
   },
+  water: {
+    key: 'water',
+    name: '💧 ماء',
+    aliases: ['ماء', 'مي', 'مية', 'water'],
+    price: 2,
+    baseStock: 90,
+    market: true
+  },
+  milk: {
+    key: 'milk',
+    name: '🥛 حليب',
+    aliases: ['حليب', 'milk'],
+    price: 3,
+    baseStock: 70,
+    market: true
+  },
+  laban: {
+    key: 'laban',
+    name: '🥛 لبن',
+    aliases: ['لبن', 'laban'],
+    price: 3,
+    baseStock: 70,
+    market: true
+  },
+  dates: {
+    key: 'dates',
+    name: '🌴 تمر',
+    aliases: ['تمر', 'تمره', 'dates'],
+    price: 3,
+    baseStock: 70,
+    market: true
+  },
+  bread: {
+    key: 'bread',
+    name: '🍞 خبز',
+    aliases: ['خبز', 'bread'],
+    price: 2,
+    baseStock: 80,
+    market: true
+  },
+  sweets: {
+    key: 'sweets',
+    name: '🍬 حلويات',
+    aliases: ['حلويات', 'حلا', 'حلو', 'سكاكر', 'sweets'],
+    price: 4,
+    baseStock: 60,
+    market: true
+  },
   shawarma_meal: {
     key: 'shawarma_meal',
     name: '🌯 وجبة شاورما',
@@ -714,9 +772,12 @@ const CAFE_CONSUMABLE_KEYS = new Set([
   'avocado_juice', 'strawberry_juice', 'mango_juice',
   'seven_up', 'cola', 'mirinda',
   'nescafe', 'cappuccino', 'chai_latte', 'hot_chocolate',
+  'water', 'milk', 'laban',
+  'dates', 'bread', 'sweets',
   'shawarma_meal', 'grilled_chicken', 'kebab_meal', 'mixed_grill'
 ]);
 const LOUNGE_PUFF_ALIASES = [/^هف{1,5}$/i, /^(?:نفس\s*ارجيلة|نفس\s*أرجيلة|نفس\s*دخان|فيب)$/i, /^نفخة\s*سيجار$/i];
+const WEARABLE_GIFT_KEYS = new Set(['eid_women', 'eid_men', 'eid_kids', 'eid_girls']);
 const LOUNGE_PUFF_LINES = [
   '😶‍🌫️ نفس رايق... المزاج تمام.',
   '💨 هالنفخة زبطت الجو.',
@@ -1101,6 +1162,12 @@ class GroupGamesHandler {
       cappuccino: 0,
       chai_latte: 0,
       hot_chocolate: 0,
+      water: 0,
+      milk: 0,
+      laban: 0,
+      dates: 0,
+      bread: 0,
+      sweets: 0,
       shawarma_meal: 0,
       grilled_chicken: 0,
       kebab_meal: 0,
@@ -1983,7 +2050,17 @@ class GroupGamesHandler {
         rose: ['وردة', 'ورده', 'ورد', 'الوردة', 'الورده', 'الورد', 'ورود', 'الورود', 'rose'],
         bouquet: ['باقة ورود', 'باقه ورود', 'باقة', 'باقه', 'bouquet'],
         santa: ['هدية بابا نويل', 'هديه بابا نويل', 'هدية', 'هديه', 'santa'],
-        car: ['سيارة', 'سياره', 'السيارة', 'السياره', 'car']
+        car: ['سيارة', 'سياره', 'السيارة', 'السياره', 'car'],
+        water: ['ماء', 'مي', 'مية', 'water'],
+        dates: ['تمر', 'تمره', 'dates'],
+        milk: ['حليب', 'milk'],
+        laban: ['لبن', 'laban'],
+        bread: ['خبز', 'bread'],
+        sweets: ['حلويات', 'حلا', 'حلو', 'سكاكر', 'sweets'],
+        eid_women: ['ملابس العيد حريمي', 'ملابس حريمي', 'حريمي', 'eid women'],
+        eid_men: ['ملابس العيد رجالي', 'ملابس رجالي', 'رجالي', 'eid men'],
+        eid_kids: ['ملابس العيد اطفال', 'ملابس اطفال', 'أطفال', 'اطفال', 'eid kids'],
+        eid_girls: ['ملابس العيد صبايا', 'ملابس صبايا', 'صبايا', 'eid girls']
       };
       const loungeAliases = Array.isArray(LOUNGE_PRODUCTS[g.key]?.aliases) ? LOUNGE_PRODUCTS[g.key].aliases : [];
       const aliases = [g.key, g.name, this.normalizeText(g.name), ...(extraAliases[g.key] || []), ...loungeAliases];
@@ -3173,7 +3250,7 @@ class GroupGamesHandler {
     const luckKey = `${String(ctx.chat.id)}:${Number(ctx.from?.id || 0)}`;
     if (this.pendingLuckInputs.has(luckKey)) {
       const normalized = this.normalizeArabicDigits(String(text || '').trim());
-      const isKnownCommandLike = /^(شراء|بيع|اهداء|إهداء|ارسال|إرسال|متجر|هدايا|ممتلكاتي|حظ|كرسي|انهاء|إنهاء|سؤال|لاونج|كافيتيريا|قائمة|مزاجي|طلب|سلم|ولع|هف|انضم|نفس|تحديد|جنسي|جنسه|اضف|أضف|حذف|عدد|كلمات|ردود|سوالفكم|فحص|رتبتي|my|كتم|تقييد|حظر|الغاء|إلغاء|فك|رفع|تنزيل|المنشئين|المالكين|المدراء|الادمنية|الأدمنية|المميزين|تفعيل|تعطيل|الحماية|اعدادات|إعدادات|برنت|تفاعل)\b/i.test(normalized);
+      const isKnownCommandLike = /^(شراء|بيع|اهداء|إهداء|ارسال|إرسال|متجر|هدايا|ممتلكاتي|حظ|كرسي|انهاء|إنهاء|سؤال|لاونج|كافيتيريا|قائمة|مزاجي|طلب|سلم|ولع|هف|انضم|نفس|اشرب|اكل|كل|كول|البس|تحديد|جنسي|جنسه|اضف|أضف|حذف|عدد|كلمات|ردود|سوالفكم|فحص|رتبتي|my|كتم|تقييد|حظر|الغاء|إلغاء|فك|رفع|تنزيل|المنشئين|المالكين|المدراء|الادمنية|الأدمنية|المميزين|تفعيل|تعطيل|الحماية|اعدادات|إعدادات|برنت|تفاعل)\b/i.test(normalized);
       if (isKnownCommandLike) {
         // Do not let pending luck block normal group commands.
         this.pendingLuckInputs.delete(luckKey);
@@ -4011,9 +4088,9 @@ class GroupGamesHandler {
     return ctx.reply(
       `🪩 <b>لاونج جو</b>\n\n` +
       `رصيدك: ${this.formatCurrency(row.points || 0)}\n\n` +
-      `🥤 <b>المشروبات الباردة</b>\n${line('mojito')}\n${line('orange_juice')}\n${line('lemon_juice')}\n${line('fruit_juice')}\n${line('banana_juice')}\n${line('avocado_juice')}\n${line('strawberry_juice')}\n${line('mango_juice')}\n${line('seven_up')}\n${line('cola')}\n${line('mirinda')}\n${line('juice')}\n\n` +
+      `🥤 <b>المشروبات الباردة</b>\n${line('mojito')}\n${line('orange_juice')}\n${line('lemon_juice')}\n${line('fruit_juice')}\n${line('banana_juice')}\n${line('avocado_juice')}\n${line('strawberry_juice')}\n${line('mango_juice')}\n${line('seven_up')}\n${line('cola')}\n${line('mirinda')}\n${line('juice')}\n${line('water')}\n${line('milk')}\n${line('laban')}\n\n` +
       `☕ <b>المشروبات الساخنة</b>\n${line('tea')}\n${line('coffee')}\n${line('nescafe')}\n${line('cappuccino')}\n${line('chai_latte')}\n${line('hot_chocolate')}\n\n` +
-      `🍽️ <b>الوجبات</b>\n${line('shawarma_meal')}\n${line('grilled_chicken')}\n${line('kebab_meal')}\n${line('mixed_grill')}\n\n` +
+      `🍽️ <b>الوجبات</b>\n${line('shawarma_meal')}\n${line('grilled_chicken')}\n${line('kebab_meal')}\n${line('mixed_grill')}\n${line('dates')}\n${line('bread')}\n${line('sweets')}\n\n` +
       `🚬 <b>الدخان</b>\n${line('cigarette')}\n${line('cigar')}\n${line('vape')}\n${line('vape_liquid')}\n${line('lighter')}\n\n` +
       `🫧 <b>الأرجيلة</b>\n${line('hookah')}\n${line('hookah_head')}\n${line('coal')}\n${line('molasses_apple')}\n${line('molasses_mint')}\n\n` +
       `🎮 <b>جلسة الأصحاب</b>\n• افتح جلسة ارجيلة\n• انضم\n• نفس\n\n` +
@@ -4022,11 +4099,16 @@ class GroupGamesHandler {
       `• شراء سيجارة 2\n` +
       `• شراء قهوة\n` +
       `• شراء قداحة\n` +
+      `• شراء ماء | شراء تمر | شراء حليب | شراء لبن\n` +
+      `• شراء خبز | شراء حلويات\n` +
       `• اشتغل بالكافيتيريا\n` +
       `• طلب كافيتيريا\n` +
       `• سلم الطلب\n` +
       `• ولع سيجارة\n` +
       `• هف / هفف / هففف / هفففف / هففففف\n` +
+      `• اشرب ماء | اشرب حليب | اشرب لبن\n` +
+      `• كول تمر | كول خبز | كول حلويات\n` +
+      `• البس ملابس حريمي | البس ملابس رجالي | البس ملابس اطفال | البس ملابس صبايا\n` +
       `• مزاجي | توب الكافيتيريا`,
       { parse_mode: 'HTML' }
     );
@@ -4502,6 +4584,11 @@ class GroupGamesHandler {
   static async handleCafeConsumeCommand(ctx) {
     if (!this.isGroupChat(ctx)) return false;
     const raw = String(ctx.message?.text || '').trim();
+    const actionText = raw.replace(/^\/\S+\s*/i, '').trim();
+    if (/^(?:البس|إلبس|لبس)\b/i.test(actionText)) {
+      const wearRaw = actionText.replace(/^(?:البس|إلبس|لبس)\s*/i, '').trim();
+      return this.handleWearGiftCommand(ctx, wearRaw);
+    }
     const normalized = this.normalizeText(raw);
     const consumeRaw = raw
       .replace(/^\/\S+\s*/i, '')
@@ -4531,13 +4618,17 @@ class GroupGamesHandler {
       hot_chocolate: 2,
       juice: 1, mojito: 1, orange_juice: 1, lemon_juice: 1, fruit_juice: 1, banana_juice: 1,
       avocado_juice: 1, strawberry_juice: 1, mango_juice: 1,
-      seven_up: 1, cola: 1, mirinda: 1
+      seven_up: 1, cola: 1, mirinda: 1,
+      water: 1, milk: 2, laban: 2,
+      dates: 2, bread: 2, sweets: 2
     };
     const moodBoostMap = {
       hot_chocolate: 3, cappuccino: 3, chai_latte: 3, nescafe: 3, coffee: 3,
       tea: 2, juice: 2, mojito: 2, orange_juice: 2, lemon_juice: 2, fruit_juice: 2, banana_juice: 2,
       avocado_juice: 2, strawberry_juice: 2, mango_juice: 2,
-      seven_up: 2, cola: 2, mirinda: 2
+      seven_up: 2, cola: 2, mirinda: 2,
+      water: 1, milk: 2, laban: 2,
+      dates: 2, bread: 2, sweets: 3
     };
     const xpBoost = Number(xpBoostMap[key] || 1);
     const moodBoost = Number(moodBoostMap[key] || 2);
@@ -4552,6 +4643,44 @@ class GroupGamesHandler {
       `• +${xpBoost} XP\n` +
       `• +${moodBoost} مزاج\n` +
       `• مزاجك الآن: ${row.cafeProfile.mood}/100`
+    );
+  }
+
+  static async handleWearGiftCommand(ctx, wearRaw = '') {
+    if (!this.isGroupChat(ctx)) return false;
+    const group = await this.ensureGroupRecord(ctx);
+    const row = this.getOrCreateScoreRow(group, ctx.from);
+    const userDoc = await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
+    const input = String(wearRaw || '').trim();
+    const preferredGift = input ? this.resolveGiftByInput(input) : null;
+
+    if (preferredGift && !WEARABLE_GIFT_KEYS.has(preferredGift.key)) {
+      return ctx.reply('❌ هذا العنصر غير قابل للبس. استخدم: البس ملابس حريمي/رجالي/اطفال/صبايا');
+    }
+
+    let chosenGift = null;
+    if (preferredGift && WEARABLE_GIFT_KEYS.has(preferredGift.key) && this.getOwnedGiftCount(row, preferredGift) > 0) {
+      chosenGift = preferredGift;
+    } else {
+      const wearables = UNIQUE_GIFTS.filter((g) => WEARABLE_GIFT_KEYS.has(g.key));
+      chosenGift = wearables.find((g) => this.getOwnedGiftCount(row, g) > 0) || null;
+    }
+
+    if (!chosenGift) {
+      return ctx.reply(
+        '❌ ما عندك ملابس عيد في ممتلكاتك.\n' +
+        '• اشتري أولًا: ملابس العيد حريمي / رجالي / أطفال / صبايا'
+      );
+    }
+
+    const count = this.getOwnedGiftCount(row, chosenGift);
+    row.updatedAt = new Date();
+    await group.save();
+    await this.syncRowToGlobal(userDoc, row);
+    return ctx.reply(
+      `✅ لبست ${chosenGift.name}\n` +
+      `• المتوفر عندك: ${count}\n` +
+      '• ما خصمنا شيء من ممتلكاتك.'
     );
   }
 
@@ -5615,10 +5744,20 @@ class GroupGamesHandler {
       { label: 'كابتشينو', keys: ['cappuccino'], names: ['كابتشينو', 'cappuccino'] },
       { label: 'شاي لاتيه', keys: ['chai_latte'], names: ['شاي لاتيه', 'لاتيه', 'chai latte'] },
       { label: 'هوت شوكليت', keys: ['hot_chocolate'], names: ['هوت شوكليت', 'hot chocolate'] },
+      { label: 'ماء', keys: ['water'], names: ['ماء', 'مي', 'مية', 'water'] },
+      { label: 'حليب', keys: ['milk'], names: ['حليب', 'milk'] },
+      { label: 'لبن', keys: ['laban'], names: ['لبن', 'laban'] },
+      { label: 'تمر', keys: ['dates'], names: ['تمر', 'تمره', 'dates'] },
+      { label: 'خبز', keys: ['bread'], names: ['خبز', 'bread'] },
+      { label: 'حلويات', keys: ['sweets'], names: ['حلويات', 'حلا', 'حلو', 'سكاكر', 'sweets'] },
       { label: 'وجبة شاورما', keys: ['shawarma_meal'], names: ['وجبة شاورما', 'شاورما', 'shawarma'] },
       { label: 'دجاجة مشوية', keys: ['grilled_chicken'], names: ['دجاجة مشوية', 'دجاج مشوي', 'فروج مشوي', 'grilled chicken'] },
       { label: 'وجبة كباب', keys: ['kebab_meal'], names: ['وجبة كباب', 'كباب', 'kebab'] },
       { label: 'مشاوي مشكل', keys: ['mixed_grill'], names: ['مشاوي مشكل', 'مشاوي مشكلة', 'مشاوي', 'mixed grill'] },
+      { label: 'ملابس العيد حريمي', keys: ['eid_women'], names: ['ملابس العيد حريمي', 'ملابس حريمي', 'حريمي'] },
+      { label: 'ملابس العيد رجالي', keys: ['eid_men'], names: ['ملابس العيد رجالي', 'ملابس رجالي', 'رجالي'] },
+      { label: 'ملابس العيد أطفال', keys: ['eid_kids'], names: ['ملابس العيد أطفال', 'ملابس العيد اطفال', 'ملابس اطفال', 'اطفال', 'أطفال'] },
+      { label: 'ملابس العيد صبايا', keys: ['eid_girls'], names: ['ملابس العيد صبايا', 'ملابس صبايا', 'صبايا'] },
       { label: 'سيارة', keys: ['car'], names: ['سيارة', 'سياره', 'car'] },
       { label: 'بيت', keys: ['house'], names: ['بيت', 'house'] },
       { label: 'فيلا', keys: ['villa'], names: ['فيلا', 'villa'] },
@@ -5658,6 +5797,12 @@ class GroupGamesHandler {
       `( كابتشينو ↤︎ ${row.loungeInventory.cappuccino || 0} )`,
       `( شاي لاتيه ↤︎ ${row.loungeInventory.chai_latte || 0} )`,
       `( هوت شوكليت ↤︎ ${row.loungeInventory.hot_chocolate || 0} )`,
+      `( ماء ↤︎ ${row.loungeInventory.water || 0} )`,
+      `( حليب ↤︎ ${row.loungeInventory.milk || 0} )`,
+      `( لبن ↤︎ ${row.loungeInventory.laban || 0} )`,
+      `( تمر ↤︎ ${row.loungeInventory.dates || 0} )`,
+      `( خبز ↤︎ ${row.loungeInventory.bread || 0} )`,
+      `( حلويات ↤︎ ${row.loungeInventory.sweets || 0} )`,
       `( وجبة شاورما ↤︎ ${row.loungeInventory.shawarma_meal || 0} )`,
       `( دجاجة مشوية ↤︎ ${row.loungeInventory.grilled_chicken || 0} )`,
       `( وجبة كباب ↤︎ ${row.loungeInventory.kebab_meal || 0} )`,
@@ -5678,7 +5823,9 @@ class GroupGamesHandler {
     const totalItems = inventory.reduce((sum, x) => sum + Number(x?.count || 0), 0)
       + ['coffee', 'tea', 'juice', 'mojito', 'orange_juice', 'lemon_juice', 'fruit_juice', 'banana_juice',
         'avocado_juice', 'strawberry_juice', 'mango_juice', 'seven_up', 'cola', 'mirinda',
-        'nescafe', 'cappuccino', 'chai_latte', 'hot_chocolate', 'shawarma_meal',
+        'nescafe', 'cappuccino', 'chai_latte', 'hot_chocolate',
+        'water', 'milk', 'laban', 'dates', 'bread', 'sweets',
+        'shawarma_meal',
         'grilled_chicken', 'kebab_meal', 'mixed_grill']
         .reduce((sum, key) => sum + Number(row.loungeInventory[key] || 0), 0);
     const totalEstimatedValue = inventory.reduce((sum, x) => {
@@ -5712,6 +5859,12 @@ class GroupGamesHandler {
       (row.loungeInventory.cappuccino || 0) * LOUNGE_PRODUCTS.cappuccino.price +
       (row.loungeInventory.chai_latte || 0) * LOUNGE_PRODUCTS.chai_latte.price +
       (row.loungeInventory.hot_chocolate || 0) * LOUNGE_PRODUCTS.hot_chocolate.price +
+      (row.loungeInventory.water || 0) * LOUNGE_PRODUCTS.water.price +
+      (row.loungeInventory.milk || 0) * LOUNGE_PRODUCTS.milk.price +
+      (row.loungeInventory.laban || 0) * LOUNGE_PRODUCTS.laban.price +
+      (row.loungeInventory.dates || 0) * LOUNGE_PRODUCTS.dates.price +
+      (row.loungeInventory.bread || 0) * LOUNGE_PRODUCTS.bread.price +
+      (row.loungeInventory.sweets || 0) * LOUNGE_PRODUCTS.sweets.price +
       (row.loungeInventory.shawarma_meal || 0) * LOUNGE_PRODUCTS.shawarma_meal.price +
       (row.loungeInventory.grilled_chicken || 0) * LOUNGE_PRODUCTS.grilled_chicken.price +
       (row.loungeInventory.kebab_meal || 0) * LOUNGE_PRODUCTS.kebab_meal.price +
@@ -6315,14 +6468,18 @@ class GroupGamesHandler {
       '• شراء سيجارة 2 | شراء دخان\n' +
       '• شراء قهوة | شراء شاي | شراء نسكفيه | شراء كابتشينو | شراء شاي لاتيه\n' +
       '• شراء هوت شوكليت\n' +
+      '• شراء ماء | شراء حليب | شراء لبن\n' +
       '• شراء عصير موهيتو | شراء عصير برتقال | شراء عصير ليمون | شراء عصير فواكه | شراء عصير موز\n' +
       '• شراء عصير افوكادو | شراء عصير فراولة | شراء عصير مانجا\n' +
       '• شراء سفن اب | شراء كوكاكولا | شراء ماريندا\n' +
+      '• شراء تمر | شراء خبز | شراء حلويات\n' +
       '• اشرب قهوة | اشرب شاي | اشرب نسكفيه | اشرب كابتشينو | اشرب شاي لاتيه | اشرب هوت شوكليت\n' +
       '• اشرب عصير | اشرب عصير موهيتو | اشرب برتقال | اشرب ليمون | اشرب فواكه | اشرب موز\n' +
       '• اشرب افوكادو | اشرب فراولة | اشرب مانجا | اشرب سفن اب | اشرب كوكاكولا | اشرب ماريندا\n' +
+      '• اشرب ماء | اشرب حليب | اشرب لبن\n' +
       '• اكل شاورما | اكل دجاجة مشوية | اكل كباب | اكل مشاوي مشكل\n' +
-      '• كول شاورما | كول كباب | كول مشاوي مشكل\n' +
+      '• كول شاورما | كول كباب | كول مشاوي مشكل | كول تمر | كول خبز | كول حلويات\n' +
+      '• البس ملابس حريمي | البس ملابس رجالي | البس ملابس اطفال | البس ملابس صبايا\n' +
       '• شراء قداحة | شرط للتوليع\n' +
       '• اشتغل بالكافيتيريا\n' +
       '• طلب كافيتيريا | سلم الطلب\n' +
