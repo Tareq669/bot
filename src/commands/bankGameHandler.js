@@ -644,7 +644,8 @@ class BankGameHandler {
     p.created = true;
     p.cardType = String(cardType || 'visa');
     p.cardNumber = this.generateCardNumber(p.cardType);
-    p.balance = 10000;
+    const globalPoints = Math.max(0, Number(user?.globalGameProfile?.points || 0));
+    p.balance = Math.max(10000, Number(p.balance || 0), globalPoints);
     user.bankProfile = p;
     await user.save();
     await this.syncBankBalanceToGameWallet(ctx?.chat?.id, user, ctx?.from, p.balance);

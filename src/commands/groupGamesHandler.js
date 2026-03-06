@@ -115,7 +115,7 @@ const HISTORY_BASE_QUESTIONS = [
   { question: 'متى وقعت معركة القادسية؟', answers: ['15هـ', '14هـ', '10هـ', '20هـ'], correct: 0, reward: 1 },
   { question: 'من بنى الأهرامات؟', answers: ['المصريون القدماء', 'الرومان', 'الفرس', 'المايا'], correct: 0, reward: 1 },
   { question: 'متى سقطت بغداد بيد المغول؟', answers: ['656هـ', '633هـ', '715هـ', '800هـ'], correct: 0, reward: 1 },
-  { question: 'مدينة أول خلافة إسلامية كانت في:', answers: ['المدينة', 'مكة', 'دمشق', 'بغداد'], correct: 0, reward: 1 },
+  { question: 'مدينة أول خلافة إسلامية كانت في:', answers: ['المدينة المنورة', 'مكة', 'دمشق', 'بغداد'], correct: 0, reward: 1 },
   { question: 'أقدم حضارة مكتوبة؟', answers: ['المسمارية', 'اليونانية', 'الرومانية', 'الصينية'], correct: 0, reward: 1 },
   { question: 'أطول إمبراطورية تاريخية هي:', answers: ['الرومانية', 'التركية', 'الفرعونية', 'الروسية'], correct: 0, reward: 1 },
   { question: 'أشهر جيوش الخوارزمي كانت في:', answers: ['الخلاط', 'القرن الخامس', 'القرن الثاني', 'القرن التاسع'], correct: 1, reward: 1 },
@@ -972,6 +972,20 @@ class GroupGamesHandler {
     return String(value || '')
       .replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
       .replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)));
+  }
+
+  static isLooseAnswerMatch(inputNorm, answerNorm) {
+    const input = this.normalizeText(String(inputNorm || ''));
+    const answer = this.normalizeText(String(answerNorm || ''));
+    if (!input || !answer) return false;
+    if (input === answer) return true;
+    const inputNoAl = input.replace(/^ال/, '');
+    const answerNoAl = answer.replace(/^ال/, '');
+    if (inputNoAl && answerNoAl && inputNoAl === answerNoAl) return true;
+    const minLen = 4;
+    if (answerNoAl.length >= minLen && inputNoAl.includes(answerNoAl)) return true;
+    if (inputNoAl.length >= minLen && answerNoAl.includes(inputNoAl)) return true;
+    return false;
   }
 
   static escapeHtml(value) {
@@ -1984,12 +1998,11 @@ class GroupGamesHandler {
 
   static async syncRowToGlobal(userDoc, row) {
     if (!userDoc) return;
-    if (userDoc.bankProfile && typeof userDoc.bankProfile === 'object' && userDoc.bankProfile.created) {
-      userDoc.bankProfile = {
-        ...userDoc.bankProfile,
-        balance: Math.max(0, Number(row?.points || 0))
-      };
-    }
+    const bankProfile = (userDoc.bankProfile && typeof userDoc.bankProfile === 'object')
+      ? { ...userDoc.bankProfile }
+      : { created: false };
+    bankProfile.balance = Math.max(0, Number(row?.points || 0));
+    userDoc.bankProfile = bankProfile;
     userDoc.globalGameProfile = this.applyRowToProfile(row, userDoc.globalGameProfile || {});
     await userDoc.save();
   }
@@ -3306,7 +3319,11 @@ class GroupGamesHandler {
     }
 
     const input = this.normalizeText(text);
-    if (!round.answersNorm.includes(input)) return false;
+    let isCorrectAnswer = round.answersNorm.includes(input);
+    if (!isCorrectAnswer && round.type === 'category_text') {
+      isCorrectAnswer = round.answersNorm.some((ans) => this.isLooseAnswerMatch(input, ans));
+    }
+    if (!isCorrectAnswer) return false;
 
     this.clearRound(groupId);
     const scoreMeta = await this.updateScore(group, ctx.from, round.reward);
