@@ -21,6 +21,70 @@ class GroupAdminHandler {
   static pendingSpecialFaq = new Map();
   static pendingGlobalSpecialFaq = new Map();
   static INTERNAL_ROLE_KEYS = ['basicOwnerIds', 'ownerIds', 'managerIds', 'adminIds', 'premiumMemberIds'];
+  static MY_INFO_QUOTES = [
+    'نورك اليوم أهدى من أول طلعة شمس.',
+    'كلمة حب مررت عليك، فزاد المساء دفئًا.',
+    'بوجودك يصير اليوم أشبه برقصة نجوْمٍ رخيم.',
+    'وجهك يحكي سكينة، وصوتك يحكي أمان.',
+    'اللحظة الحلوة إنك هون.',
+    'ابتسامتك تذكرني بقصص الصيف.',
+    'أنت من الهدوء اللي يبدد ضجيج القلب.',
+    'كل ما تكلمت، حسّيت الدنيا أهدأ.',
+    'بيك كل شي بصير له معنى.',
+    'معك الدنيا أوسع من كلام المذكرات.',
+    'يا قمر، لا أبدع لما تغيب.',
+    'الصدق والحنان يخلّوا اسمك عالق بالذاكرة.',
+    'وجودك مثل نسمة شتوية على قلب دافئ.',
+    'ببعتك التحية مثل موسيقى خفيفة على بحر.',
+    'اسمك ريشة حلوة على صفحة يومي.',
+    'فيك يجي العطاء قبل الإحساس.',
+    'معاك حتى الصمت يصير له لحن.',
+    'صوتك في الكلام اليوم أجمل من العنوان.',
+    'أحيانًا أغنى بوجودك من ألف نجاح.',
+    'كل خطوة منك لها رصانة ومود.',
+    'فيك مزيج نادر من حنان وقوة.',
+    'لو المسافات تتكاثر، أنا أظل قريب.',
+    'أنت دفء البيت قبل أول ضحكة.',
+    'القلب يرقص لما يمر اسمك.',
+    'الطمأنينة له شكل وجهك.',
+    'معك أحلى اللحظات تطول.',
+    'الحنان بدايتك، والحب اختيارك.',
+    'تجربة أجمل: لقاء كلمة منك.',
+    'حضورك يترك أثر ورد في يومي.',
+    'العيد يمر حين يجي نهارك.',
+    'حتى الغياب عندك يكون له طابع حضوره.',
+    'ضحكتك ترجع الحياة للونها.',
+    'إحساسك للناس ياخذهم لمكان أفضل.',
+    'كل رسالة منك رسالة ربيع.',
+    'أمانة الأسماء ما تنسى من يكتب بالطيب.',
+    'وجهك يعيد ترتيب روحي.',
+    'منك تعلمت كيف أسمع بدل ما أجادل.',
+    'لطفك في التفاصيل هو فخري.',
+    'أنت دليل أن الدنيا لسه تنبت خير.',
+    'ما في شي أجمل من هدوءك.',
+    'معك، حتى يوم التعب يصير قابل للهدوء.',
+    'خطوتك الأولى كانت بداية أمل جديد.',
+    'الود اللي فيك يكتب أجمل القصص.',
+    'حضورك يخلّي المسافة أعمق.',
+    'حين أراك، أسمع نغمة أمان.',
+    'كل كلمة منك كأنها عهد جديد.',
+    'أنت أكثر من اسم: حالة من السلام.',
+    'في شخصيتك سعة بقدر البحر.',
+    'يا من يملك العين في زمن ضجيج.',
+    'أشوفك فأفهم معنى الرقة الحقيقية.',
+    'الصدق يصير أسهل معك.',
+    'أنت جمال بسيط يذكرني بالخير.',
+    'روحية لطيفة تصنع جوًا أدفأ.',
+    'تليق بك قلوب كثيرة وذكراك باقية.',
+    'بوجودك يكون الأمل أقرب.',
+    'أنت أول ما يخطر على القلب بالخير.'
+  ];
+
+  static getMyInfoQuote() {
+    const quotes = this.MY_INFO_QUOTES;
+    const index = Math.floor(Math.random() * quotes.length);
+    return quotes[index] || quotes[0];
+  }
 
   static isGroupChat(ctx) {
     return GROUP_TYPES.has(ctx?.chat?.type);
@@ -557,21 +621,26 @@ class GroupAdminHandler {
   }
 
   static async handleMyInfoCommand(ctx) {
-    if (!this.isGroupChat(ctx)) return;
-
-    const group = await this.ensureGroupRecord(ctx);
-    if (!group.settings?.enableMyInfoCommand) {
+    const hasGroup = this.isGroupChat(ctx);
+    const group = hasGroup ? await this.ensureGroupRecord(ctx) : null;
+    if (hasGroup && !group.settings?.enableMyInfoCommand) {
       return ctx.reply('❌ أمر my معطل في هذا الجروب.');
     }
 
     const userId = Number(ctx.from?.id || 0);
-    const scoreRow = (group.gameSystem?.scores || []).find((row) => Number(row?.userId) === userId);
+    const scoreRow = hasGroup && group
+      ? (group.gameSystem?.scores || []).find((row) => Number(row?.userId) === userId)
+      : null;
     const messageCount = Number(scoreRow?.messageCount || 0);
-    const member = await this.getChatMemberSafe(ctx, userId);
-    const internalRoleLabel = this.getInternalRoleLabel(group, userId);
-    const isPrimaryOwner = await this.isPrimaryOwner(ctx, userId);
-    const statusLabel = this.mapMyStatusLabel(member?.status, isPrimaryOwner, internalRoleLabel);
-    const titleLabel = member?.custom_title || statusLabel || 'لا يوجد';
+    const member = hasGroup ? await this.getChatMemberSafe(ctx, userId) : null;
+    const internalRoleLabel = hasGroup ? this.getInternalRoleLabel(group, userId) : null;
+    const isPrimaryOwner = hasGroup ? await this.isPrimaryOwner(ctx, userId) : false;
+    const statusLabel = hasGroup
+      ? this.mapMyStatusLabel(member?.status, isPrimaryOwner, internalRoleLabel)
+      : 'عضو';
+    const titleLabel = hasGroup
+      ? (member?.custom_title || statusLabel || 'لا يوجد')
+      : 'لا يوجد';
 
     let bioText = 'لا يوجد';
     try {
@@ -589,6 +658,7 @@ class GroupAdminHandler {
 
     const card =
       'احلا حدا بكتب ايدي🥺🖤\n' +
+      `• ${this.getMyInfoQuote()}\n` +
       `𝑁𝐴𝑀𝐸 ⌯ ${name}\n` +
       `𝑈𝑆𝐸 ⌯ ${username}\n` +
       `𝑆𝑇𝐴 ⌯ ${status}\n` +
