@@ -3292,7 +3292,7 @@ class GroupGamesHandler {
     const round = this.activeRounds.get(groupId);
     if (!round) return false;
 
-    if (Date.now() > round.deadline) {
+    if (round.type !== 'category_text' && Date.now() > round.deadline) {
       this.clearRound(groupId);
       await ctx.reply(`⌛ انتهت الجولة.\n✅ الإجابة الصحيحة: ${round.answers[0]}`);
       return true;
@@ -3538,12 +3538,11 @@ class GroupGamesHandler {
     const source = pool.length > 0 ? pool : ALL_MCQ_QUESTIONS;
     const key = finalCategory || opts.category || 'all';
     const question = this.pickNonRepeating(source, `mcq:${String(ctx.chat.id)}:${opts.difficulty || 'all'}:${key}`);
-    const timeoutSec = Math.max(10, opts.timeoutSec || 25);
     const categoryLabel = QUIZ_CATEGORY_LABELS[finalCategory] || QUIZ_CATEGORY_LABELS.culture;
-    return this.startCategoryTextRound(ctx, question, categoryLabel, timeoutSec);
+    return this.startCategoryTextRound(ctx, question, categoryLabel);
   }
 
-  static async startCategoryTextRound(ctx, question, categoryLabel, timeoutSec = 25) {
+  static async startCategoryTextRound(ctx, question, categoryLabel) {
     const groupId = String(ctx.chat.id);
     this.clearRound(groupId);
 
@@ -3567,7 +3566,7 @@ class GroupGamesHandler {
       answers: [correctAnswer],
       answersNorm: [this.normalizeText(correctAnswer)],
       reward,
-      deadline: askedAt + (timeoutSec * 1000),
+      deadline: Number.MAX_SAFE_INTEGER,
       askedAt
     });
 
@@ -3579,18 +3578,6 @@ class GroupGamesHandler {
         reply_to_message_id: ctx.message?.message_id
       }
     );
-
-    const timeout = setTimeout(async () => {
-      const active = this.activeRounds.get(groupId);
-      if (!active || active.type !== 'category_text') return;
-      this.clearRound(groupId);
-      await this.bot.telegram.sendMessage(
-        Number(ctx.chat.id),
-        `⌛ انتهى السؤال.\n✅ الإجابة الصحيحة: ${active.answers?.[0] || ''}`,
-        { reply_to_message_id: sent?.message_id }
-      ).catch(() => {});
-    }, timeoutSec * 1000);
-    this.roundTimers.set(groupId, timeout);
   }
 
   static async dispatchQuizSeries(chatId) {
