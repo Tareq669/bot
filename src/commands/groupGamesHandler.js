@@ -4662,9 +4662,9 @@ class GroupGamesHandler {
   static async handleCafeConsumeCommand(ctx) {
     if (!this.isGroupChat(ctx)) return false;
     const raw = String(ctx.message?.text || '').trim();
-    const actionText = raw.replace(/^\/\S+\s*/i, '').trim();
-    if (/^(?:البس|إلبس|لبس)\b/i.test(actionText)) {
-      const wearRaw = actionText.replace(/^(?:البس|إلبس|لبس)\s*/i, '').trim();
+    const wearMatch = raw.match(/^\/?(?:البس|إلبس|لبس)(?:@\w+)?(?:\s+(.*))?$/i);
+    if (wearMatch) {
+      const wearRaw = String(wearMatch[1] || '').trim();
       return this.handleWearGiftCommand(ctx, wearRaw);
     }
     const normalized = this.normalizeText(raw);
@@ -4765,8 +4765,8 @@ class GroupGamesHandler {
   static async handleWearCommand(ctx) {
     if (!this.isGroupChat(ctx)) return false;
     const raw = String(ctx.message?.text || '').trim();
-    const actionText = raw.replace(/^\/\S+\s*/i, '').trim();
-    const wearRaw = actionText.replace(/^(?:البس|إلبس|لبس)\s*/i, '').trim();
+    const wearMatch = raw.match(/^\/?(?:البس|إلبس|لبس)(?:@\w+)?(?:\s+(.*))?$/i);
+    const wearRaw = String(wearMatch?.[1] || '').trim();
     return this.handleWearGiftCommand(ctx, wearRaw);
   }
 
