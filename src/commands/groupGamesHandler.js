@@ -4762,6 +4762,14 @@ class GroupGamesHandler {
     );
   }
 
+  static async handleWearCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return false;
+    const raw = String(ctx.message?.text || '').trim();
+    const actionText = raw.replace(/^\/\S+\s*/i, '').trim();
+    const wearRaw = actionText.replace(/^(?:البس|إلبس|لبس)\s*/i, '').trim();
+    return this.handleWearGiftCommand(ctx, wearRaw);
+  }
+
   static async handleCafeTopCommand(ctx) {
     if (!this.isGroupChat(ctx)) return;
     const group = await this.ensureGroupRecord(ctx);
