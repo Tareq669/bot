@@ -985,6 +985,15 @@ class GroupGamesHandler {
     const minLen = 4;
     if (answerNoAl.length >= minLen && inputNoAl.includes(answerNoAl)) return true;
     if (inputNoAl.length >= minLen && answerNoAl.includes(inputNoAl)) return true;
+    const inputWords = inputNoAl.split(/\s+/).filter((w) => w.length >= 3);
+    const answerWords = answerNoAl.split(/\s+/).filter((w) => w.length >= 3);
+    if (answerWords.length > 0 && inputWords.length > 0) {
+      const overlap = answerWords.filter((w) => inputWords.includes(w)).length;
+      if (overlap >= 1) return true;
+      const firstInput = inputWords[0] || '';
+      const firstAnswer = answerWords[0] || '';
+      if (firstInput && firstAnswer && firstInput === firstAnswer) return true;
+    }
     return false;
   }
 
@@ -3382,10 +3391,7 @@ class GroupGamesHandler {
       await ctx.reply('⏳ يوجد سلسلة QuizBot نشطة حاليًا.');
       return { ok: false, group };
     }
-    if (this.activeRounds.has(String(ctx.chat.id))) {
-      await ctx.reply('⏳ يوجد تحدي نشط الآن. جاوبوا أولاً قبل بدء لعبة جديدة.');
-      return { ok: false, group };
-    }
+    if (this.activeRounds.has(String(ctx.chat.id))) return { ok: false, group };
     return { ok: true, group };
   }
 
@@ -3545,12 +3551,12 @@ class GroupGamesHandler {
 
   static async handleMcqByCategoryAlias(ctx, forcedCategory) {
     if (!this.isGroupChat(ctx)) return;
-    const status = await this.canStartRound(ctx);
-    if (!status.ok) return;
+    const group = await this.ensureGroupRecord(ctx);
+    this.clearRound(String(ctx.chat.id));
 
     const args = this.parseCommandArgs(ctx).filter((value) => String(value || '').trim().length > 0);
 
-    const opts = this.parseQuizOptions(args, status.group.gameSystem.settings.questionTimeoutSec || 25);
+    const opts = this.parseQuizOptions(args, group.gameSystem.settings.questionTimeoutSec || 25);
     const finalCategory = forcedCategory || opts.category;
     const pool = ALL_MCQ_QUESTIONS
       .filter((q) => this.questionMatchesDifficulty(q, opts.difficulty))
