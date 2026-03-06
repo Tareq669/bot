@@ -3075,6 +3075,7 @@ class GroupGamesHandler {
       questionText,
       askedAt: Date.now(),
       correctOptionId,
+      correctWord: String(options[correctOptionId] || ''),
       awardedUsers: new Set(),
       cleanup
     });
@@ -3107,9 +3108,10 @@ class GroupGamesHandler {
     const seconds = askedAt ? Math.max(1, Math.round((Date.now() - askedAt) / 1000)) : 0;
     const userName = answer.user?.first_name || answer.user?.username || 'المستخدم';
     const mention = this.mentionUser(answer.user?.id, userName);
+    const correctWord = this.escapeHtml(String(state.correctWord || ''));
     await this.bot.telegram.sendMessage(
       Number(state.chatId),
-      `• اجابة صحيحة ~» ${mention}\n• عدد الثواني ~» ${seconds}\n• فلوسك ~» ${this.formatCurrency(scoreMeta.finalReward)}`,
+      `• الكلمة الصحيحة ~» ${correctWord}\n• اجابة صحيحة ~» ${mention}\n• عدد الثواني ~» ${seconds}\n• فلوسك ~» ${this.formatCurrency(scoreMeta.finalReward)}`,
       { parse_mode: 'HTML' }
     ).catch(() => {});
   }
@@ -3320,8 +3322,9 @@ class GroupGamesHandler {
       const seconds = askedAt ? Math.max(1, Math.round((Date.now() - askedAt) / 1000)) : 0;
       const winnerNameSimple = ctx.from.first_name || ctx.from.username || String(ctx.from.id);
       const winnerSimple = this.mentionUser(ctx.from.id, winnerNameSimple);
+      const correctWord = this.escapeHtml(String(round.answers?.[0] || ''));
       await ctx.reply(
-        `• اجابة صحيحة ~» ${winnerSimple}\n• عدد الثواني ~» ${seconds}\n• فلوسك ~» ${this.formatCurrency(scoreMeta.finalReward)}`,
+        `• الكلمة الصحيحة ~» ${correctWord}\n• اجابة صحيحة ~» ${winnerSimple}\n• عدد الثواني ~» ${seconds}\n• فلوسك ~» ${this.formatCurrency(scoreMeta.finalReward)}`,
         { parse_mode: 'HTML' }
       );
       return true;
