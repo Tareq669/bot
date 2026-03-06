@@ -3542,7 +3542,7 @@ class GroupGamesHandler {
     const mention = userId ? `<a href="tg://user?id=${userId}">${displayName}</a>` : displayName;
     const categoryLabel = QUIZ_CATEGORY_LABELS[categoryKey] || 'عام';
     await ctx.reply(
-      `• سؤال ${categoryLabel} ~»\n• اللاعب ~» ${mention}`,
+      `• سؤال ${categoryLabel} ~» ${mention}`,
       { parse_mode: 'HTML' }
     );
   }
