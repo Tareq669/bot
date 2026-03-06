@@ -73,7 +73,7 @@ const RELIGIOUS_BASE_QUESTIONS = [
   { question: 'كم عدد سور القرآن؟', answers: ['110', '112', '114', '116'], correct: 2, reward: 1 },
   { question: 'في أي شهر يبدأ موسم الزكاة؟', answers: ['رمضان', 'ذو الحجة', 'شوال', 'محرم'], correct: 0, reward: 1 },
   { question: 'كم ركنًا في الصلاة؟', answers: ['3', '4', '5', '6'], correct: 2, reward: 1 },
-  { question: 'عدد الأبواب في باب المسجد النبوي؟', answers: ['5', '6', '7', '8'], correct: 1, reward: 1 },
+  { question: 'كم عدد أبواب المسجد النبوي تقريبًا؟', answers: ['42', '4', '7', '12'], correct: 0, reward: 1 },
   { question: 'أين نزلت سورة البقرة؟', answers: ['مكة', 'المدينة', 'البحرين', 'اليمن'], correct: 1, reward: 1 },
   { question: 'أطول سورة في القرآن؟', answers: ['يوسف', 'البقرة', 'الرحمن', 'الملك'], correct: 1, reward: 1 }
 ];
