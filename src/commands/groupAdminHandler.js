@@ -763,12 +763,14 @@ class GroupAdminHandler {
     if (typeof group.settings.lockLinks !== 'boolean') group.settings.lockLinks = false;
     if (typeof group.settings.lockStickers !== 'boolean') group.settings.lockStickers = false;
     if (typeof group.settings.blockForwards !== 'boolean') group.settings.blockForwards = false;
+    if (typeof group.settings.exemptAdminsFromForwards !== 'boolean') group.settings.exemptAdminsFromForwards = false;
     if (typeof group.settings.filterBadWords !== 'boolean') group.settings.filterBadWords = true;
     if (typeof group.settings.blockExplicitContent !== 'boolean') group.settings.blockExplicitContent = true;
     if (typeof group.settings.floodProtection !== 'boolean') group.settings.floodProtection = true;
     if (typeof group.settings.exemptAdminsFromProtection !== 'boolean') group.settings.exemptAdminsFromProtection = false;
     if (typeof group.settings.blockLongMessages !== 'boolean') group.settings.blockLongMessages = true;
     if (typeof group.settings.notifyLongMessageBlock !== 'boolean') group.settings.notifyLongMessageBlock = true;
+    if (typeof group.settings.exemptAdminsFromLongMessages !== 'boolean') group.settings.exemptAdminsFromLongMessages = false;
     if (typeof group.settings.enableMyInfoCommand !== 'boolean') group.settings.enableMyInfoCommand = true;
     if (typeof group.settings.blockMediaOnlyEdits !== 'boolean') group.settings.blockMediaOnlyEdits = false;
     if (typeof group.settings.blockChannelAnonymousEdits !== 'boolean') group.settings.blockChannelAnonymousEdits = false;
@@ -889,8 +891,10 @@ class GroupAdminHandler {
       `• منع الاباحيه ↤︎ ${settings.blockExplicitContent ? '✅' : '❌'}\n` +
       `• منع الرسائل الطويله ↤︎ ${settings.blockLongMessages ? '✅' : '❌'}\n` +
       `• اشعار الرسائل الطويله ↤︎ ${settings.notifyLongMessageBlock ? '✅' : '❌'}\n` +
+      `• استثناء المشرفين من الرسائل الطويله ↤︎ ${settings.exemptAdminsFromLongMessages ? '✅' : '❌'}\n` +
       `• امر my ↤︎ ${settings.enableMyInfoCommand ? '✅' : '❌'}\n` +
       `• منع التوجيه ↤︎ ${settings.blockForwards ? '✅' : '❌'}\n` +
+      `• استثناء المشرفين من التوجيه ↤︎ ${settings.exemptAdminsFromForwards ? '✅' : '❌'}\n` +
       `• حماية التعديل ↤︎ ${settings.blockChannelEdits ? '✅' : '❌'}\n` +
       `• حماية تعديل الوسائط ↤︎ ${settings.blockMediaOnlyEdits ? '✅' : '❌'}\n` +
       `• حماية القنوات + الادمن المجهول ↤︎ ${settings.blockChannelAnonymousEdits ? '✅' : '❌'}\n` +
@@ -937,8 +941,10 @@ class GroupAdminHandler {
       `• حماية التكرار: ${settings.floodProtection ? '✅' : '❌'}\n` +
       `• منع الرسائل الطويلة: ${settings.blockLongMessages ? '✅' : '❌'} (الحد: ${settings.maxMessageLength})\n` +
       `• اشعار الرسائل الطويلة: ${settings.notifyLongMessageBlock ? '✅' : '❌'}\n` +
+      `• استثناء المشرفين من الرسائل الطويلة: ${settings.exemptAdminsFromLongMessages ? '✅' : '❌'}\n` +
       `• أمر my: ${settings.enableMyInfoCommand ? '✅' : '❌'}\n` +
       `• منع التوجيه: ${settings.blockForwards ? '✅' : '❌'}\n` +
+      `• استثناء المشرفين من التوجيه: ${settings.exemptAdminsFromForwards ? '✅' : '❌'}\n` +
       `• حماية التعديل: ${settings.blockChannelEdits ? '✅' : '❌'}\n` +
       `• حماية تعديل الوسائط: ${settings.blockMediaOnlyEdits ? '✅' : '❌'}\n` +
       `• حماية القنوات + الأدمن المجهول: ${settings.blockChannelAnonymousEdits ? '✅' : '❌'}\n` +
@@ -1131,6 +1137,8 @@ class GroupAdminHandler {
       '• قفل الروابط | فتح الروابط\n' +
       '• قفل الملصقات | فتح الملصقات\n' +
       '• تفعيل منع التوجيه | تعطيل منع التوجيه\n' +
+      '• استثناء المشرفين من التوجيه | الغاء استثناء المشرفين من التوجيه\n' +
+      '• إلغاء استثناء المشرفين من التوجيه\n' +
       '• تفعيل حماية التعديل | تعطيل حماية التعديل\n' +
       '• تفعيل حماية تعديل الوسائط فقط | تعطيل حماية تعديل الوسائط فقط\n' +
       '• تفعيل حماية تعديل من القنوات والادمن المجهول | تعطيل حماية تعديل من القنوات والادمن المجهول\n' +
@@ -1143,6 +1151,8 @@ class GroupAdminHandler {
       '• تفعيل منع الاباحية | تعطيل منع الاباحية\n' +
       '• تفعيل منع الرسائل الطويلة | تعطيل منع الرسائل الطويلة\n' +
       '• تفعيل اشعار منع الرسائل الطويلة | تعطيل اشعار منع الرسائل الطويلة\n' +
+      '• استثناء المشرفين من الرسائل الطويلة | الغاء استثناء المشرفين من الرسائل الطويلة\n' +
+      '• إلغاء استثناء المشرفين من الرسائل الطويلة\n' +
       '• تفعيل امر my | تعطيل امر my\n' +
       '• استثناء المشرفين من الحماية | الغاء استثناء المشرفين من الحماية\n' +
       '• /gprotect links on|off\n' +
@@ -4426,7 +4436,7 @@ class GroupAdminHandler {
       return true;
     }
     if (
-      /^(قفل الروابط|فتح الروابط|تفعيل منع ارسال الروابط|تعطيل منع ارسال الروابط|تفعيل منع إرسال الروابط|تعطيل منع إرسال الروابط|قفل الملصقات|فتح الملصقات|تفعيل منع التوجيه|تعطيل منع التوجيه|تفعيل حماية التعديل|تعطيل حماية التعديل|تفعيل حماية تعديل الوسائط فقط|تعطيل حماية تعديل الوسائط فقط|تفعيل حماية تعديل من القنوات والادمن المجهول|تعطيل حماية تعديل من القنوات والادمن المجهول|تفعيل حماية تعديل من القنوات والأدمن المجهول|تعطيل حماية تعديل من القنوات والأدمن المجهول|تفعيل حماية الحذف|تعطيل حماية الحذف|تفعيل الاشتراك الاجباري|تعطيل الاشتراك الاجباري|تفعيل الاشتراك الإجباري|تعطيل الاشتراك الإجباري|تفعيل الكلمات|تعطيل الكلمات|تفعيل التكرار|تعطيل التكرار|تفعيل منع الاباحية|تعطيل منع الاباحية|تفعيل منع الرسائل الطويل(?:ة|ه)|تعطيل منع الرسائل الطويل(?:ة|ه)|تفعيل اشعار منع الرسائل الطويل(?:ة|ه)|تعطيل اشعار منع الرسائل الطويل(?:ة|ه)|استثناء المشرفين من الحماية|الغاء استثناء المشرفين من الحماية|إلغاء استثناء المشرفين من الحماية|الحماية|\/gprotect\b)/i.test(rawText)
+      /^(قفل الروابط|فتح الروابط|تفعيل منع ارسال الروابط|تعطيل منع ارسال الروابط|تفعيل منع إرسال الروابط|تعطيل منع إرسال الروابط|قفل الملصقات|فتح الملصقات|تفعيل منع التوجيه|تعطيل منع التوجيه|استثناء المشرفين من التوجيه|الغاء استثناء المشرفين من التوجيه|إلغاء استثناء المشرفين من التوجيه|تفعيل حماية التعديل|تعطيل حماية التعديل|تفعيل حماية تعديل الوسائط فقط|تعطيل حماية تعديل الوسائط فقط|تفعيل حماية تعديل من القنوات والادمن المجهول|تعطيل حماية تعديل من القنوات والادمن المجهول|تفعيل حماية تعديل من القنوات والأدمن المجهول|تعطيل حماية تعديل من القنوات والأدمن المجهول|تفعيل حماية الحذف|تعطيل حماية الحذف|تفعيل الاشتراك الاجباري|تعطيل الاشتراك الاجباري|تفعيل الاشتراك الإجباري|تعطيل الاشتراك الإجباري|تفعيل الكلمات|تعطيل الكلمات|تفعيل التكرار|تعطيل التكرار|تفعيل منع الاباحية|تعطيل منع الاباحية|تفعيل منع الرسائل الطويل(?:ة|ه)|تعطيل منع الرسائل الطويل(?:ة|ه)|تفعيل اشعار منع الرسائل الطويل(?:ة|ه)|تعطيل اشعار منع الرسائل الطويل(?:ة|ه)|استثناء المشرفين من الرسائل الطويلة|الغاء استثناء المشرفين من الرسائل الطويلة|إلغاء استثناء المشرفين من الرسائل الطويلة|استثناء المشرفين من الحماية|الغاء استثناء المشرفين من الحماية|إلغاء استثناء المشرفين من الحماية|الحماية|\/gprotect\b)/i.test(rawText)
     ) {
       if (/^(قفل الروابط|تفعيل منع ارسال الروابط|تفعيل منع إرسال الروابط)$/i.test(rawText)) {
         const result = await this.setProtectionSetting(ctx, 'lockLinks', true, 'text');
@@ -4462,6 +4472,18 @@ class GroupAdminHandler {
         const result = await this.setProtectionSetting(ctx, 'blockForwards', false, 'text');
         if (!result?.ok) return true;
         await ctx.reply('✅ تم تعطيل منع التوجيه.');
+        return true;
+      }
+      if (/^استثناء المشرفين من التوجيه$/i.test(rawText)) {
+        const result = await this.setProtectionSetting(ctx, 'exemptAdminsFromForwards', true, 'text');
+        if (!result?.ok) return true;
+        await ctx.reply('✅ تم تفعيل استثناء المشرفين من منع التوجيه.');
+        return true;
+      }
+      if (/^(الغاء استثناء المشرفين من التوجيه|إلغاء استثناء المشرفين من التوجيه)$/i.test(rawText)) {
+        const result = await this.setProtectionSetting(ctx, 'exemptAdminsFromForwards', false, 'text');
+        if (!result?.ok) return true;
+        await ctx.reply('✅ تم إلغاء استثناء المشرفين من منع التوجيه.');
         return true;
       }
       if (/^تفعيل حماية التعديل$/i.test(rawText)) {
@@ -4585,6 +4607,18 @@ class GroupAdminHandler {
         await ctx.reply('✅ تم تعطيل اشعار منع الرسائل الطويلة.');
         return true;
       }
+      if (/^استثناء المشرفين من الرسائل الطويلة$/i.test(rawText)) {
+        const result = await this.setProtectionSetting(ctx, 'exemptAdminsFromLongMessages', true, 'text');
+        if (!result?.ok) return true;
+        await ctx.reply('✅ تم تفعيل استثناء المشرفين من منع الرسائل الطويلة.');
+        return true;
+      }
+      if (/^(الغاء استثناء المشرفين من الرسائل الطويلة|إلغاء استثناء المشرفين من الرسائل الطويلة)$/i.test(rawText)) {
+        const result = await this.setProtectionSetting(ctx, 'exemptAdminsFromLongMessages', false, 'text');
+        if (!result?.ok) return true;
+        await ctx.reply('✅ تم إلغاء استثناء المشرفين من منع الرسائل الطويلة.');
+        return true;
+      }
       if (/^استثناء المشرفين من الحماية$/i.test(rawText)) {
         const result = await this.setProtectionSetting(ctx, 'exemptAdminsFromProtection', true, 'text');
         if (!result?.ok) return true;
@@ -4674,6 +4708,14 @@ class GroupAdminHandler {
     if (isAdmin && group.settings?.exemptAdminsFromProtection) {
       return false;
     }
+    const bypassForwards = Boolean(
+      isAdmin
+      && (group.settings?.exemptAdminsFromProtection || group.settings?.exemptAdminsFromForwards)
+    );
+    const bypassLongMessages = Boolean(
+      isAdmin
+      && (group.settings?.exemptAdminsFromProtection || group.settings?.exemptAdminsFromLongMessages)
+    );
 
     if (!isAdmin && group.settings?.requireNewsSubscription) {
       const subscribed = await this.isUserSubscribedToNewsChannel(ctx, group, ctx.from?.id);
@@ -4704,7 +4746,7 @@ class GroupAdminHandler {
     );
 
     // Keep linked-channel auto posts untouched; only block manual user forwards.
-    if (group.settings?.blockForwards && isForwarded && !isAutomaticForward) {
+    if (group.settings?.blockForwards && isForwarded && !isAutomaticForward && !bypassForwards) {
       try {
         await ctx.telegram.deleteMessage(ctx.chat.id, ctx.message.message_id);
         await this.addModerationLog(group, 'delete_forward_message', ctx.botInfo.id, ctx.from.id, 'forward blocked');
@@ -4740,7 +4782,7 @@ class GroupAdminHandler {
       return true;
     }
 
-    if (group.settings?.blockLongMessages) {
+    if (group.settings?.blockLongMessages && !bypassLongMessages) {
       const maxLength = Number.isInteger(group.settings?.maxMessageLength) ? group.settings.maxMessageLength : 700;
       if (rawText.length > maxLength) {
         try {
