@@ -3315,6 +3315,18 @@ class GroupGamesHandler {
     }
     await group.save();
 
+    if (round.type === 'category_text') {
+      const askedAt = Number(round.askedAt || 0);
+      const seconds = askedAt ? Math.max(1, Math.round((Date.now() - askedAt) / 1000)) : 0;
+      const winnerNameSimple = ctx.from.first_name || ctx.from.username || String(ctx.from.id);
+      const winnerSimple = this.mentionUser(ctx.from.id, winnerNameSimple);
+      await ctx.reply(
+        `• اجابة صحيحة ~» ${winnerSimple}\n• عدد الثواني ~» ${seconds}\n• فلوسك ~» ${this.formatCurrency(scoreMeta.finalReward)}`,
+        { parse_mode: 'HTML' }
+      );
+      return true;
+    }
+
     const winnerName = ctx.from.first_name || ctx.from.username || String(ctx.from.id);
     const winner = this.mentionUser(ctx.from.id, winnerName);
     const rank = this.getUserRank(group, ctx.from.id);
@@ -3527,24 +3539,58 @@ class GroupGamesHandler {
     const key = finalCategory || opts.category || 'all';
     const question = this.pickNonRepeating(source, `mcq:${String(ctx.chat.id)}:${opts.difficulty || 'all'}:${key}`);
     const timeoutSec = Math.max(10, opts.timeoutSec || 25);
-    if (finalCategory) {
-      await this.sendCategoryQuizPrompt(ctx, finalCategory);
-    }
-    await this.sendQuizPoll(ctx.chat.id, question, question.reward, timeoutSec);
+    const categoryLabel = QUIZ_CATEGORY_LABELS[finalCategory] || QUIZ_CATEGORY_LABELS.culture;
+    return this.startCategoryTextRound(ctx, question, categoryLabel, timeoutSec);
   }
 
-  static async sendCategoryQuizPrompt(ctx, categoryKey) {
+  static async startCategoryTextRound(ctx, question, categoryLabel, timeoutSec = 25) {
+    const groupId = String(ctx.chat.id);
+    this.clearRound(groupId);
+
     const from = ctx.from || {};
     const userId = from.id;
     const displayName = this.escapeHtml(
       from.first_name || from.username || 'المستخدم'
     );
     const mention = userId ? `<a href="tg://user?id=${userId}">${displayName}</a>` : displayName;
-    const categoryLabel = QUIZ_CATEGORY_LABELS[categoryKey] || 'عام';
-    await ctx.reply(
-      `• سؤال ${categoryLabel} ~» ${mention}`,
-      { parse_mode: 'HTML' }
+    const correctAnswer = String(
+      Array.isArray(question?.options)
+        ? question.options[Number(question.answerIndex) || 0]
+        : (Array.isArray(question?.answers) ? question.answers[0] : '')
+    ).trim();
+    const reward = Math.max(1, Number(question?.reward || 1));
+
+    const askedAt = Date.now();
+    this.activeRounds.set(groupId, {
+      type: 'category_text',
+      prompt: `• سؤال ${categoryLabel} ~» ${question?.question || ''}`,
+      answers: [correctAnswer],
+      answersNorm: [this.normalizeText(correctAnswer)],
+      reward,
+      deadline: askedAt + (timeoutSec * 1000),
+      askedAt
+    });
+
+    const sent = await this.bot.telegram.sendMessage(
+      Number(ctx.chat.id),
+      `${mention}\n• سؤال ${categoryLabel} ~» ${question?.question || ''}`,
+      {
+        parse_mode: 'HTML',
+        reply_to_message_id: ctx.message?.message_id
+      }
     );
+
+    const timeout = setTimeout(async () => {
+      const active = this.activeRounds.get(groupId);
+      if (!active || active.type !== 'category_text') return;
+      this.clearRound(groupId);
+      await this.bot.telegram.sendMessage(
+        Number(ctx.chat.id),
+        `⌛ انتهى السؤال.\n✅ الإجابة الصحيحة: ${active.answers?.[0] || ''}`,
+        { reply_to_message_id: sent?.message_id }
+      ).catch(() => {});
+    }, timeoutSec * 1000);
+    this.roundTimers.set(groupId, timeout);
   }
 
   static async dispatchQuizSeries(chatId) {
