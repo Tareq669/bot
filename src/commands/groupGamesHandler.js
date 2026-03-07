@@ -6485,7 +6485,89 @@ class GroupGamesHandler {
     return null;
   }
 
-  static async handleGamesHelp(ctx) {
+  static getGamesHelpPages() {
+    return [
+      {
+        title: '🎮 أوامر الألعاب (1/4)',
+        lines: [
+          '• سؤال سريع | /gquiz',
+          '• اختيارات | /gmcq',
+          '• حساب ذهني | /gmath',
+          '• ترتيب كلمة | /gword',
+          '• مين انا | /gwho',
+          '• ألغاز | /griddle',
+          '• سرعة الكتابة | /gtype',
+          '• تحدي | /gduel',
+          '• روليت | /chance',
+          '• تصويت | /gvote'
+        ]
+      },
+      {
+        title: '📊 الأرصدة والترتيب (2/4)',
+        lines: [
+          '• متصدرين | /gleader',
+          '• اسبوعي | /gweekly',
+          '• متصدرين الشهر | /gmonth',
+          '• المستويات | /glevels',
+          '• ملفي | /gprofile',
+          '• استثمار فلوسي | /ginvest',
+          '• حظ | /gluck',
+          '• احصائيات الحظ | /gluckstats',
+          '• كشط | /gscratch',
+          '• احصائيات الكشط | /gscratchstats'
+        ]
+      },
+      {
+        title: '🏪 المتجر والكافيتيريا (3/4)',
+        lines: [
+          '• متجر الجروب | /gstore',
+          '• الهدايا | /ggifts',
+          '• ممتلكاتي | /gassets',
+          '• شراء [اسم] / بيع [اسم]',
+          '• لاونج | /glounge',
+          '• كافيتيريا',
+          '• مستلزماتي',
+          '• مزاجي | /gmood',
+          '• توب الكافيتيريا | /gtopcafe',
+          '• توب الدخان | /gtopsmoke'
+        ]
+      },
+      {
+        title: '🏰 القلاع والنظام (4/4)',
+        lines: [
+          '• انشاء قلعه | /gcastle',
+          '• قلعتي | /gmycastle',
+          '• متجر الموارد | /gresstore',
+          '• شراء موارد | /gbuyres',
+          '• تطوير قلعتي | /gupcastle',
+          '• انشاء معكسر | /gbarracks',
+          '• شراء جيش | /gbuyarmy',
+          '• تطوير الجيش | /guparmy',
+          '• بحث الكنز | /gtreasure',
+          '• حصانتي | /gmyshield'
+        ]
+      }
+    ];
+  }
+
+  static buildGamesHelpPager(pageIndex, totalPages) {
+    const current = Math.max(0, Math.min(totalPages - 1, Number(pageIndex) || 0));
+    const prev = (current - 1 + totalPages) % totalPages;
+    const next = (current + 1) % totalPages;
+    return Markup.inlineKeyboard([
+      [
+        Markup.button.callback('⬅️ السابق', `group:help:page:${prev}`),
+        Markup.button.callback(`📄 ${current + 1}/${totalPages}`, 'group:help:noop'),
+        Markup.button.callback('التالي ➡️', `group:help:page:${next}`)
+      ],
+      [
+        Markup.button.callback('🧰 مستلزماتي', 'group:quick:supplies'),
+        Markup.button.callback('🪩 لاونج', 'group:games:glounge')
+      ]
+    ]);
+  }
+
+  static async handleGamesHelp(ctx, page = 0) {
     if (!this.isGroupChat(ctx)) return;
     const quickKeyboard = Markup.keyboard([
       ['سؤال سريع', 'ألغاز', 'سرعة الكتابة'],
@@ -6494,31 +6576,39 @@ class GroupGamesHandler {
       ['متصدرين', 'اسبوعي', 'متصدرين الشهر'],
       ['متجر الجروب', 'الهدايا', 'ممتلكاتي'],
       ['لاونج', 'كافيتيريا', 'مزاجي'],
-      ['قلعتي', 'حصانتي', 'ملفي']
+      ['قلعتي', 'حصانتي', 'ملفي'],
+      ['إخفاء كيبورد']
     ]).resize();
 
-    const inlineKeyboard = Markup.inlineKeyboard([
-      [Markup.button.callback('❓ سؤال سريع', 'group:games:gquiz'), Markup.button.callback('🗳️ اختيارات', 'group:games:gmcq')],
-      [Markup.button.callback('🪑 كرسي الاعتراف', 'group:games:gconfess'), Markup.button.callback('🛑 إنهاء الكرسي', 'group:games:gconfess_end')],
-      [Markup.button.callback('🧰 مستلزماتي', 'group:quick:supplies'), Markup.button.callback('🪩 لاونج', 'group:games:glounge')]
-    ]);
+    const pages = this.getGamesHelpPages();
+    const safePage = Math.max(0, Math.min(pages.length - 1, Number(page) || 0));
+    const pageText = `<b>${pages[safePage].title}</b>\n\n${pages[safePage].lines.join('\n')}`;
+    const pager = this.buildGamesHelpPager(safePage, pages.length);
 
-    const text =
-      '🎮 <b>أوامر الجروب</b>\n\n' +
-      '• تم فتح كيبورد أوامر سريع ومنظم تحت المحادثة.\n' +
-      '• اختر الزر المناسب، أو استخدم الأوامر النصية مباشرة.\n\n' +
-      '<b>أمثلة سريعة:</b>\n' +
-      '• سؤال سريع | ألغاز | سرعة الكتابة\n' +
-      '• متجر الجروب | الهدايا | ممتلكاتي\n' +
-      '• لاونج | كافيتيريا | مزاجي\n' +
-      '• قلعتي | حصانتي | ملفي';
+    if (ctx.callbackQuery?.message?.message_id) {
+      return ctx.editMessageText(pageText, {
+        parse_mode: 'HTML',
+        reply_markup: pager.reply_markup
+      }).catch(() => null);
+    }
 
-    return ctx.reply(text, {
+    await ctx.reply(
+      '🎮 <b>تم تفعيل كيبورد الأوامر</b>\n' +
+      '• كل الأوامر موزعة على صفحات.\n' +
+      '• تنقل بينها من أزرار (التالي/السابق).\n' +
+      '• للإخفاء اكتب أو اضغط: إخفاء كيبورد',
+      { parse_mode: 'HTML', reply_markup: quickKeyboard.reply_markup }
+    );
+    return ctx.reply(pageText, {
       parse_mode: 'HTML',
-      reply_markup: quickKeyboard.reply_markup
-    }).then(() => ctx.reply('⬇️ أزرار إضافية:', {
-      reply_markup: inlineKeyboard.reply_markup
-    }));
+      reply_markup: pager.reply_markup
+    });
+  }
+
+  static async handleGamesHelpPageAction(ctx, page) {
+    if (!this.isGroupChat(ctx)) return;
+    if (ctx.callbackQuery) await ctx.answerCbQuery().catch(() => {});
+    return this.handleGamesHelp(ctx, Number(page) || 0);
   }
 }
 
