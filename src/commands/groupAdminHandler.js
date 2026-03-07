@@ -704,8 +704,15 @@ class GroupAdminHandler {
     const isAdmin = await this.isAdminOrHigher(ctx);
     if (!isAdmin) return ctx.reply('❌ هذا الأمر للمشرفين فقط.');
 
-    const { target } = await this.resolveModerationTarget(ctx);
-    if (!target?.id) return ctx.reply('❌ استخدم فحص بالرد أو @user أو ID.');
+    const resolved = await this.resolveModerationTarget(ctx);
+    const target = resolved?.target?.id
+      ? resolved.target
+      : {
+        id: Number(ctx.from?.id || 0),
+        firstName: ctx.from?.first_name || '',
+        username: ctx.from?.username || ''
+      };
+    if (!target?.id) return ctx.reply('❌ تعذر تحديد المستخدم.');
 
     const group = await this.ensureGroupRecord(ctx);
     const userDoc = await User.findOne({ userId: Number(target.id) });
@@ -721,15 +728,25 @@ class GroupAdminHandler {
       if (log?.action) records.push(String(log.action));
     });
 
-    const historyEntry = Array.isArray(userDoc?.nameHistory) ? userDoc.nameHistory[0] : null;
-    const oldName = historyEntry
-      ? (historyEntry.username ? `@${historyEntry.username}` : (historyEntry.firstName || 'غير محفوظ'))
-      : 'غير محفوظ';
+    const historyList = Array.isArray(userDoc?.nameHistory) ? userDoc.nameHistory : [];
+    const currentFirstName = String(userDoc?.firstName || target.firstName || '').trim();
+    const currentUsername = String(userDoc?.username || target.username || '').trim();
+    const oldEntry = historyList.find((entry) => {
+      const firstName = String(entry?.firstName || '').trim();
+      const username = String(entry?.username || '').trim();
+      return firstName !== currentFirstName || username !== currentUsername;
+    }) || null;
+    const oldName = oldEntry
+      ? String(oldEntry.firstName || (oldEntry.username ? `@${oldEntry.username}` : '')).trim()
+      : '';
+    const targetUserLabel = target.username
+      ? `@${target.username}`
+      : (target.firstName || String(target.id));
     return ctx.reply(
-      `• فحص : ${this.mentionUser(target.id, target.firstName || target.username || String(target.id))}\n` +
-      `• الايدي : <code>${target.id}</code>\n\n` +
-      `• الاسم القديم : ${this.escapeHtml(oldName)}\n` +
-      `• سوابقة :\n${records.length ? records.map((item) => `- ${this.escapeHtml(item)}`).join('\n') : 'لا توجد سوابق'}`,
+      `• فحص العضو ~» ${this.mentionUser(target.id, targetUserLabel)}\n` +
+      `• الأيدي ~» <code>${target.id}</code>\n` +
+      `• الاسم القديم ~» ${this.escapeHtml(oldName || 'غير محفوظ')}\n` +
+      `• السوابق ~» ${records.length ? records.map((item) => this.escapeHtml(item)).join(' | ') : 'لا توجد سوابق'}`,
       { parse_mode: 'HTML' }
     );
   }
