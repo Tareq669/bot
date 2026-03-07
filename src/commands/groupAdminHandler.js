@@ -2306,14 +2306,14 @@ class GroupAdminHandler {
     const exceptionCount = Array.isArray(group.settings?.exceptions) ? group.settings.exceptions.length : 0;
     return ctx.reply(
       '• أهلاً بك عزيزي في عدد رتب المجموعة\n\n' +
-        `• المالكين الاساسين ↤ ${basicCount}\n` +
-        `• المالكين ↤ ${ownersCount}\n` +
-        `• المنشئين ↤ ${creatorsCount}\n` +
-        `• المدراء ↤ ${managersCount}\n` +
-        `• الادمنيه ↤ ${internalAdminsCount}\n` +
-        `• المميزين ↤ ${premiumCount}\n` +
-        `• مشرفو تيليجرام ↤ ${adminCount}\n` +
-        `• المستثنين ↤ ${exceptionCount}\n-`,
+        `• المنشئين ~» ${creatorsCount}\n` +
+        `• المالكين الاساسيين ~» ${basicCount}\n` +
+        `• المالكين ~» ${ownersCount}\n` +
+        `• المدراء ~» ${managersCount}\n` +
+        `• الأدمنية ~» ${internalAdminsCount}\n` +
+        `• المميزين ~» ${premiumCount}\n` +
+        `• مشرفو تيليجرام ~» ${adminCount}\n` +
+        `• المستثنين ~» ${exceptionCount}`,
       { parse_mode: 'HTML' }
     );
   }
