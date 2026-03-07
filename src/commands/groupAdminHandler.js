@@ -2228,16 +2228,19 @@ class GroupAdminHandler {
   static async handleExceptionsCommand(ctx) {
     if (!this.isGroupChat(ctx)) return;
     const canUse = await this.isOwnerOrBasic(ctx);
-    if (!canUse) return ctx.reply('❌ هذا الأمر للمالك الأساسي أو الأساسي فقط.');
+    if (!canUse) return ctx.reply(this.formatOwnerOnlyError());
 
     const group = await this.ensureGroupRecord(ctx);
     const text = String(ctx.message?.text || '').trim();
+    const requester = {
+      id: ctx.from?.id,
+      firstName: ctx.from?.first_name,
+      username: ctx.from?.username
+    };
     group.settings.exceptions = Array.isArray(group.settings.exceptions) ? group.settings.exceptions.map(Number) : [];
 
     if (/^(المستثنئين|\/gexceptions(\s+list)?)$/i.test(text)) {
-      if (group.settings.exceptions.length === 0) return ctx.reply('ℹ️ لا يوجد مستثنين حاليًا.');
-      const rows = group.settings.exceptions.slice(0, 50).map((id, i) => `${i + 1}. <code>${id}</code>`);
-      return ctx.reply(`📋 <b>قائمة المستثنين</b>\n\n${rows.join('\n')}`, { parse_mode: 'HTML' });
+      return ctx.reply(this.formatRoleListMessage('المستثنئين', group.settings.exceptions.slice(0, 50), requester), { parse_mode: 'HTML' });
     }
 
     if (/^(مسح الاستثناءات|\/gexceptions\s+clear)$/i.test(text)) {
@@ -2260,7 +2263,7 @@ class GroupAdminHandler {
       if (!group.settings.exceptions.includes(Number(target.id))) group.settings.exceptions.push(Number(target.id));
       await this.addModerationLog(group, 'add_exception', ctx.from.id, target.id);
       await group.save();
-      return ctx.reply(`✅ تم رفع <code>${target.id}</code> استثناء.`, { parse_mode: 'HTML' });
+      return ctx.reply(this.formatRoleActionMessage('تم رفعه استثناء', target, requester), { parse_mode: 'HTML' });
     }
 
     if (/^(تنزيل استثناء|\/gexceptions\s+remove)/i.test(text)) {
@@ -2269,7 +2272,7 @@ class GroupAdminHandler {
       group.settings.exceptions = group.settings.exceptions.filter((id) => Number(id) !== Number(target.id));
       await this.addModerationLog(group, 'remove_exception', ctx.from.id, target.id);
       await group.save();
-      return ctx.reply(`✅ تم تنزيل <code>${target.id}</code> من الاستثناءات.`, { parse_mode: 'HTML' });
+      return ctx.reply(this.formatRoleActionMessage('تم تنزيله من الاستثناءات', target, requester), { parse_mode: 'HTML' });
     }
   }
 
