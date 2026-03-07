@@ -196,6 +196,7 @@ bot.use(async (ctx, next) => {
     isGroup &&
     ctx.callbackQuery?.data &&
     !ctx.callbackQuery.data.startsWith('group:') &&
+    !ctx.callbackQuery.data.startsWith('bank:create:') &&
     !ctx.callbackQuery.data.startsWith('xo:')
   ) {
     await ctx.answerCbQuery('هذا الزر مخصص للمحادثة الخاصة.', { show_alert: false }).catch(() => {});
