@@ -56,7 +56,9 @@ const QUIZ_CATEGORY_LABELS = {
   science: 'علمي',
   history: 'تاريخي',
   fiqh: 'فقهي',
-  geography: 'جغرافي'
+  geography: 'جغرافي',
+  physics: 'فيزيائي',
+  calculations: 'حسابي'
 };
 
 const QUIZ_VARIANTS = ['سؤال تجميعي', 'مستوى متوسط', 'تمرين ذكي', 'معرفة عامة', 'مفصل', 'اختبار سريع', 'دقيقة فكر', 'أسئلة متنوعة', 'تحدي معرفي', 'مراجعة ذكية'];
@@ -148,6 +150,36 @@ const GEOGRAPHY_BASE_QUESTIONS = [
   { question: 'أكبر دولة جغرافية من ناحية المساحة:', answers: ['روسيا', 'الصين', 'الولايات المتحدة', 'كندا'], correct: 0, reward: 1 }
 ];
 
+const PHYSICS_BASE_QUESTIONS = [
+  { question: 'ما وحدة قياس القوة في النظام الدولي؟', answers: ['نيوتن', 'جول', 'واط', 'أمبير'], correct: 0, reward: 1 },
+  { question: 'ما وحدة قياس الشغل والطاقة؟', answers: ['جول', 'نيوتن', 'فولت', 'تسلا'], correct: 0, reward: 1 },
+  { question: 'السرعة = ؟', answers: ['المسافة ÷ الزمن', 'الزمن ÷ المسافة', 'القوة × الزمن', 'الكتلة ÷ الحجم'], correct: 0, reward: 1 },
+  { question: 'التسارع هو:', answers: ['معدل تغير السرعة', 'معدل تغير الكتلة', 'حاصل ضرب الكتلة في الطول', 'الزمن اللازم لمسافة'], correct: 0, reward: 1 },
+  { question: 'ما وحدة قياس القدرة؟', answers: ['واط', 'جول', 'نيوتن', 'أوم'], correct: 0, reward: 1 },
+  { question: 'قانون أوم ينص على:', answers: ['V = I × R', 'P = V × I', 'F = m × a', 'E = m c²'], correct: 0, reward: 1 },
+  { question: 'الجاذبية الأرضية تقريبا:', answers: ['9.8 م/ث²', '98 م/ث²', '0.98 م/ث²', '1.8 م/ث²'], correct: 0, reward: 1 },
+  { question: 'ما وحدة قياس المقاومة الكهربائية؟', answers: ['أوم', 'فولت', 'أمبير', 'واط'], correct: 0, reward: 1 },
+  { question: 'أداة قياس شدة التيار هي:', answers: ['أميتر', 'فولتميتر', 'أوميتر', 'بارومتر'], correct: 0, reward: 1 },
+  { question: 'الطاقة الحركية تعتمد على:', answers: ['الكتلة والسرعة', 'الزمن فقط', 'الضغط فقط', 'الحجم فقط'], correct: 0, reward: 1 },
+  { question: 'الضوء ينتقل في الفراغ بسرعة:', answers: ['300000 كم/ث', '30000 كم/ث', '3000 كم/ث', '3 كم/ث'], correct: 0, reward: 1 },
+  { question: 'التيار في الدارة المتسلسلة يكون:', answers: ['ثابت في جميع النقاط', 'مختلف بكل نقطة', 'صفر دائمًا', 'يعتمد على الطول فقط'], correct: 0, reward: 1 }
+];
+
+const CALCULATIONS_BASE_QUESTIONS = [
+  { question: 'كم ناتج 25 + 17 ؟', answers: ['42', '41', '43', '40'], correct: 0, reward: 1 },
+  { question: 'كم ناتج 90 - 38 ؟', answers: ['52', '51', '53', '50'], correct: 0, reward: 1 },
+  { question: 'كم ناتج 14 × 6 ؟', answers: ['84', '74', '94', '64'], correct: 0, reward: 1 },
+  { question: 'كم ناتج 144 ÷ 12 ؟', answers: ['12', '11', '13', '14'], correct: 0, reward: 1 },
+  { question: 'كم ناتج 9² ؟', answers: ['81', '72', '91', '99'], correct: 0, reward: 1 },
+  { question: 'كم ناتج 15% من 200 ؟', answers: ['30', '20', '25', '35'], correct: 0, reward: 1 },
+  { question: 'إذا كان س = 7، فما ناتج 3س + 2 ؟', answers: ['23', '21', '19', '25'], correct: 0, reward: 1 },
+  { question: 'محيط مربع طول ضلعه 8 = ؟', answers: ['32', '16', '64', '24'], correct: 0, reward: 1 },
+  { question: 'مساحة مستطيل 9 × 4 = ؟', answers: ['36', '13', '45', '32'], correct: 0, reward: 1 },
+  { question: 'متوسط (10، 20، 30) = ؟', answers: ['20', '15', '25', '30'], correct: 0, reward: 1 },
+  { question: 'كم ناتج 7 × (5 + 3) ؟', answers: ['56', '40', '35', '49'], correct: 0, reward: 1 },
+  { question: 'كم ناتج 1000 ÷ 25 ؟', answers: ['40', '25', '50', '35'], correct: 0, reward: 1 }
+];
+
 const makeQuestionFromTemplate = (template, category, index) => ({
   question: `${template.question} (${QUIZ_VARIANTS[index % QUIZ_VARIANTS.length]} #${index + 1})`,
   options: (() => {
@@ -182,6 +214,8 @@ const SCIENCE_MCQ_GENERATED = buildGeneratedCategoryQuestions(SCIENCE_BASE_QUEST
 const HISTORY_MCQ_QUESTIONS = buildGeneratedCategoryQuestions(HISTORY_BASE_QUESTIONS, 'history', QUIZ_REQUIRED_PER_CATEGORY);
 const FIQH_MCQ_QUESTIONS = buildGeneratedCategoryQuestions(FIQH_BASE_QUESTIONS, 'fiqh', QUIZ_REQUIRED_PER_CATEGORY);
 const GEOGRAPHY_MCQ_QUESTIONS = buildGeneratedCategoryQuestions(GEOGRAPHY_BASE_QUESTIONS, 'geography', QUIZ_REQUIRED_PER_CATEGORY);
+const PHYSICS_MCQ_QUESTIONS = buildGeneratedCategoryQuestions(PHYSICS_BASE_QUESTIONS, 'physics', QUIZ_REQUIRED_PER_CATEGORY);
+const CALCULATIONS_MCQ_QUESTIONS = buildGeneratedCategoryQuestions(CALCULATIONS_BASE_QUESTIONS, 'calculations', QUIZ_REQUIRED_PER_CATEGORY);
 
 const CAPITALS_BANK = [
   ['السعودية', 'الرياض'], ['مصر', 'القاهرة'], ['المغرب', 'الرباط'], ['الجزائر', 'الجزائر'],
@@ -260,6 +294,8 @@ const ALL_MCQ_QUESTIONS = [
   ...HISTORY_MCQ_QUESTIONS,
   ...FIQH_MCQ_QUESTIONS,
   ...GEOGRAPHY_MCQ_QUESTIONS,
+  ...PHYSICS_MCQ_QUESTIONS,
+  ...CALCULATIONS_MCQ_QUESTIONS,
   ...buildGeneratedMathMcq(),
   ...buildGeneratedCapitalsMcq()
 ];
@@ -1356,10 +1392,12 @@ class GroupGamesHandler {
   static parseCategory(arg) {
     const x = String(arg || '').toLowerCase();
     if (['ثقافي', 'ثقافيه', 'ثقافية', 'culture', 'cultural', 'عام', 'عامة'].includes(x)) return 'culture';
-    if (['ديني', 'دينيه', 'دينية', 'religion', 'religious'].includes(x)) return 'religious';
-    if (['تاريخي', 'تاريخ', 'history'].includes(x)) return 'history';
-    if (['فقه', 'فقهي', 'fiqh'].includes(x)) return 'fiqh';
-    if (['جغرافي', 'جغرافيا', 'geography'].includes(x)) return 'geography';
+    if (['ديني', 'دينيه', 'دينية', 'religious'].includes(x)) return 'religious';
+    if (['تاريخي', 'history'].includes(x)) return 'history';
+    if (['فقهي', 'fiqh'].includes(x)) return 'fiqh';
+    if (['جغرافي', 'geography'].includes(x)) return 'geography';
+    if (['فيزياء', 'فيزيائي', 'فيزيائيه', 'فيزيائية', 'physics'].includes(x)) return 'physics';
+    if (['حسابات', 'حسابي', 'حسابيه', 'حسابية', 'calculations', 'calculation'].includes(x)) return 'calculations';
     if (['رياضي', 'رياضيه', 'رياضية', 'math', 'رياضيات'].includes(x)) return 'math';
     if (['علمي', 'علميه', 'علمية', 'science', 'scientific'].includes(x)) return 'science';
     return null;
@@ -3548,6 +3586,14 @@ class GroupGamesHandler {
 
   static async handleGeographyMcqCommand(ctx) {
     return this.handleMcqByCategoryAlias(ctx, 'geography');
+  }
+
+  static async handlePhysicsMcqCommand(ctx) {
+    return this.handleMcqByCategoryAlias(ctx, 'physics');
+  }
+
+  static async handleCalculationsMcqCommand(ctx) {
+    return this.handleMcqByCategoryAlias(ctx, 'calculations');
   }
 
   static async handleMcqByCategoryAlias(ctx, forcedCategory) {
