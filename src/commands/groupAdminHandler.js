@@ -4678,9 +4678,7 @@ class GroupAdminHandler {
     }
 
     const isAdmin = await this.isGroupAdmin(ctx);
-    if (isAdmin && group.settings?.exemptAdminsFromProtection) {
-      return false;
-    }
+    const adminProtectionBypass = Boolean(isAdmin && group.settings?.exemptAdminsFromProtection);
 
     if (!isAdmin && group.settings?.requireNewsSubscription) {
       const subscribed = await this.isUserSubscribedToNewsChannel(ctx, group, ctx.from?.id);
@@ -4711,7 +4709,7 @@ class GroupAdminHandler {
     );
 
     // Keep linked-channel auto posts untouched; only block manual user forwards.
-    if (group.settings?.blockForwards && isForwarded && !isAutomaticForward) {
+    if (group.settings?.blockForwards && isForwarded && !isAutomaticForward && !adminProtectionBypass) {
       try {
         await ctx.telegram.deleteMessage(ctx.chat.id, ctx.message.message_id);
         await this.addModerationLog(group, 'delete_forward_message', ctx.botInfo.id, ctx.from.id, 'forward blocked');
@@ -4730,7 +4728,7 @@ class GroupAdminHandler {
       return true;
     }
 
-    if (group.settings?.lockStickers && hasSticker) {
+    if (group.settings?.lockStickers && hasSticker && !adminProtectionBypass) {
       try {
         await ctx.telegram.deleteMessage(ctx.chat.id, ctx.message.message_id);
         await this.addModerationLog(
@@ -4747,7 +4745,7 @@ class GroupAdminHandler {
       return true;
     }
 
-    if (group.settings?.blockLongMessages) {
+    if (group.settings?.blockLongMessages && !adminProtectionBypass) {
       const maxLength = Number.isInteger(group.settings?.maxMessageLength) ? group.settings.maxMessageLength : 700;
       if (rawText.length > maxLength) {
         try {
@@ -4771,7 +4769,7 @@ class GroupAdminHandler {
       }
     }
 
-    if (group.settings?.lockLinks) {
+    if (group.settings?.lockLinks && !adminProtectionBypass) {
       const hasLink = /(https?:\/\/|t\.me\/|telegram\.me\/|www\.|(?:[a-z0-9-]+\.)+(?:com|net|org|io|me|co|ai|dev|app|xyz|info|ly|ru|uk|de|fr|sa|ae|qa|eg|tr)\b)/i.test(text);
       if (hasLink) {
         try {
@@ -4793,7 +4791,7 @@ class GroupAdminHandler {
       }
     }
 
-    if (group.settings?.blockExplicitContent) {
+    if (group.settings?.blockExplicitContent && !adminProtectionBypass) {
       const explicitPattern = /(?:\b(?:porn|xxx|sex|xvideos|xnxx|redtube|onlyfans|nsfw)\b|اباحي|اباحية|سكس|جنس صريح|نيك)/i;
       if (explicitPattern.test(text)) {
         try {
@@ -4808,7 +4806,7 @@ class GroupAdminHandler {
       }
     }
 
-    if (group.settings?.filterBadWords) {
+    if (group.settings?.filterBadWords && !adminProtectionBypass) {
       const blockedWords = ['سب', 'شتيمة', 'كلمة_ممنوعة'];
       const found = blockedWords.some((w) => this.hasBoundedPhrase(text, w));
       if (found) {
