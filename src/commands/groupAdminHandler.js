@@ -739,9 +739,7 @@ class GroupAdminHandler {
     const oldName = oldEntry
       ? String(oldEntry.firstName || (oldEntry.username ? `@${oldEntry.username}` : '')).trim()
       : '';
-    const targetUserLabel = target.username
-      ? `@${target.username}`
-      : (target.firstName || String(target.id));
+    const targetUserLabel = target.firstName || String(target.id);
     return ctx.reply(
       `• فحص العضو ~» ${this.mentionUser(target.id, targetUserLabel)}\n` +
       `• الأيدي ~» <code>${target.id}</code>\n` +
