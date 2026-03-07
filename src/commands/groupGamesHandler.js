@@ -920,6 +920,7 @@ class GroupGamesHandler {
   static pendingLuckInputs = new Map();
   static luckDailyNumbersCache = null;
   static pendingAlliances = new Map();
+  static helpKeyboardPageByUser = new Map();
 
   static isGroupChat(ctx) {
     return GROUP_TYPES.has(ctx?.chat?.type);
@@ -6569,6 +6570,68 @@ class GroupGamesHandler {
     ];
   }
 
+  static getHelpKeyboardPages() {
+    return [
+      [
+        ['الاساسيين', 'المالكين', 'المنشئين'],
+        ['المدراء', 'الادمنية', 'المميزين'],
+        ['رتبتي', 'الرتب', 'فحص'],
+        ['سؤال سريع', 'ألغاز', 'سرعة الكتابة'],
+        ['مين انا', 'حساب ذهني', 'ترتيب كلمة']
+      ],
+      [
+        ['تحدي', 'روليت', 'تصويت'],
+        ['متصدرين', 'اسبوعي', 'متصدرين الشهر'],
+        ['المستويات', 'ملفي', 'حسابي'],
+        ['راتب', 'بخشيش', 'استثمار فلوسي'],
+        ['حظ', 'العجلة', 'سعر الاسهم']
+      ],
+      [
+        ['متجر الجروب', 'الهدايا', 'ممتلكاتي'],
+        ['شراء', 'بيع', 'اهداء'],
+        ['لاونج', 'كافيتيريا', 'مستلزماتي'],
+        ['مزاجي', 'توب الكافيتيريا', 'توب الدخان'],
+        ['تفعيل منع الروابط', 'تعطيل منع الروابط', 'تفعيل منع التوجيه']
+      ],
+      [
+        ['تعطيل منع التوجيه', 'تفعيل منع الرسائل الطويلة', 'تعطيل منع الرسائل الطويلة'],
+        ['تفعيل الاشتراك الاجباري', 'تعطيل الاشتراك الاجباري', 'اعدادات الحمايه'],
+        ['تفعيل الحمايه 2', 'تعطيل الحمايه 2', 'كتم'],
+        ['الغاء كتم', 'تقييد', 'الغاء تقييد'],
+        ['حظر', 'الغاء حظر', 'all']
+      ]
+    ];
+  }
+
+  static buildHelpKeyboard(pageIndex = 0) {
+    const pages = this.getHelpKeyboardPages();
+    const total = pages.length;
+    const current = Math.max(0, Math.min(total - 1, Number(pageIndex) || 0));
+    const rows = [
+      ...pages[current],
+      ['⬅️ الصفحة السابقة', `📄 ${current + 1}/${total}`, '➡️ الصفحة التالية'],
+      ['إخفاء كيبورد']
+    ];
+    return Markup.keyboard(rows).resize();
+  }
+
+  static getHelpKeyboardPageKey(ctx) {
+    const chatId = Number(ctx?.chat?.id || 0);
+    const userId = Number(ctx?.from?.id || 0);
+    return `${chatId}:${userId}`;
+  }
+
+  static async handleHelpKeyboardNavigation(ctx, direction = 1) {
+    if (!this.isGroupChat(ctx)) return;
+    const pages = this.getHelpKeyboardPages();
+    const total = Math.max(1, pages.length);
+    const key = this.getHelpKeyboardPageKey(ctx);
+    const current = Number(this.helpKeyboardPageByUser.get(key) || 0);
+    const next = (current + (Number(direction) || 0) + total) % total;
+    this.helpKeyboardPageByUser.set(key, next);
+    return this.handleGamesHelp(ctx, next);
+  }
+
   static buildGamesHelpPager(pageIndex, totalPages) {
     const current = Math.max(0, Math.min(totalPages - 1, Number(pageIndex) || 0));
     const prev = (current - 1 + totalPages) % totalPages;
@@ -6588,20 +6651,11 @@ class GroupGamesHandler {
 
   static async handleGamesHelp(ctx, page = 0) {
     if (!this.isGroupChat(ctx)) return;
-    const quickKeyboard = Markup.keyboard([
-      ['الاوامر', 'الرتب', 'رتبتي'],
-      ['سؤال سريع', 'ألغاز', 'سرعة الكتابة'],
-      ['تحدي', 'روليت', 'تصويت'],
-      ['متصدرين', 'اسبوعي', 'متصدرين الشهر'],
-      ['حسابي', 'راتب', 'بخشيش'],
-      ['متجر الجروب', 'الهدايا', 'ممتلكاتي'],
-      ['تفعيل منع الروابط', 'تعطيل منع الروابط'],
-      ['تفعيل منع التوجيه', 'تعطيل منع التوجيه'],
-      ['إخفاء كيبورد']
-    ]).resize();
-
     const pages = this.getGamesHelpPages();
     const safePage = Math.max(0, Math.min(pages.length - 1, Number(page) || 0));
+    const keyboardKey = this.getHelpKeyboardPageKey(ctx);
+    this.helpKeyboardPageByUser.set(keyboardKey, safePage);
+    const quickKeyboard = this.buildHelpKeyboard(safePage);
     const pageText = `<b>${pages[safePage].title}</b>\n\n${pages[safePage].lines.join('\n')}`;
     const pager = this.buildGamesHelpPager(safePage, pages.length);
 

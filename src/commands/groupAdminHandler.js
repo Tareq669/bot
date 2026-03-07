@@ -382,16 +382,29 @@ class GroupAdminHandler {
     );
   }
 
-  static formatRoleListMessage(title, ids = [], requester = null) {
+  static async resolveUserDisplayLabel(ctx, userId) {
+    const id = Number(userId || 0);
+    if (!id) return 'مستخدم';
+    const member = await this.getChatMemberSafe(ctx, id);
+    const memberLabel = member?.user?.first_name || member?.user?.username;
+    if (memberLabel) return memberLabel;
+    const userDoc = await User.findOne({ userId: id }).select('firstName username').lean().catch(() => null);
+    return String(userDoc?.firstName || userDoc?.username || `عضو ${id}`);
+  }
+
+  static async formatRoleListMessage(ctx, title, ids = [], requester = null) {
     const requesterMention = requester?.id
       ? this.mentionUser(requester.id, requester.firstName || requester.username || String(requester.id))
       : '';
-    const lines = ids.length
-      ? ids.map((id, index) => `${index + 1})→ ${this.mentionUser(id, String(id))}`).join('\n')
-      : 'لا يوجد';
+    const lines = ids.length ? await Promise.all(
+      ids.map(async (id, index) => {
+        const label = await this.resolveUserDisplayLabel(ctx, id);
+        return `${index + 1})→ ${this.mentionUser(id, label)}`;
+      })
+    ) : [];
     return (
       `${requesterMention ? `• الطلب من ← ${requesterMention}\n` : ''}` +
-      `• ${title}\n${lines}`
+      `• ${title}\n${lines.length ? lines.join('\n') : 'لا يوجد'}`
     );
   }
 
@@ -1878,7 +1891,7 @@ class GroupAdminHandler {
 
     if (/^(الاساسي|الاساسيين|المالكين الاساسيين|\/gbasic)$/i.test(text)) {
       const rows = this.getRoleIds(group, 'basicOwnerIds');
-      return ctx.reply(this.formatRoleListMessage('الاساسيين', rows, {
+      return ctx.reply(await this.formatRoleListMessage(ctx, 'الاساسيين', rows, {
         id: ctx.from?.id,
         firstName: ctx.from?.first_name,
         username: ctx.from?.username
@@ -2009,7 +2022,7 @@ class GroupAdminHandler {
 
     if (/^(المالكين|\/gowner)$/i.test(text)) {
       const rows = this.getRoleIds(group, 'ownerIds');
-      return ctx.reply(this.formatRoleListMessage('المالكين', rows, {
+      return ctx.reply(await this.formatRoleListMessage(ctx, 'المالكين', rows, {
         id: ctx.from?.id,
         firstName: ctx.from?.first_name,
         username: ctx.from?.username
@@ -2053,7 +2066,7 @@ class GroupAdminHandler {
 
     if (/^(المدراء|\/gmanager)$/i.test(text)) {
       const rows = this.getRoleIds(group, 'managerIds');
-      return ctx.reply(this.formatRoleListMessage('المدراء', rows, {
+      return ctx.reply(await this.formatRoleListMessage(ctx, 'المدراء', rows, {
         id: ctx.from?.id,
         firstName: ctx.from?.first_name,
         username: ctx.from?.username
@@ -2098,7 +2111,7 @@ class GroupAdminHandler {
 
     if (/^(الادمنية|الأدمنية|الادمن|الادمنز|\/gadmins)$/i.test(text)) {
       const rows = this.getRoleIds(group, 'adminIds');
-      return ctx.reply(this.formatRoleListMessage('الادمنية', rows, {
+      return ctx.reply(await this.formatRoleListMessage(ctx, 'الادمنية', rows, {
         id: ctx.from?.id,
         firstName: ctx.from?.first_name,
         username: ctx.from?.username
@@ -2158,7 +2171,7 @@ class GroupAdminHandler {
 
     if (/^(المميزين|\/gpremium)$/i.test(text)) {
       const rows = this.getRoleIds(group, 'premiumMemberIds');
-      return ctx.reply(this.formatRoleListMessage('المميزين', rows, {
+      return ctx.reply(await this.formatRoleListMessage(ctx, 'المميزين', rows, {
         id: ctx.from?.id,
         firstName: ctx.from?.first_name,
         username: ctx.from?.username
@@ -2218,7 +2231,7 @@ class GroupAdminHandler {
 
     const rows = roleMap[text];
     if (!rows) return false;
-    return ctx.reply(this.formatRoleListMessage(text, rows.slice(0, 50), {
+    return ctx.reply(await this.formatRoleListMessage(ctx, text, rows.slice(0, 50), {
       id: ctx.from?.id,
       firstName: ctx.from?.first_name,
       username: ctx.from?.username
@@ -2240,7 +2253,7 @@ class GroupAdminHandler {
     group.settings.exceptions = Array.isArray(group.settings.exceptions) ? group.settings.exceptions.map(Number) : [];
 
     if (/^(المستثنئين|\/gexceptions(\s+list)?)$/i.test(text)) {
-      return ctx.reply(this.formatRoleListMessage('المستثنئين', group.settings.exceptions.slice(0, 50), requester), { parse_mode: 'HTML' });
+      return ctx.reply(await this.formatRoleListMessage(ctx, 'المستثنئين', group.settings.exceptions.slice(0, 50), requester), { parse_mode: 'HTML' });
     }
 
     if (/^(مسح الاستثناءات|\/gexceptions\s+clear)$/i.test(text)) {
