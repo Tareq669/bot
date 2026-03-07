@@ -625,7 +625,11 @@ class BankGameHandler {
     const p = this.normalizeProfile(user.bankProfile || {});
     if (p.created) return ctx.reply('🏦 حسابك البنكي موجود بالفعل.');
     return ctx.reply(
-      '• من أجل انشاء حساب بنكي تختار نوع البطاقة\n\n↤︎ فيزا\n↤︎ ماستر كارد\n↤︎ بايونير\n\n- اضغط للنسخ',
+      '↢ عشان تسوي حساب لازم تختار نوع البطاقة\n\n' +
+      '↤︎ الفيزا\n' +
+      '↤︎ ماستر كارد\n' +
+      '↤︎ بايونير\n\n' +
+      '- اضغط للنسخ',
       Markup.inlineKeyboard([
         [Markup.button.callback('↤︎ فيزا', 'bank:create:visa')],
         [Markup.button.callback('↤︎ ماستر كارد', 'bank:create:mastercard')],
@@ -650,12 +654,12 @@ class BankGameHandler {
     await user.save();
     await this.syncBankBalanceToGameWallet(ctx?.chat?.id, user, ctx?.from, p.balance);
     await ctx.answerCbQuery('تم إنشاء الحساب');
+    const displayName = String(ctx.from?.first_name || 'المستخدم');
     return ctx.reply(
-      `✅ تم انشاء حساب بنكي.\n` +
-      `• نوع البطاقة: ${this.getCardTypeLabel(p.cardType)}\n` +
-      `• رقم البطاقة: \`${p.cardNumber}\`\n` +
-      `• رصيد البداية: ${this.fmt(p.balance)}`,
-      { parse_mode: 'Markdown' }
+      `↢ وسوينا لك حساب في البنك باسم (${displayName} 💳)\n\n` +
+      `↢ رقم حسابك ↢ ( ${p.cardNumber} )\n` +
+      `↢ نوع البطاقة ↢ ( ${this.getCardTypeLabel(p.cardType)} )\n` +
+      `↢ فلوسك ↢ ( ${this.fmt(p.balance)} )`
     );
   }
 

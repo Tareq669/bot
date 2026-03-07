@@ -302,6 +302,18 @@ class GroupAdminHandler {
   static assignInternalRole(group, roleKey, userId) {
     const targetUserId = Number(userId || 0);
     if (!targetUserId || !this.INTERNAL_ROLE_KEYS.includes(roleKey)) return false;
+    const isHigherOwnerRole = this.getRoleIds(group, 'basicOwnerIds').includes(targetUserId)
+      || this.getRoleIds(group, 'ownerIds').includes(targetUserId);
+
+    if (
+      isHigherOwnerRole
+      && (roleKey === 'managerIds' || roleKey === 'adminIds' || roleKey === 'premiumMemberIds')
+    ) {
+      group.settings[roleKey] = [...new Set([...this.getRoleIds(group, roleKey), targetUserId])];
+      this.syncLegacyRoleFields(group);
+      return true;
+    }
+
     this.removeUserFromInternalRoles(group, targetUserId);
     group.settings[roleKey] = [...this.getRoleIds(group, roleKey), targetUserId];
     this.syncLegacyRoleFields(group);
@@ -355,12 +367,36 @@ class GroupAdminHandler {
     return owners;
   }
 
-  static formatRoleActionMessage(actionText, target) {
+  static formatRoleActionMessage(actionText, target, requester = null) {
+    const requesterMention = requester?.id
+      ? this.mentionUser(requester.id, requester.firstName || requester.username || String(requester.id))
+      : '';
     const targetMention = this.mentionUser(
       target.id,
       target.firstName || target.username || String(target.id)
     );
-    return `• ${actionText}\n• المستخدم ↤︎ ${targetMention}`;
+    return (
+      `${requesterMention ? `• الطلب من ← ${requesterMention}\n` : ''}` +
+      `• ${actionText}\n` +
+      `• المستخدم ← ${targetMention}`
+    );
+  }
+
+  static formatRoleListMessage(title, ids = [], requester = null) {
+    const requesterMention = requester?.id
+      ? this.mentionUser(requester.id, requester.firstName || requester.username || String(requester.id))
+      : '';
+    const lines = ids.length
+      ? ids.map((id, index) => `${index + 1})→ ${this.mentionUser(id, String(id))}`).join('\n')
+      : 'لا يوجد';
+    return (
+      `${requesterMention ? `• الطلب من ← ${requesterMention}\n` : ''}` +
+      `• ${title}\n${lines}`
+    );
+  }
+
+  static formatOwnerOnlyError() {
+    return '• عذراً هذا الامر يخص ← { المالك الأساسي } فقط .';
   }
 
   static formatProtectionTimestamp(unixSeconds) {
@@ -608,9 +644,8 @@ class GroupAdminHandler {
     const isPrimaryOwner = await this.isPrimaryOwner(ctx);
     const roleLabel = this.getRoleLabel(member?.status, isPrimaryOwner, internalRoleLabel);
     return ctx.reply(
-      '🏷️ <b>رتبتي</b>\n\n' +
-      `• المستخدم ↤︎ ${this.mentionUser(ctx.from?.id, ctx.from?.first_name || ctx.from?.username || String(ctx.from?.id || 'عضو'))}\n` +
-      `• رتبتك ↤︎ ${roleLabel}`,
+      `• رتبتي ← ${this.mentionUser(ctx.from?.id, ctx.from?.first_name || ctx.from?.username || String(ctx.from?.id || 'عضو'))}\n` +
+      `• الرتبة ← ${roleLabel}`,
       { parse_mode: 'HTML' }
     );
   }
@@ -790,6 +825,7 @@ class GroupAdminHandler {
     if (typeof group.settings.enableMyInfoCommand !== 'boolean') group.settings.enableMyInfoCommand = true;
     if (typeof group.settings.blockMediaOnlyEdits !== 'boolean') group.settings.blockMediaOnlyEdits = false;
     if (typeof group.settings.blockChannelAnonymousEdits !== 'boolean') group.settings.blockChannelAnonymousEdits = false;
+    if (typeof group.settings.exemptAdminsFromEditProtection !== 'boolean') group.settings.exemptAdminsFromEditProtection = false;
     if (!Number.isInteger(group.settings.maxMessageLength)) group.settings.maxMessageLength = 700;
     group.settings.maxMessageLength = Math.max(100, Math.min(4000, group.settings.maxMessageLength));
 
@@ -912,6 +948,7 @@ class GroupAdminHandler {
       `• حماية التعديل ↤︎ ${settings.blockChannelEdits ? '✅' : '❌'}\n` +
       `• حماية تعديل الوسائط ↤︎ ${settings.blockMediaOnlyEdits ? '✅' : '❌'}\n` +
       `• حماية القنوات + الادمن المجهول ↤︎ ${settings.blockChannelAnonymousEdits ? '✅' : '❌'}\n` +
+      `• استثناء المشرفين من حماية التعديل ↤︎ ${settings.exemptAdminsFromEditProtection ? '✅' : '❌'}\n` +
       `• الاشتراك الاجباري ↤︎ ${settings.requireNewsSubscription ? '✅' : '❌'}\n` +
       `• قناة الاشتراك ↤︎ ${this.escapeHtml(subscriptionChannel?.title || 'غير محددة')}\n` +
       `• قفل الروابط ↤︎ ${settings.lockLinks ? '✅' : '❌'}\n` +
@@ -1242,6 +1279,7 @@ class GroupAdminHandler {
       edits: 'blockChannelEdits',
       mediaedits: 'blockMediaOnlyEdits',
       channeledits: 'blockChannelAnonymousEdits',
+      editadmins: 'exemptAdminsFromEditProtection',
       subscribe: 'requireNewsSubscription',
       words: 'filterBadWords',
       flood: 'floodProtection',
@@ -1252,7 +1290,7 @@ class GroupAdminHandler {
     };
     const key = keyMap[target];
     if (!key) {
-      return ctx.reply('❌ الخيار غير معروف. استخدم: links أو stickers أو forwards أو edits أو mediaedits أو channeledits أو subscribe أو words أو flood أو nsfw أو long أو longnotify أو maxlen أو admins');
+      return ctx.reply('❌ الخيار غير معروف. استخدم: links أو stickers أو forwards أو edits أو mediaedits أو channeledits أو editadmins أو subscribe أو words أو flood أو nsfw أو long أو longnotify أو maxlen أو admins');
     }
 
     if (target === 'subscribe' && switchValue === true) {
@@ -1836,13 +1874,15 @@ class GroupAdminHandler {
     const group = await this.ensureGroupRecord(ctx);
     const text = String(ctx.message?.text || '').trim();
     const isPrimaryOwner = await this.isPrimaryOwner(ctx);
-    if (!isPrimaryOwner) return ctx.reply('❌ هذا الأمر للمالك الأساسي فقط.');
+    if (!isPrimaryOwner) return ctx.reply(this.formatOwnerOnlyError());
 
     if (/^(الاساسي|الاساسيين|المالكين الاساسيين|\/gbasic)$/i.test(text)) {
       const rows = this.getRoleIds(group, 'basicOwnerIds');
-      if (rows.length === 0) return ctx.reply('ℹ️ لا يوجد مالكون أساسيون مرفوعون.');
-      const lines = rows.map((id, index) => `${index + 1}. <code>${id}</code>`);
-      return ctx.reply(`👑 <b>المالكون الأساسيون</b>\n\n${lines.join('\n')}`, { parse_mode: 'HTML' });
+      return ctx.reply(this.formatRoleListMessage('الاساسيين', rows, {
+        id: ctx.from?.id,
+        firstName: ctx.from?.first_name,
+        username: ctx.from?.username
+      }), { parse_mode: 'HTML' });
     }
 
     if (/^(رفع اساسي|\/gbasic\s+set)/i.test(text)) {
@@ -1852,7 +1892,11 @@ class GroupAdminHandler {
       this.assignInternalRole(group, 'basicOwnerIds', target.id);
       await this.addModerationLog(group, 'set_basic_owner', ctx.from.id, target.id);
       await group.save();
-      return ctx.reply(this.formatRoleActionMessage('تم رفعه مالك اساسي', target), { parse_mode: 'HTML' });
+      return ctx.reply(this.formatRoleActionMessage('تم رفعه مالك اساسي', target, {
+        id: ctx.from?.id,
+        firstName: ctx.from?.first_name,
+        username: ctx.from?.username
+      }), { parse_mode: 'HTML' });
     }
 
     if (/^(تنزيل اساسي|\/gbasic\s+remove)/i.test(text)) {
@@ -1863,7 +1907,11 @@ class GroupAdminHandler {
       this.syncLegacyRoleFields(group);
       await this.addModerationLog(group, 'remove_basic_owner', ctx.from.id, targetId);
       await group.save();
-      return ctx.reply(this.formatRoleActionMessage('تم تنزيله من المالكين الاساسيين', target), { parse_mode: 'HTML' });
+      return ctx.reply(this.formatRoleActionMessage('تم تنزيله من المالك الاساسي', target, {
+        id: ctx.from?.id,
+        firstName: ctx.from?.first_name,
+        username: ctx.from?.username
+      }), { parse_mode: 'HTML' });
     }
   }
 
@@ -1957,13 +2005,15 @@ class GroupAdminHandler {
     const group = await this.ensureGroupRecord(ctx);
     const text = String(ctx.message?.text || '').trim();
     const canUse = await this.isOwnerOrBasic(ctx);
-    if (!canUse) return ctx.reply('❌ هذا الأمر للمالك الأساسي أو المالكين الأساسيين أو المالكين فقط.');
+    if (!canUse) return ctx.reply(this.formatOwnerOnlyError());
 
     if (/^(المالكين|\/gowner)$/i.test(text)) {
       const rows = this.getRoleIds(group, 'ownerIds');
-      if (rows.length === 0) return ctx.reply('ℹ️ لا يوجد مالكون مرفوعون.');
-      const lines = rows.map((id, index) => `${index + 1}. <code>${id}</code>`);
-      return ctx.reply(`👑 <b>المالكون</b>\n\n${lines.join('\n')}`, { parse_mode: 'HTML' });
+      return ctx.reply(this.formatRoleListMessage('المالكين', rows, {
+        id: ctx.from?.id,
+        firstName: ctx.from?.first_name,
+        username: ctx.from?.username
+      }), { parse_mode: 'HTML' });
     }
 
     if (/^(رفع مالك|\/gowner\s+add)/i.test(text)) {
@@ -1972,7 +2022,11 @@ class GroupAdminHandler {
       this.assignInternalRole(group, 'ownerIds', target.id);
       await this.addModerationLog(group, 'add_owner_role', ctx.from.id, target.id);
       await group.save();
-      return ctx.reply(this.formatRoleActionMessage('تم رفعه مالك', target), { parse_mode: 'HTML' });
+      return ctx.reply(this.formatRoleActionMessage('تم رفعه مالك', target, {
+        id: ctx.from?.id,
+        firstName: ctx.from?.first_name,
+        username: ctx.from?.username
+      }), { parse_mode: 'HTML' });
     }
 
     if (/^(تنزيل مالك|\/gowner\s+remove)/i.test(text)) {
@@ -1982,7 +2036,11 @@ class GroupAdminHandler {
       group.settings.ownerIds = this.getRoleIds(group, 'ownerIds').filter((id) => id !== targetId);
       await this.addModerationLog(group, 'remove_owner_role', ctx.from.id, targetId);
       await group.save();
-      return ctx.reply(this.formatRoleActionMessage('تم تنزيله من المالكين', target), { parse_mode: 'HTML' });
+      return ctx.reply(this.formatRoleActionMessage('تم تنزيله من المالكين', target, {
+        id: ctx.from?.id,
+        firstName: ctx.from?.first_name,
+        username: ctx.from?.username
+      }), { parse_mode: 'HTML' });
     }
   }
 
@@ -1991,13 +2049,15 @@ class GroupAdminHandler {
     const group = await this.ensureGroupRecord(ctx);
     const text = String(ctx.message?.text || '').trim();
     const canUse = await this.isOwnerOrBasic(ctx);
-    if (!canUse) return ctx.reply('❌ هذا الأمر للمالك الأساسي أو المالكين الأساسيين أو المالكين فقط.');
+    if (!canUse) return ctx.reply(this.formatOwnerOnlyError());
 
     if (/^(المدراء|\/gmanager)$/i.test(text)) {
       const rows = this.getRoleIds(group, 'managerIds');
-      if (rows.length === 0) return ctx.reply('ℹ️ لا يوجد مدراء مرفوعون.');
-      const lines = rows.map((id, index) => `${index + 1}. <code>${id}</code>`);
-      return ctx.reply(`🛠️ <b>المدراء</b>\n\n${lines.join('\n')}`, { parse_mode: 'HTML' });
+      return ctx.reply(this.formatRoleListMessage('المدراء', rows, {
+        id: ctx.from?.id,
+        firstName: ctx.from?.first_name,
+        username: ctx.from?.username
+      }), { parse_mode: 'HTML' });
     }
 
     if (/^(رفع مدير|\/gmanager\s+add)/i.test(text)) {
@@ -2006,7 +2066,11 @@ class GroupAdminHandler {
       this.assignInternalRole(group, 'managerIds', target.id);
       await this.addModerationLog(group, 'add_manager_role', ctx.from.id, target.id);
       await group.save();
-      return ctx.reply(this.formatRoleActionMessage('تم رفعه مدير', target), { parse_mode: 'HTML' });
+      return ctx.reply(this.formatRoleActionMessage('تم رفعه مدير', target, {
+        id: ctx.from?.id,
+        firstName: ctx.from?.first_name,
+        username: ctx.from?.username
+      }), { parse_mode: 'HTML' });
     }
 
     if (/^(تنزيل مدير|\/gmanager\s+remove)/i.test(text)) {
@@ -2016,7 +2080,11 @@ class GroupAdminHandler {
       group.settings.managerIds = this.getRoleIds(group, 'managerIds').filter((id) => id !== targetId);
       await this.addModerationLog(group, 'remove_manager_role', ctx.from.id, targetId);
       await group.save();
-      return ctx.reply(this.formatRoleActionMessage('تم تنزيله من المدراء', target), { parse_mode: 'HTML' });
+      return ctx.reply(this.formatRoleActionMessage('تم تنزيله من المدراء', target, {
+        id: ctx.from?.id,
+        firstName: ctx.from?.first_name,
+        username: ctx.from?.username
+      }), { parse_mode: 'HTML' });
     }
   }
 
@@ -2026,31 +2094,58 @@ class GroupAdminHandler {
     const text = String(ctx.message?.text || '').trim();
     const canUse = await this.isManagerOrHigher(ctx);
     if (!canUse) return ctx.reply('❌ هذا الأمر للمدراء فما فوق فقط.');
+    const actorIsOwnerOrBasic = await this.isOwnerOrBasic(ctx);
 
     if (/^(الادمنية|الأدمنية|الادمن|الادمنز|\/gadmins)$/i.test(text)) {
       const rows = this.getRoleIds(group, 'adminIds');
-      if (rows.length === 0) return ctx.reply('ℹ️ لا يوجد أدمنية مرفوعون.');
-      const lines = rows.map((id, index) => `${index + 1}. <code>${id}</code>`);
-      return ctx.reply(`🛡️ <b>الأدمنية</b>\n\n${lines.join('\n')}`, { parse_mode: 'HTML' });
+      return ctx.reply(this.formatRoleListMessage('الادمنية', rows, {
+        id: ctx.from?.id,
+        firstName: ctx.from?.first_name,
+        username: ctx.from?.username
+      }), { parse_mode: 'HTML' });
     }
 
     if (/^(رفع ادمن|\/gadmins\s+add)/i.test(text)) {
       const target = await this.resolveTargetUser(ctx, this.parseCommandArgs(ctx).slice(1));
       if (!target?.id) return ctx.reply('❌ استخدم الأمر بالرد على العضو أو بالمعرف.');
+      if (!actorIsOwnerOrBasic) {
+        const targetIsOwnerOrBasic = await this.isOwnerOrBasic(ctx, target.id);
+        const targetIsManager = this.getRoleIds(group, 'managerIds').includes(Number(target.id));
+        const targetMember = await this.getChatMemberSafe(ctx, target.id);
+        if (targetIsOwnerOrBasic || targetIsManager || targetMember?.status === 'creator') {
+          return ctx.reply('❌ لا يمكنك التحكم برتبة أعلى منك.');
+        }
+      }
       this.assignInternalRole(group, 'adminIds', target.id);
       await this.addModerationLog(group, 'add_admin_role', ctx.from.id, target.id);
       await group.save();
-      return ctx.reply(this.formatRoleActionMessage('تم رفعه أدمن', target), { parse_mode: 'HTML' });
+      return ctx.reply(this.formatRoleActionMessage('تم رفعه أدمن', target, {
+        id: ctx.from?.id,
+        firstName: ctx.from?.first_name,
+        username: ctx.from?.username
+      }), { parse_mode: 'HTML' });
     }
 
     if (/^(تنزيل ادمن|\/gadmins\s+remove)/i.test(text)) {
       const target = await this.resolveTargetUser(ctx, this.parseCommandArgs(ctx).slice(1));
       if (!target?.id) return ctx.reply('❌ استخدم الأمر بالرد على العضو أو بالمعرف.');
+      if (!actorIsOwnerOrBasic) {
+        const targetIsOwnerOrBasic = await this.isOwnerOrBasic(ctx, target.id);
+        const targetIsManager = this.getRoleIds(group, 'managerIds').includes(Number(target.id));
+        const targetMember = await this.getChatMemberSafe(ctx, target.id);
+        if (targetIsOwnerOrBasic || targetIsManager || targetMember?.status === 'creator') {
+          return ctx.reply('❌ لا يمكنك التحكم برتبة أعلى منك.');
+        }
+      }
       const targetId = Number(target.id);
       group.settings.adminIds = this.getRoleIds(group, 'adminIds').filter((id) => id !== targetId);
       await this.addModerationLog(group, 'remove_admin_role', ctx.from.id, targetId);
       await group.save();
-      return ctx.reply(this.formatRoleActionMessage('تم تنزيله من الأدمنية', target), { parse_mode: 'HTML' });
+      return ctx.reply(this.formatRoleActionMessage('تم تنزيله من الأدمنية', target, {
+        id: ctx.from?.id,
+        firstName: ctx.from?.first_name,
+        username: ctx.from?.username
+      }), { parse_mode: 'HTML' });
     }
   }
 
@@ -2059,13 +2154,15 @@ class GroupAdminHandler {
     const group = await this.ensureGroupRecord(ctx);
     const text = String(ctx.message?.text || '').trim();
     const canUse = await this.isOwnerOrBasic(ctx);
-    if (!canUse) return ctx.reply('❌ هذا الأمر للمالك الأساسي أو المالكين الأساسيين أو المالكين فقط.');
+    if (!canUse) return ctx.reply(this.formatOwnerOnlyError());
 
     if (/^(المميزين|\/gpremium)$/i.test(text)) {
       const rows = this.getRoleIds(group, 'premiumMemberIds');
-      if (rows.length === 0) return ctx.reply('ℹ️ لا يوجد أعضاء مميزون حاليًا.');
-      const lines = rows.slice(0, 50).map((id, index) => `${index + 1}. <code>${id}</code>`);
-      return ctx.reply(`🌟 <b>المميزين</b>\n\n${lines.join('\n')}`, { parse_mode: 'HTML' });
+      return ctx.reply(this.formatRoleListMessage('المميزين', rows, {
+        id: ctx.from?.id,
+        firstName: ctx.from?.first_name,
+        username: ctx.from?.username
+      }), { parse_mode: 'HTML' });
     }
 
     if (/^(رفع مميز|\/gpremium\s+add)/i.test(text)) {
@@ -2074,7 +2171,11 @@ class GroupAdminHandler {
       this.assignInternalRole(group, 'premiumMemberIds', target.id);
       await this.addModerationLog(group, 'add_premium_member', ctx.from.id, target.id);
       await group.save();
-      return ctx.reply(this.formatRoleActionMessage('تم رفعه مميز', target), { parse_mode: 'HTML' });
+      return ctx.reply(this.formatRoleActionMessage('تم رفعه مميز', target, {
+        id: ctx.from?.id,
+        firstName: ctx.from?.first_name,
+        username: ctx.from?.username
+      }), { parse_mode: 'HTML' });
     }
 
     if (/^(تنزيل مميز|\/gpremium\s+remove)/i.test(text)) {
@@ -2084,7 +2185,11 @@ class GroupAdminHandler {
       group.settings.premiumMemberIds = this.getRoleIds(group, 'premiumMemberIds').filter((id) => id !== targetId);
       await this.addModerationLog(group, 'remove_premium_member', ctx.from.id, targetId);
       await group.save();
-      return ctx.reply(this.formatRoleActionMessage('تم تنزيله من المميزين', target), { parse_mode: 'HTML' });
+      return ctx.reply(this.formatRoleActionMessage('تم تنزيله من المميزين', target, {
+        id: ctx.from?.id,
+        firstName: ctx.from?.first_name,
+        username: ctx.from?.username
+      }), { parse_mode: 'HTML' });
     }
   }
 
@@ -2093,7 +2198,7 @@ class GroupAdminHandler {
     const group = await this.ensureGroupRecord(ctx);
     const text = String(ctx.message?.text || '').trim();
     const canUse = await this.isOwnerOrBasic(ctx);
-    if (!canUse) return ctx.reply('❌ هذا الأمر للمالك الأساسي أو المالكين الأساسيين أو المالكين فقط.');
+    if (!canUse) return ctx.reply(this.formatOwnerOnlyError());
 
     const admins = await ctx.telegram.getChatAdministrators(ctx.chat.id).catch(() => []);
     const creators = admins
@@ -2113,9 +2218,11 @@ class GroupAdminHandler {
 
     const rows = roleMap[text];
     if (!rows) return false;
-    if (rows.length === 0) return ctx.reply(`ℹ️ لا يوجد ${text} حاليًا.`);
-    const lines = rows.slice(0, 50).map((id, index) => `${index + 1}. <code>${id}</code>`);
-    return ctx.reply(`📋 <b>${text}</b>\n\n${lines.join('\n')}`, { parse_mode: 'HTML' });
+    return ctx.reply(this.formatRoleListMessage(text, rows.slice(0, 50), {
+      id: ctx.from?.id,
+      firstName: ctx.from?.first_name,
+      username: ctx.from?.username
+    }), { parse_mode: 'HTML' });
   }
 
   static async handleExceptionsCommand(ctx) {
@@ -4097,6 +4204,12 @@ class GroupAdminHandler {
       const isChannelEdit = Boolean(senderChat && senderChat.type === 'channel');
       const isAnonymousAdminEdit = Boolean(senderChat && Number(senderChat.id) === Number(chat.id));
       const isMediaEdit = this.isEditedMediaMessage(message);
+      const editorUserId = Number(message?.from?.id || 0);
+      const editorIsAdmin = editorUserId ? await this.isGroupAdmin(ctx, editorUserId) : false;
+
+      if (group.settings?.exemptAdminsFromEditProtection && (editorIsAdmin || isAnonymousAdminEdit)) {
+        return;
+      }
 
       let modeLabel = '';
       if (group.settings?.blockChannelEdits && isChannelEdit) {
@@ -4448,7 +4561,7 @@ class GroupAdminHandler {
       return true;
     }
     if (
-      /^(قفل الروابط|فتح الروابط|تفعيل منع ارسال الروابط|تعطيل منع ارسال الروابط|تفعيل منع إرسال الروابط|تعطيل منع إرسال الروابط|قفل الملصقات|فتح الملصقات|تفعيل منع التوجيه|تعطيل منع التوجيه|تفعيل حماية التعديل|تعطيل حماية التعديل|تفعيل حماية تعديل الوسائط فقط|تعطيل حماية تعديل الوسائط فقط|تفعيل حماية تعديل من القنوات والادمن المجهول|تعطيل حماية تعديل من القنوات والادمن المجهول|تفعيل حماية تعديل من القنوات والأدمن المجهول|تعطيل حماية تعديل من القنوات والأدمن المجهول|تفعيل حماية الحذف|تعطيل حماية الحذف|تفعيل الاشتراك الاجباري|تعطيل الاشتراك الاجباري|تفعيل الاشتراك الإجباري|تعطيل الاشتراك الإجباري|تفعيل الكلمات|تعطيل الكلمات|تفعيل التكرار|تعطيل التكرار|تفعيل منع الاباحية|تعطيل منع الاباحية|تفعيل منع الرسائل الطويل(?:ة|ه)|تعطيل منع الرسائل الطويل(?:ة|ه)|تفعيل اشعار منع الرسائل الطويل(?:ة|ه)|تعطيل اشعار منع الرسائل الطويل(?:ة|ه)|استثناء المشرفين من الحماية|الغاء استثناء المشرفين من الحماية|إلغاء استثناء المشرفين من الحماية|الحماية|\/gprotect\b)/i.test(rawText)
+      /^(قفل الروابط|فتح الروابط|تفعيل منع ارسال الروابط|تعطيل منع ارسال الروابط|تفعيل منع إرسال الروابط|تعطيل منع إرسال الروابط|قفل الملصقات|فتح الملصقات|تفعيل منع التوجيه|تعطيل منع التوجيه|تفعيل حماية التعديل|تعطيل حماية التعديل|تفعيل حماية تعديل الوسائط فقط|تعطيل حماية تعديل الوسائط فقط|تفعيل حماية تعديل من القنوات والادمن المجهول|تعطيل حماية تعديل من القنوات والادمن المجهول|تفعيل حماية تعديل من القنوات والأدمن المجهول|تعطيل حماية تعديل من القنوات والأدمن المجهول|استثناء المشرفين من حماية التعديل|الغاء استثناء المشرفين من حماية التعديل|إلغاء استثناء المشرفين من حماية التعديل|تفعيل حماية الحذف|تعطيل حماية الحذف|تفعيل الاشتراك الاجباري|تعطيل الاشتراك الاجباري|تفعيل الاشتراك الإجباري|تعطيل الاشتراك الإجباري|تفعيل الكلمات|تعطيل الكلمات|تفعيل التكرار|تعطيل التكرار|تفعيل منع الاباحية|تعطيل منع الاباحية|تفعيل منع الرسائل الطويل(?:ة|ه)|تعطيل منع الرسائل الطويل(?:ة|ه)|تفعيل اشعار منع الرسائل الطويل(?:ة|ه)|تعطيل اشعار منع الرسائل الطويل(?:ة|ه)|استثناء المشرفين من الحماية|الغاء استثناء المشرفين من الحماية|إلغاء استثناء المشرفين من الحماية|الحماية|\/gprotect\b)/i.test(rawText)
     ) {
       if (/^(قفل الروابط|تفعيل منع ارسال الروابط|تفعيل منع إرسال الروابط)$/i.test(rawText)) {
         const result = await this.setProtectionSetting(ctx, 'lockLinks', true, 'text');
@@ -4520,6 +4633,18 @@ class GroupAdminHandler {
         const result = await this.setProtectionSetting(ctx, 'blockChannelAnonymousEdits', false, 'text');
         if (!result?.ok) return true;
         await ctx.reply('✅ تم تعطيل حماية تعديل من القنوات + الأدمن المجهول.');
+        return true;
+      }
+      if (/^استثناء المشرفين من حماية التعديل$/i.test(rawText)) {
+        const result = await this.setProtectionSetting(ctx, 'exemptAdminsFromEditProtection', true, 'text');
+        if (!result?.ok) return true;
+        await ctx.reply('✅ تم تفعيل استثناء المشرفين من حماية التعديل.');
+        return true;
+      }
+      if (/^(الغاء استثناء المشرفين من حماية التعديل|إلغاء استثناء المشرفين من حماية التعديل)$/i.test(rawText)) {
+        const result = await this.setProtectionSetting(ctx, 'exemptAdminsFromEditProtection', false, 'text');
+        if (!result?.ok) return true;
+        await ctx.reply('✅ تم إلغاء استثناء المشرفين من حماية التعديل.');
         return true;
       }
       if (/^تفعيل حماية الحذف$/i.test(rawText)) {
