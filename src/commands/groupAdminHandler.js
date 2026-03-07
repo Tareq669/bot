@@ -1886,8 +1886,6 @@ class GroupAdminHandler {
     if (!this.isGroupChat(ctx)) return;
     const group = await this.ensureGroupRecord(ctx);
     const text = String(ctx.message?.text || '').trim();
-    const isPrimaryOwner = await this.isPrimaryOwner(ctx);
-    if (!isPrimaryOwner) return ctx.reply(this.formatOwnerOnlyError());
 
     if (/^(الاساسي|الاساسيين|المالكين الاساسيين|\/gbasic)$/i.test(text)) {
       const rows = this.getRoleIds(group, 'basicOwnerIds');
@@ -1897,6 +1895,9 @@ class GroupAdminHandler {
         username: ctx.from?.username
       }), { parse_mode: 'HTML' });
     }
+
+    const isPrimaryOwner = await this.isPrimaryOwner(ctx);
+    if (!isPrimaryOwner) return ctx.reply(this.formatOwnerOnlyError());
 
     if (/^(رفع اساسي|\/gbasic\s+set)/i.test(text)) {
       const target = await this.resolveTargetUser(ctx, this.parseCommandArgs(ctx).slice(1));
@@ -2017,8 +2018,6 @@ class GroupAdminHandler {
     if (!this.isGroupChat(ctx)) return;
     const group = await this.ensureGroupRecord(ctx);
     const text = String(ctx.message?.text || '').trim();
-    const canUse = await this.isOwnerOrBasic(ctx);
-    if (!canUse) return ctx.reply(this.formatOwnerOnlyError());
 
     if (/^(المالكين|\/gowner)$/i.test(text)) {
       const rows = this.getRoleIds(group, 'ownerIds');
@@ -2028,6 +2027,9 @@ class GroupAdminHandler {
         username: ctx.from?.username
       }), { parse_mode: 'HTML' });
     }
+
+    const canUse = await this.isOwnerOrBasic(ctx);
+    if (!canUse) return ctx.reply(this.formatOwnerOnlyError());
 
     if (/^(رفع مالك|\/gowner\s+add)/i.test(text)) {
       const target = await this.resolveTargetUser(ctx, this.parseCommandArgs(ctx).slice(1));
@@ -2061,8 +2063,6 @@ class GroupAdminHandler {
     if (!this.isGroupChat(ctx)) return;
     const group = await this.ensureGroupRecord(ctx);
     const text = String(ctx.message?.text || '').trim();
-    const canUse = await this.isOwnerOrBasic(ctx);
-    if (!canUse) return ctx.reply(this.formatOwnerOnlyError());
 
     if (/^(المدراء|\/gmanager)$/i.test(text)) {
       const rows = this.getRoleIds(group, 'managerIds');
@@ -2072,6 +2072,9 @@ class GroupAdminHandler {
         username: ctx.from?.username
       }), { parse_mode: 'HTML' });
     }
+
+    const canUse = await this.isOwnerOrBasic(ctx);
+    if (!canUse) return ctx.reply(this.formatOwnerOnlyError());
 
     if (/^(رفع مدير|\/gmanager\s+add)/i.test(text)) {
       const target = await this.resolveTargetUser(ctx, this.parseCommandArgs(ctx).slice(1));
@@ -2105,9 +2108,6 @@ class GroupAdminHandler {
     if (!this.isGroupChat(ctx)) return;
     const group = await this.ensureGroupRecord(ctx);
     const text = String(ctx.message?.text || '').trim();
-    const canUse = await this.isManagerOrHigher(ctx);
-    if (!canUse) return ctx.reply('❌ هذا الأمر للمدراء فما فوق فقط.');
-    const actorIsOwnerOrBasic = await this.isOwnerOrBasic(ctx);
 
     if (/^(الادمنية|الأدمنية|الادمن|الادمنز|\/gadmins)$/i.test(text)) {
       const rows = this.getRoleIds(group, 'adminIds');
@@ -2117,6 +2117,10 @@ class GroupAdminHandler {
         username: ctx.from?.username
       }), { parse_mode: 'HTML' });
     }
+
+    const canUse = await this.isManagerOrHigher(ctx);
+    if (!canUse) return ctx.reply('❌ هذا الأمر للمدراء فما فوق فقط.');
+    const actorIsOwnerOrBasic = await this.isOwnerOrBasic(ctx);
 
     if (/^(رفع ادمن|\/gadmins\s+add)/i.test(text)) {
       const target = await this.resolveTargetUser(ctx, this.parseCommandArgs(ctx).slice(1));
@@ -2166,8 +2170,6 @@ class GroupAdminHandler {
     if (!this.isGroupChat(ctx)) return;
     const group = await this.ensureGroupRecord(ctx);
     const text = String(ctx.message?.text || '').trim();
-    const canUse = await this.isOwnerOrBasic(ctx);
-    if (!canUse) return ctx.reply(this.formatOwnerOnlyError());
 
     if (/^(المميزين|\/gpremium)$/i.test(text)) {
       const rows = this.getRoleIds(group, 'premiumMemberIds');
@@ -2177,6 +2179,9 @@ class GroupAdminHandler {
         username: ctx.from?.username
       }), { parse_mode: 'HTML' });
     }
+
+    const canUse = await this.isOwnerOrBasic(ctx);
+    if (!canUse) return ctx.reply(this.formatOwnerOnlyError());
 
     if (/^(رفع مميز|\/gpremium\s+add)/i.test(text)) {
       const target = await this.resolveTargetUser(ctx, this.parseCommandArgs(ctx).slice(1));
@@ -2210,12 +2215,14 @@ class GroupAdminHandler {
     if (!this.isGroupChat(ctx)) return false;
     const group = await this.ensureGroupRecord(ctx);
     const text = String(ctx.message?.text || '').trim();
-    const canUse = await this.isOwnerOrBasic(ctx);
-    if (!canUse) return ctx.reply(this.formatOwnerOnlyError());
 
     const admins = await ctx.telegram.getChatAdministrators(ctx.chat.id).catch(() => []);
     const creators = admins
       .filter((member) => member.status === 'creator')
+      .map((member) => Number(member.user?.id))
+      .filter(Boolean);
+    const telegramAdmins = admins
+      .filter((member) => member.status === 'administrator')
       .map((member) => Number(member.user?.id))
       .filter(Boolean);
 
@@ -2226,7 +2233,9 @@ class GroupAdminHandler {
       'المدراء': this.getRoleIds(group, 'managerIds'),
       'الادمنية': this.getRoleIds(group, 'adminIds'),
       'الأدمنية': this.getRoleIds(group, 'adminIds'),
-      'المميزين': this.getRoleIds(group, 'premiumMemberIds')
+      'المميزين': this.getRoleIds(group, 'premiumMemberIds'),
+      'مشرفو تيليجرام': telegramAdmins,
+      'المستثنين': Array.isArray(group.settings?.exceptions) ? group.settings.exceptions.map(Number) : []
     };
 
     const rows = roleMap[text];
@@ -2240,9 +2249,6 @@ class GroupAdminHandler {
 
   static async handleExceptionsCommand(ctx) {
     if (!this.isGroupChat(ctx)) return;
-    const canUse = await this.isOwnerOrBasic(ctx);
-    if (!canUse) return ctx.reply(this.formatOwnerOnlyError());
-
     const group = await this.ensureGroupRecord(ctx);
     const text = String(ctx.message?.text || '').trim();
     const requester = {
@@ -2255,6 +2261,9 @@ class GroupAdminHandler {
     if (/^(المستثنئين|\/gexceptions(\s+list)?)$/i.test(text)) {
       return ctx.reply(await this.formatRoleListMessage(ctx, 'المستثنئين', group.settings.exceptions.slice(0, 50), requester), { parse_mode: 'HTML' });
     }
+
+    const canUse = await this.isOwnerOrBasic(ctx);
+    if (!canUse) return ctx.reply(this.formatOwnerOnlyError());
 
     if (/^(مسح الاستثناءات|\/gexceptions\s+clear)$/i.test(text)) {
       group.settings.exceptions = [];
@@ -2291,9 +2300,6 @@ class GroupAdminHandler {
 
   static async handleRanksCountCommand(ctx) {
     if (!this.isGroupChat(ctx)) return;
-    const canUse = await this.isOwnerOrBasic(ctx);
-    if (!canUse) return ctx.reply('❌ هذا الأمر للمالك الأساسي أو الأساسي فقط.');
-
     const group = await this.ensureGroupRecord(ctx);
     const admins = await ctx.telegram.getChatAdministrators(ctx.chat.id).catch(() => []);
     const creatorsCount = admins.filter((m) => m.status === 'creator').length;
@@ -4492,7 +4498,7 @@ class GroupAdminHandler {
       await this.handlePremiumMemberCommand(ctx);
       return true;
     }
-    if (/^(المنشئين|المالكين الاساسيين|المالكين|المدراء|الادمنية|الأدمنية|المميزين|رتبتي)$/i.test(rawText)) {
+    if (/^(المنشئين|المالكين الاساسيين|المالكين|المدراء|الادمنية|الأدمنية|المميزين|مشرفو تيليجرام|المستثنين|المستثنئين|رتبتي)$/i.test(rawText)) {
       if (/^رتبتي$/i.test(rawText)) {
         await this.handleMyRankCommand(ctx);
         return true;
