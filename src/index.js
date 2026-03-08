@@ -231,6 +231,53 @@ bot.use(async (ctx, next) => {
   return next();
 });
 
+// Auto-reply commands to the same user message in groups.
+bot.use(async (ctx, next) => {
+  const chatType = ctx.chat?.type;
+  const isGroup = chatType === 'group' || chatType === 'supergroup';
+  const text = String(ctx.message?.text || '').trim();
+  const messageId = Number(ctx.message?.message_id || 0);
+
+  const isCommandLike = Boolean(
+    isGroup &&
+    messageId > 0 &&
+    text &&
+    (
+      text.startsWith('/') ||
+      /^(الاوامر|مساعدة|ساعدني|الالعاب|الألعاب|العاب الجروب|الرتب|رتبتي|فحص|رفع|تنزيل|كتم|الغاء|إلغاء|فك|حظر|تقييد|تفعيل|تعطيل|اعدادات|إعدادات|شراء|بيع|اهداء|إهداء|متجر|هدايا|ممتلكاتي|حسابي|راتب|بخشيش|العجلة|حظ|استثمار|سعر الاسهم|ديني|علمي|تاريخي|فقهي|جغرافي|فيزياء|فيزيائي|حسابات|حسابي|لاونج|كافيتيريا|اشرب|اكل|كول|البس|همسه|همسة|all)\b/i.test(text)
+    )
+  );
+
+  if (isCommandLike) {
+    const patchReplyMethod = (methodName) => {
+      const original = ctx[methodName];
+      if (typeof original !== 'function') return;
+      ctx[methodName] = (...args) => {
+        if (!args.length) return original.apply(ctx, args);
+        const lastArg = args[args.length - 1];
+        const hasOptionsObject = lastArg && typeof lastArg === 'object' && !Array.isArray(lastArg);
+        const options = hasOptionsObject ? lastArg : {};
+        if (!options.reply_to_message_id) options.reply_to_message_id = messageId;
+        if (!hasOptionsObject) args.push(options);
+        return original.apply(ctx, args);
+      };
+    };
+
+    [
+      'reply',
+      'replyWithPhoto',
+      'replyWithVideo',
+      'replyWithAnimation',
+      'replyWithDocument',
+      'replyWithAudio',
+      'replyWithVoice',
+      'replyWithSticker'
+    ].forEach(patchReplyMethod);
+  }
+
+  return next();
+});
+
 bot.use(async (ctx, next) => {
   await next();
   await SponsoredAdsSystem.maybeShowAd(ctx);
