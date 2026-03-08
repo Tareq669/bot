@@ -2759,6 +2759,7 @@ bot.hears(/^(?:\/)?ابدأ\s*حاكم\s*جلاد$/i, (ctx) => GroupGamesHandler
 bot.hears(/^(?:\/)?انهاء\s*حاكم\s*جلاد$/i, (ctx) => GroupGamesHandler.handleRulerExecutionEndCommand(ctx));
 bot.hears(/^حكم\s*سؤال$/i, (ctx) => GroupGamesHandler.handleRulerExecutionJudgeCommand(ctx, 'question'));
 bot.hears(/^حكم\s*تحدي$/i, (ctx) => GroupGamesHandler.handleRulerExecutionJudgeCommand(ctx, 'challenge'));
+bot.hears(/^(?:\/)?(?:😂\s*)?(?:مولد\s*نكت|نكت|نكته|نكتة)$/i, (ctx) => GroupGamesHandler.handleJokeGeneratorCommand(ctx));
 bot.hears(/^مين\s*انا$/i, (ctx) => GroupGamesHandler.handleWhoAmICommand(ctx));
 bot.hears(/^(?:الغاز|ألغاز|لغز)$/i, (ctx) => GroupGamesHandler.handleRiddleCommand(ctx));
 bot.hears(/^سرعة\s*الكتابة$/i, (ctx) => GroupGamesHandler.handleTypingCommand(ctx));

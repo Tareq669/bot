@@ -3,6 +3,117 @@ const { Group, User } = require('../database/models');
 
 const GROUP_TYPES = new Set(['group', 'supergroup']);
 
+const JOKE_SUBJECTS = [
+  'واحد بخيل',
+  'واحد كريم زيادة',
+  'واحد ناسي كل شي',
+  'واحد سريع الزعل',
+  'واحد عبقري بس مستعجل',
+  'واحد رايق زيادة',
+  'واحد كسول محترف',
+  'واحد فضولي',
+  'واحد مبرمج',
+  'واحد لاعب',
+  'واحد طالب',
+  'واحد موظف',
+  'واحد صاحب محل',
+  'واحد خباز',
+  'واحد سائق',
+  'واحد صيّاد',
+  'واحد مغني حمّام',
+  'واحد فنان',
+  'واحد شاعر',
+  'واحد ميكانيكي'
+];
+
+const JOKE_PLACES = [
+  'راح على المطعم',
+  'دخل السوبرماركت',
+  'طلع على الباص',
+  'دخل الصف',
+  'فتح اللابتوب',
+  'راح على الصيدلية',
+  'دخل البنك',
+  'راح على السوق',
+  'دخل الجيم',
+  'راح على الحلاق',
+  'فتح الثلاجة',
+  'دخل المصعد',
+  'اتصل بخدمة العملاء',
+  'راح على السينما',
+  'دخل المكتبة',
+  'راح على المستشفى',
+  'دخل قاعة الامتحان',
+  'فتح تطبيق الخرائط',
+  'دخل المخبز',
+  'راح على المطار'
+];
+
+const JOKE_TWISTS = [
+  'طلب خصم على الهوا',
+  'سأل إذا في تقسيط على الابتسامة',
+  'نسي ليش إجى من الأساس',
+  'قعد يعدّ البلاط',
+  'صار يفاوض على سعر المجان',
+  'كتب ملاحظة ونسي يقرأها',
+  'حكى: دقيقة وبرجع بعد يومين',
+  'سأل عن زر الحظ',
+  'حاول يشحن بطارية الباب',
+  'طلب فاتورة للنكتة',
+  'حسبها آلة حاسبة وطلعت مزحة',
+  'حط منبّه عشان ما ينسى المنبّه',
+  'بدل ما يشتري، باع النصيحة',
+  'طلب من الكاشير يسلفه صبر',
+  'سأل إذا في واي فاي للضمير',
+  'أرسل لنفسه رسالة تذكير',
+  'قلب الجد لحصة ضحك',
+  'ضحك لحاله وبعدين استأذن',
+  'حكى: أنا جاي أتفرج بس',
+  'حاول يثبت إن الشاي أسرع من القهوة',
+  'استخدم المنطق بالغلط',
+  'سأل عن مخرج الطوارئ من الإحراج',
+  'خلّى الطابور يضحك عليه',
+  'دفع بكرت الولاء تبع الجيران',
+  'نزل تحديث لمزاجه',
+  'قال: اليوم بدون قرارات',
+  'طلب كيس للكسل',
+  'أخذ رقم وانتظر على وضع الطيران',
+  'سأل إذا النكتة عليها ضمان',
+  'طلب كوب مي بدون بلل'
+];
+
+const JOKE_ENDINGS = [
+  'وصار الكل يضحك عليه قبل ما يكمل.',
+  'والكاشير قاله: عيني عليك باردة يا فيلسوف.',
+  'وبالآخر اكتشف إنه في المكان الغلط.',
+  'ومن يومها سماه الحي: معلم الارتباك.',
+  'ورد عليه الموظف: ممتاز... بس ليش؟',
+  'وطلع أذكى حركة بس في الكون الموازي.',
+  'وبدل ما يخلص المهمة، فتح موضوع جديد.',
+  'ومن كثر الجدية قلبت Stand-up.',
+  'وطلع الحل أبسط من تفكيره بمليون مرة.',
+  'ومن بعدها صار يعطي كورسات مجانية بالإحراج.',
+  'واللي حواليه صفقوا له من باب الدعم النفسي.',
+  'والجواب كان: ولا حدا فاهم بس مبسوطين.',
+  'ومن يومها وهو ممنوع يفكر قبل القهوة.',
+  'وبالآخر قال: تمام اعتبروني ما جيت.',
+  'والمشكلة إنه كان مقتنع 100٪.',
+  'وطلع البطل الرسمي في الهبد المنطقي.',
+  'والنتيجة: ضحك جماعي بدون سبب.',
+  'ومن بعدها صار يسأل قبل ما يحكي.',
+  'وهيك خلصت القصة بضحكتين وفاتورة.',
+  'والقروب اتفق يعطيه لقب نجم النكت.'
+];
+
+const JOKE_PATTERNS = [
+  'مرة {subject}، {place}، {twist}، {ending}',
+  'مرة {subject} {place}، وفجأة {twist}، {ending}',
+  'مرة {subject} قال: \"أنا جاهز\"، {place}، وبالآخر {twist}، {ending}'
+];
+
+const TOTAL_JOKE_COMBINATIONS =
+  JOKE_SUBJECTS.length * JOKE_PLACES.length * JOKE_TWISTS.length * JOKE_ENDINGS.length * JOKE_PATTERNS.length;
+
 const QUICK_QUESTIONS = [
   { question: 'ما عاصمة السعودية؟', answers: ['الرياض'], reward: 8 },
   { question: 'ما عاصمة مصر؟', answers: ['القاهرة', 'القاهره'], reward: 8 },
@@ -952,6 +1063,7 @@ class GroupGamesHandler {
   static activeHookahSessions = new Map();
   static activeRulerExecutionGames = new Map();
   static rulerExecutionTimers = new Map();
+  static jokeCursorByChat = new Map();
   static lastQuestionByGroup = new Map();
   static questionQueues = new Map();
   static userCooldowns = new Map();
@@ -6140,6 +6252,50 @@ class GroupGamesHandler {
     const timer = this.rulerExecutionTimers.get(key);
     if (timer) clearTimeout(timer);
     this.rulerExecutionTimers.delete(key);
+  }
+
+  static buildGeneratedJokeByIndex(index) {
+    const total = Math.max(1, TOTAL_JOKE_COMBINATIONS);
+    let cursor = Math.abs(Number(index) || 0) % total;
+
+    const pattern = JOKE_PATTERNS[cursor % JOKE_PATTERNS.length];
+    cursor = Math.floor(cursor / JOKE_PATTERNS.length);
+    const subject = JOKE_SUBJECTS[cursor % JOKE_SUBJECTS.length];
+    cursor = Math.floor(cursor / JOKE_SUBJECTS.length);
+    const place = JOKE_PLACES[cursor % JOKE_PLACES.length];
+    cursor = Math.floor(cursor / JOKE_PLACES.length);
+    const twist = JOKE_TWISTS[cursor % JOKE_TWISTS.length];
+    cursor = Math.floor(cursor / JOKE_TWISTS.length);
+    const ending = JOKE_ENDINGS[cursor % JOKE_ENDINGS.length];
+
+    return pattern
+      .replace('{subject}', subject)
+      .replace('{place}', place)
+      .replace('{twist}', twist)
+      .replace('{ending}', ending);
+  }
+
+  static getNextJoke(chatId) {
+    const key = String(chatId || 'global');
+    const last = Number(this.jokeCursorByChat.get(key) || 0);
+    const step = 137;
+    const base = Math.floor(Math.random() * 1000);
+    const next = (last + step + base + 1) % Math.max(1, TOTAL_JOKE_COMBINATIONS);
+    this.jokeCursorByChat.set(key, next);
+    return this.buildGeneratedJokeByIndex(next);
+  }
+
+  static async handleJokeGeneratorCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const requester = this.mentionUser(
+      ctx.from?.id,
+      ctx.from?.first_name || ctx.from?.username || String(ctx.from?.id || 'مستخدم')
+    );
+    const joke = this.getNextJoke(ctx.chat?.id);
+    return ctx.reply(
+      `${requester}\n♪ ${joke}`,
+      { parse_mode: 'HTML', reply_to_message_id: ctx.message?.message_id }
+    );
   }
 
   static async handleRulerExecutionCommand(ctx) {
