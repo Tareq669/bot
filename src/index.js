@@ -249,6 +249,22 @@ bot.use(async (ctx, next) => {
   );
 
   if (isCommandLike) {
+    const mentionHtml = `<a href="tg://user?id=${Number(ctx.from?.id || 0)}">${String(ctx.from?.first_name || ctx.from?.username || 'مستخدم').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</a>`;
+    const applyMentionPrefix = (content, options = {}, _captionMode = false) => {
+      const parseMode = String(options.parse_mode || '').toLowerCase();
+      const supportsHtml = !parseMode || parseMode === 'html';
+      const separator = '\n';
+      if (typeof content !== 'string' || !content.trim()) return { content, options };
+      if (content.includes('tg://user?id=')) return { content, options };
+      if (supportsHtml) {
+        const nextOptions = { ...options };
+        if (!nextOptions.parse_mode) nextOptions.parse_mode = 'HTML';
+        return { content: `${mentionHtml}${separator}${content}`, options: nextOptions };
+      }
+      const plainName = String(ctx.from?.first_name || ctx.from?.username || 'مستخدم');
+      return { content: `${plainName}${separator}${content}`, options };
+    };
+
     const patchReplyMethod = (methodName) => {
       const original = ctx[methodName];
       if (typeof original !== 'function') return;
@@ -256,15 +272,31 @@ bot.use(async (ctx, next) => {
         if (!args.length) return original.apply(ctx, args);
         const lastArg = args[args.length - 1];
         const hasOptionsObject = lastArg && typeof lastArg === 'object' && !Array.isArray(lastArg);
-        const options = hasOptionsObject ? lastArg : {};
+        let options = hasOptionsObject ? { ...lastArg } : {};
         if (!options.reply_to_message_id) options.reply_to_message_id = messageId;
-        if (!hasOptionsObject) args.push(options);
+
+        if (methodName === 'reply' || methodName === 'replyWithHTML' || methodName === 'replyWithMarkdown' || methodName === 'replyWithMarkdownV2') {
+          const first = args[0];
+          const withMention = applyMentionPrefix(first, options, false);
+          args[0] = withMention.content;
+          options = withMention.options;
+        } else if (['replyWithPhoto', 'replyWithVideo', 'replyWithAnimation', 'replyWithDocument', 'replyWithAudio', 'replyWithVoice'].includes(methodName)) {
+          const withMention = applyMentionPrefix(String(options.caption || ''), options, true);
+          options = withMention.options;
+          options.caption = withMention.content;
+        }
+
+        if (hasOptionsObject) args[args.length - 1] = options;
+        else args.push(options);
         return original.apply(ctx, args);
       };
     };
 
     [
       'reply',
+      'replyWithHTML',
+      'replyWithMarkdown',
+      'replyWithMarkdownV2',
       'replyWithPhoto',
       'replyWithVideo',
       'replyWithAnimation',
