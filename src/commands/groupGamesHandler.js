@@ -1063,6 +1063,8 @@ class GroupGamesHandler {
   static activeHookahSessions = new Map();
   static activeRulerExecutionGames = new Map();
   static rulerExecutionTimers = new Map();
+  static RULER_LOBBY_TIMEOUT_MS = 10 * 60 * 1000;
+  static RULER_JUDGE_TIMEOUT_MS = 5 * 60 * 1000;
   static jokeCursorByChat = new Map();
   static lastQuestionByGroup = new Map();
   static questionQueues = new Map();
@@ -6254,6 +6256,24 @@ class GroupGamesHandler {
     this.rulerExecutionTimers.delete(key);
   }
 
+  static getRulerExecutionGame(chatId) {
+    const key = String(chatId);
+    const game = this.activeRulerExecutionGames.get(key);
+    if (!game) return null;
+    const now = Date.now();
+    const createdAt = Number(game.createdAt || now);
+    const phase = String(game.phase || '');
+    if (phase === 'lobby' && now - createdAt > this.RULER_LOBBY_TIMEOUT_MS) {
+      this.clearRulerExecutionGame(chatId);
+      return null;
+    }
+    if (phase === 'judge_choice' && now - createdAt > this.RULER_JUDGE_TIMEOUT_MS) {
+      this.clearRulerExecutionGame(chatId);
+      return null;
+    }
+    return game;
+  }
+
   static buildGeneratedJokeByIndex(index) {
     const total = Math.max(1, TOTAL_JOKE_COMBINATIONS);
     let cursor = Math.abs(Number(index) || 0) % total;
@@ -6301,13 +6321,14 @@ class GroupGamesHandler {
   static async handleRulerExecutionCommand(ctx) {
     if (!this.isGroupChat(ctx)) return;
     const key = String(ctx.chat.id);
-    if (this.activeRulerExecutionGames.has(key)) {
+    if (this.getRulerExecutionGame(ctx.chat.id)) {
       return ctx.reply('ℹ️ اللعبة شغالة بالفعل. اكتب: انضم حاكم جلاد');
     }
     const hostId = Number(ctx.from?.id || 0);
     const hostName = ctx.from?.first_name || ctx.from?.username || String(hostId || 'عضو');
     this.activeRulerExecutionGames.set(key, {
       phase: 'lobby',
+      createdAt: Date.now(),
       hostId,
       participants: [hostId],
       names: { [hostId]: hostName }
@@ -6325,7 +6346,7 @@ class GroupGamesHandler {
   static async handleRulerExecutionJoinCommand(ctx) {
     if (!this.isGroupChat(ctx)) return false;
     const key = String(ctx.chat.id);
-    const game = this.activeRulerExecutionGames.get(key);
+    const game = this.getRulerExecutionGame(ctx.chat.id);
     if (!game || game.phase !== 'lobby') return false;
     const userId = Number(ctx.from?.id || 0);
     const userName = ctx.from?.first_name || ctx.from?.username || String(userId || 'عضو');
@@ -6340,7 +6361,7 @@ class GroupGamesHandler {
   static async handleRulerExecutionBeginCommand(ctx) {
     if (!this.isGroupChat(ctx)) return;
     const key = String(ctx.chat.id);
-    const game = this.activeRulerExecutionGames.get(key);
+    const game = this.getRulerExecutionGame(ctx.chat.id);
     if (!game || game.phase !== 'lobby') return ctx.reply('❌ ما في لعبة قيد التجهيز.');
     if (Number(ctx.from?.id || 0) !== Number(game.hostId)) return ctx.reply('❌ فقط صاحب الجلسة يبدأ اللعبة.');
     if (game.participants.length < 3) return ctx.reply('❌ لازم 3 لاعبين على الأقل.');
@@ -6350,6 +6371,7 @@ class GroupGamesHandler {
     game.executionerId = Number(picks[1]);
     game.accusedId = Number(picks[2]);
     game.phase = 'judge_choice';
+    game.createdAt = Date.now();
 
     return ctx.reply(
       '⚖️ <b>تم توزيع الأدوار</b>\n\n' +
@@ -6366,7 +6388,7 @@ class GroupGamesHandler {
   static async handleRulerExecutionEndCommand(ctx) {
     if (!this.isGroupChat(ctx)) return;
     const key = String(ctx.chat.id);
-    const game = this.activeRulerExecutionGames.get(key);
+    const game = this.getRulerExecutionGame(ctx.chat.id);
     if (!game) return ctx.reply('ℹ️ لا توجد لعبة شغالة.');
     const isAdmin = await this.isGroupAdmin(ctx);
     if (!isAdmin && Number(ctx.from?.id || 0) !== Number(game.hostId)) {
@@ -6379,7 +6401,7 @@ class GroupGamesHandler {
   static async handleRulerExecutionJudgeCommand(ctx, mode = 'question') {
     if (!this.isGroupChat(ctx)) return;
     const key = String(ctx.chat.id);
-    const game = this.activeRulerExecutionGames.get(key);
+    const game = this.getRulerExecutionGame(ctx.chat.id);
     if (!game || game.phase !== 'judge_choice') return false;
     if (Number(ctx.from?.id || 0) !== Number(game.rulerId)) return ctx.reply('❌ فقط الحاكم يختار الحكم.');
 
@@ -6399,6 +6421,7 @@ class GroupGamesHandler {
     }
 
     game.phase = 'await_answer';
+    game.createdAt = Date.now();
     game.answersNorm = answers.map((a) => this.normalizeText(String(a)));
     game.askedAt = Date.now();
     game.deadline = Date.now() + (timeout * 1000);
@@ -6417,7 +6440,7 @@ class GroupGamesHandler {
 
   static async resolveRulerExecutionRound(chatId, success, winnerUser) {
     const key = String(chatId);
-    const game = this.activeRulerExecutionGames.get(key);
+    const game = this.getRulerExecutionGame(chatId);
     if (!game) return;
     const timer = this.rulerExecutionTimers.get(key);
     if (timer) clearTimeout(timer);
@@ -6457,6 +6480,26 @@ class GroupGamesHandler {
       `• الجلاد: ${this.mentionUser(game.executionerId, game.names[game.executionerId] || String(game.executionerId))} (+${this.formatCurrency(1)})`,
       { parse_mode: 'HTML' }
     ).catch(() => {});
+  }
+
+  static async handleRulerExecutionStatusCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const game = this.getRulerExecutionGame(ctx.chat.id);
+    if (!game) return ctx.reply('ℹ️ لا توجد لعبة حاكم جلاد شغالة حالياً.');
+    const phaseLabel = game.phase === 'lobby'
+      ? 'تجهيز'
+      : game.phase === 'judge_choice'
+        ? 'بانتظار اختيار الحاكم'
+        : game.phase === 'await_answer'
+          ? 'بانتظار إجابة المتهم'
+          : 'غير معروف';
+    return ctx.reply(
+      `🎭 <b>حالة لعبة حاكم جلاد</b>\n\n` +
+      `• المرحلة: ${phaseLabel}\n` +
+      `• المشاركين: ${Array.isArray(game.participants) ? game.participants.length : 0}\n` +
+      `• صاحب الجلسة: ${this.mentionUser(game.hostId, game.names?.[game.hostId] || String(game.hostId || '—'))}`,
+      { parse_mode: 'HTML', reply_to_message_id: ctx.message?.message_id }
+    );
   }
 
 
