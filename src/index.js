@@ -2673,6 +2673,7 @@ bot.hears(/^توب\s*القروبات$/i, (ctx) => BankGameHandler.handleTopGrou
 bot.hears(/^(?:توب\s*المتفاعلين|الاكثر\s*تفاعلا|الأكثر\s*تفاعلا)$/i, (ctx) => BankGameHandler.handleTopActiveInGroup(ctx));
 // Group Arabic aliases (without slash)
 bot.hears(/^العاب\s*الجروب$/i, (ctx) => GroupGamesHandler.handleGamesHelp(ctx));
+bot.hears(/^(?:الالعاب|الألعاب)$/i, (ctx) => GroupGamesHandler.handleGamesListCommand(ctx));
 bot.hears(/^مين\s*انا$/i, (ctx) => GroupGamesHandler.handleWhoAmICommand(ctx));
 bot.hears(/^(?:الغاز|ألغاز|لغز)$/i, (ctx) => GroupGamesHandler.handleRiddleCommand(ctx));
 bot.hears(/^سرعة\s*الكتابة$/i, (ctx) => GroupGamesHandler.handleTypingCommand(ctx));

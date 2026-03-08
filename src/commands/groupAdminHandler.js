@@ -694,7 +694,7 @@ class GroupAdminHandler {
     return ctx.reply(
       `• رتبتي ← ${this.mentionUser(ctx.from?.id, ctx.from?.first_name || ctx.from?.username || String(ctx.from?.id || 'عضو'))}\n` +
       `• الرتبة ← ${roleLabel}`,
-      { parse_mode: 'HTML' }
+      { parse_mode: 'HTML', reply_to_message_id: ctx.message?.message_id }
     );
   }
 
@@ -2345,7 +2345,12 @@ class GroupAdminHandler {
     const internalAdminsCount = this.getRoleIds(group, 'adminIds').length;
     const premiumCount = this.getRoleIds(group, 'premiumMemberIds').length;
     const exceptionCount = Array.isArray(group.settings?.exceptions) ? group.settings.exceptions.length : 0;
+    const requesterMention = this.mentionUser(
+      ctx.from?.id,
+      ctx.from?.first_name || ctx.from?.username || String(ctx.from?.id || 'مستخدم')
+    );
     return ctx.reply(
+      `${requesterMention}\n` +
       '• أهلاً بك عزيزي في عدد رتب المجموعة\n\n' +
         `• المنشئين ~» ${creatorsCount}\n` +
         `• المالكين الاساسيين ~» ${basicCount}\n` +
@@ -2355,7 +2360,7 @@ class GroupAdminHandler {
         `• المميزين ~» ${premiumCount}\n` +
         `• مشرفو تيليجرام ~» ${adminCount}\n` +
         `• المستثنين ~» ${exceptionCount}`,
-      { parse_mode: 'HTML' }
+      { parse_mode: 'HTML', reply_to_message_id: ctx.message?.message_id }
     );
   }
 

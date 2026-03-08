@@ -3313,7 +3313,7 @@ class GroupGamesHandler {
     const luckKey = `${String(ctx.chat.id)}:${Number(ctx.from?.id || 0)}`;
     if (this.pendingLuckInputs.has(luckKey)) {
       const normalized = this.normalizeArabicDigits(String(text || '').trim());
-      const isKnownCommandLike = /^(شراء|بيع|اهداء|إهداء|ارسال|إرسال|متجر|هدايا|ممتلكاتي|حظ|كرسي|انهاء|إنهاء|سؤال|لاونج|كافيتيريا|قائمة|مزاجي|طلب|سلم|ولع|هف|انضم|نفس|اشرب|اكل|كل|كول|البس|تحديد|جنسي|جنسه|اضف|أضف|حذف|عدد|كلمات|ردود|سوالفكم|فحص|رتبتي|my|كتم|تقييد|حظر|الغاء|إلغاء|فك|رفع|تنزيل|المنشئين|المالكين|المدراء|الادمنية|الأدمنية|المميزين|تفعيل|تعطيل|الحماية|اعدادات|إعدادات|برنت|تفاعل)\b/i.test(normalized);
+      const isKnownCommandLike = /^(شراء|بيع|اهداء|إهداء|ارسال|إرسال|متجر|هدايا|ممتلكاتي|حظ|كرسي|انهاء|إنهاء|سؤال|لاونج|كافيتيريا|قائمة|مزاجي|طلب|سلم|ولع|هف|انضم|نفس|اشرب|اكل|كل|كول|البس|تحديد|جنسي|جنسه|اضف|أضف|حذف|عدد|كلمات|ردود|سوالفكم|فحص|رتبتي|my|الالعاب|الألعاب|كتم|تقييد|حظر|الغاء|إلغاء|فك|رفع|تنزيل|المنشئين|المالكين|المدراء|الادمنية|الأدمنية|المميزين|تفعيل|تعطيل|الحماية|اعدادات|إعدادات|برنت|تفاعل)\b/i.test(normalized);
       if (isKnownCommandLike) {
         // Do not let pending luck block normal group commands.
         this.pendingLuckInputs.delete(luckKey);
@@ -6530,6 +6530,49 @@ class GroupGamesHandler {
     if (action === 'gconfess') return this.handleConfessionStart(ctx);
     if (action === 'gconfess_end') return this.handleConfessionEnd(ctx);
     return null;
+  }
+
+  static buildGamesShowcaseKeyboard() {
+    return Markup.inlineKeyboard([
+      [
+        Markup.button.callback('❓ سؤال سريع', 'group:games:gquiz'),
+        Markup.button.callback('🧠 ألغاز', 'group:games:griddle')
+      ],
+      [
+        Markup.button.callback('⚡ سرعة الكتابة', 'group:games:gtype'),
+        Markup.button.callback('🕵️ مين أنا', 'group:games:gwho')
+      ],
+      [
+        Markup.button.callback('🧮 حساب ذهني', 'group:games:gmath'),
+        Markup.button.callback('🔤 ترتيب كلمة', 'group:games:gword')
+      ],
+      [
+        Markup.button.callback('⚔️ تحدي', 'group:games:gduel'),
+        Markup.button.callback('🎲 روليت', 'group:games:gchance')
+      ],
+      [
+        Markup.button.callback('🗳️ تصويت', 'group:games:gvote'),
+        Markup.button.callback('🏆 المتصدرين', 'group:games:gleader')
+      ]
+    ]);
+  }
+
+  static async handleGamesListCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const text =
+      '• الالعاب للبوت 🎲🎰.\n' +
+      '↓ ↓ ↓ ↓\n' +
+      '• سؤال سريع\n' +
+      '• ألغاز\n' +
+      '• سرعة الكتابة\n' +
+      '• مين أنا\n' +
+      '• حساب ذهني\n' +
+      '• ترتيب كلمة\n' +
+      '• تحدي';
+    return ctx.reply(text, {
+      reply_to_message_id: ctx.message?.message_id,
+      reply_markup: this.buildGamesShowcaseKeyboard().reply_markup
+    });
   }
 
   static getGamesHelpPages() {
