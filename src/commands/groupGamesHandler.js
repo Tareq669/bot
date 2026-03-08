@@ -169,7 +169,8 @@ const QUIZ_CATEGORY_LABELS = {
   fiqh: 'فقهي',
   geography: 'جغرافي',
   physics: 'فيزيائي',
-  calculations: 'حسابي'
+  calculations: 'حسابي',
+  detective: 'محقق'
 };
 
 const QUIZ_VARIANTS = ['سؤال تجميعي', 'مستوى متوسط', 'تمرين ذكي', 'معرفة عامة', 'مفصل', 'اختبار سريع', 'دقيقة فكر', 'أسئلة متنوعة', 'تحدي معرفي', 'مراجعة ذكية'];
@@ -327,6 +328,82 @@ const FIQH_MCQ_QUESTIONS = buildGeneratedCategoryQuestions(FIQH_BASE_QUESTIONS, 
 const GEOGRAPHY_MCQ_QUESTIONS = buildGeneratedCategoryQuestions(GEOGRAPHY_BASE_QUESTIONS, 'geography', QUIZ_REQUIRED_PER_CATEGORY);
 const PHYSICS_MCQ_QUESTIONS = buildGeneratedCategoryQuestions(PHYSICS_BASE_QUESTIONS, 'physics', QUIZ_REQUIRED_PER_CATEGORY);
 const CALCULATIONS_MCQ_QUESTIONS = buildGeneratedCategoryQuestions(CALCULATIONS_BASE_QUESTIONS, 'calculations', QUIZ_REQUIRED_PER_CATEGORY);
+
+const DETECTIVE_REQUIRED_CASES = 10000;
+const DETECTIVE_VARIANTS = ['ملف', 'قضية', 'بلاغ', 'مسرح', 'تحقيق', 'أثر', 'شاهد', 'دليل', 'غموض', 'قرينة'];
+const DETECTIVE_BASE_CASES = [
+  {
+    question: 'رجل وُجد ميتاً في غرفة مغلقة من الداخل، وعلى الأرض ماء فقط. كيف مات؟',
+    options: ['تسمم', 'اختناق دخان', 'سقط من السلم', 'ذاب قالب ثلج كان يقف عليه', 'صدمة كهرباء'],
+    answerIndex: 3
+  },
+  {
+    question: 'انقطعت الكهرباء في قصر، وبعد دقيقة اختفى عقد ثمين من الخزنة. من المشتبه الأقرب؟',
+    options: ['الطباخ', 'الحارس المسؤول عن غرفة الكهرباء', 'الضيف', 'السائق', 'البستاني'],
+    answerIndex: 1
+  },
+  {
+    question: 'وُجدت نافذة مكسورة والزجاج كلّه خارج البيت. ماذا يعني هذا؟',
+    options: ['السرقة من الخارج', 'الكسر حدث من داخل البيت', 'انفجار بالشارع', 'حادث طبيعي', 'لا شيء مهم'],
+    answerIndex: 1
+  },
+  {
+    question: 'شخص قال: "كنت وحدي في البيت"، لكن التحقيق أثبت كذبه فوراً. ما السبب الأقوى؟',
+    options: ['نسي إغلاق الباب', 'وجود فنجانين قهوة دافئين', 'الهاتف مغلق', 'الإنارة مطفأة', 'الساعة متوقفة'],
+    answerIndex: 1
+  },
+  {
+    question: 'رسالة تهديد وصلت قبل الجريمة بساعتين، والمرسل "مجهول". أين الخيط الحقيقي؟',
+    options: ['نوع الخط المستخدم', 'اسم الضحية', 'لون الورق', 'حجم الرسالة', 'لغة التحية'],
+    answerIndex: 0
+  },
+  {
+    question: 'المتهم قال إنه كان في السينما، لكن تم كشفه بسرعة. ما الدليل الأفضل؟',
+    options: ['ملابسه أنيقة', 'لا يملك تذكرة أو سجل دفع', 'تكلم كثيرًا', 'هاتفه قديم', 'لا يحب الأفلام'],
+    answerIndex: 1
+  },
+  {
+    question: 'في جريمة سرقة، البصمات كلها ممسوحة إلا مقبض داخلي صغير. ماذا نستنتج؟',
+    options: ['فاعل محترف جدًا', 'الفاعل من الداخل ونسي المقبض الصغير', 'الفاعل طفل', 'الفاعل أجنبي', 'الكاميرات معطلة'],
+    answerIndex: 1
+  },
+  {
+    question: 'صاحب محل قال إن السارق أخذ المال فقط، لكن الرفوف مرتبة بشكل غريب. لماذا؟',
+    options: ['السارق يحب النظام', 'السرقة كانت تمثيلية من صاحب المحل', 'الموظف رتبها', 'الرفوف جديدة', 'خطأ تصوير'],
+    answerIndex: 1
+  },
+  {
+    question: 'اتصال الطوارئ جاء من هاتف الضحية بعد وفاته بوقت. منطقياً من المتهم؟',
+    options: ['أي شخص بالشارع', 'القاتل القريب من الهاتف وقتها', 'المسعف', 'الجيران', 'موظف الشبكة'],
+    answerIndex: 1
+  },
+  {
+    question: 'خلال التحقيق، شخص صحّح تفصيلًا لم يُعلن للإعلام. ماذا يعني غالبًا؟',
+    options: ['يتابع الأخبار جيدًا', 'يعرف الجريمة من المصدر', 'محاميه ذكي', 'كان محظوظًا', 'سمع إشاعة'],
+    answerIndex: 1
+  }
+];
+
+const buildGeneratedDetectiveCases = (baseCases, count) => {
+  const out = [];
+  for (let i = 0; i < count; i += 1) {
+    const base = baseCases[i % baseCases.length];
+    const shift = i % base.options.length;
+    const options = base.options.map((_, idx) => base.options[(idx + shift) % base.options.length]);
+    const correctText = base.options[base.answerIndex];
+    const answerIndex = Math.max(0, options.indexOf(correctText));
+    out.push({
+      question: `${base.question} (${DETECTIVE_VARIANTS[i % DETECTIVE_VARIANTS.length]} #${i + 1})`,
+      options,
+      answerIndex,
+      reward: 3,
+      category: 'detective'
+    });
+  }
+  return out;
+};
+
+const DETECTIVE_CASES = buildGeneratedDetectiveCases(DETECTIVE_BASE_CASES, DETECTIVE_REQUIRED_CASES);
 
 const CAPITALS_BANK = [
   ['السعودية', 'الرياض'], ['مصر', 'القاهرة'], ['المغرب', 'الرباط'], ['الجزائر', 'الجزائر'],
@@ -3429,7 +3506,7 @@ class GroupGamesHandler {
     const luckKey = `${String(ctx.chat.id)}:${Number(ctx.from?.id || 0)}`;
     if (this.pendingLuckInputs.has(luckKey)) {
       const normalized = this.normalizeArabicDigits(String(text || '').trim());
-      const isKnownCommandLike = /^(شراء|بيع|اهداء|إهداء|ارسال|إرسال|متجر|هدايا|ممتلكاتي|حظ|كرسي|انهاء|إنهاء|سؤال|لاونج|كافيتيريا|قائمة|مزاجي|طلب|سلم|ولع|هف|انضم|نفس|اشرب|اكل|كل|كول|البس|حاكم|جلاد|متهم|حكم|ابدأ|تحديد|جنسي|جنسه|اضف|أضف|حذف|عدد|كلمات|ردود|سوالفكم|فحص|رتبتي|my|الالعاب|الألعاب|كتم|تقييد|حظر|الغاء|إلغاء|فك|رفع|تنزيل|المنشئين|المالكين|المدراء|الادمنية|الأدمنية|المميزين|تفعيل|تعطيل|الحماية|اعدادات|إعدادات|برنت|تفاعل)\b/i.test(normalized);
+      const isKnownCommandLike = /^(شراء|بيع|اهداء|إهداء|ارسال|إرسال|متجر|هدايا|ممتلكاتي|حظ|كرسي|انهاء|إنهاء|سؤال|لاونج|كافيتيريا|قائمة|مزاجي|طلب|سلم|ولع|هف|انضم|نفس|اشرب|اكل|كل|كول|البس|حاكم|جلاد|متهم|حكم|ابدأ|محقق|تحديد|جنسي|جنسه|اضف|أضف|حذف|عدد|كلمات|ردود|سوالفكم|فحص|رتبتي|my|الالعاب|الألعاب|كتم|تقييد|حظر|الغاء|إلغاء|فك|رفع|تنزيل|المنشئين|المالكين|المدراء|الادمنية|الأدمنية|المميزين|تفعيل|تعطيل|الحماية|اعدادات|إعدادات|برنت|تفاعل)\b/i.test(normalized);
       if (isKnownCommandLike) {
         // Do not let pending luck block normal group commands.
         this.pendingLuckInputs.delete(luckKey);
@@ -3514,6 +3591,16 @@ class GroupGamesHandler {
       const correctWord = this.escapeHtml(String(round.answers?.[0] || ''));
       await ctx.reply(
         `• الكلمة الصحيحة ~» ${correctWord}\n• اجابة صحيحة ~» ${winnerSimple}\n• عدد الثواني ~» ${seconds}\n• فلوسك ~» ${this.formatCurrency(scoreMeta.finalReward)}`,
+        { parse_mode: 'HTML' }
+      );
+      return true;
+    }
+
+    if (round.type === 'detective') {
+      const winnerNameSimple = ctx.from.first_name || ctx.from.username || String(ctx.from.id);
+      const winnerSimple = this.mentionUser(ctx.from.id, winnerNameSimple);
+      await ctx.reply(
+        `• محقق بارع 👀 اجابة صحيحة √\n• الفائز ~» ${winnerSimple}\n• فلوسك ~» ${this.formatCurrency(scoreMeta.finalReward)}`,
         { parse_mode: 'HTML' }
       );
       return true;
@@ -3720,6 +3807,14 @@ class GroupGamesHandler {
     return this.handleMcqByCategoryAlias(ctx, 'calculations');
   }
 
+  static async handleDetectiveCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const status = await this.canStartRound(ctx);
+    if (!status.ok) return;
+    const question = this.pickNonRepeating(DETECTIVE_CASES, `detective:${String(ctx.chat.id)}`);
+    return this.startDetectiveRound(ctx, question);
+  }
+
   static async handleMcqByCategoryAlias(ctx, forcedCategory) {
     if (!this.isGroupChat(ctx)) return;
     const group = await this.ensureGroupRecord(ctx);
@@ -3789,6 +3884,58 @@ class GroupGamesHandler {
     const sent = await this.bot.telegram.sendMessage(
       Number(ctx.chat.id),
       `${mention}\n• سؤال ${categoryLabel} ~» ${plainQuestion}`,
+      {
+        parse_mode: 'HTML',
+        reply_to_message_id: ctx.message?.message_id
+      }
+    );
+  }
+
+  static async startDetectiveRound(ctx, question) {
+    const groupId = String(ctx.chat.id);
+    this.clearRound(groupId);
+
+    const from = ctx.from || {};
+    const userId = from.id;
+    const displayName = this.escapeHtml(from.first_name || from.username || 'المستخدم');
+    const mention = userId ? `<a href="tg://user?id=${userId}">${displayName}</a>` : displayName;
+    const options = Array.isArray(question?.options)
+      ? question.options.map((x) => String(x || '').trim())
+      : [];
+    const answerIndex = Math.max(0, Number(question?.answerIndex) || 0);
+    const correctAnswer = String(options[answerIndex] || '').trim();
+    const plainQuestion = String(question?.question || '')
+      .replace(/\s*\([^()]*#\d+\)\s*$/u, '')
+      .trim();
+
+    const acceptedAnswers = new Set();
+    const addAnswer = (value) => {
+      const normalized = this.normalizeText(String(value || ''));
+      if (!normalized) return;
+      acceptedAnswers.add(normalized);
+      if (normalized.startsWith('ال') && normalized.length > 2) acceptedAnswers.add(normalized.slice(2));
+    };
+    addAnswer(correctAnswer);
+    addAnswer(String(answerIndex + 1));
+    if (options[answerIndex]) addAnswer(options[answerIndex]);
+
+    this.activeRounds.set(groupId, {
+      type: 'detective',
+      prompt: `• قضية المحقق ~» ${plainQuestion}`,
+      answers: [correctAnswer],
+      answersNorm: [...acceptedAnswers],
+      reward: 3,
+      deadline: Date.now() + 60000,
+      askedAt: Date.now()
+    });
+
+    const optionsText = options.length
+      ? `\n• 1) ${this.escapeHtml(options[0] || '')}\n• 2) ${this.escapeHtml(options[1] || '')}\n• 3) ${this.escapeHtml(options[2] || '')}\n• 4) ${this.escapeHtml(options[3] || '')}\n• 5) ${this.escapeHtml(options[4] || '')}`
+      : '';
+
+    return this.bot.telegram.sendMessage(
+      Number(ctx.chat.id),
+      `${mention}\n• قضية المحقق ~» ${this.escapeHtml(plainQuestion)} 🤔${optionsText}`,
       {
         parse_mode: 'HTML',
         reply_to_message_id: ctx.message?.message_id
@@ -6407,17 +6554,17 @@ class GroupGamesHandler {
 
     let answers = [];
     let prompt = '';
-    let timeout = 30;
+    let timeout = 10;
     if (mode === 'challenge') {
       const word = this.pickNonRepeating(TYPING_WORDS.map((w) => ({ question: w })), `ruler:challenge:${String(ctx.chat.id)}`).question;
       answers = [word];
       prompt = `⚡ <b>حكم تحدي</b>\n\nاكتب الكلمة:\n<b>${word}</b>`;
-      timeout = 20;
+      timeout = 10;
     } else {
       const q = this.pickNonRepeating(QUICK_QUESTIONS, `ruler:question:${String(ctx.chat.id)}`);
       answers = q.answers;
       prompt = `❓ <b>حكم سؤال</b>\n\n${q.question}`;
-      timeout = 30;
+      timeout = 10;
     }
 
     game.phase = 'await_answer';
@@ -6449,7 +6596,7 @@ class GroupGamesHandler {
     const group = await this.ensureGroupRecordByChatId(chatId);
     if (success) {
       const accused = winnerUser || { id: Number(game.accusedId), first_name: game.names[game.accusedId] || String(game.accusedId) };
-      const meta = await this.updateScore(group, accused, 2);
+      const meta = await this.updateScore(group, accused, 6);
       group.updatedAt = new Date();
       await group.save();
       this.clearRulerExecutionGame(chatId);
@@ -6461,13 +6608,13 @@ class GroupGamesHandler {
 
     const row = this.getOrCreateScoreRow(group, { id: Number(game.accusedId), first_name: game.names[game.accusedId] || String(game.accusedId), username: '' });
     const userDoc = await this.ensureGlobalProfileAndSyncRow(row, { id: Number(game.accusedId), first_name: game.names[game.accusedId] || String(game.accusedId), username: '' });
-    row.points = Math.max(0, Number(row.points || 0) - 2);
-    row.weeklyPoints = Math.max(0, Number(row.weeklyPoints || 0) - 2);
-    row.monthlyPoints = Math.max(0, Number(row.monthlyPoints || 0) - 2);
+    row.points = Math.max(0, Number(row.points || 0) - 6);
+    row.weeklyPoints = Math.max(0, Number(row.weeklyPoints || 0) - 6);
+    row.monthlyPoints = Math.max(0, Number(row.monthlyPoints || 0) - 6);
     row.updatedAt = new Date();
     await this.syncRowToGlobal(userDoc, row);
-    await this.addRewardPointsToMember(group, game.rulerId, 1);
-    await this.addRewardPointsToMember(group, game.executionerId, 1);
+    await this.addRewardPointsToMember(group, game.rulerId, 3);
+    await this.addRewardPointsToMember(group, game.executionerId, 3);
     group.updatedAt = new Date();
     await group.save();
     this.clearRulerExecutionGame(chatId);
@@ -6475,9 +6622,9 @@ class GroupGamesHandler {
     await this.bot.telegram.sendMessage(
       Number(chatId),
       `⛓️ <b>تم تنفيذ الحكم</b>\n` +
-      `• المتهم: ${this.mentionUser(game.accusedId, game.names[game.accusedId] || String(game.accusedId))} (-${this.formatCurrency(2)})\n` +
-      `• الحاكم: ${this.mentionUser(game.rulerId, game.names[game.rulerId] || String(game.rulerId))} (+${this.formatCurrency(1)})\n` +
-      `• الجلاد: ${this.mentionUser(game.executionerId, game.names[game.executionerId] || String(game.executionerId))} (+${this.formatCurrency(1)})`,
+      `• المتهم: ${this.mentionUser(game.accusedId, game.names[game.accusedId] || String(game.accusedId))} (-${this.formatCurrency(6)})\n` +
+      `• الحاكم: ${this.mentionUser(game.rulerId, game.names[game.rulerId] || String(game.rulerId))} (+${this.formatCurrency(3)})\n` +
+      `• الجلاد: ${this.mentionUser(game.executionerId, game.names[game.executionerId] || String(game.executionerId))} (+${this.formatCurrency(3)})`,
       { parse_mode: 'HTML' }
     ).catch(() => {});
   }
@@ -6980,6 +7127,7 @@ class GroupGamesHandler {
           '• مين انا | /gwho',
           '• ألغاز | /griddle',
           '• سرعة الكتابة | /gtype',
+          '• المحقق',
           '• تحدي | /gduel',
           '• روليت | /chance',
           '• تصويت | /gvote'

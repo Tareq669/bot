@@ -244,7 +244,7 @@ bot.use(async (ctx, next) => {
     text &&
     (
       text.startsWith('/') ||
-      /^(الاوامر|مساعدة|ساعدني|الالعاب|الألعاب|العاب الجروب|حاكم|جلاد|متهم|حكم|ابدأ|انضم|الرتب|رتبتي|فحص|رفع|تنزيل|كتم|الغاء|إلغاء|فك|حظر|تقييد|تفعيل|تعطيل|اعدادات|إعدادات|شراء|بيع|اهداء|إهداء|متجر|هدايا|ممتلكاتي|حسابي|راتب|بخشيش|العجلة|حظ|استثمار|سعر الاسهم|ديني|علمي|تاريخي|فقهي|جغرافي|فيزياء|فيزيائي|حسابات|حسابي|لاونج|كافيتيريا|اشرب|اكل|كول|البس|همسه|همسة|all)\b/i.test(text)
+      /^(الاوامر|مساعدة|ساعدني|الالعاب|الألعاب|العاب الجروب|حاكم|جلاد|متهم|حكم|ابدأ|انضم|محقق|الرتب|رتبتي|فحص|رفع|تنزيل|كتم|الغاء|إلغاء|فك|حظر|تقييد|تفعيل|تعطيل|اعدادات|إعدادات|شراء|بيع|اهداء|إهداء|متجر|هدايا|ممتلكاتي|حسابي|راتب|بخشيش|العجلة|حظ|استثمار|سعر الاسهم|ديني|علمي|تاريخي|فقهي|جغرافي|فيزياء|فيزيائي|حسابات|حسابي|لاونج|كافيتيريا|اشرب|اكل|كول|البس|همسه|همسة|all)\b/i.test(text)
     )
   );
 
@@ -2760,6 +2760,7 @@ bot.hears(/^(?:\/)?(?:انهاء|إنهاء)\s*حاكم\s*جلاد(?:\s*متهم
 bot.hears(/^(?:\/)?حكم\s*سؤال$/i, (ctx) => GroupGamesHandler.handleRulerExecutionJudgeCommand(ctx, 'question'));
 bot.hears(/^(?:\/)?حكم\s*تحدي$/i, (ctx) => GroupGamesHandler.handleRulerExecutionJudgeCommand(ctx, 'challenge'));
 bot.hears(/^(?:\/)?(?:حالة|وضع|status)\s*حاكم\s*جلاد(?:\s*متهم)?$/i, (ctx) => GroupGamesHandler.handleRulerExecutionStatusCommand(ctx));
+bot.hears(/^(?:\/)?(?:المحقق|لعبة\s*المحقق|تحقيق|جريمة)$/i, (ctx) => GroupGamesHandler.handleDetectiveCommand(ctx));
 bot.hears(/^(?:\/)?(?:😂\s*)?(?:مولد\s*نكت|نكت|نكته|نكتة)$/i, (ctx) => GroupGamesHandler.handleJokeGeneratorCommand(ctx));
 bot.hears(/^مين\s*انا$/i, (ctx) => GroupGamesHandler.handleWhoAmICommand(ctx));
 bot.hears(/^(?:الغاز|ألغاز|لغز)$/i, (ctx) => GroupGamesHandler.handleRiddleCommand(ctx));
