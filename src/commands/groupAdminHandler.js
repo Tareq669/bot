@@ -457,7 +457,7 @@ class GroupAdminHandler {
     const targetWeight = this.getRoleWeight(target?.key);
     if (actorWeight <= targetWeight) {
       await ctx.reply(
-        '❌ لا يمكنك تعديل رتبة أعلى منك أو مساوية لك.',
+        '• لا يمكنك تعديل رتبة أعلى منك أو مساوية لك •',
         { reply_to_message_id: ctx.message?.message_id }
       );
       return false;
@@ -2190,7 +2190,7 @@ class GroupAdminHandler {
         const targetIsManager = this.getRoleIds(group, 'managerIds').includes(Number(target.id));
         const targetMember = await this.getChatMemberSafe(ctx, target.id);
         if (targetIsOwnerOrBasic || targetIsManager || targetMember?.status === 'creator') {
-          return ctx.reply('❌ لا يمكنك التحكم برتبة أعلى منك.');
+          return ctx.reply('• لا يمكنك تعديل رتبة أعلى منك أو مساوية لك •');
         }
       }
       this.assignInternalRole(group, 'adminIds', target.id);
@@ -2212,7 +2212,7 @@ class GroupAdminHandler {
         const targetIsManager = this.getRoleIds(group, 'managerIds').includes(Number(target.id));
         const targetMember = await this.getChatMemberSafe(ctx, target.id);
         if (targetIsOwnerOrBasic || targetIsManager || targetMember?.status === 'creator') {
-          return ctx.reply('❌ لا يمكنك التحكم برتبة أعلى منك.');
+          return ctx.reply('• لا يمكنك تعديل رتبة أعلى منك أو مساوية لك •');
         }
       }
       const targetId = Number(target.id);
