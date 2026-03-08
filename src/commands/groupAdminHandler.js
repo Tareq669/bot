@@ -302,18 +302,8 @@ class GroupAdminHandler {
   static assignInternalRole(group, roleKey, userId) {
     const targetUserId = Number(userId || 0);
     if (!targetUserId || !this.INTERNAL_ROLE_KEYS.includes(roleKey)) return false;
-    const isHigherOwnerRole = this.getRoleIds(group, 'basicOwnerIds').includes(targetUserId)
-      || this.getRoleIds(group, 'ownerIds').includes(targetUserId);
-
-    if (
-      isHigherOwnerRole
-      && (roleKey === 'managerIds' || roleKey === 'adminIds' || roleKey === 'premiumMemberIds')
-    ) {
-      group.settings[roleKey] = [...new Set([...this.getRoleIds(group, roleKey), targetUserId])];
-      this.syncLegacyRoleFields(group);
-      return true;
-    }
-
+    // Always move user to the requested single internal role.
+    // This guarantees demotion/promotion actually changes the current rank.
     this.removeUserFromInternalRoles(group, targetUserId);
     group.settings[roleKey] = [...this.getRoleIds(group, roleKey), targetUserId];
     this.syncLegacyRoleFields(group);
@@ -445,6 +435,34 @@ class GroupAdminHandler {
       `${requesterMention}\n• عذراً هذا الامر يخص ← { ${requiredRoleLabel} } فقط .`,
       { parse_mode: 'HTML', reply_to_message_id: ctx.message?.message_id }
     );
+  }
+
+  static getRoleWeight(roleKey) {
+    const map = {
+      creator: 100,
+      basic_owner: 90,
+      owner: 80,
+      manager: 70,
+      admin: 60,
+      premium: 50,
+      telegram_admin: 40
+    };
+    return Number(map[String(roleKey || '')] || 0);
+  }
+
+  static async ensureCanModifyTargetRole(ctx, targetUserId, actorInfo = null) {
+    const actor = actorInfo || await this.getActorRoleInfo(ctx, ctx.from?.id);
+    const target = await this.getActorRoleInfo(ctx, targetUserId);
+    const actorWeight = this.getRoleWeight(actor?.key);
+    const targetWeight = this.getRoleWeight(target?.key);
+    if (actorWeight <= targetWeight) {
+      await ctx.reply(
+        '❌ لا يمكنك تعديل رتبة أعلى منك أو مساوية لك.',
+        { reply_to_message_id: ctx.message?.message_id }
+      );
+      return false;
+    }
+    return true;
   }
 
   static formatProtectionTimestamp(unixSeconds) {
@@ -1938,6 +1956,7 @@ class GroupAdminHandler {
       const target = await this.resolveTargetUser(ctx, this.parseCommandArgs(ctx).slice(1));
       if (!target?.id) return ctx.reply('❌ اكتب الأمر بالرد على العضو أو بالمعرف.');
       if (Number(target.id) === Number(ctx.from.id)) return ctx.reply('❌ أنت بالفعل المالك الأساسي.');
+      if (!(await this.ensureCanModifyTargetRole(ctx, target.id, actor))) return;
       this.assignInternalRole(group, 'basicOwnerIds', target.id);
       await this.addModerationLog(group, 'set_basic_owner', ctx.from.id, target.id);
       await group.save();
@@ -1951,6 +1970,7 @@ class GroupAdminHandler {
     if (/^(تنزيل اساسي|\/gbasic\s+remove)/i.test(text)) {
       const target = await this.resolveTargetUser(ctx, this.parseCommandArgs(ctx).slice(1));
       if (!target?.id) return ctx.reply('❌ اكتب الأمر بالرد على العضو أو بالمعرف.');
+      if (!(await this.ensureCanModifyTargetRole(ctx, target.id, actor))) return;
       const targetId = Number(target.id);
       group.settings.basicOwnerIds = this.getRoleIds(group, 'basicOwnerIds').filter((id) => id !== targetId);
       this.syncLegacyRoleFields(group);
@@ -2069,6 +2089,7 @@ class GroupAdminHandler {
     if (/^(رفع مالك|\/gowner\s+add)/i.test(text)) {
       const target = await this.resolveTargetUser(ctx, this.parseCommandArgs(ctx).slice(1));
       if (!target?.id) return ctx.reply('❌ استخدم الأمر بالرد على العضو أو بالمعرف.');
+      if (!(await this.ensureCanModifyTargetRole(ctx, target.id, actor))) return;
       this.assignInternalRole(group, 'ownerIds', target.id);
       await this.addModerationLog(group, 'add_owner_role', ctx.from.id, target.id);
       await group.save();
@@ -2082,6 +2103,7 @@ class GroupAdminHandler {
     if (/^(تنزيل مالك|\/gowner\s+remove)/i.test(text)) {
       const target = await this.resolveTargetUser(ctx, this.parseCommandArgs(ctx).slice(1));
       if (!target?.id) return ctx.reply('❌ استخدم الأمر بالرد على العضو أو بالمعرف.');
+      if (!(await this.ensureCanModifyTargetRole(ctx, target.id, actor))) return;
       const targetId = Number(target.id);
       group.settings.ownerIds = this.getRoleIds(group, 'ownerIds').filter((id) => id !== targetId);
       await this.addModerationLog(group, 'remove_owner_role', ctx.from.id, targetId);
@@ -2114,6 +2136,7 @@ class GroupAdminHandler {
     if (/^(رفع مدير|\/gmanager\s+add)/i.test(text)) {
       const target = await this.resolveTargetUser(ctx, this.parseCommandArgs(ctx).slice(1));
       if (!target?.id) return ctx.reply('❌ استخدم الأمر بالرد على العضو أو بالمعرف.');
+      if (!(await this.ensureCanModifyTargetRole(ctx, target.id, actor))) return;
       this.assignInternalRole(group, 'managerIds', target.id);
       await this.addModerationLog(group, 'add_manager_role', ctx.from.id, target.id);
       await group.save();
@@ -2127,6 +2150,7 @@ class GroupAdminHandler {
     if (/^(تنزيل مدير|\/gmanager\s+remove)/i.test(text)) {
       const target = await this.resolveTargetUser(ctx, this.parseCommandArgs(ctx).slice(1));
       if (!target?.id) return ctx.reply('❌ استخدم الأمر بالرد على العضو أو بالمعرف.');
+      if (!(await this.ensureCanModifyTargetRole(ctx, target.id, actor))) return;
       const targetId = Number(target.id);
       group.settings.managerIds = this.getRoleIds(group, 'managerIds').filter((id) => id !== targetId);
       await this.addModerationLog(group, 'remove_manager_role', ctx.from.id, targetId);
@@ -2160,6 +2184,7 @@ class GroupAdminHandler {
     if (/^(رفع ادمن|\/gadmins\s+add)/i.test(text)) {
       const target = await this.resolveTargetUser(ctx, this.parseCommandArgs(ctx).slice(1));
       if (!target?.id) return ctx.reply('❌ استخدم الأمر بالرد على العضو أو بالمعرف.');
+      if (!(await this.ensureCanModifyTargetRole(ctx, target.id, actor))) return;
       if (!actorIsOwnerOrBasic) {
         const targetIsOwnerOrBasic = await this.isOwnerOrBasic(ctx, target.id);
         const targetIsManager = this.getRoleIds(group, 'managerIds').includes(Number(target.id));
@@ -2181,6 +2206,7 @@ class GroupAdminHandler {
     if (/^(تنزيل ادمن|\/gadmins\s+remove)/i.test(text)) {
       const target = await this.resolveTargetUser(ctx, this.parseCommandArgs(ctx).slice(1));
       if (!target?.id) return ctx.reply('❌ استخدم الأمر بالرد على العضو أو بالمعرف.');
+      if (!(await this.ensureCanModifyTargetRole(ctx, target.id, actor))) return;
       if (!actorIsOwnerOrBasic) {
         const targetIsOwnerOrBasic = await this.isOwnerOrBasic(ctx, target.id);
         const targetIsManager = this.getRoleIds(group, 'managerIds').includes(Number(target.id));
@@ -2221,6 +2247,7 @@ class GroupAdminHandler {
     if (/^(رفع مميز|\/gpremium\s+add)/i.test(text)) {
       const target = await this.resolveTargetUser(ctx, this.parseCommandArgs(ctx).slice(1));
       if (!target?.id) return ctx.reply('❌ استخدم الأمر بالرد على العضو أو بالمعرف.');
+      if (!(await this.ensureCanModifyTargetRole(ctx, target.id, actor))) return;
       this.assignInternalRole(group, 'premiumMemberIds', target.id);
       await this.addModerationLog(group, 'add_premium_member', ctx.from.id, target.id);
       await group.save();
@@ -2234,6 +2261,7 @@ class GroupAdminHandler {
     if (/^(تنزيل مميز|\/gpremium\s+remove)/i.test(text)) {
       const target = await this.resolveTargetUser(ctx, this.parseCommandArgs(ctx).slice(1));
       if (!target?.id) return ctx.reply('❌ استخدم الأمر بالرد على العضو أو بالمعرف.');
+      if (!(await this.ensureCanModifyTargetRole(ctx, target.id, actor))) return;
       const targetId = Number(target.id);
       group.settings.premiumMemberIds = this.getRoleIds(group, 'premiumMemberIds').filter((id) => id !== targetId);
       await this.addModerationLog(group, 'remove_premium_member', ctx.from.id, targetId);
