@@ -471,7 +471,8 @@ class CommandHandler {
         return ctx.reply('❌ ليس لديك صلاحية');
       }
 
-      const groups = await Group.find({}).sort({ updatedAt: -1 }).limit(200).lean();
+      const allChats = await Group.find({}).sort({ updatedAt: -1 }).limit(300).lean();
+      const groups = allChats.filter((g) => ['group', 'supergroup', 'channel'].includes(String(g.groupType || '').toLowerCase()));
       const total = groups.length;
       const channels = groups.filter((g) => String(g.groupType || '').toLowerCase() === 'channel').length;
       const groupCount = groups.filter((g) => ['group', 'supergroup'].includes(String(g.groupType || '').toLowerCase())).length;
@@ -495,10 +496,19 @@ class CommandHandler {
       ]);
 
       if (ctx.callbackQuery) {
-        await ctx.editMessageText(message, {
-          parse_mode: 'HTML',
-          reply_markup: keyboard.reply_markup
-        });
+        try {
+          await ctx.editMessageText(message, {
+            parse_mode: 'HTML',
+            reply_markup: keyboard.reply_markup
+          });
+        } catch (error) {
+          const desc = String(error?.response?.description || error?.description || error?.message || '');
+          if (error?.response?.error_code === 400 && desc.includes('message is not modified')) {
+            await ctx.answerCbQuery('لا يوجد تحديث جديد').catch(() => {});
+            return;
+          }
+          throw error;
+        }
       } else {
         await ctx.reply(message, {
           parse_mode: 'HTML',
