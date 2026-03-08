@@ -950,6 +950,8 @@ class GroupGamesHandler {
   static confessionQuestions = new Map();
   static activeCafeRequests = new Map();
   static activeHookahSessions = new Map();
+  static activeRulerExecutionGames = new Map();
+  static rulerExecutionTimers = new Map();
   static lastQuestionByGroup = new Map();
   static questionQueues = new Map();
   static userCooldowns = new Map();
@@ -3313,7 +3315,7 @@ class GroupGamesHandler {
     const luckKey = `${String(ctx.chat.id)}:${Number(ctx.from?.id || 0)}`;
     if (this.pendingLuckInputs.has(luckKey)) {
       const normalized = this.normalizeArabicDigits(String(text || '').trim());
-      const isKnownCommandLike = /^(شراء|بيع|اهداء|إهداء|ارسال|إرسال|متجر|هدايا|ممتلكاتي|حظ|كرسي|انهاء|إنهاء|سؤال|لاونج|كافيتيريا|قائمة|مزاجي|طلب|سلم|ولع|هف|انضم|نفس|اشرب|اكل|كل|كول|البس|تحديد|جنسي|جنسه|اضف|أضف|حذف|عدد|كلمات|ردود|سوالفكم|فحص|رتبتي|my|الالعاب|الألعاب|كتم|تقييد|حظر|الغاء|إلغاء|فك|رفع|تنزيل|المنشئين|المالكين|المدراء|الادمنية|الأدمنية|المميزين|تفعيل|تعطيل|الحماية|اعدادات|إعدادات|برنت|تفاعل)\b/i.test(normalized);
+      const isKnownCommandLike = /^(شراء|بيع|اهداء|إهداء|ارسال|إرسال|متجر|هدايا|ممتلكاتي|حظ|كرسي|انهاء|إنهاء|سؤال|لاونج|كافيتيريا|قائمة|مزاجي|طلب|سلم|ولع|هف|انضم|نفس|اشرب|اكل|كل|كول|البس|حاكم|جلاد|متهم|حكم|ابدأ|تحديد|جنسي|جنسه|اضف|أضف|حذف|عدد|كلمات|ردود|سوالفكم|فحص|رتبتي|my|الالعاب|الألعاب|كتم|تقييد|حظر|الغاء|إلغاء|فك|رفع|تنزيل|المنشئين|المالكين|المدراء|الادمنية|الأدمنية|المميزين|تفعيل|تعطيل|الحماية|اعدادات|إعدادات|برنت|تفاعل)\b/i.test(normalized);
       if (isKnownCommandLike) {
         // Do not let pending luck block normal group commands.
         this.pendingLuckInputs.delete(luckKey);
@@ -3335,9 +3337,18 @@ class GroupGamesHandler {
     const handledConfession = await this.handleIncomingConfessionText(ctx, text);
     if (handledConfession) return true;
 
+    const groupId = String(ctx.chat.id);
     const group = await this.ensureGroupRecord(ctx);
     const row = this.getOrCreateScoreRow(group, ctx.from);
     await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
+
+    const rulerGame = this.activeRulerExecutionGames.get(groupId);
+    if (rulerGame && rulerGame.phase === 'await_answer' && Number(ctx.from?.id || 0) === Number(rulerGame.accusedId)) {
+      const input = this.normalizeText(text);
+      const ok = Array.isArray(rulerGame.answersNorm) && rulerGame.answersNorm.some((ans) => this.isLooseAnswerMatch(input, ans));
+      await this.resolveRulerExecutionRound(ctx.chat.id, ok, ctx.from);
+      return true;
+    }
 
     const handledStory = await this.maybeHandleStoryTalkMessage(ctx, group, row, text);
     if (handledStory) return true;
@@ -3351,7 +3362,6 @@ class GroupGamesHandler {
     const handledGenderReply = await this.maybeHandleGenderAutoReply(ctx, group, row, text);
     if (handledGenderReply) return true;
 
-    const groupId = String(ctx.chat.id);
     const round = this.activeRounds.get(groupId);
     if (!round) return false;
 
@@ -6122,6 +6132,175 @@ class GroupGamesHandler {
       '💡 تعتمد اللوحة على قيمة مخزون الهدايا فقط.',
       { parse_mode: 'HTML' }
     );
+  }
+
+  static clearRulerExecutionGame(chatId) {
+    const key = String(chatId);
+    this.activeRulerExecutionGames.delete(key);
+    const timer = this.rulerExecutionTimers.get(key);
+    if (timer) clearTimeout(timer);
+    this.rulerExecutionTimers.delete(key);
+  }
+
+  static async handleRulerExecutionCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const key = String(ctx.chat.id);
+    if (this.activeRulerExecutionGames.has(key)) {
+      return ctx.reply('ℹ️ اللعبة شغالة بالفعل. اكتب: انضم حاكم جلاد');
+    }
+    const hostId = Number(ctx.from?.id || 0);
+    const hostName = ctx.from?.first_name || ctx.from?.username || String(hostId || 'عضو');
+    this.activeRulerExecutionGames.set(key, {
+      phase: 'lobby',
+      hostId,
+      participants: [hostId],
+      names: { [hostId]: hostName }
+    });
+    return ctx.reply(
+      `🎭 <b>لعبة حاكم جلاد متهم</b>\n\n` +
+      `• صاحب الجلسة: ${this.mentionUser(hostId, hostName)}\n` +
+      '• انضمام: <b>انضم حاكم جلاد</b>\n' +
+      '• بدء: <b>ابدأ حاكم جلاد</b>\n' +
+      '• إنهاء: <b>انهاء حاكم جلاد</b>',
+      { parse_mode: 'HTML', reply_to_message_id: ctx.message?.message_id }
+    );
+  }
+
+  static async handleRulerExecutionJoinCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return false;
+    const key = String(ctx.chat.id);
+    const game = this.activeRulerExecutionGames.get(key);
+    if (!game || game.phase !== 'lobby') return false;
+    const userId = Number(ctx.from?.id || 0);
+    const userName = ctx.from?.first_name || ctx.from?.username || String(userId || 'عضو');
+    if (!game.participants.includes(userId)) game.participants.push(userId);
+    game.names[userId] = userName;
+    return ctx.reply(
+      `✅ انضم ${this.mentionUser(userId, userName)}\n• المشاركين: ${game.participants.length}`,
+      { parse_mode: 'HTML', reply_to_message_id: ctx.message?.message_id }
+    );
+  }
+
+  static async handleRulerExecutionBeginCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const key = String(ctx.chat.id);
+    const game = this.activeRulerExecutionGames.get(key);
+    if (!game || game.phase !== 'lobby') return ctx.reply('❌ ما في لعبة قيد التجهيز.');
+    if (Number(ctx.from?.id || 0) !== Number(game.hostId)) return ctx.reply('❌ فقط صاحب الجلسة يبدأ اللعبة.');
+    if (game.participants.length < 3) return ctx.reply('❌ لازم 3 لاعبين على الأقل.');
+
+    const picks = this.shuffleArray([...game.participants]);
+    game.rulerId = Number(picks[0]);
+    game.executionerId = Number(picks[1]);
+    game.accusedId = Number(picks[2]);
+    game.phase = 'judge_choice';
+
+    return ctx.reply(
+      '⚖️ <b>تم توزيع الأدوار</b>\n\n' +
+      `• الحاكم: ${this.mentionUser(game.rulerId, game.names[game.rulerId] || String(game.rulerId))}\n` +
+      `• الجلاد: ${this.mentionUser(game.executionerId, game.names[game.executionerId] || String(game.executionerId))}\n` +
+      `• المتهم: ${this.mentionUser(game.accusedId, game.names[game.accusedId] || String(game.accusedId))}\n\n` +
+      `${this.mentionUser(game.rulerId, game.names[game.rulerId] || String(game.rulerId))} اختَر:\n` +
+      '• <b>حكم سؤال</b>\n' +
+      '• <b>حكم تحدي</b>',
+      { parse_mode: 'HTML', reply_to_message_id: ctx.message?.message_id }
+    );
+  }
+
+  static async handleRulerExecutionEndCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const key = String(ctx.chat.id);
+    const game = this.activeRulerExecutionGames.get(key);
+    if (!game) return ctx.reply('ℹ️ لا توجد لعبة شغالة.');
+    const isAdmin = await this.isGroupAdmin(ctx);
+    if (!isAdmin && Number(ctx.from?.id || 0) !== Number(game.hostId)) {
+      return ctx.reply('❌ فقط المشرف أو صاحب الجلسة يقدر ينهي اللعبة.');
+    }
+    this.clearRulerExecutionGame(ctx.chat.id);
+    return ctx.reply('🛑 تم إنهاء لعبة حاكم جلاد متهم.');
+  }
+
+  static async handleRulerExecutionJudgeCommand(ctx, mode = 'question') {
+    if (!this.isGroupChat(ctx)) return;
+    const key = String(ctx.chat.id);
+    const game = this.activeRulerExecutionGames.get(key);
+    if (!game || game.phase !== 'judge_choice') return false;
+    if (Number(ctx.from?.id || 0) !== Number(game.rulerId)) return ctx.reply('❌ فقط الحاكم يختار الحكم.');
+
+    let answers = [];
+    let prompt = '';
+    let timeout = 30;
+    if (mode === 'challenge') {
+      const word = this.pickNonRepeating(TYPING_WORDS.map((w) => ({ question: w })), `ruler:challenge:${String(ctx.chat.id)}`).question;
+      answers = [word];
+      prompt = `⚡ <b>حكم تحدي</b>\n\nاكتب الكلمة:\n<b>${word}</b>`;
+      timeout = 20;
+    } else {
+      const q = this.pickNonRepeating(QUICK_QUESTIONS, `ruler:question:${String(ctx.chat.id)}`);
+      answers = q.answers;
+      prompt = `❓ <b>حكم سؤال</b>\n\n${q.question}`;
+      timeout = 30;
+    }
+
+    game.phase = 'await_answer';
+    game.answersNorm = answers.map((a) => this.normalizeText(String(a)));
+    game.askedAt = Date.now();
+    game.deadline = Date.now() + (timeout * 1000);
+    const timer = setTimeout(async () => {
+      const current = this.activeRulerExecutionGames.get(key);
+      if (!current || current.phase !== 'await_answer') return;
+      await this.resolveRulerExecutionRound(ctx.chat.id, false, null);
+    }, timeout * 1000);
+    this.rulerExecutionTimers.set(key, timer);
+
+    return ctx.reply(
+      `${this.mentionUser(game.accusedId, game.names[game.accusedId] || String(game.accusedId))}\n${prompt}\n\n⏱️ ${timeout} ثانية`,
+      { parse_mode: 'HTML', reply_to_message_id: ctx.message?.message_id }
+    );
+  }
+
+  static async resolveRulerExecutionRound(chatId, success, winnerUser) {
+    const key = String(chatId);
+    const game = this.activeRulerExecutionGames.get(key);
+    if (!game) return;
+    const timer = this.rulerExecutionTimers.get(key);
+    if (timer) clearTimeout(timer);
+    this.rulerExecutionTimers.delete(key);
+
+    const group = await this.ensureGroupRecordByChatId(chatId);
+    if (success) {
+      const accused = winnerUser || { id: Number(game.accusedId), first_name: game.names[game.accusedId] || String(game.accusedId) };
+      const meta = await this.updateScore(group, accused, 2);
+      group.updatedAt = new Date();
+      await group.save();
+      this.clearRulerExecutionGame(chatId);
+      await this.bot.telegram.sendMessage(Number(chatId),
+        `✅ <b>نجا المتهم</b>\n• المتهم: ${this.mentionUser(game.accusedId, game.names[game.accusedId] || String(game.accusedId))}\n• المكافأة: +${this.formatCurrency(meta.finalReward)}`,
+        { parse_mode: 'HTML' }).catch(() => {});
+      return;
+    }
+
+    const row = this.getOrCreateScoreRow(group, { id: Number(game.accusedId), first_name: game.names[game.accusedId] || String(game.accusedId), username: '' });
+    const userDoc = await this.ensureGlobalProfileAndSyncRow(row, { id: Number(game.accusedId), first_name: game.names[game.accusedId] || String(game.accusedId), username: '' });
+    row.points = Math.max(0, Number(row.points || 0) - 2);
+    row.weeklyPoints = Math.max(0, Number(row.weeklyPoints || 0) - 2);
+    row.monthlyPoints = Math.max(0, Number(row.monthlyPoints || 0) - 2);
+    row.updatedAt = new Date();
+    await this.syncRowToGlobal(userDoc, row);
+    await this.addRewardPointsToMember(group, game.rulerId, 1);
+    await this.addRewardPointsToMember(group, game.executionerId, 1);
+    group.updatedAt = new Date();
+    await group.save();
+    this.clearRulerExecutionGame(chatId);
+
+    await this.bot.telegram.sendMessage(
+      Number(chatId),
+      `⛓️ <b>تم تنفيذ الحكم</b>\n` +
+      `• المتهم: ${this.mentionUser(game.accusedId, game.names[game.accusedId] || String(game.accusedId))} (-${this.formatCurrency(2)})\n` +
+      `• الحاكم: ${this.mentionUser(game.rulerId, game.names[game.rulerId] || String(game.rulerId))} (+${this.formatCurrency(1)})\n` +
+      `• الجلاد: ${this.mentionUser(game.executionerId, game.names[game.executionerId] || String(game.executionerId))} (+${this.formatCurrency(1)})`,
+      { parse_mode: 'HTML' }
+    ).catch(() => {});
   }
 
 
