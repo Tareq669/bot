@@ -248,7 +248,7 @@ bot.use(async (ctx, next) => {
     )
   );
 
-  if (isCommandLike) {
+  if (isGroup && messageId > 0) {
     const mentionHtml = `<a href="tg://user?id=${Number(ctx.from?.id || 0)}">${String(ctx.from?.first_name || ctx.from?.username || 'مستخدم').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</a>`;
     const applyMentionPrefix = (content, options = {}, _captionMode = false) => {
       const parseMode = String(options.parse_mode || '').toLowerCase();
@@ -275,12 +275,12 @@ bot.use(async (ctx, next) => {
         let options = hasOptionsObject ? { ...lastArg } : {};
         if (!options.reply_to_message_id) options.reply_to_message_id = messageId;
 
-        if (methodName === 'reply' || methodName === 'replyWithHTML' || methodName === 'replyWithMarkdown' || methodName === 'replyWithMarkdownV2') {
+        if (isCommandLike && (methodName === 'reply' || methodName === 'replyWithHTML' || methodName === 'replyWithMarkdown' || methodName === 'replyWithMarkdownV2')) {
           const first = args[0];
           const withMention = applyMentionPrefix(first, options, false);
           args[0] = withMention.content;
           options = withMention.options;
-        } else if (['replyWithPhoto', 'replyWithVideo', 'replyWithAnimation', 'replyWithDocument', 'replyWithAudio', 'replyWithVoice'].includes(methodName)) {
+        } else if (isCommandLike && ['replyWithPhoto', 'replyWithVideo', 'replyWithAnimation', 'replyWithDocument', 'replyWithAudio', 'replyWithVoice'].includes(methodName)) {
           const withMention = applyMentionPrefix(String(options.caption || ''), options, true);
           options = withMention.options;
           options.caption = withMention.content;
