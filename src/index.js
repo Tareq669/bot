@@ -729,6 +729,7 @@ bot.command('panel', (ctx) => CommandHandler.handleOwnerPanel(ctx));
 bot.action('owner:panel', (ctx) => CommandHandler.handleOwnerPanel(ctx));
 bot.action('owner:stats', (ctx) => CommandHandler.handleOwnerStats(ctx));
 bot.action('owner:users', (ctx) => CommandHandler.handleOwnerUsers(ctx));
+bot.action('owner:chats', (ctx) => CommandHandler.handleOwnerChats(ctx));
 bot.action('owner:broadcast', (ctx) => CommandHandler.handleOwnerBroadcast(ctx));
 bot.action('owner:economy', (ctx) => CommandHandler.handleOwnerEconomy(ctx));
 bot.action('owner:database', (ctx) => CommandHandler.handleOwnerDatabase(ctx));

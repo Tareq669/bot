@@ -412,6 +412,41 @@ class GroupAdminHandler {
     return '• عذراً هذا الامر يخص ← { المالك الأساسي } فقط .';
   }
 
+  static async getActorRoleInfo(ctx, userId = null) {
+    const targetUserId = Number(userId || ctx?.from?.id || 0);
+    if (!targetUserId) return { key: null, label: '' };
+
+    const member = await this.getChatMemberSafe(ctx, targetUserId);
+    if (member?.status === 'creator') return { key: 'creator', label: 'المنشئ' };
+
+    const group = await this.ensureGroupRecord(ctx);
+    if (this.getRoleIds(group, 'basicOwnerIds').includes(targetUserId)) return { key: 'basic_owner', label: 'المالك الاساسي' };
+    if (this.getRoleIds(group, 'ownerIds').includes(targetUserId)) return { key: 'owner', label: 'المالك' };
+    if (this.getRoleIds(group, 'managerIds').includes(targetUserId)) return { key: 'manager', label: 'المدير' };
+    if (this.getRoleIds(group, 'adminIds').includes(targetUserId)) return { key: 'admin', label: 'الادمن' };
+    if (this.getRoleIds(group, 'premiumMemberIds').includes(targetUserId)) return { key: 'premium', label: 'المميز' };
+    if (member?.status === 'administrator') return { key: 'telegram_admin', label: 'مشرف تيليجرام' };
+    return { key: null, label: '' };
+  }
+
+  static async replyRoleGuardMessage(ctx, requiredRoleLabel) {
+    const requesterMention = this.mentionUser(
+      ctx.from?.id,
+      ctx.from?.first_name || ctx.from?.username || String(ctx.from?.id || 'مستخدم')
+    );
+    const actor = await this.getActorRoleInfo(ctx, ctx.from?.id);
+    if (!actor.key) {
+      return ctx.reply(
+        `${requesterMention}\n• عذراً عزيزي أنت لا تملك رتبه •`,
+        { parse_mode: 'HTML', reply_to_message_id: ctx.message?.message_id }
+      );
+    }
+    return ctx.reply(
+      `${requesterMention}\n• عذراً هذا الامر يخص ← { ${requiredRoleLabel} } فقط .`,
+      { parse_mode: 'HTML', reply_to_message_id: ctx.message?.message_id }
+    );
+  }
+
   static formatProtectionTimestamp(unixSeconds) {
     if (!Number.isFinite(Number(unixSeconds))) return 'غير متوفر';
     return new Date(Number(unixSeconds) * 1000).toLocaleString('ar-EG', {
@@ -1896,8 +1931,8 @@ class GroupAdminHandler {
       }), { parse_mode: 'HTML' });
     }
 
-    const isPrimaryOwner = await this.isPrimaryOwner(ctx);
-    if (!isPrimaryOwner) return ctx.reply(this.formatOwnerOnlyError());
+    const actor = await this.getActorRoleInfo(ctx, ctx.from?.id);
+    if (actor.key !== 'creator') return this.replyRoleGuardMessage(ctx, 'المنشئ');
 
     if (/^(رفع اساسي|\/gbasic\s+set)/i.test(text)) {
       const target = await this.resolveTargetUser(ctx, this.parseCommandArgs(ctx).slice(1));
@@ -2028,8 +2063,8 @@ class GroupAdminHandler {
       }), { parse_mode: 'HTML' });
     }
 
-    const canUse = await this.isOwnerOrBasic(ctx);
-    if (!canUse) return ctx.reply(this.formatOwnerOnlyError());
+    const actor = await this.getActorRoleInfo(ctx, ctx.from?.id);
+    if (actor.key !== 'creator') return this.replyRoleGuardMessage(ctx, 'المنشئ');
 
     if (/^(رفع مالك|\/gowner\s+add)/i.test(text)) {
       const target = await this.resolveTargetUser(ctx, this.parseCommandArgs(ctx).slice(1));
@@ -2073,8 +2108,8 @@ class GroupAdminHandler {
       }), { parse_mode: 'HTML' });
     }
 
-    const canUse = await this.isOwnerOrBasic(ctx);
-    if (!canUse) return ctx.reply(this.formatOwnerOnlyError());
+    const actor = await this.getActorRoleInfo(ctx, ctx.from?.id);
+    if (!['creator', 'basic_owner'].includes(actor.key)) return this.replyRoleGuardMessage(ctx, 'المالك الاساسي');
 
     if (/^(رفع مدير|\/gmanager\s+add)/i.test(text)) {
       const target = await this.resolveTargetUser(ctx, this.parseCommandArgs(ctx).slice(1));
@@ -2118,8 +2153,8 @@ class GroupAdminHandler {
       }), { parse_mode: 'HTML' });
     }
 
-    const canUse = await this.isManagerOrHigher(ctx);
-    if (!canUse) return ctx.reply('❌ هذا الأمر للمدراء فما فوق فقط.');
+    const actor = await this.getActorRoleInfo(ctx, ctx.from?.id);
+    if (!['creator', 'basic_owner', 'manager'].includes(actor.key)) return this.replyRoleGuardMessage(ctx, 'المدير');
     const actorIsOwnerOrBasic = await this.isOwnerOrBasic(ctx);
 
     if (/^(رفع ادمن|\/gadmins\s+add)/i.test(text)) {
@@ -2180,8 +2215,8 @@ class GroupAdminHandler {
       }), { parse_mode: 'HTML' });
     }
 
-    const canUse = await this.isOwnerOrBasic(ctx);
-    if (!canUse) return ctx.reply(this.formatOwnerOnlyError());
+    const actor = await this.getActorRoleInfo(ctx, ctx.from?.id);
+    if (!['creator', 'basic_owner', 'manager', 'admin'].includes(actor.key)) return this.replyRoleGuardMessage(ctx, 'الادمن');
 
     if (/^(رفع مميز|\/gpremium\s+add)/i.test(text)) {
       const target = await this.resolveTargetUser(ctx, this.parseCommandArgs(ctx).slice(1));

@@ -1,7 +1,7 @@
 ﻿const Markup = require('telegraf/markup');
 const UIManager = require('../ui/keyboards');
 const Formatter = require('../ui/formatter');
-const { User } = require('../database/models');
+const { User, Group } = require('../database/models');
 const EconomyManager = require('../economy/economyManager');
 
 class CommandHandler {
@@ -461,6 +461,54 @@ class CommandHandler {
     } catch (error) {
       console.error('Error in handleProfile:', error);
       await ctx.reply('❌ حدث خطأ');
+    }
+  }
+
+  static async handleOwnerChats(ctx) {
+    try {
+      if (!UIManager.isOwner(ctx.from.id)) {
+        if (ctx.callbackQuery) await ctx.answerCbQuery('❌ غير مصرح');
+        return ctx.reply('❌ ليس لديك صلاحية');
+      }
+
+      const groups = await Group.find({}).sort({ updatedAt: -1 }).limit(200).lean();
+      const total = groups.length;
+      const channels = groups.filter((g) => String(g.groupType || '').toLowerCase() === 'channel').length;
+      const groupCount = groups.filter((g) => ['group', 'supergroup'].includes(String(g.groupType || '').toLowerCase())).length;
+
+      const rows = groups.slice(0, 40).map((g, idx) => {
+        const type = String(g.groupType || 'group').toLowerCase() === 'channel' ? '📣 قناة' : '👥 جروب';
+        const title = String(g.groupTitle || g.groupId || 'غير معروف').replace(/\n/g, ' ').trim();
+        return `${idx + 1}) ${type} • ${title}`;
+      });
+
+      const message =
+        '🏘️ <b>المجموعات والقنوات التي استخدمت البوت</b>\n\n' +
+        `• الإجمالي ↤︎ ${total}\n` +
+        `• الجروبات ↤︎ ${groupCount}\n` +
+        `• القنوات ↤︎ ${channels}\n\n` +
+        (rows.length ? rows.join('\n') : 'لا توجد بيانات حالياً.');
+
+      const keyboard = Markup.inlineKeyboard([
+        [Markup.button.callback('🔄 تحديث', 'owner:chats')],
+        [Markup.button.callback('⬅️ رجوع', 'owner:panel')]
+      ]);
+
+      if (ctx.callbackQuery) {
+        await ctx.editMessageText(message, {
+          parse_mode: 'HTML',
+          reply_markup: keyboard.reply_markup
+        });
+      } else {
+        await ctx.reply(message, {
+          parse_mode: 'HTML',
+          reply_markup: keyboard.reply_markup
+        });
+      }
+    } catch (error) {
+      console.error('Error in handleOwnerChats:', error);
+      if (ctx.callbackQuery) await ctx.answerCbQuery('❌ حدث خطأ').catch(() => {});
+      await ctx.reply('❌ حدث خطأ أثناء جلب المجموعات والقنوات.').catch(() => {});
     }
   }
 

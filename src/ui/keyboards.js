@@ -297,6 +297,9 @@ class UIManager {
         Markup.button.callback('🗑️ حذف البيانات', 'owner:cleanup')
       ],
       [
+        Markup.button.callback('🏘️ المجموعات والقنوات', 'owner:chats')
+      ],
+      [
         Markup.button.callback('🚫 المحظورون', 'owner:banned'),
         Markup.button.callback('💰 إدارة الاقتصاد', 'owner:economy')
       ],
