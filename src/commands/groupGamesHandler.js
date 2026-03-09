@@ -6018,7 +6018,7 @@ class GroupGamesHandler {
     const rawInput = this.extractGiftInputFromArgs(args);
     const giftTokens = rawInput ? rawInput.split(/\s+/) : [];
     const gift = this.resolveGiftByInput(rawInput) || this.resolveGiftByInput(giftTokens[0]) || this.resolveGiftByInput(args[0]);
-    if (!gift) return ctx.reply('❌ الهدية غير معروفة. استخدم /ggifts');
+    if (!gift) return ctx.reply('• عذراً عزيزي هذه الهديه غير متوفره');
 
     const group = await this.ensureGroupRecord(ctx);
     const row = this.getOrCreateScoreRow(group, ctx.from);
@@ -6067,7 +6067,7 @@ class GroupGamesHandler {
     const rawInput = this.extractGiftInputFromArgs(args);
     const giftTokens = rawInput ? rawInput.split(/\s+/) : [];
     const gift = this.resolveGiftByInput(rawInput) || this.resolveGiftByInput(giftTokens[0]) || this.resolveGiftByInput(args[0]);
-    if (!gift) return ctx.reply('❌ الهدية غير معروفة. استخدم /ggifts');
+    if (!gift) return ctx.reply('• عذراً عزيزي هذه الهديه غير متوفره');
 
     const group = await this.ensureGroupRecord(ctx);
     const row = this.getOrCreateScoreRow(group, ctx.from);
@@ -6305,7 +6305,7 @@ class GroupGamesHandler {
     const rawInput = this.extractGiftInputFromArgs(compact);
     const giftTokens = rawInput ? rawInput.split(/\s+/) : [];
     const gift = this.resolveGiftByInput(rawInput) || this.resolveGiftByInput(giftTokens[0]) || this.resolveGiftByInput(compact[0] || args[0]);
-    if (!gift) return ctx.reply('❌ الهدية غير معروفة. استخدم /ggifts');
+    if (!gift) return ctx.reply('• عذراً عزيزي هذه الهديه غير متوفره');
 
     const targetArg = compact.find((x) => String(x).startsWith('@') || /^\d+$/.test(String(x))) || null;
     const qtyArg = compact.find((x) => /^\d+$/.test(String(x))) || '1';
