@@ -1100,6 +1100,58 @@ const RIDDLE_BANK = [
   { question: 'حيوان إذا جاع أكل أولاده، ما هو؟', answers: ['الاسد', 'الأسد'] },
   { question: 'ما الذي ينام ولا يقوم؟', answers: ['النار'] }
 ];
+const RIDDLE_REQUIRED_CASES = 10000;
+const RIDDLE_VARIANTS = ['لغز', 'فكرة', 'تحدي', 'ذكاء', 'محاولة', 'غموض', 'سؤال', 'مستوى', 'اختبار', 'تحليل'];
+const normalizeRiddleSeedText = (value) => String(value || '')
+  .toLowerCase()
+  .trim()
+  .replace(/[ًٌٍَُِّْـ]/g, '')
+  .replace(/[إأآ]/g, 'ا')
+  .replace(/ة/g, 'ه')
+  .replace(/[^\p{L}\p{N}\s]/gu, '')
+  .replace(/\s+/g, ' ');
+
+const buildGeneratedRiddleCases = (baseRiddles, count) => {
+  const bank = [];
+  const fallbackOptions = ['القلم', 'البحر', 'الوقت', 'الريح', 'الظل', 'النار', 'الماء', 'الشمس'];
+  for (let i = 0; i < count; i += 1) {
+    const base = baseRiddles[i % baseRiddles.length];
+    const correct = String(base?.answers?.[0] || '').trim();
+    const wrongRaw = fallbackOptions
+      .filter((x) => normalizeRiddleSeedText(x) !== normalizeRiddleSeedText(correct));
+    for (let j = 0; j < baseRiddles.length && wrongRaw.length < 12; j += 1) {
+      if (j === (i % baseRiddles.length)) continue;
+      const candidate = String(baseRiddles[j]?.answers?.[0] || '').trim();
+      if (!candidate) continue;
+      if (normalizeRiddleSeedText(candidate) === normalizeRiddleSeedText(correct)) continue;
+      if (!wrongRaw.some((x) => normalizeRiddleSeedText(x) === normalizeRiddleSeedText(candidate))) {
+        wrongRaw.push(candidate);
+      }
+    }
+    const wrongStart = i % Math.max(1, wrongRaw.length);
+    const wrong = [];
+    for (let k = 0; k < wrongRaw.length && wrong.length < 4; k += 1) {
+      wrong.push(wrongRaw[(wrongStart + k) % wrongRaw.length]);
+    }
+    while (wrong.length < 4) wrong.push(`خيار ${wrong.length + 2}`);
+
+    const optionsSeed = [correct, ...wrong];
+    const shift = i % optionsSeed.length;
+    const options = optionsSeed.map((_, idx) => optionsSeed[(idx + shift) % optionsSeed.length]);
+    const answerIndex = options.findIndex((x) => normalizeRiddleSeedText(x) === normalizeRiddleSeedText(correct));
+
+    bank.push({
+      question: `${String(base?.question || '').trim()} (${RIDDLE_VARIANTS[i % RIDDLE_VARIANTS.length]} #${i + 1})`,
+      options,
+      answerIndex: Math.max(0, answerIndex),
+      reward: 5,
+      category: 'riddle'
+    });
+  }
+  return bank;
+};
+
+const RIDDLE_CASES = buildGeneratedRiddleCases(RIDDLE_BANK, RIDDLE_REQUIRED_CASES);
 const TYPING_WORDS = [
   'فلسطين', 'المتسابق', 'البرمجة', 'التحدي', 'الذكاء', 'الإنجاز', 'السرعة', 'التركيز', 'التعاون', 'الاستمرارية',
   'المنافسة', 'النجاح', 'الإبداع', 'الاجتهاد', 'التفكير', 'المعلومة', 'المهارة', 'الخبرة', 'القراءة', 'المعرفة',
@@ -3556,7 +3608,7 @@ class GroupGamesHandler {
     const round = this.activeRounds.get(groupId);
     if (!round) return false;
 
-    if (round.type !== 'category_text' && Date.now() > round.deadline) {
+    if (!['category_text', 'detective', 'riddle_mcq'].includes(round.type) && Date.now() > round.deadline) {
       this.clearRound(groupId);
       await ctx.reply(`⌛ انتهت الجولة.\n✅ الإجابة الصحيحة: ${round.answers[0]}`);
       return true;
@@ -3569,7 +3621,7 @@ class GroupGamesHandler {
 
     const input = this.normalizeText(text);
     let isCorrectAnswer = round.answersNorm.includes(input);
-    if (!isCorrectAnswer && round.type === 'category_text') {
+    if (!isCorrectAnswer && ['category_text', 'detective', 'riddle_mcq'].includes(round.type)) {
       isCorrectAnswer = round.answersNorm.some((ans) => this.isLooseAnswerMatch(input, ans));
     }
     if (!isCorrectAnswer) return false;
@@ -3602,6 +3654,16 @@ class GroupGamesHandler {
       await ctx.reply(
         `• محقق بارع 👀 اجابة صحيحة √\n• الفائز ~» ${winnerSimple}\n• فلوسك ~» ${this.formatCurrency(scoreMeta.finalReward)}`,
         { parse_mode: 'HTML' }
+      );
+      return true;
+    }
+
+    if (round.type === 'riddle_mcq') {
+      const winnerNameSimple = ctx.from.first_name || ctx.from.username || String(ctx.from.id);
+      const winnerSimple = this.mentionUser(ctx.from.id, winnerNameSimple);
+      await ctx.reply(
+        `• اجابة صحيحة √ أنت عبقري 😍\n• الفائز  ~» ${winnerSimple}\n• فلوسك ~» ${this.formatCurrency(scoreMeta.finalReward)}`,
+        { parse_mode: 'HTML', reply_to_message_id: ctx.message?.message_id }
       );
       return true;
     }
@@ -3740,11 +3802,49 @@ class GroupGamesHandler {
 
   static async handleRiddleCommand(ctx) {
     if (!this.isGroupChat(ctx)) return;
-    const status = await this.canStartRound(ctx);
-    if (!status.ok) return;
-    const round = this.buildRiddleRound();
-    round.timeoutSec = Math.max(12, status.group.gameSystem.settings.questionTimeoutSec || 25);
-    await this.startRoundInternal(ctx.chat.id, round, false);
+    const groupId = String(ctx.chat.id);
+    this.clearRound(groupId);
+    const question = this.pickNonRepeating(RIDDLE_CASES, `riddle:${String(ctx.chat.id)}`);
+    const from = ctx.from || {};
+    const mention = this.mentionUser(from.id, from.first_name || from.username || 'المستخدم');
+    const options = Array.isArray(question?.options)
+      ? question.options.map((x) => String(x || '').trim())
+      : [];
+    const answerIndex = Math.max(0, Number(question?.answerIndex) || 0);
+    const correctAnswer = String(options[answerIndex] || '').trim();
+    const plainQuestion = String(question?.question || '')
+      .replace(/\s*\([^()]*#\d+\)\s*$/u, '')
+      .trim();
+    const acceptedAnswers = new Set();
+    const addAnswer = (value) => {
+      const normalized = this.normalizeText(String(value || ''));
+      if (!normalized) return;
+      acceptedAnswers.add(normalized);
+      if (normalized.startsWith('ال') && normalized.length > 2) acceptedAnswers.add(normalized.slice(2));
+    };
+    addAnswer(correctAnswer);
+    addAnswer(String(answerIndex + 1));
+    if (options[answerIndex]) addAnswer(options[answerIndex]);
+
+    this.activeRounds.set(groupId, {
+      type: 'riddle_mcq',
+      prompt: `• لغز ~» ${plainQuestion}`,
+      answers: [correctAnswer],
+      answersNorm: [...acceptedAnswers],
+      reward: 5,
+      deadline: Number.MAX_SAFE_INTEGER,
+      askedAt: Date.now()
+    });
+
+    const optionsText = `\n• 1) ${this.escapeHtml(options[0] || '')}\n• 2) ${this.escapeHtml(options[1] || '')}\n• 3) ${this.escapeHtml(options[2] || '')}\n• 4) ${this.escapeHtml(options[3] || '')}\n• 5) ${this.escapeHtml(options[4] || '')}`;
+    return this.bot.telegram.sendMessage(
+      Number(ctx.chat.id),
+      `${mention}\n• لغز ~» ${this.escapeHtml(plainQuestion)}${optionsText}`,
+      {
+        parse_mode: 'HTML',
+        reply_to_message_id: ctx.message?.message_id
+      }
+    );
   }
 
   static async handleTypingCommand(ctx) {
@@ -3845,8 +3945,20 @@ class GroupGamesHandler {
     );
     const mention = userId ? `<a href="tg://user?id=${userId}">${displayName}</a>` : displayName;
     const options = Array.isArray(question?.options)
-      ? question.options.map((x) => String(x || '').trim())
+      ? question.options.map((x) => String(x || '').trim()).slice(0, 5)
       : [];
+    const wrongPool = ALL_MCQ_QUESTIONS
+      .flatMap((item) => Array.isArray(item?.options) ? item.options : [])
+      .map((x) => String(x || '').trim())
+      .filter(Boolean);
+    while (options.length < 5) {
+      const fallback = wrongPool[(options.length * 73) % Math.max(1, wrongPool.length)] || `خيار ${options.length + 1}`;
+      if (!options.some((x) => this.normalizeText(x) === this.normalizeText(fallback))) {
+        options.push(fallback);
+      } else {
+        options.push(`خيار ${options.length + 1}`);
+      }
+    }
     const answerIndex = Math.max(0, Number(question?.answerIndex) || 0);
     const correctAnswer = String(
       Array.isArray(question?.options)
@@ -3881,9 +3993,10 @@ class GroupGamesHandler {
       askedAt
     });
 
-    const sent = await this.bot.telegram.sendMessage(
+    const optionsText = `\n• 1) ${this.escapeHtml(options[0] || '')}\n• 2) ${this.escapeHtml(options[1] || '')}\n• 3) ${this.escapeHtml(options[2] || '')}\n• 4) ${this.escapeHtml(options[3] || '')}\n• 5) ${this.escapeHtml(options[4] || '')}`;
+    await this.bot.telegram.sendMessage(
       Number(ctx.chat.id),
-      `${mention}\n• سؤال ${categoryLabel} ~» ${plainQuestion}`,
+      `${mention}\n• سؤال ${categoryLabel} ~» ${this.escapeHtml(plainQuestion)}${optionsText}`,
       {
         parse_mode: 'HTML',
         reply_to_message_id: ctx.message?.message_id
@@ -3925,7 +4038,7 @@ class GroupGamesHandler {
       answers: [correctAnswer],
       answersNorm: [...acceptedAnswers],
       reward: 3,
-      deadline: Date.now() + 60000,
+      deadline: Number.MAX_SAFE_INTEGER,
       askedAt: Date.now()
     });
 
