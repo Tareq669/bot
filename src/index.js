@@ -1131,6 +1131,96 @@ bot.action('owner:delete', async (ctx) => {
   }
 });
 
+bot.action(/^owner:userchats:(\d+)$/i, async (ctx) => {
+  try {
+    if (!(await ensureOwner(ctx))) return;
+    const targetUserId = Number(ctx.match?.[1] || 0);
+    if (!Number.isInteger(targetUserId) || targetUserId <= 0) {
+      return ctx.answerCbQuery('❌ ID غير صالح');
+    }
+
+    const { Group, User } = require('./database/models');
+    const targetUser = await User.findOne({ userId: targetUserId }).lean();
+    const targetName = String(targetUser?.firstName || targetUser?.username || `user_${targetUserId}`);
+
+    const chats = await Group.find({
+      $or: [
+        { 'settings.primaryOwnerId': targetUserId },
+        { 'settings.basicOwnerId': targetUserId },
+        { 'settings.basicOwnerIds': targetUserId },
+        { 'settings.ownerIds': targetUserId },
+        { 'settings.managerIds': targetUserId },
+        { 'settings.adminIds': targetUserId },
+        { 'settings.premiumMemberIds': targetUserId },
+        { 'admins.userId': targetUserId },
+        { 'warnings.userId': targetUserId },
+        { 'bannedUsers.userId': targetUserId },
+        { 'moderationLogs.actorId': targetUserId },
+        { 'moderationLogs.targetId': targetUserId },
+        { 'gameSystem.scores.userId': targetUserId },
+        { 'gameSystem.state.storySession.participantIds': targetUserId },
+        { 'teams.members': targetUserId },
+        { 'teams.captainId': targetUserId }
+      ]
+    }).sort({ updatedAt: -1 }).limit(200).lean();
+
+    const uniqueByGroup = new Map();
+    for (const chat of chats) {
+      uniqueByGroup.set(String(chat.groupId), chat);
+    }
+    const all = Array.from(uniqueByGroup.values());
+    const channels = all.filter((g) => String(g.groupType || '').toLowerCase() === 'channel');
+    const groups = all.filter((g) => ['group', 'supergroup'].includes(String(g.groupType || '').toLowerCase()));
+
+    const rows = all.slice(0, 50).map((g, idx) => {
+      const type = String(g.groupType || '').toLowerCase() === 'channel' ? '📣 قناة' : '👥 جروب';
+      const title = escapeHtml(String(g.groupTitle || g.groupId || 'غير معروف').replace(/\n/g, ' ').trim());
+      return `${idx + 1}) ${type} • ${title}`;
+    });
+
+    const message =
+      '🧾 <b>نتيجة فحص مجموعات/قنوات المستخدم</b>\n\n' +
+      `👤 المستخدم: ${escapeHtml(targetName)}\n` +
+      `🆔 ID: <code>${targetUserId}</code>\n\n` +
+      `• الإجمالي ↤︎ ${all.length}\n` +
+      `• الجروبات ↤︎ ${groups.length}\n` +
+      `• القنوات ↤︎ ${channels.length}\n\n` +
+      (rows.length ? rows.join('\n') : 'لا توجد بيانات مرتبطة بهذا المستخدم داخل سجلات البوت.');
+
+    const keyboard = Markup.inlineKeyboard([
+      [Markup.button.callback('🔄 تحديث', `owner:userchats:${targetUserId}`)],
+      [Markup.button.callback('⬅️ رجوع', 'owner:users')]
+    ]);
+
+    if (ctx.callbackQuery) {
+      try {
+        await ctx.editMessageText(message, {
+          parse_mode: 'HTML',
+          reply_markup: keyboard.reply_markup
+        });
+      } catch (error) {
+        const desc = String(error?.response?.description || error?.description || error?.message || '');
+        if (error?.response?.error_code === 400 && desc.includes('message is not modified')) {
+          await ctx.answerCbQuery('لا يوجد تحديث جديد').catch(() => {});
+          return;
+        }
+        throw error;
+      }
+      await ctx.answerCbQuery('✅').catch(() => {});
+      return;
+    }
+
+    await ctx.reply(message, {
+      parse_mode: 'HTML',
+      reply_markup: keyboard.reply_markup
+    });
+  } catch (error) {
+    console.error('Owner user chats error:', error);
+    await ctx.answerCbQuery('❌ حدث خطأ').catch(() => {});
+    await ctx.reply('❌ تعذر جلب مجموعات/قنوات المستخدم.').catch(() => {});
+  }
+});
+
 // Owner - Economy details
 bot.action('owner:ecostats', async (ctx) => {
   try {
@@ -4358,6 +4448,16 @@ bot.on('text', async (ctx) => {
           ctx.session.ownerAwait = null;
 
           if (!foundUser) {
+            if (numericId) {
+              const keyboard = Markup.inlineKeyboard([
+                [Markup.button.callback('🏘️ مجموعات/قنوات المستخدم', `owner:userchats:${numericId}`)],
+                [Markup.button.callback('⬅️ رجوع', 'owner:users')]
+              ]);
+              return ctx.reply(
+                `❌ لم يتم العثور على المستخدم في قاعدة المستخدمين.\n🆔 ID: <code>${numericId}</code>`,
+                { parse_mode: 'HTML', reply_markup: keyboard.reply_markup }
+              );
+            }
             return ctx.reply('❌ لم يتم العثور على المستخدم');
           }
 
@@ -4381,6 +4481,7 @@ bot.on('text', async (ctx) => {
                 ? Markup.button.callback('✅ إلغاء الحظر', `admin:unban:${foundUser.userId}`)
                 : Markup.button.callback('🚫 حظر المستخدم', `admin:ban:${foundUser.userId}`)
             ],
+            [Markup.button.callback('🏘️ مجموعات/قنوات المستخدم', `owner:userchats:${foundUser.userId}`)],
             [Markup.button.callback('⬅️ رجوع', 'owner:users')]
           ]);
 
