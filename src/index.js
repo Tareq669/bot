@@ -4228,15 +4228,41 @@ bot.on('text', async (ctx) => {
         if (awaiting.type === 'searchUser') {
           // Search for user by ID or name
           let foundUser;
-          if (/^\d+$/.test(message.trim())) {
+          const rawInput = String(message || '').trim();
+          const cleanInput = rawInput.replace(/^@+/, '').trim();
+
+          if (!cleanInput) {
+            ctx.session.adminAwait = null;
+            return ctx.reply('❌ أدخل معرفًا أو اسم مستخدم صحيحًا.');
+          }
+
+          if (/^\d+$/.test(cleanInput)) {
             // Search by ID
-            foundUser = await User.findOne({ userId: parseInt(message.trim()) });
+            foundUser = await User.findOne({ userId: parseInt(cleanInput, 10) });
           } else {
             // Search by name
-            const searchRegex = new RegExp(escapeRegex(message.trim()), 'i');
+            const searchRegex = new RegExp(escapeRegex(cleanInput), 'i');
             foundUser = await User.findOne({
-              $or: [{ firstName: searchRegex }, { username: searchRegex }]
+              $or: [{ firstName: searchRegex }, { username: searchRegex }, { lastName: searchRegex }]
             });
+
+            if (!foundUser && rawInput.startsWith('@')) {
+              try {
+                const tgUser = await ctx.telegram.getChat(rawInput);
+                const tgUserId = Number(tgUser?.id || 0);
+                const tgUsername = String(tgUser?.username || '').trim();
+                if (tgUserId > 0) {
+                  foundUser = await User.findOne({
+                    $or: [
+                      { userId: tgUserId },
+                      ...(tgUsername ? [{ username: new RegExp(`^${escapeRegex(tgUsername)}$`, 'i') }] : [])
+                    ]
+                  });
+                }
+              } catch (_error) {
+                // ignore Telegram lookup failure and keep standard "not found" behavior
+              }
+            }
           }
 
           ctx.session.adminAwait = null;
