@@ -1620,6 +1620,51 @@ class GroupGamesHandler {
     return state.queue.pop();
   }
 
+  static getQuestionStableId(question) {
+    const text = String(question?.question || question?.prompt || '').trim();
+    const m = text.match(/#(\d+)\)\s*$/u);
+    if (m && m[1]) return `n:${m[1]}`;
+    const normalized = this.normalizeText(text);
+    return `t:${normalized.slice(0, 180)}`;
+  }
+
+  static pickMonthlyNonRepeating(group, items, usageKey) {
+    if (!Array.isArray(items) || !items.length) return null;
+    this.normalizeGroupState(group);
+    const monthKey = this.getMonthKey();
+    if (!group.gameSystem.state.monthlyQuestionUsage || typeof group.gameSystem.state.monthlyQuestionUsage !== 'object') {
+      group.gameSystem.state.monthlyQuestionUsage = {};
+    }
+
+    const bagKey = String(usageKey || 'general');
+    const rawUsage = group.gameSystem.state.monthlyQuestionUsage[bagKey];
+    let usage = rawUsage && typeof rawUsage === 'object' ? rawUsage : { monthKey: monthKey, used: [] };
+    if (!Array.isArray(usage.used)) usage.used = [];
+    if (String(usage.monthKey || '') !== monthKey) {
+      usage = { monthKey: monthKey, used: [] };
+    }
+
+    const usedSet = new Set(usage.used.map((x) => String(x)));
+    let available = items.filter((q) => !usedSet.has(this.getQuestionStableId(q)));
+    if (!available.length) {
+      usage.used = [];
+      available = [...items];
+    }
+
+    const picked = this.pickFromQueue(
+      available,
+      `monthly:${String(group.groupId || '')}:${bagKey}:${monthKey}`
+    ) || this.pickRandom(available);
+    if (!picked) return null;
+
+    const pickedId = this.getQuestionStableId(picked);
+    if (!usage.used.includes(pickedId)) usage.used.push(pickedId);
+    if (usage.used.length > 15000) usage.used = usage.used.slice(usage.used.length - 15000);
+
+    group.gameSystem.state.monthlyQuestionUsage[bagKey] = usage;
+    return picked;
+  }
+
   static parseCommandArgs(ctx) {
     const text = ctx.message?.text || '';
     const parts = text.trim().split(/\s+/);
@@ -3802,9 +3847,13 @@ class GroupGamesHandler {
 
   static async handleRiddleCommand(ctx) {
     if (!this.isGroupChat(ctx)) return;
+    const group = await this.ensureGroupRecord(ctx);
     const groupId = String(ctx.chat.id);
     this.clearRound(groupId);
-    const question = this.pickFromQueue(RIDDLE_CASES, `riddle:${String(ctx.chat.id)}`);
+    const question = this.pickMonthlyNonRepeating(group, RIDDLE_CASES, 'riddle_mcq');
+    if (!question) return;
+    group.updatedAt = new Date();
+    await group.save();
     const from = ctx.from || {};
     const mention = this.mentionUser(from.id, from.first_name || from.username || 'المستخدم');
     const options = Array.isArray(question?.options)
@@ -3911,7 +3960,11 @@ class GroupGamesHandler {
     if (!this.isGroupChat(ctx)) return;
     const status = await this.canStartRound(ctx);
     if (!status.ok) return;
-    const question = this.pickFromQueue(DETECTIVE_CASES, `detective:${String(ctx.chat.id)}`);
+    const group = status.group;
+    const question = this.pickMonthlyNonRepeating(group, DETECTIVE_CASES, 'detective');
+    if (!question) return;
+    group.updatedAt = new Date();
+    await group.save();
     return this.startDetectiveRound(ctx, question);
   }
 
@@ -3929,7 +3982,14 @@ class GroupGamesHandler {
       .filter((q) => this.questionMatchesCategory(q, finalCategory || opts.category));
     const source = pool.length > 0 ? pool : ALL_MCQ_QUESTIONS;
     const key = finalCategory || opts.category || 'all';
-    const question = this.pickFromQueue(source, `mcq:${String(ctx.chat.id)}:${opts.difficulty || 'all'}:${key}`);
+    const question = this.pickMonthlyNonRepeating(
+      group,
+      source,
+      `category:${key}:${opts.difficulty || 'all'}`
+    );
+    if (!question) return;
+    group.updatedAt = new Date();
+    await group.save();
     const categoryLabel = QUIZ_CATEGORY_LABELS[finalCategory] || QUIZ_CATEGORY_LABELS.culture;
     return this.startCategoryTextRound(ctx, question, categoryLabel);
   }

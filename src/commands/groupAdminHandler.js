@@ -618,7 +618,7 @@ class GroupAdminHandler {
 
     const group = await this.ensureGroupRecord(ctx);
     const rawText = String(ctx.message?.text || '').trim();
-    const note = rawText.replace(/^\/?all\b/i, '').trim();
+    const note = rawText.replace(/^\/?(?:all@|all|gall)(?:\s|$)/i, '').trim();
     const members = (await this.collectMentionableMembers(group, ctx.botInfo?.id))
       .filter((member) => Number(member.id) !== Number(ctx.from?.id || 0));
 
@@ -627,8 +627,23 @@ class GroupAdminHandler {
       return;
     }
 
-    for (let index = 0; index < members.length; index += 8) {
-      const chunk = members.slice(index, index + 8);
+    const resolvedMembers = await Promise.all(
+      members.map(async (member) => {
+        let label = String(member.label || '').trim();
+        try {
+          const chatMember = await ctx.telegram.getChatMember(ctx.chat.id, Number(member.id));
+          const firstName = String(chatMember?.user?.first_name || '').trim();
+          if (firstName) label = firstName;
+        } catch (_error) {
+          // ignore and keep fallback label
+        }
+        if (!label || label.startsWith('@')) label = `عضو ${member.id}`;
+        return { id: member.id, label };
+      })
+    );
+
+    for (let index = 0; index < resolvedMembers.length; index += 8) {
+      const chunk = resolvedMembers.slice(index, index + 8);
       const mentions = chunk.map((member) => this.mentionUser(member.id, member.label)).join(' | ');
       const prefix = index === 0
         ? `📢 ${note || 'نداء لجميع الأعضاء'}\n\n`
@@ -4578,7 +4593,7 @@ class GroupAdminHandler {
       await this.handleInspectCommand(ctx);
       return true;
     }
-    if (/^(all|\/gall\b)(?:\s+.+)?$/i.test(rawText)) {
+    if (/^(all@?|\/gall\b)(?:\s+.+)?$/i.test(rawText)) {
       await this.handleAllMentionCommand(ctx);
       return true;
     }
