@@ -936,9 +936,6 @@ class GroupAdminHandler {
     if (!group.settings.templates.member) group.settings.templates.member = {};
     if (!group.settings.templates.admin) group.settings.templates.admin = {};
     if (!Array.isArray(group.settings.faqTriggers)) group.settings.faqTriggers = [];
-    if (!group.settings.addedByMap || typeof group.settings.addedByMap !== 'object' || Array.isArray(group.settings.addedByMap)) {
-      group.settings.addedByMap = {};
-    }
     group.settings.faqMatchMode = 'exact';
     group.settings.faqTriggers = group.settings.faqTriggers
       .map((item) => ({
@@ -4228,19 +4225,6 @@ class GroupAdminHandler {
       this.normalizeGroupState(group);
 
       const joinedNow = ['left', 'kicked'].includes(oldStatus) && ['member', 'administrator', 'creator'].includes(newStatus);
-      if (joinedNow && user.id !== ctx.botInfo?.id) {
-        const adder = update?.from;
-        if (adder?.id && Number(adder.id) !== Number(user.id)) {
-          group.settings.addedByMap = group.settings.addedByMap || {};
-          group.settings.addedByMap[String(user.id)] = {
-            id: Number(adder.id),
-            name: String(adder.first_name || adder.username || adder.id),
-            username: String(adder.username || ''),
-            at: new Date()
-          };
-          await this.saveGroupQuietly(group);
-        }
-      }
       if (joinedNow && user.id !== ctx.botInfo?.id && group.settings?.welcomeEnabled) {
         const welcome = this.renderWelcomeTemplate(group.settings?.welcomeTemplate, user, chat);
         await ctx.telegram.sendMessage(chat.id, welcome).catch(() => null);
@@ -4283,25 +4267,6 @@ class GroupAdminHandler {
     } catch (_error) {
       // ignore chat_member failures
     }
-  }
-
-  static async handleWhoAddedMeCommand(ctx) {
-    if (!this.isGroupChat(ctx)) return;
-    const group = await this.ensureGroupRecord(ctx);
-    this.normalizeGroupState(group);
-    const lookup = group.settings?.addedByMap || {};
-    const item = lookup[String(ctx.from?.id || 0)];
-    if (!item?.id) {
-      return ctx.reply('❌ ما عندي سجل واضح للشخص الذي أضافك.', {
-        reply_to_message_id: ctx.message?.message_id
-      });
-    }
-
-    const label = this.mentionUser(item.id, item.name || item.username || String(item.id));
-    return ctx.reply(`♪ الذي أضافك هو ~» ﴿ ${label} ﴾`, {
-      parse_mode: 'HTML',
-      reply_to_message_id: ctx.message?.message_id
-    });
   }
 
   static async handleEditedMessage(ctx) {

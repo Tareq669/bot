@@ -1642,7 +1642,7 @@ class GroupGamesHandler {
     if (['فقهي', 'fiqh'].includes(x)) return 'fiqh';
     if (['جغرافي', 'geography'].includes(x)) return 'geography';
     if (['فيزياء', 'فيزيائي', 'فيزيائيه', 'فيزيائية', 'physics'].includes(x)) return 'physics';
-    if (['حسابات', 'حسابي', 'حسابيه', 'حسابية', 'calculations', 'calculation'].includes(x)) return 'calculations';
+    if (['حسابات', 'حسابي', 'حساباتي', 'حسابيه', 'حسابية', 'calculations', 'calculation'].includes(x)) return 'calculations';
     if (['رياضي', 'رياضيه', 'رياضية', 'math', 'رياضيات'].includes(x)) return 'math';
     if (['علمي', 'علميه', 'علمية', 'science', 'scientific'].includes(x)) return 'science';
     return null;
@@ -3804,7 +3804,7 @@ class GroupGamesHandler {
     if (!this.isGroupChat(ctx)) return;
     const groupId = String(ctx.chat.id);
     this.clearRound(groupId);
-    const question = this.pickNonRepeating(RIDDLE_CASES, `riddle:${String(ctx.chat.id)}`);
+    const question = this.pickFromQueue(RIDDLE_CASES, `riddle:${String(ctx.chat.id)}`);
     const from = ctx.from || {};
     const mention = this.mentionUser(from.id, from.first_name || from.username || 'المستخدم');
     const options = Array.isArray(question?.options)
@@ -3911,7 +3911,7 @@ class GroupGamesHandler {
     if (!this.isGroupChat(ctx)) return;
     const status = await this.canStartRound(ctx);
     if (!status.ok) return;
-    const question = this.pickNonRepeating(DETECTIVE_CASES, `detective:${String(ctx.chat.id)}`);
+    const question = this.pickFromQueue(DETECTIVE_CASES, `detective:${String(ctx.chat.id)}`);
     return this.startDetectiveRound(ctx, question);
   }
 
@@ -3929,7 +3929,7 @@ class GroupGamesHandler {
       .filter((q) => this.questionMatchesCategory(q, finalCategory || opts.category));
     const source = pool.length > 0 ? pool : ALL_MCQ_QUESTIONS;
     const key = finalCategory || opts.category || 'all';
-    const question = this.pickNonRepeating(source, `mcq:${String(ctx.chat.id)}:${opts.difficulty || 'all'}:${key}`);
+    const question = this.pickFromQueue(source, `mcq:${String(ctx.chat.id)}:${opts.difficulty || 'all'}:${key}`);
     const categoryLabel = QUIZ_CATEGORY_LABELS[finalCategory] || QUIZ_CATEGORY_LABELS.culture;
     return this.startCategoryTextRound(ctx, question, categoryLabel);
   }
@@ -3947,12 +3947,15 @@ class GroupGamesHandler {
     const options = Array.isArray(question?.options)
       ? question.options.map((x) => String(x || '').trim()).slice(0, 5)
       : [];
+    const categoryKey = String(question?.category || '');
     const wrongPool = ALL_MCQ_QUESTIONS
+      .filter((item) => !categoryKey || String(item?.category || '') === categoryKey)
       .flatMap((item) => Array.isArray(item?.options) ? item.options : [])
       .map((x) => String(x || '').trim())
-      .filter(Boolean);
+      .filter((x) => x && !/^\s*رجب\s*$/i.test(x));
+    const shuffledWrongPool = this.shuffleArray(wrongPool);
     while (options.length < 5) {
-      const fallback = wrongPool[(options.length * 73) % Math.max(1, wrongPool.length)] || `خيار ${options.length + 1}`;
+      const fallback = shuffledWrongPool.pop() || `خيار ${options.length + 1}`;
       if (!options.some((x) => this.normalizeText(x) === this.normalizeText(fallback))) {
         options.push(fallback);
       } else {
