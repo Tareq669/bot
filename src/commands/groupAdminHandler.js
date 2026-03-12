@@ -2478,6 +2478,7 @@ class GroupAdminHandler {
       'أوامر سريعة:\n' +
       '• اضف رد مرحبا | أهلًا وسهلًا\n' +
       '• اضف رد سبشل\n' +
+      '• (للـمالك بالخاص) اضف رد عام جو | هلا\n' +
       '• حذف رد سبشل مرحبا\n' +
       '• ردود سبشل\n' +
       '• حذف رد مرحبا\n' +
@@ -2599,7 +2600,6 @@ class GroupAdminHandler {
 
     const list = await this.getGlobalSpecialFaqTriggers();
     const key = this.normalizePlainText(trigger);
-    const existingIndex = list.findIndex((item) => this.normalizePlainText(item.trigger) === key);
     const row = this.normalizeSpecialFaqRow({
       trigger,
       response: payload?.response,
@@ -2609,15 +2609,24 @@ class GroupAdminHandler {
       createdAt: new Date()
     });
 
-    if (existingIndex >= 0) {
-      list[existingIndex] = row;
-    } else {
+    const duplicateExists = list.some((item) => {
+      return this.normalizePlainText(item.trigger) === key
+        && String(item.responseType || 'text') === String(row.responseType || 'text')
+        && String(item.fileId || '') === String(row.fileId || '')
+        && this.normalizePlainText(String(item.response || '')) === this.normalizePlainText(String(row.response || ''));
+    });
+
+    if (!duplicateExists) {
       list.push(row);
     }
 
     await this.saveGlobalSpecialFaqTriggers(list, ctx.from?.id);
     this.clearPendingGlobalSpecialFaq(ctx);
-    await ctx.reply(`✅ تم حفظ الرد السبشل العام.\n• كلمة الرد ↤︎ ${trigger}\n• النوع ↤︎ ${row.responseType}`);
+    await ctx.reply(
+      duplicateExists
+        ? `ℹ️ هذا الرد العام موجود مسبقًا.\n• كلمة الرد ↤︎ ${trigger}`
+        : `✅ تم حفظ الرد العام.\n• كلمة الرد ↤︎ ${trigger}\n• النوع ↤︎ ${row.responseType}`
+    );
     return true;
   }
 
@@ -2669,6 +2678,22 @@ class GroupAdminHandler {
     const handledPending = await this.handlePendingGlobalSpecialFaqText(ctx, rawText);
     if (handledPending) return true;
 
+    const addGlobalDirect = rawText.match(/^(?:اضف|أضف) رد عام\s+(.+)$/i);
+    if (addGlobalDirect) {
+      const payload = String(addGlobalDirect[1] || '').trim();
+      const parsed = this.parseFaqPayload(payload);
+      if (!parsed) {
+        await ctx.reply('❌ الصيغة غير صحيحة.\nاستخدم: اضف رد عام الكلمة | الرد');
+        return true;
+      }
+      await this.saveGlobalSpecialFaqEntry(
+        ctx,
+        { trigger: parsed.trigger },
+        { responseType: 'text', response: parsed.response }
+      );
+      return true;
+    }
+
     if (/^(?:اضف|أضف) رد (?:سبشل(?: عام)?|عام)$/i.test(rawText)) {
       await this.startGlobalSpecialFaqFlow(ctx);
       return true;
@@ -2680,10 +2705,16 @@ class GroupAdminHandler {
         await ctx.reply('ℹ️ لا يوجد ردود سبشل عامة مضافة بعد.');
         return true;
       }
-      const rows = list
-        .slice(0, 50)
-        .map((item, i) => `${i + 1}. <b>${this.escapeHtml(item.trigger)}</b>\n↳ ${this.escapeHtml(item.response || item.responseType)}`);
-      await ctx.reply(`📚 قائمة الردود السبشل العامة (${list.length})\n\n${rows.join('\n\n')}`, { parse_mode: 'HTML' });
+      const grouped = new Map();
+      list.forEach((item) => {
+        const k = this.normalizePlainText(item.trigger);
+        if (!grouped.has(k)) grouped.set(k, { trigger: item.trigger, count: 0 });
+        grouped.get(k).count += 1;
+      });
+      const rows = [...grouped.values()]
+        .slice(0, 100)
+        .map((item, i) => `${i + 1}. <b>${this.escapeHtml(item.trigger)}</b> ↤︎ (${item.count}) رد`);
+      await ctx.reply(`📚 قائمة الردود العامة (${grouped.size})\n\n${rows.join('\n')}`, { parse_mode: 'HTML' });
       return true;
     }
 
@@ -2998,13 +3029,20 @@ class GroupAdminHandler {
 
     const normalizedText = this.normalizePlainText(text);
     const sorted = [...list].sort((a, b) => b.trigger.length - a.trigger.length);
-    const matched = sorted.find((item) => {
+    const firstMatched = sorted.find((item) => {
       const key = this.normalizePlainText(item.trigger);
       if (!key) return false;
       return normalizedText === key;
     });
-    if (!matched) return false;
-    await this.sendSpecialFaqResponse(ctx, group, matched);
+    if (!firstMatched) return false;
+
+    const matchedKey = this.normalizePlainText(firstMatched.trigger);
+    const matchedList = sorted.filter((item) => this.normalizePlainText(item.trigger) === matchedKey);
+    const picked = matchedList.length > 0
+      ? matchedList[Math.floor(Math.random() * matchedList.length)]
+      : firstMatched;
+
+    await this.sendSpecialFaqResponse(ctx, group, picked);
     return true;
   }
 
@@ -5078,4 +5116,3 @@ class GroupAdminHandler {
 }
 
 module.exports = GroupAdminHandler;
-
