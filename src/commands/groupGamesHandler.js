@@ -23,7 +23,16 @@ const JOKE_SUBJECTS = [
   'واحد مغني حمّام',
   'واحد فنان',
   'واحد شاعر',
-  'واحد ميكانيكي'
+  'واحد ميكانيكي',
+  'واحد شيف عصبي',
+  'واحد لاعب شطرنج متوتر',
+  'واحد مهندس ديكور',
+  'واحد بياع قهوة',
+  'واحد مدرب جيم',
+  'واحد صاحب بسطة',
+  'واحد معلم رياضيات',
+  'واحد مصلّح موبايلات',
+  'واحد عاشق تصوير'
 ];
 
 const JOKE_PLACES = [
@@ -46,7 +55,16 @@ const JOKE_PLACES = [
   'دخل قاعة الامتحان',
   'فتح تطبيق الخرائط',
   'دخل المخبز',
-  'راح على المطار'
+  'راح على المطار',
+  'دخل محل العطور',
+  'راح على المول',
+  'دخل محل الموبايلات',
+  'وقف على الإشارة',
+  'دخل مطعم شعبي',
+  'راح على المكتب',
+  'دخل كوفي شوب',
+  'دخل محل الذهب',
+  'راح على النادي'
 ];
 
 const JOKE_TWISTS = [
@@ -79,7 +97,16 @@ const JOKE_TWISTS = [
   'طلب كيس للكسل',
   'أخذ رقم وانتظر على وضع الطيران',
   'سأل إذا النكتة عليها ضمان',
-  'طلب كوب مي بدون بلل'
+  'طلب كوب مي بدون بلل',
+  'حاول يحجز كرسي في الطابور',
+  'طلب من الذكاء الاصطناعي يبرر تأخيره',
+  'سأل إذا في خصم للناس اللي محتارة',
+  'كتب شكوى ضد المنبّه لأنه صريح',
+  'قاس المزاج بالمسطرة',
+  'طلب قهوة بلا مزاج',
+  'اتخانق مع الحاسبة لأنها أسرع منه',
+  'سأل إذا في موقف سيارات للأفكار',
+  'طلب ريموت للواقع'
 ];
 
 const JOKE_ENDINGS = [
@@ -102,13 +129,24 @@ const JOKE_ENDINGS = [
   'والنتيجة: ضحك جماعي بدون سبب.',
   'ومن بعدها صار يسأل قبل ما يحكي.',
   'وهيك خلصت القصة بضحكتين وفاتورة.',
-  'والقروب اتفق يعطيه لقب نجم النكت.'
+  'والقروب اتفق يعطيه لقب نجم النكت.',
+  'ومن يومها صار يعمل اجتماعات مع نفسه قبل أي قرار.',
+  'والشاهد الوحيد كان الضحك.',
+  'وبالآخر طلع الموضوع كله سوء تفاهم لطيف.',
+  'ومن بعدها أي حدا يشوفه يجهز ضحكته.',
+  'وهيك أخذ جائزة أفضل هبدة محترمة.',
+  'وبدل الحل، كسب تصفيق مجاني.',
+  'ومن يومها وهو ممنوع يشرح الأشياء السهلة.',
+  'واكتشفوا إنه مشكلته الوحيدة: الثقة الزايدة.',
+  'وخلص اليوم وهو مقتنع إنه عبقري الموقف.'
 ];
 
 const JOKE_PATTERNS = [
   'مرة {subject}، {place}، {twist}، {ending}',
   'مرة {subject} {place}، وفجأة {twist}، {ending}',
-  'مرة {subject} قال: \"أنا جاهز\"، {place}، وبالآخر {twist}، {ending}'
+  'مرة {subject} قال: \"أنا جاهز\"، {place}، وبالآخر {twist}، {ending}',
+  '{subject} قرر يكون عملي: {place}، بس {twist}، {ending}',
+  '{subject} حاول يضبطها بهدوء: {place}، وبعدها {twist}، {ending}'
 ];
 
 const TOTAL_JOKE_COMBINATIONS =
@@ -1194,6 +1232,7 @@ class GroupGamesHandler {
   static rulerExecutionTimers = new Map();
   static RULER_LOBBY_TIMEOUT_MS = 10 * 60 * 1000;
   static RULER_JUDGE_TIMEOUT_MS = 5 * 60 * 1000;
+  static QUESTION_COOLDOWN_DAYS = 30;
   static jokeCursorByChat = new Map();
   static lastQuestionByGroup = new Map();
   static questionQueues = new Map();
@@ -1631,36 +1670,50 @@ class GroupGamesHandler {
   static pickMonthlyNonRepeating(group, items, usageKey) {
     if (!Array.isArray(items) || !items.length) return null;
     this.normalizeGroupState(group);
-    const monthKey = this.getMonthKey();
     if (!group.gameSystem.state.monthlyQuestionUsage || typeof group.gameSystem.state.monthlyQuestionUsage !== 'object') {
       group.gameSystem.state.monthlyQuestionUsage = {};
     }
 
     const bagKey = String(usageKey || 'general');
+    const now = Date.now();
+    const cooldownMs = Math.max(1, Number(this.QUESTION_COOLDOWN_DAYS || 30)) * 24 * 60 * 60 * 1000;
+    const cutoff = now - cooldownMs;
     const rawUsage = group.gameSystem.state.monthlyQuestionUsage[bagKey];
-    let usage = rawUsage && typeof rawUsage === 'object' ? rawUsage : { monthKey: monthKey, used: [] };
-    if (!Array.isArray(usage.used)) usage.used = [];
-    if (String(usage.monthKey || '') !== monthKey) {
-      usage = { monthKey: monthKey, used: [] };
-    }
+    const usage = rawUsage && typeof rawUsage === 'object' ? rawUsage : { byId: {} };
+    if (!usage.byId || typeof usage.byId !== 'object') usage.byId = {};
 
-    const usedSet = new Set(usage.used.map((x) => String(x)));
-    let available = items.filter((q) => !usedSet.has(this.getQuestionStableId(q)));
+    // تنظيف تاريخ قديم جدًا حتى ما يكبر المستند بلا داعٍ.
+    Object.keys(usage.byId).forEach((id) => {
+      const ts = Number(usage.byId[id] || 0);
+      if (!Number.isFinite(ts) || ts < (now - (90 * 24 * 60 * 60 * 1000))) {
+        delete usage.byId[id];
+      }
+    });
+
+    let available = items.filter((q) => {
+      const qid = this.getQuestionStableId(q);
+      const lastUsed = Number(usage.byId[qid] || 0);
+      return !lastUsed || lastUsed <= cutoff;
+    });
+
+    // إذا كل الأسئلة دخلت cooldown، نسمح بالأقدم استخدامًا أولًا.
     if (!available.length) {
-      usage.used = [];
-      available = [...items];
+      const oldestSorted = [...items].sort((a, b) => {
+        const aTs = Number(usage.byId[this.getQuestionStableId(a)] || 0);
+        const bTs = Number(usage.byId[this.getQuestionStableId(b)] || 0);
+        return aTs - bTs;
+      });
+      available = oldestSorted.slice(0, Math.max(1, Math.min(50, oldestSorted.length)));
     }
 
-    const picked = this.pickFromQueue(
+    const picked = this.pickNonRepeating(
       available,
-      `monthly:${String(group.groupId || '')}:${bagKey}:${monthKey}`
+      `cooldown:${String(group.groupId || '')}:${bagKey}`
     ) || this.pickRandom(available);
     if (!picked) return null;
 
     const pickedId = this.getQuestionStableId(picked);
-    if (!usage.used.includes(pickedId)) usage.used.push(pickedId);
-    if (usage.used.length > 15000) usage.used = usage.used.slice(usage.used.length - 15000);
-
+    usage.byId[pickedId] = now;
     group.gameSystem.state.monthlyQuestionUsage[bagKey] = usage;
     return picked;
   }
@@ -6620,10 +6673,19 @@ class GroupGamesHandler {
 
   static getNextJoke(chatId) {
     const key = String(chatId || 'global');
-    const last = Number(this.jokeCursorByChat.get(key) || 0);
-    const step = 137;
-    const base = Math.floor(Math.random() * 1000);
-    const next = (last + step + base + 1) % Math.max(1, TOTAL_JOKE_COMBINATIONS);
+    const total = Math.max(1, TOTAL_JOKE_COMBINATIONS);
+    let last = Number(this.jokeCursorByChat.get(key));
+    if (!Number.isFinite(last)) {
+      // توزيع أولي مختلف لكل جروب لتقليل التشابه بين الجروبات.
+      const seed = Math.abs(
+        String(key)
+          .split('')
+          .reduce((acc, ch, i) => acc + (ch.charCodeAt(0) * (i + 3)), 0)
+      );
+      last = seed % total;
+    }
+    const step = 7919 % total || 1;
+    const next = (last + step) % total;
     this.jokeCursorByChat.set(key, next);
     return this.buildGeneratedJokeByIndex(next);
   }
