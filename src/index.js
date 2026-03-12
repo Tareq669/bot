@@ -4035,7 +4035,7 @@ bot.on('text', async (ctx) => {
     // Handle economy awaiting input
     if (ctx.session && ctx.session.ecoAwait) {
       const awaiting = ctx.session.ecoAwait;
-      const { User } = require('./database/models');
+      const { User, Group } = require('./database/models');
 
       try {
         if (awaiting.type === 'auction_select') {
@@ -4228,6 +4228,7 @@ bot.on('text', async (ctx) => {
         if (awaiting.type === 'searchUser') {
           // Search for user by ID or name
           let foundUser;
+          let foundFromUserDb = false;
           const rawInput = String(message || '').trim();
           const cleanInput = rawInput.replace(/^@+/, '').trim();
 
@@ -4239,12 +4240,14 @@ bot.on('text', async (ctx) => {
           if (/^\d+$/.test(cleanInput)) {
             // Search by ID
             foundUser = await User.findOne({ userId: parseInt(cleanInput, 10) });
+            if (foundUser) foundFromUserDb = true;
           } else {
             // Search by name
             const searchRegex = new RegExp(escapeRegex(cleanInput), 'i');
             foundUser = await User.findOne({
               $or: [{ firstName: searchRegex }, { username: searchRegex }, { lastName: searchRegex }]
             });
+            if (foundUser) foundFromUserDb = true;
 
             if (!foundUser && rawInput.startsWith('@')) {
               try {
@@ -4258,9 +4261,46 @@ bot.on('text', async (ctx) => {
                       ...(tgUsername ? [{ username: new RegExp(`^${escapeRegex(tgUsername)}$`, 'i') }] : [])
                     ]
                   });
+                  if (foundUser) foundFromUserDb = true;
                 }
               } catch (_error) {
                 // ignore Telegram lookup failure and keep standard "not found" behavior
+              }
+            }
+          }
+
+          if (!foundUser) {
+            const cleanRegex = cleanInput ? new RegExp(escapeRegex(cleanInput), 'i') : null;
+            let groupDoc = null;
+            if (/^\d+$/.test(cleanInput)) {
+              const uid = parseInt(cleanInput, 10);
+              groupDoc = await Group.findOne({ 'gameSystem.scores.userId': uid })
+                .select('groupId title gameSystem.scores createdAt')
+                .lean();
+            } else if (cleanRegex) {
+              groupDoc = await Group.findOne({ 'gameSystem.scores.username': cleanRegex })
+                .select('groupId title gameSystem.scores createdAt')
+                .lean();
+            }
+            if (groupDoc) {
+              const row = (groupDoc.gameSystem?.scores || []).find((s) => {
+                const sameId = /^\d+$/.test(cleanInput) && Number(s?.userId || 0) === Number(cleanInput);
+                const sameName = cleanRegex && cleanRegex.test(String(s?.username || ''));
+                return sameId || sameName;
+              });
+              if (row) {
+                foundUser = {
+                  userId: Number(row.userId || 0),
+                  firstName: String(row.username || cleanInput || 'مستخدم'),
+                  username: String(row.username || ''),
+                  xp: Number(row.xp || 0),
+                  level: Number(row.level || 1),
+                  coins: Number(row.points || 0),
+                  isBanned: false,
+                  banned: false,
+                  joinDate: groupDoc.createdAt || new Date(),
+                  __fromGroupScore: true
+                };
               }
             }
           }
@@ -4281,11 +4321,15 @@ bot.on('text', async (ctx) => {
             `🚫 الحالة: ${foundUser.isBanned || foundUser.banned ? 'محظور' : 'نشط'}\n` +
             `📅 تاريخ الانضمام: ${new Date(foundUser.joinDate).toLocaleDateString('ar')}`;
 
-          const buttons = Markup.inlineKeyboard([
-            [Markup.button.callback('🚫 حظر', `admin:ban:${foundUser.userId}`)],
-            [Markup.button.callback('✅ السماح', `admin:unban:${foundUser.userId}`)],
-            [Markup.button.callback('⬅️ رجوع', 'settings:users')]
-          ]);
+          const buttons = foundFromUserDb
+            ? Markup.inlineKeyboard([
+              [Markup.button.callback('🚫 حظر', `admin:ban:${foundUser.userId}`)],
+              [Markup.button.callback('✅ السماح', `admin:unban:${foundUser.userId}`)],
+              [Markup.button.callback('⬅️ رجوع', 'settings:users')]
+            ])
+            : Markup.inlineKeyboard([
+              [Markup.button.callback('⬅️ رجوع', 'settings:users')]
+            ]);
 
           return ctx.reply(userInfo, { parse_mode: 'HTML', reply_markup: buttons.reply_markup });
         }
@@ -4329,7 +4373,7 @@ bot.on('text', async (ctx) => {
     // Handle owner awaiting input
     if (ctx.session && ctx.session.ownerAwait) {
       const awaiting = ctx.session.ownerAwait;
-      const { User, Transaction, GameStats, Content } = require('./database/models');
+      const { User, Group, Transaction, GameStats, Content } = require('./database/models');
       const UIManager = require('./ui/keyboards');
 
       if (!UIManager.isOwner(ctx.from.id)) {
@@ -4461,16 +4505,19 @@ bot.on('text', async (ctx) => {
 
         if (awaiting.type === 'searchUser') {
           let foundUser = null;
+          let foundFromUserDb = false;
           const rawInput = String(input || '').trim();
           const normalizedInput = rawInput.replace(/^@+/, '').trim();
           const numericId = parsePositiveInt(normalizedInput);
           if (numericId) {
             foundUser = await User.findOne({ userId: numericId });
+            if (foundUser) foundFromUserDb = true;
           } else {
             const searchRegex = new RegExp(escapeRegex(normalizedInput), 'i');
             foundUser = await User.findOne({
               $or: [{ firstName: searchRegex }, { username: searchRegex }, { lastName: searchRegex }]
             });
+            if (foundUser) foundFromUserDb = true;
 
             if (!foundUser && rawInput.startsWith('@')) {
               try {
@@ -4484,9 +4531,45 @@ bot.on('text', async (ctx) => {
                       ...(tgUsername ? [{ username: new RegExp(`^${escapeRegex(tgUsername)}$`, 'i') }] : [])
                     ]
                   });
+                  if (foundUser) foundFromUserDb = true;
                 }
               } catch (_error) {
                 // keep default not-found behavior
+              }
+            }
+          }
+
+          if (!foundUser && normalizedInput) {
+            const normalizedRegex = new RegExp(escapeRegex(normalizedInput), 'i');
+            let groupDoc = null;
+            if (numericId) {
+              groupDoc = await Group.findOne({ 'gameSystem.scores.userId': numericId })
+                .select('groupId title gameSystem.scores createdAt')
+                .lean();
+            } else {
+              groupDoc = await Group.findOne({ 'gameSystem.scores.username': normalizedRegex })
+                .select('groupId title gameSystem.scores createdAt')
+                .lean();
+            }
+            if (groupDoc) {
+              const row = (groupDoc.gameSystem?.scores || []).find((s) => {
+                const sameId = numericId && Number(s?.userId || 0) === Number(numericId);
+                const sameName = !numericId && normalizedRegex.test(String(s?.username || ''));
+                return sameId || sameName;
+              });
+              if (row) {
+                foundUser = {
+                  userId: Number(row.userId || numericId || 0),
+                  firstName: String(row.username || normalizedInput || 'مستخدم'),
+                  username: String(row.username || ''),
+                  coins: Number(row.points || 0),
+                  xp: Number(row.xp || 0),
+                  level: Number(row.level || 1),
+                  isBanned: false,
+                  banned: false,
+                  joinDate: groupDoc.createdAt || new Date(),
+                  __fromGroupScore: true
+                };
               }
             }
           }
@@ -4521,15 +4604,20 @@ bot.on('text', async (ctx) => {
             `🚫 الحالة: ${isBanned ? 'محظور' : 'نشط'}\n` +
             `📅 الانضمام: ${new Date(joinDate).toLocaleDateString('ar')}`;
 
-          const keyboard = Markup.inlineKeyboard([
-            [
-              isBanned
-                ? Markup.button.callback('✅ إلغاء الحظر', `admin:unban:${foundUser.userId}`)
-                : Markup.button.callback('🚫 حظر المستخدم', `admin:ban:${foundUser.userId}`)
-            ],
-            [Markup.button.callback('🏘️ مجموعات/قنوات المستخدم', `owner:userchats:${foundUser.userId}`)],
-            [Markup.button.callback('⬅️ رجوع', 'owner:users')]
-          ]);
+          const keyboard = foundFromUserDb
+            ? Markup.inlineKeyboard([
+              [
+                isBanned
+                  ? Markup.button.callback('✅ إلغاء الحظر', `admin:unban:${foundUser.userId}`)
+                  : Markup.button.callback('🚫 حظر المستخدم', `admin:ban:${foundUser.userId}`)
+              ],
+              [Markup.button.callback('🏘️ مجموعات/قنوات المستخدم', `owner:userchats:${foundUser.userId}`)],
+              [Markup.button.callback('⬅️ رجوع', 'owner:users')]
+            ])
+            : Markup.inlineKeyboard([
+              [Markup.button.callback('🏘️ مجموعات/قنوات المستخدم', `owner:userchats:${foundUser.userId}`)],
+              [Markup.button.callback('⬅️ رجوع', 'owner:users')]
+            ]);
 
           return ctx.reply(messageText, {
             parse_mode: 'HTML',
