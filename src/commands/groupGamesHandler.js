@@ -1,4 +1,6 @@
-﻿const Markup = require('telegraf/markup');
+const Markup = require('telegraf/markup');
+const fs = require('fs');
+const path = require('path');
 const { Group, User } = require('../database/models');
 
 const GROUP_TYPES = new Set(['group', 'supergroup']);
@@ -153,6 +155,88 @@ const QUIZ_CATEGORY_LABELS = {
 const QUIZ_VARIANTS = ['سؤال تجميعي', 'مستوى متوسط', 'تمرين ذكي', 'معرفة عامة', 'مفصل', 'اختبار سريع', 'دقيقة فكر', 'أسئلة متنوعة', 'تحدي معرفي', 'مراجعة ذكية'];
 
 const QUIZ_REQUIRED_PER_CATEGORY = 10000;
+const EXTERNAL_QUESTION_SEEDS_PATH = path.join(__dirname, '..', 'content', 'questionSeeds.json');
+
+const loadExternalQuestionSeeds = () => {
+  const empty = {
+    religious: [],
+    science: [],
+    history: [],
+    fiqh: [],
+    geography: [],
+    physics: [],
+    calculations: [],
+    riddle: [],
+    detective: []
+  };
+  try {
+    if (!fs.existsSync(EXTERNAL_QUESTION_SEEDS_PATH)) return empty;
+    const raw = fs.readFileSync(EXTERNAL_QUESTION_SEEDS_PATH, 'utf8');
+    const parsed = JSON.parse(raw);
+    return {
+      ...empty,
+      ...parsed
+    };
+  } catch (_error) {
+    return empty;
+  }
+};
+
+const EXTERNAL_QUESTION_SEEDS = loadExternalQuestionSeeds();
+
+const normalizeMcqSeeds = (list = []) => {
+  if (!Array.isArray(list)) return [];
+  return list
+    .map((item) => {
+      const question = String(item?.question || '').trim();
+      const answers = Array.isArray(item?.answers) ? item.answers : [];
+      const options = answers.map((x) => String(x || '').trim()).filter(Boolean).slice(0, 5);
+      const correct = Number.isInteger(item?.correct) ? Number(item.correct) : 0;
+      if (!question || options.length < 2) return null;
+      const answerIndex = Math.max(0, Math.min(options.length - 1, correct));
+      return {
+        question,
+        answers: options,
+        correct: answerIndex,
+        reward: 1
+      };
+    })
+    .filter(Boolean);
+};
+
+const normalizeRiddleSeeds = (list = []) => {
+  if (!Array.isArray(list)) return [];
+  return list
+    .map((item) => {
+      const question = String(item?.question || '').trim();
+      const answers = Array.isArray(item?.answers)
+        ? item.answers.map((x) => String(x || '').trim()).filter(Boolean).slice(0, 8)
+        : [];
+      if (!question || !answers.length) return null;
+      return { question, answers };
+    })
+    .filter(Boolean);
+};
+
+const normalizeDetectiveSeeds = (list = []) => {
+  if (!Array.isArray(list)) return [];
+  return list
+    .map((item) => {
+      const question = String(item?.question || '').trim();
+      const options = Array.isArray(item?.options)
+        ? item.options.map((x) => String(x || '').trim()).filter(Boolean).slice(0, 5)
+        : [];
+      const answerIndex = Math.max(0, Math.min(options.length - 1, Number(item?.answerIndex || 0)));
+      if (!question || options.length < 2) return null;
+      return {
+        question,
+        options,
+        answerIndex,
+        reward: 3
+      };
+    })
+    .filter(Boolean);
+};
 
 const RELIGIOUS_BASE_QUESTIONS = [
   { question: 'كم عدد أركان الإسلام؟', answers: ['4', '5', '6', '7'], correct: 1, reward: 1 },
@@ -298,13 +382,21 @@ const buildGeneratedCategoryQuestions = (baseQuestions, category, count) => {
   return list;
 };
 
-const RELIGIOUS_MCQ_GENERATED = buildGeneratedCategoryQuestions(RELIGIOUS_BASE_QUESTIONS, 'religious', QUIZ_REQUIRED_PER_CATEGORY);
-const SCIENCE_MCQ_GENERATED = buildGeneratedCategoryQuestions(SCIENCE_BASE_QUESTIONS, 'science', QUIZ_REQUIRED_PER_CATEGORY);
-const HISTORY_MCQ_QUESTIONS = buildGeneratedCategoryQuestions(HISTORY_BASE_QUESTIONS, 'history', QUIZ_REQUIRED_PER_CATEGORY);
-const FIQH_MCQ_QUESTIONS = buildGeneratedCategoryQuestions(FIQH_BASE_QUESTIONS, 'fiqh', QUIZ_REQUIRED_PER_CATEGORY);
-const GEOGRAPHY_MCQ_QUESTIONS = buildGeneratedCategoryQuestions(GEOGRAPHY_BASE_QUESTIONS, 'geography', QUIZ_REQUIRED_PER_CATEGORY);
-const PHYSICS_MCQ_QUESTIONS = buildGeneratedCategoryQuestions(PHYSICS_BASE_QUESTIONS, 'physics', QUIZ_REQUIRED_PER_CATEGORY);
-const CALCULATIONS_MCQ_QUESTIONS = buildGeneratedCategoryQuestions(CALCULATIONS_BASE_QUESTIONS, 'calculations', QUIZ_REQUIRED_PER_CATEGORY);
+const RELIGIOUS_BASE_EFFECTIVE = [...RELIGIOUS_BASE_QUESTIONS, ...normalizeMcqSeeds(EXTERNAL_QUESTION_SEEDS.religious)];
+const SCIENCE_BASE_EFFECTIVE = [...SCIENCE_BASE_QUESTIONS, ...normalizeMcqSeeds(EXTERNAL_QUESTION_SEEDS.science)];
+const HISTORY_BASE_EFFECTIVE = [...HISTORY_BASE_QUESTIONS, ...normalizeMcqSeeds(EXTERNAL_QUESTION_SEEDS.history)];
+const FIQH_BASE_EFFECTIVE = [...FIQH_BASE_QUESTIONS, ...normalizeMcqSeeds(EXTERNAL_QUESTION_SEEDS.fiqh)];
+const GEOGRAPHY_BASE_EFFECTIVE = [...GEOGRAPHY_BASE_QUESTIONS, ...normalizeMcqSeeds(EXTERNAL_QUESTION_SEEDS.geography)];
+const PHYSICS_BASE_EFFECTIVE = [...PHYSICS_BASE_QUESTIONS, ...normalizeMcqSeeds(EXTERNAL_QUESTION_SEEDS.physics)];
+const CALCULATIONS_BASE_EFFECTIVE = [...CALCULATIONS_BASE_QUESTIONS, ...normalizeMcqSeeds(EXTERNAL_QUESTION_SEEDS.calculations)];
+
+const RELIGIOUS_MCQ_GENERATED = buildGeneratedCategoryQuestions(RELIGIOUS_BASE_EFFECTIVE, 'religious', QUIZ_REQUIRED_PER_CATEGORY);
+const SCIENCE_MCQ_GENERATED = buildGeneratedCategoryQuestions(SCIENCE_BASE_EFFECTIVE, 'science', QUIZ_REQUIRED_PER_CATEGORY);
+const HISTORY_MCQ_QUESTIONS = buildGeneratedCategoryQuestions(HISTORY_BASE_EFFECTIVE, 'history', QUIZ_REQUIRED_PER_CATEGORY);
+const FIQH_MCQ_QUESTIONS = buildGeneratedCategoryQuestions(FIQH_BASE_EFFECTIVE, 'fiqh', QUIZ_REQUIRED_PER_CATEGORY);
+const GEOGRAPHY_MCQ_QUESTIONS = buildGeneratedCategoryQuestions(GEOGRAPHY_BASE_EFFECTIVE, 'geography', QUIZ_REQUIRED_PER_CATEGORY);
+const PHYSICS_MCQ_QUESTIONS = buildGeneratedCategoryQuestions(PHYSICS_BASE_EFFECTIVE, 'physics', QUIZ_REQUIRED_PER_CATEGORY);
+const CALCULATIONS_MCQ_QUESTIONS = buildGeneratedCategoryQuestions(CALCULATIONS_BASE_EFFECTIVE, 'calculations', QUIZ_REQUIRED_PER_CATEGORY);
 
 const DETECTIVE_REQUIRED_CASES = 10000;
 const DETECTIVE_VARIANTS = ['ملف', 'قضية', 'بلاغ', 'مسرح', 'تحقيق', 'أثر', 'شاهد', 'دليل', 'غموض', 'قرينة'];
@@ -380,7 +472,8 @@ const buildGeneratedDetectiveCases = (baseCases, count) => {
   return out;
 };
 
-const DETECTIVE_CASES = buildGeneratedDetectiveCases(DETECTIVE_BASE_CASES, DETECTIVE_REQUIRED_CASES);
+const DETECTIVE_BASE_EFFECTIVE = [...DETECTIVE_BASE_CASES, ...normalizeDetectiveSeeds(EXTERNAL_QUESTION_SEEDS.detective)];
+const DETECTIVE_CASES = buildGeneratedDetectiveCases(DETECTIVE_BASE_EFFECTIVE, DETECTIVE_REQUIRED_CASES);
 
 const CAPITALS_BANK = [
   ['السعودية', 'الرياض'], ['مصر', 'القاهرة'], ['المغرب', 'الرباط'], ['الجزائر', 'الجزائر'],
@@ -1128,7 +1221,8 @@ const buildGeneratedRiddleCases = (baseRiddles, count) => {
   return bank;
 };
 
-const RIDDLE_CASES = buildGeneratedRiddleCases(RIDDLE_BANK, RIDDLE_REQUIRED_CASES);
+const RIDDLE_BASE_EFFECTIVE = [...RIDDLE_BANK, ...normalizeRiddleSeeds(EXTERNAL_QUESTION_SEEDS.riddle)];
+const RIDDLE_CASES = buildGeneratedRiddleCases(RIDDLE_BASE_EFFECTIVE, RIDDLE_REQUIRED_CASES);
 const TYPING_WORDS = [
   'فلسطين', 'المتسابق', 'البرمجة', 'التحدي', 'الذكاء', 'الإنجاز', 'السرعة', 'التركيز', 'التعاون', 'الاستمرارية',
   'المنافسة', 'النجاح', 'الإبداع', 'الاجتهاد', 'التفكير', 'المعلومة', 'المهارة', 'الخبرة', 'القراءة', 'المعرفة',
@@ -7460,3 +7554,8 @@ class GroupGamesHandler {
 }
 
 module.exports = GroupGamesHandler;
+
+
+
+
+
