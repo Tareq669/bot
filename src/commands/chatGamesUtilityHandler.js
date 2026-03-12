@@ -4,6 +4,8 @@ const { User } = require('../database/models');
 
 class ChatGamesUtilityHandler {
   static xoGames = new Map();
+  static ARCHIVE_SEARCH_URL = 'https://archive.org/advancedsearch.php';
+  static ARCHIVE_METADATA_URL = 'https://archive.org/metadata';
 
   static cityAliases = {
     '\u063A\u0632\u0629': 'Gaza',
@@ -330,6 +332,88 @@ class ChatGamesUtilityHandler {
 
     if (game.status === 'done') {
       this.xoGames.delete(gameId);
+    }
+  }
+
+  static pickArchiveMp3File(files = []) {
+    if (!Array.isArray(files) || !files.length) return null;
+    const candidates = files.filter((file) => {
+      const name = String(file?.name || '').toLowerCase();
+      const format = String(file?.format || '').toLowerCase();
+      return name.endsWith('.mp3') || format.includes('mp3');
+    });
+    if (!candidates.length) return null;
+    const original = candidates.find((file) => String(file?.source || '').toLowerCase() === 'original');
+    return original || candidates[0];
+  }
+
+  static async searchArchiveAudio(query) {
+    const q = String(query || '').trim();
+    if (!q) return null;
+    const { data } = await axios.get(this.ARCHIVE_SEARCH_URL, {
+      params: {
+        q: `${q} AND mediatype:(audio)`,
+        fl: ['identifier', 'title', 'creator'],
+        rows: 7,
+        page: 1,
+        output: 'json'
+      },
+      timeout: 15000
+    });
+    const docs = data?.response?.docs || [];
+    if (!docs.length) return null;
+
+    for (const doc of docs) {
+      const identifier = String(doc?.identifier || '').trim();
+      if (!identifier) continue;
+      try {
+        const metaResp = await axios.get(`${this.ARCHIVE_METADATA_URL}/${encodeURIComponent(identifier)}`, {
+          timeout: 15000
+        });
+        const files = metaResp?.data?.files || [];
+        const mp3 = this.pickArchiveMp3File(files);
+        if (!mp3?.name) continue;
+        const fileName = String(mp3.name).split('/').pop();
+        if (!fileName) continue;
+        return {
+          title: String(doc?.title || identifier),
+          creator: String(doc?.creator || ''),
+          url: `https://archive.org/download/${encodeURIComponent(identifier)}/${encodeURIComponent(fileName)}`
+        };
+      } catch (_innerError) {
+        continue;
+      }
+    }
+    return null;
+  }
+
+  static async handleDotCommand(ctx, queryText) {
+    const query = String(queryText || '').trim();
+    if (!query) {
+      await ctx.reply('❌ الصيغة:\nدوت اسم المقطع');
+      return;
+    }
+
+    await ctx.reply('🔎 جاري البحث عن ملف صوت...');
+    try {
+      const audio = await this.searchArchiveAudio(query);
+      if (!audio?.url) {
+        await ctx.reply('❌ ما لقيت نتيجة صوت مناسبة. جرّب كلمات بحث ثانية.');
+        return;
+      }
+
+      const captionParts = [`🎵 ${audio.title}`];
+      if (audio.creator) captionParts.push(`👤 ${audio.creator}`);
+      await ctx.replyWithAudio(
+        { url: audio.url },
+        {
+          caption: captionParts.join('\n'),
+          title: audio.title || undefined,
+          performer: audio.creator || undefined
+        }
+      );
+    } catch (_error) {
+      await ctx.reply('❌ تعذر تحميل الصوت الآن. حاول بعد قليل.');
     }
   }
 

@@ -2803,6 +2803,8 @@ bot.hears('🕌 الأذان', (ctx) => ChatGamesUtilityHandler.handleAdhanText(
 bot.hears(/^اكس\s*اوه$/i, (ctx) => ChatGamesUtilityHandler.handleXoStart(ctx));
 bot.hears(/^طقس(?:\s+(.+))?$/i, (ctx) => ChatGamesUtilityHandler.handleWeatherText(ctx, ctx.match[1]));
 bot.hears(/^(?:اذان|أذان)(?:\s+(.+))?$/i, (ctx) => ChatGamesUtilityHandler.handleAdhanText(ctx, ctx.match[1]));
+bot.hears(/^دوت(?:\s+(.+))?$/i, (ctx) => ChatGamesUtilityHandler.handleDotCommand(ctx, ctx.match[1]));
+bot.hears(/^(?:\/)?dot(?:\s+(.+))?$/i, (ctx) => ChatGamesUtilityHandler.handleDotCommand(ctx, ctx.match[1]));
 // Group Bank Game commands
 bot.hears(/^انشاء\s*حساب\s*بنكي$/i, (ctx) => BankGameHandler.handleCreateAccount(ctx));
 bot.hears(/^حسابي$/i, (ctx) => BankGameHandler.handleAccountInfo(ctx));
