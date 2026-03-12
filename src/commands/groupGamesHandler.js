@@ -1613,45 +1613,36 @@ class GroupGamesHandler {
     }
 
     const bagKey = String(usageKey || 'general');
-    const now = Date.now();
-    const cooldownMs = Math.max(1, Number(this.QUESTION_COOLDOWN_DAYS || 30)) * 24 * 60 * 60 * 1000;
-    const cutoff = now - cooldownMs;
     const rawUsage = group.gameSystem.state.monthlyQuestionUsage[bagKey];
-    const usage = rawUsage && typeof rawUsage === 'object' ? rawUsage : { byId: {} };
-    if (!usage.byId || typeof usage.byId !== 'object') usage.byId = {};
+    const usage = rawUsage && typeof rawUsage === 'object'
+      ? rawUsage
+      : { usedIds: [], cycle: 1, sourceSize: items.length };
 
-    // تنظيف تاريخ قديم جدًا حتى ما يكبر المستند بلا داعٍ.
-    Object.keys(usage.byId).forEach((id) => {
-      const ts = Number(usage.byId[id] || 0);
-      if (!Number.isFinite(ts) || ts < (now - (90 * 24 * 60 * 60 * 1000))) {
-        delete usage.byId[id];
-      }
-    });
+    if (!Array.isArray(usage.usedIds)) usage.usedIds = [];
+    if (!Number.isInteger(usage.cycle) || usage.cycle < 1) usage.cycle = 1;
+    usage.sourceSize = Number(items.length || 0);
 
-    let available = items.filter((q) => {
-      const qid = this.getQuestionStableId(q);
-      const lastUsed = Number(usage.byId[qid] || 0);
-      return !lastUsed || lastUsed <= cutoff;
-    });
+    const usedSet = new Set(usage.usedIds.map((x) => String(x)));
+    let available = items.filter((q) => !usedSet.has(this.getQuestionStableId(q)));
 
-    // إذا كل الأسئلة دخلت cooldown، نسمح بالأقدم استخدامًا أولًا.
+    // عند استهلاك كل الأسئلة في هذه الفئة، نبدأ دورة جديدة من الصفر.
     if (!available.length) {
-      const oldestSorted = [...items].sort((a, b) => {
-        const aTs = Number(usage.byId[this.getQuestionStableId(a)] || 0);
-        const bTs = Number(usage.byId[this.getQuestionStableId(b)] || 0);
-        return aTs - bTs;
-      });
-      available = oldestSorted.slice(0, Math.max(1, Math.min(50, oldestSorted.length)));
+      usage.usedIds = [];
+      usage.cycle += 1;
+      available = [...items];
     }
 
-    const picked = this.pickNonRepeating(
+    const picked = this.pickFromQueue(
       available,
-      `cooldown:${String(group.groupId || '')}:${bagKey}`
+      `cycle:${String(group.groupId || '')}:${bagKey}:c${usage.cycle}`
     ) || this.pickRandom(available);
     if (!picked) return null;
 
     const pickedId = this.getQuestionStableId(picked);
-    usage.byId[pickedId] = now;
+    if (!usage.usedIds.includes(pickedId)) usage.usedIds.push(pickedId);
+    if (usage.usedIds.length > Math.max(items.length + 200, 10200)) {
+      usage.usedIds = usage.usedIds.slice(usage.usedIds.length - Math.max(items.length, 10000));
+    }
     group.gameSystem.state.monthlyQuestionUsage[bagKey] = usage;
     return picked;
   }
