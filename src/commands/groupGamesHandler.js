@@ -3861,12 +3861,20 @@ class GroupGamesHandler {
     if (!this.isGroupChat(ctx)) return;
     const status = await this.canStartRound(ctx);
     if (!status.ok) return;
+    const group = status.group;
     const args = this.parseCommandArgs(ctx);
-    const opts = this.parseQuizOptions(args, status.group.gameSystem.settings.questionTimeoutSec || 25);
+    const opts = this.parseQuizOptions(args, group.gameSystem.settings.questionTimeoutSec || 25);
     const pool = ALL_MCQ_QUESTIONS.filter((q) => this.questionMatchesDifficulty(q, opts.difficulty))
       .filter((q) => this.questionMatchesCategory(q, opts.category));
     const source = pool.length > 0 ? pool : ALL_MCQ_QUESTIONS;
-    const question = this.pickNonRepeating(source, `quizpoll:${String(ctx.chat.id)}:${opts.difficulty || 'all'}:${opts.category || 'all'}`);
+    const question = this.pickMonthlyNonRepeating(
+      group,
+      source,
+      `quizpoll:${opts.difficulty || 'all'}:${opts.category || 'all'}`
+    );
+    if (!question) return;
+    group.updatedAt = new Date();
+    await group.save();
     const timeoutSec = Math.max(10, opts.timeoutSec || 25);
     await this.sendQuizPoll(ctx.chat.id, question, question.reward, timeoutSec);
   }
@@ -3971,12 +3979,20 @@ class GroupGamesHandler {
     if (!this.isGroupChat(ctx)) return;
     const status = await this.canStartRound(ctx);
     if (!status.ok) return;
+    const group = status.group;
     const args = this.parseCommandArgs(ctx);
-    const opts = this.parseQuizOptions(args, status.group.gameSystem.settings.questionTimeoutSec || 25);
+    const opts = this.parseQuizOptions(args, group.gameSystem.settings.questionTimeoutSec || 25);
     const pool = ALL_MCQ_QUESTIONS.filter((q) => this.questionMatchesDifficulty(q, opts.difficulty))
       .filter((q) => this.questionMatchesCategory(q, opts.category));
     const source = pool.length > 0 ? pool : ALL_MCQ_QUESTIONS;
-    const question = this.pickNonRepeating(source, `mcq:${String(ctx.chat.id)}:${opts.difficulty || 'all'}:${opts.category || 'all'}`);
+    const question = this.pickMonthlyNonRepeating(
+      group,
+      source,
+      `mcq:${opts.difficulty || 'all'}:${opts.category || 'all'}`
+    );
+    if (!question) return;
+    group.updatedAt = new Date();
+    await group.save();
     const timeoutSec = Math.max(10, opts.timeoutSec || 25);
     await this.sendQuizPoll(ctx.chat.id, question, question.reward, timeoutSec);
   }
@@ -4184,7 +4200,15 @@ class GroupGamesHandler {
     const pool = ALL_MCQ_QUESTIONS.filter((q) => this.questionMatchesDifficulty(q, session.difficulty))
       .filter((q) => this.questionMatchesCategory(q, session.category));
     const source = pool.length > 0 ? pool : ALL_MCQ_QUESTIONS;
-    const question = this.pickNonRepeating(source, `series:${String(chatId)}:${session.difficulty || 'all'}:${session.category || 'all'}`);
+    const group = await this.ensureGroupRecordByChatId(chatId);
+    const question = this.pickMonthlyNonRepeating(
+      group,
+      source,
+      `series:${session.difficulty || 'all'}:${session.category || 'all'}`
+    );
+    if (!question) return;
+    group.updatedAt = new Date();
+    await group.save();
     await this.sendQuizPoll(chatId, question, question.reward, session.timeoutSec);
     session.remaining -= 1;
 
