@@ -896,11 +896,13 @@ class GroupAdminHandler {
     if (!group.settings) group.settings = {};
     if (typeof group.settings.lockLinks !== 'boolean') group.settings.lockLinks = false;
     if (typeof group.settings.lockStickers !== 'boolean') group.settings.lockStickers = false;
+    if (typeof group.settings.lockPremiumStickers !== 'boolean') group.settings.lockPremiumStickers = false;
     if (typeof group.settings.blockForwards !== 'boolean') group.settings.blockForwards = false;
     if (typeof group.settings.filterBadWords !== 'boolean') group.settings.filterBadWords = true;
     if (typeof group.settings.blockExplicitContent !== 'boolean') group.settings.blockExplicitContent = true;
     if (typeof group.settings.floodProtection !== 'boolean') group.settings.floodProtection = true;
     if (typeof group.settings.exemptAdminsFromProtection !== 'boolean') group.settings.exemptAdminsFromProtection = false;
+    if (typeof group.settings.exemptAdminsFromPremiumStickers !== 'boolean') group.settings.exemptAdminsFromPremiumStickers = false;
     if (typeof group.settings.blockLongMessages !== 'boolean') group.settings.blockLongMessages = true;
     if (typeof group.settings.notifyLongMessageBlock !== 'boolean') group.settings.notifyLongMessageBlock = true;
     if (typeof group.settings.enableMyInfoCommand !== 'boolean') group.settings.enableMyInfoCommand = true;
@@ -1034,6 +1036,8 @@ class GroupAdminHandler {
       `• قناة الاشتراك ↤︎ ${this.escapeHtml(subscriptionChannel?.title || 'غير محددة')}\n` +
       `• قفل الروابط ↤︎ ${settings.lockLinks ? '✅' : '❌'}\n` +
       `• قفل الملصقات ↤︎ ${settings.lockStickers ? '✅' : '❌'}\n` +
+      `• منع الملصقات المميزة ↤︎ ${settings.lockPremiumStickers ? '✅' : '❌'}\n` +
+      `• استثناء المشرفين من الملصقات المميزة ↤︎ ${settings.exemptAdminsFromPremiumStickers ? '✅' : '❌'}\n` +
       `• العقوبات التلقائيه ↤︎ ${policy.enabled ? '✅' : '❌'}\n` +
       `• الكتم عند ↤︎ ${policy.muteAt}\n` +
       `• الحظر عند ↤︎ ${policy.banAt}\n` +
@@ -1068,6 +1072,8 @@ class GroupAdminHandler {
       '<b>الإعدادات الحالية:</b>\n' +
       `• منع الروابط: ${settings.lockLinks ? '✅' : '❌'}\n` +
       `• قفل الملصقات: ${settings.lockStickers ? '✅' : '❌'}\n` +
+      `• منع الملصقات المميزة: ${settings.lockPremiumStickers ? '✅' : '❌'}\n` +
+      `• استثناء المشرفين من الملصقات المميزة: ${settings.exemptAdminsFromPremiumStickers ? '✅' : '❌'}\n` +
       `• فلتر الكلمات: ${settings.filterBadWords ? '✅' : '❌'}\n` +
       `• منع الإباحي: ${settings.blockExplicitContent ? '✅' : '❌'}\n` +
       `• حماية التكرار: ${settings.floodProtection ? '✅' : '❌'}\n` +
@@ -1096,6 +1102,8 @@ class GroupAdminHandler {
       '• /gprotect\n' +
       '• /gprotect links on|off\n' +
       '• /gprotect stickers on|off\n' +
+      '• /gprotect premiumstickers on|off\n' +
+      '• /gprotect premiumadmins on|off\n' +
       '• /gprotect edits on|off\n' +
       '• /gprotect subscribe on|off\n' +
       '• /gprotect words on|off\n' +
@@ -1250,6 +1258,8 @@ class GroupAdminHandler {
       '🛡️ <b>حالة الحماية الحالية</b>\n\n' +
       `• الروابط: ${group.settings?.lockLinks ? '✅ مقفلة' : '❌ مفتوحة'}\n` +
       `• الملصقات: ${group.settings?.lockStickers ? '✅ مقفلة' : '❌ مفتوحة'}\n` +
+      `• الملصقات المميزة: ${group.settings?.lockPremiumStickers ? '✅ مفعلة' : '❌ معطلة'}\n` +
+      `• استثناء المشرفين من الملصقات المميزة: ${group.settings?.exemptAdminsFromPremiumStickers ? '✅ مفعّل' : '❌ معطّل'}\n` +
       `• التوجيه: ${group.settings?.blockForwards ? '✅ مفعّل' : '❌ معطّل'}\n` +
       `• حماية التعديل: ${group.settings?.blockChannelEdits ? '✅ مفعّلة' : '❌ معطّلة'}\n` +
       `• حماية تعديل الوسائط: ${group.settings?.blockMediaOnlyEdits ? '✅ مفعّلة' : '❌ معطّلة'}\n` +
@@ -1266,6 +1276,8 @@ class GroupAdminHandler {
       '<b>أوامر سريعة:</b>\n' +
       '• قفل الروابط | فتح الروابط\n' +
       '• قفل الملصقات | فتح الملصقات\n' +
+      '• تفعيل منع الملصقات المميزة | تعطيل منع الملصقات المميزة\n' +
+      '• استثناء المشرفين من منع الملصقات المميزة | الغاء استثناء المشرفين من منع الملصقات المميزة\n' +
       '• تفعيل منع التوجيه | تعطيل منع التوجيه\n' +
       '• تفعيل حماية التعديل | تعطيل حماية التعديل\n' +
       '• تفعيل حماية تعديل الوسائط فقط | تعطيل حماية تعديل الوسائط فقط\n' +
@@ -1283,6 +1295,8 @@ class GroupAdminHandler {
       '• استثناء المشرفين من الحماية | الغاء استثناء المشرفين من الحماية\n' +
       '• /gprotect links on|off\n' +
       '• /gprotect stickers on|off\n' +
+      '• /gprotect premiumstickers on|off\n' +
+      '• /gprotect premiumadmins on|off\n' +
       '• /gprotect forwards on|off\n' +
       '• /gprotect edits on|off\n' +
       '• /gprotect subscribe on|off\n' +
@@ -1356,6 +1370,8 @@ class GroupAdminHandler {
     const keyMap = {
       links: 'lockLinks',
       stickers: 'lockStickers',
+      premiumstickers: 'lockPremiumStickers',
+      premiumadmins: 'exemptAdminsFromPremiumStickers',
       forwards: 'blockForwards',
       edits: 'blockChannelEdits',
       mediaedits: 'blockMediaOnlyEdits',
@@ -1371,7 +1387,7 @@ class GroupAdminHandler {
     };
     const key = keyMap[target];
     if (!key) {
-      return ctx.reply('❌ الخيار غير معروف. استخدم: links أو stickers أو forwards أو edits أو mediaedits أو channeledits أو editadmins أو subscribe أو words أو flood أو nsfw أو long أو longnotify أو maxlen أو admins');
+      return ctx.reply('❌ الخيار غير معروف. استخدم: links أو stickers أو premiumstickers أو premiumadmins أو forwards أو edits أو mediaedits أو channeledits أو editadmins أو subscribe أو words أو flood أو nsfw أو long أو longnotify أو maxlen أو admins');
     }
 
     if (target === 'subscribe' && switchValue === true) {
@@ -4704,7 +4720,7 @@ class GroupAdminHandler {
       return true;
     }
     if (
-      /^(قفل الروابط|فتح الروابط|تفعيل منع ارسال الروابط|تعطيل منع ارسال الروابط|تفعيل منع إرسال الروابط|تعطيل منع إرسال الروابط|قفل الملصقات|فتح الملصقات|تفعيل منع التوجيه|تعطيل منع التوجيه|تفعيل حماية التعديل|تعطيل حماية التعديل|تفعيل حماية تعديل الوسائط فقط|تعطيل حماية تعديل الوسائط فقط|تفعيل حماية تعديل من القنوات والادمن المجهول|تعطيل حماية تعديل من القنوات والادمن المجهول|تفعيل حماية تعديل من القنوات والأدمن المجهول|تعطيل حماية تعديل من القنوات والأدمن المجهول|استثناء المشرفين من حماية التعديل|الغاء استثناء المشرفين من حماية التعديل|إلغاء استثناء المشرفين من حماية التعديل|تفعيل حماية الحذف|تعطيل حماية الحذف|تفعيل الاشتراك الاجباري|تعطيل الاشتراك الاجباري|تفعيل الاشتراك الإجباري|تعطيل الاشتراك الإجباري|تفعيل الكلمات|تعطيل الكلمات|تفعيل التكرار|تعطيل التكرار|تفعيل منع الاباحية|تعطيل منع الاباحية|تفعيل منع الرسائل الطويل(?:ة|ه)|تعطيل منع الرسائل الطويل(?:ة|ه)|تفعيل اشعار منع الرسائل الطويل(?:ة|ه)|تعطيل اشعار منع الرسائل الطويل(?:ة|ه)|استثناء المشرفين من الحماية|الغاء استثناء المشرفين من الحماية|إلغاء استثناء المشرفين من الحماية|الحماية|\/gprotect\b)/i.test(rawText)
+      /^(قفل الروابط|فتح الروابط|تفعيل منع ارسال الروابط|تعطيل منع ارسال الروابط|تفعيل منع إرسال الروابط|تعطيل منع إرسال الروابط|قفل الملصقات|فتح الملصقات|تفعيل منع الملصقات المميزة|تعطيل منع الملصقات المميزة|استثناء المشرفين من منع الملصقات المميزة|استئناف المشرفين من منع الملصقات المميزة|الغاء استثناء المشرفين من منع الملصقات المميزة|إلغاء استثناء المشرفين من منع الملصقات المميزة|تفعيل منع التوجيه|تعطيل منع التوجيه|تفعيل حماية التعديل|تعطيل حماية التعديل|تفعيل حماية تعديل الوسائط فقط|تعطيل حماية تعديل الوسائط فقط|تفعيل حماية تعديل من القنوات والادمن المجهول|تعطيل حماية تعديل من القنوات والادمن المجهول|تفعيل حماية تعديل من القنوات والأدمن المجهول|تعطيل حماية تعديل من القنوات والأدمن المجهول|استثناء المشرفين من حماية التعديل|الغاء استثناء المشرفين من حماية التعديل|إلغاء استثناء المشرفين من حماية التعديل|تفعيل حماية الحذف|تعطيل حماية الحذف|تفعيل الاشتراك الاجباري|تعطيل الاشتراك الاجباري|تفعيل الاشتراك الإجباري|تعطيل الاشتراك الإجباري|تفعيل الكلمات|تعطيل الكلمات|تفعيل التكرار|تعطيل التكرار|تفعيل منع الاباحية|تعطيل منع الاباحية|تفعيل منع الرسائل الطويل(?:ة|ه)|تعطيل منع الرسائل الطويل(?:ة|ه)|تفعيل اشعار منع الرسائل الطويل(?:ة|ه)|تعطيل اشعار منع الرسائل الطويل(?:ة|ه)|استثناء المشرفين من الحماية|الغاء استثناء المشرفين من الحماية|إلغاء استثناء المشرفين من الحماية|الحماية|\/gprotect\b)/i.test(rawText)
     ) {
       if (/^(قفل الروابط|تفعيل منع ارسال الروابط|تفعيل منع إرسال الروابط)$/i.test(rawText)) {
         const result = await this.setProtectionSetting(ctx, 'lockLinks', true, 'text');
@@ -4728,6 +4744,30 @@ class GroupAdminHandler {
         const result = await this.setProtectionSetting(ctx, 'lockStickers', false, 'text');
         if (!result?.ok) return true;
         await ctx.reply('✅ تم فتح الملصقات.');
+        return true;
+      }
+      if (/^تفعيل منع الملصقات المميزة$/i.test(rawText)) {
+        const result = await this.setProtectionSetting(ctx, 'lockPremiumStickers', true, 'text');
+        if (!result?.ok) return true;
+        await ctx.reply('✅ تم تفعيل منع الملصقات المميزة.');
+        return true;
+      }
+      if (/^تعطيل منع الملصقات المميزة$/i.test(rawText)) {
+        const result = await this.setProtectionSetting(ctx, 'lockPremiumStickers', false, 'text');
+        if (!result?.ok) return true;
+        await ctx.reply('✅ تم تعطيل منع الملصقات المميزة.');
+        return true;
+      }
+      if (/^(استثناء المشرفين من منع الملصقات المميزة|استئناف المشرفين من منع الملصقات المميزة)$/i.test(rawText)) {
+        const result = await this.setProtectionSetting(ctx, 'exemptAdminsFromPremiumStickers', true, 'text');
+        if (!result?.ok) return true;
+        await ctx.reply('✅ تم تفعيل استثناء المشرفين من منع الملصقات المميزة.');
+        return true;
+      }
+      if (/^(الغاء استثناء المشرفين من منع الملصقات المميزة|إلغاء استثناء المشرفين من منع الملصقات المميزة)$/i.test(rawText)) {
+        const result = await this.setProtectionSetting(ctx, 'exemptAdminsFromPremiumStickers', false, 'text');
+        if (!result?.ok) return true;
+        await ctx.reply('✅ تم إلغاء استثناء المشرفين من منع الملصقات المميزة.');
         return true;
       }
       if (/^تفعيل منع التوجيه$/i.test(rawText)) {
@@ -4962,6 +5002,7 @@ class GroupAdminHandler {
 
     const isAdmin = await this.isGroupAdmin(ctx);
     const adminProtectionBypass = Boolean(isAdmin && group.settings?.exemptAdminsFromProtection);
+    const adminPremiumStickerBypass = Boolean(isAdmin && group.settings?.exemptAdminsFromPremiumStickers);
 
     if (!isAdmin && group.settings?.requireNewsSubscription) {
       const subscribed = await this.isUserSubscribedToNewsChannel(ctx, group, ctx.from?.id);
@@ -4982,7 +5023,9 @@ class GroupAdminHandler {
     }
 
     const text = lowered;
-    const hasSticker = Boolean(ctx.message?.sticker);
+    const sticker = ctx.message?.sticker;
+    const hasSticker = Boolean(sticker);
+    const hasPremiumSticker = Boolean(sticker?.premium_animation);
     const isAutomaticForward = Boolean(ctx.message?.is_automatic_forward);
     const isForwarded = Boolean(
       ctx.message?.forward_origin
@@ -5011,6 +5054,23 @@ class GroupAdminHandler {
       return true;
     }
 
+    if (group.settings?.lockPremiumStickers && hasPremiumSticker && !adminPremiumStickerBypass) {
+      try {
+        await ctx.telegram.deleteMessage(ctx.chat.id, ctx.message.message_id);
+        await this.addModerationLog(group, 'delete_premium_sticker_message', ctx.botInfo.id, ctx.from.id, 'premium sticker blocked');
+        await this.saveGroupQuietly(group);
+        const blockedName = this.getUserDisplayName(ctx.from);
+        await ctx.reply(
+          `• عذرا عزيزي ← ${blockedName} .\n` +
+          '• ممنوع ارسال الملصقات المميزة هنا .',
+          { parse_mode: 'HTML' }
+        );
+      } catch (_error) {
+        await ctx.reply('⚠️ تم اكتشاف ملصق مميز لكن لا يمكن حذفه. فعّل صلاحية حذف الرسائل للبوت.');
+      }
+      return true;
+    }
+
     if (group.settings?.lockStickers && hasSticker && !adminProtectionBypass) {
       try {
         await ctx.telegram.deleteMessage(ctx.chat.id, ctx.message.message_id);
@@ -5019,7 +5079,7 @@ class GroupAdminHandler {
           'delete_sticker_message',
           ctx.botInfo.id,
           ctx.from.id,
-          ctx.message?.sticker?.is_video ? 'video sticker blocked' : (ctx.message?.sticker?.premium_animation ? 'premium sticker blocked' : 'sticker blocked')
+          sticker?.is_video ? 'video sticker blocked' : (sticker?.premium_animation ? 'premium sticker blocked' : 'sticker blocked')
         );
         await this.saveGroupQuietly(group);
       } catch (_error) {

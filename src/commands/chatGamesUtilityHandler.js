@@ -6,6 +6,8 @@ class ChatGamesUtilityHandler {
   static xoGames = new Map();
   static ARCHIVE_SEARCH_URL = 'https://archive.org/advancedsearch.php';
   static ARCHIVE_METADATA_URL = 'https://archive.org/metadata';
+  static YT_SEARCH_URL = 'https://piped.video/api/v1/search';
+  static YT_STREAMS_URL = 'https://piped.video/api/v1/streams';
 
   static cityAliases = {
     '\u063A\u0632\u0629': 'Gaza',
@@ -387,16 +389,57 @@ class ChatGamesUtilityHandler {
     return null;
   }
 
-  static async handleDotCommand(ctx, queryText) {
+  static pickYoutubeAudioStream(streams = []) {
+    if (!Array.isArray(streams) || !streams.length) return null;
+    const withUrl = streams.filter((stream) => stream?.url);
+    if (!withUrl.length) return null;
+    const ranked = withUrl
+      .map((stream) => ({
+        ...stream,
+        bitrateValue: Number(stream?.bitrate || 0)
+      }))
+      .sort((a, b) => b.bitrateValue - a.bitrateValue);
+    return ranked[0] || null;
+  }
+
+  static async searchYoutubeAudio(query) {
+    const q = String(query || '').trim();
+    if (!q) return null;
+    const { data } = await axios.get(this.YT_SEARCH_URL, {
+      params: { q, filter: 'videos' },
+      timeout: 15000
+    });
+
+    const first = Array.isArray(data)
+      ? data.find((item) => item?.id && (item?.type === 'stream' || item?.type === 'video'))
+      : null;
+    if (!first?.id) return null;
+
+    const { data: streamData } = await axios.get(`${this.YT_STREAMS_URL}/${encodeURIComponent(first.id)}`, {
+      timeout: 15000
+    });
+
+    const audioStream = this.pickYoutubeAudioStream(streamData?.audioStreams || []);
+    if (!audioStream?.url) return null;
+
+    return {
+      title: String(first?.title || 'مقطع صوتي'),
+      creator: String(first?.uploader || first?.author || ''),
+      url: String(audioStream.url),
+      source: 'youtube'
+    };
+  }
+
+  static async handleHotCommand(ctx, queryText) {
     const query = String(queryText || '').trim();
     if (!query) {
-      await ctx.reply('❌ الصيغة:\nدوت اسم المقطع');
+      await ctx.reply('❌ الصيغة:\nهوت اسم المقطع');
       return;
     }
 
     await ctx.reply('🔎 جاري البحث عن ملف صوت...');
     try {
-      const audio = await this.searchArchiveAudio(query);
+      const audio = (await this.searchYoutubeAudio(query)) || (await this.searchArchiveAudio(query));
       if (!audio?.url) {
         await ctx.reply('❌ ما لقيت نتيجة صوت مناسبة. جرّب كلمات بحث ثانية.');
         return;
@@ -415,6 +458,10 @@ class ChatGamesUtilityHandler {
     } catch (_error) {
       await ctx.reply('❌ تعذر تحميل الصوت الآن. حاول بعد قليل.');
     }
+  }
+
+  static async handleDotCommand(ctx, queryText) {
+    return this.handleHotCommand(ctx, queryText);
   }
 
   static async resolveCity(cityText) {
