@@ -2804,10 +2804,6 @@ bot.hears(/^اكس\s*اوه$/i, (ctx) => ChatGamesUtilityHandler.handleXoStart(c
 bot.hears(/^طقس(?:\s+(.+))?$/i, (ctx) => ChatGamesUtilityHandler.handleWeatherText(ctx, ctx.match[1]));
 bot.hears(/^(?:اذان|أذان)(?:\s+(.+))?$/i, (ctx) => ChatGamesUtilityHandler.handleAdhanText(ctx, ctx.match[1]));
 bot.hears(/^ستارز(?:\s+(.+))?$/i, (ctx) => ChatGamesUtilityHandler.handlePlayCommand(ctx, ctx.match[1]));
-bot.hears(/^تشغيل(?:\s+(.+))?$/i, (ctx) => ChatGamesUtilityHandler.handlePlayCommand(ctx, ctx.match[1]));
-bot.hears(/^(?:\/)?play(?:\s+(.+))?$/i, (ctx) => ChatGamesUtilityHandler.handlePlayCommand(ctx, ctx.match[1]));
-bot.hears(/^هوت(?:\s+(.+))?$/i, (ctx) => ChatGamesUtilityHandler.handlePlayCommand(ctx, ctx.match[1]));
-bot.hears(/^(?:\/)?hot(?:\s+(.+))?$/i, (ctx) => ChatGamesUtilityHandler.handlePlayCommand(ctx, ctx.match[1]));
 bot.action('hot:next', (ctx) => ChatGamesUtilityHandler.handleHotNextAction(ctx));
 // Group Bank Game commands
 bot.hears(/^انشاء\s*حساب\s*بنكي$/i, (ctx) => BankGameHandler.handleCreateAccount(ctx));

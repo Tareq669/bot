@@ -418,9 +418,8 @@ class ChatGamesUtilityHandler {
 
   static getHotCacheKey(ctx) {
     const chatId = Number(ctx?.chat?.id || 0);
-    const userId = Number(ctx?.from?.id || 0);
-    if (!chatId || !userId) return '';
-    return `${chatId}:${userId}`;
+    if (!chatId) return '';
+    return `${chatId}`;
   }
 
   static buildHotKeyboard(canNext = true) {
@@ -856,7 +855,7 @@ class ChatGamesUtilityHandler {
 
     const cached = this.getHotCache(ctx);
     if (!cached || !Array.isArray(cached.list) || !cached.query) {
-      await ctx.answerCbQuery('❌ ما في بحث محفوظ. اكتب تشغيل من جديد.', { show_alert: false }).catch(() => {});
+      await ctx.answerCbQuery('❌ ما في بحث محفوظ. اكتب ستارز من جديد.', { show_alert: false }).catch(() => {});
       return;
     }
 
