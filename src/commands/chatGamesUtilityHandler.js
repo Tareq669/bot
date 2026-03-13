@@ -423,10 +423,7 @@ class ChatGamesUtilityHandler {
   }
 
   static buildHotKeyboard(canNext = true) {
-    if (!canNext) return undefined;
-    return Markup.inlineKeyboard([
-      [Markup.button.callback('🟢🎵 نتيجة أخرى', 'hot:next')]
-    ]);
+    return undefined;
   }
 
   static setHotCache(ctx, query, list = [], index = 0) {
