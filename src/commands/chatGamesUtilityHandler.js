@@ -479,6 +479,21 @@ class ChatGamesUtilityHandler {
     return data;
   }
 
+  static async fetchPipedSearchCandidates(query, instance, filters = ['music_songs', 'music_videos', 'videos']) {
+    const all = [];
+    for (const filter of filters) {
+      try {
+        const data = await this.fetchPiped('/api/v1/search', { q: query, filter }, instance);
+        const items = (Array.isArray(data) ? data : [])
+          .filter((item) => item?.id && (item?.type === 'stream' || item?.type === 'video'));
+        all.push(...items);
+      } catch (_error) {
+        continue;
+      }
+    }
+    return all;
+  }
+
   static hasAnyTerm(text, terms = []) {
     if (!text) return false;
     return terms.some((term) => text.includes(this.normalizeSearchText(term)));
@@ -581,8 +596,8 @@ class ChatGamesUtilityHandler {
     const instances = this.shuffleArray(this.YT_PIPED_INSTANCES);
     for (const instance of instances) {
       try {
-        const data = await this.fetchPiped('/api/v1/search', { q, filter: 'videos' }, instance);
-        const candidates = (Array.isArray(data) ? data : [])
+        const items = await this.fetchPipedSearchCandidates(q, instance, ['music_songs', 'music_videos', 'videos']);
+        const candidates = items
           .filter((item) => item?.id && (item?.type === 'stream' || item?.type === 'video'))
           .map((item) => ({
             item,
@@ -633,8 +648,8 @@ class ChatGamesUtilityHandler {
     for (const instance of instances) {
       if (results.length >= limit) break;
       try {
-        const data = await this.fetchPiped('/api/v1/search', { q, filter: 'videos' }, instance);
-        const candidates = (Array.isArray(data) ? data : [])
+        const items = await this.fetchPipedSearchCandidates(q, instance, ['music_songs', 'music_videos', 'videos']);
+        const candidates = items
           .filter((item) => item?.id && (item?.type === 'stream' || item?.type === 'video'))
           .map((item) => ({
             item,
