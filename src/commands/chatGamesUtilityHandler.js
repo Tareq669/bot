@@ -382,6 +382,15 @@ class ChatGamesUtilityHandler {
     return hit / tokens.length;
   }
 
+  static isAcceptableQueryMatch(query, text) {
+    const tokens = this.queryTokens(query);
+    if (!tokens.length) return false;
+    const ratio = this.queryMatchRatio(query, text);
+    if (tokens.length === 1) return ratio >= 1;
+    if (tokens.length === 2) return ratio >= 0.5;
+    return ratio >= 0.4;
+  }
+
   static hasAnyTerm(text, terms = []) {
     if (!text) return false;
     return terms.some((term) => text.includes(this.normalizeSearchText(term)));
@@ -436,11 +445,12 @@ class ChatGamesUtilityHandler {
       .sort((a, b) => b.score - a.score)
       .map((entry) => entry.doc);
 
-    for (const doc of rankedDocs) {
-      const docTitle = String(doc?.title || '');
-      const docCreator = String(doc?.creator || '');
-      const ratio = this.queryMatchRatio(query, `${docTitle} ${docCreator}`);
-      if (ratio < 1) continue;
+    const strictDocs = rankedDocs.filter((doc) =>
+      this.isAcceptableQueryMatch(query, `${String(doc?.title || '')} ${String(doc?.creator || '')}`)
+    );
+    const docsToTry = strictDocs.length ? strictDocs : rankedDocs;
+
+    for (const doc of docsToTry) {
       const identifier = String(doc?.identifier || '').trim();
       if (!identifier) continue;
       try {
@@ -495,9 +505,12 @@ class ChatGamesUtilityHandler {
       .slice(0, 6)
       .map((entry) => entry.item);
 
-    for (const candidate of candidates) {
-      const ratio = this.queryMatchRatio(query, `${candidate?.title || ''} ${candidate?.uploader || candidate?.author || ''}`);
-      if (ratio < 1) continue;
+    const strictCandidates = candidates.filter((candidate) =>
+      this.isAcceptableQueryMatch(query, `${candidate?.title || ''} ${candidate?.uploader || candidate?.author || ''}`)
+    );
+    const candidatesToTry = strictCandidates.length ? strictCandidates : candidates;
+
+    for (const candidate of candidatesToTry) {
       try {
         const { data: streamData } = await axios.get(`${this.YT_STREAMS_URL}/${encodeURIComponent(candidate.id)}`, {
           timeout: 15000
