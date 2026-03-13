@@ -1311,7 +1311,6 @@ class GroupGamesHandler {
       row.activityWeeklyKey = weekKey;
       row.activityWeeklyCount = 0;
     }
-    if (!row.joinedAt) row.joinedAt = new Date(now);
   }
 
   static bumpActivityCounters(row, now = new Date()) {
@@ -1357,15 +1356,15 @@ class GroupGamesHandler {
       .sort((a, b) => (Number(b.messagesCount || 0) - Number(a.messagesCount || 0))
         || (Number(b.activityWeeklyCount || 0) - Number(a.activityWeeklyCount || 0)));
     const rank = Math.max(1, rows.findIndex((item) => Number(item.userId) === userId) + 1);
-    const joinDate = row.joinedAt || row.createdAt || group.createdAt || new Date();
-    const joinDateObj = new Date(joinDate);
-    const joinDateKey = this.getDateKey(joinDateObj);
+    const joinDate = row.joinedAt ? new Date(row.joinedAt) : null;
+    const hasKnownJoinDate = Boolean(joinDate && Number.isFinite(joinDate.getTime()));
+    const joinDateLabel = hasKnownJoinDate ? this.getDateKey(joinDate) : 'لا يوجد';
     const text =
       `• رسائلك بالتفاعل ~» ${Number(row.messagesCount || 0)} \n` +
       `• ترتيبك بالمتفاعلين ~» ${rank} \n` +
       `• تفاعلك اليومي ~» ${Number(row.activityDailyCount || 0)}\n` +
       `• تفاعلك الاسبوعي ~» ${Number(row.activityWeeklyCount || 0)}\n` +
-      `• تاريخ دخولك ~» Joined on ${joinDateKey}\n` +
+      `• تاريخ دخولك ~» ${joinDateLabel}\n` +
       '-';
 
     await ctx.reply(text);
