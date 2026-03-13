@@ -684,6 +684,11 @@ class ChatGamesUtilityHandler {
   }
 
   static async handleHotCommand(ctx, queryText) {
+    if (!['group', 'supergroup'].includes(ctx.chat?.type)) {
+      await ctx.reply('❌ هذا الأمر للجروب فقط.');
+      return;
+    }
+
     const query = String(queryText || '').trim();
     if (!query) {
       await ctx.reply('❌ الصيغة:\nهوت اسم المقطع');
@@ -712,6 +717,11 @@ class ChatGamesUtilityHandler {
   }
 
   static async handleHotNextAction(ctx) {
+    if (!['group', 'supergroup'].includes(ctx.chat?.type)) {
+      await ctx.answerCbQuery('❌ هذا الزر للجروب فقط.', { show_alert: false }).catch(() => {});
+      return;
+    }
+
     const cached = this.getHotCache(ctx);
     if (!cached || !Array.isArray(cached.list) || !cached.query) {
       await ctx.answerCbQuery('❌ ما في بحث محفوظ. اكتب هوت من جديد.', { show_alert: false }).catch(() => {});
