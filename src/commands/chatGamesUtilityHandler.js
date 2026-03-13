@@ -391,6 +391,25 @@ class ChatGamesUtilityHandler {
     return ratio >= 0.4;
   }
 
+  static isArtistOnlyQuery(query) {
+    const normalized = this.normalizeSearchText(query);
+    if (!normalized) return false;
+    const tokens = this.queryTokens(normalized);
+    if (tokens.length === 0 || tokens.length > 2) return false;
+    const songHints = ['اغنيه', 'اغنية', 'song', 'mp3', 'lyrics', 'كليب', 'موسيقى', 'music'];
+    if (this.hasAnyTerm(normalized, songHints)) return false;
+    return true;
+  }
+
+  static shuffleArray(items = []) {
+    const arr = [...items];
+    for (let i = arr.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
   static hasAnyTerm(text, terms = []) {
     if (!text) return false;
     return terms.some((term) => text.includes(this.normalizeSearchText(term)));
@@ -502,13 +521,16 @@ class ChatGamesUtilityHandler {
         score: this.scoreAudioCandidate(query, item?.title, item?.uploader || item?.author || '')
       }))
       .sort((a, b) => b.score - a.score)
-      .slice(0, 6)
+      .slice(0, 12)
       .map((entry) => entry.item);
 
     const strictCandidates = candidates.filter((candidate) =>
       this.isAcceptableQueryMatch(query, `${candidate?.title || ''} ${candidate?.uploader || candidate?.author || ''}`)
     );
-    const candidatesToTry = strictCandidates.length ? strictCandidates : candidates;
+    const baseCandidates = strictCandidates.length ? strictCandidates : candidates;
+    const candidatesToTry = this.isArtistOnlyQuery(query) && baseCandidates.length > 1
+      ? this.shuffleArray(baseCandidates)
+      : baseCandidates;
 
     for (const candidate of candidatesToTry) {
       try {
