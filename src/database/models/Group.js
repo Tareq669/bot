@@ -446,6 +446,27 @@ const groupSchema = new mongoose.Schema({
           type: Number,
           default: 0
         },
+        messagesCount: {
+          type: Number,
+          default: 0
+        },
+        activityDailyCount: {
+          type: Number,
+          default: 0
+        },
+        activityDailyKey: {
+          type: String,
+          default: ''
+        },
+        activityWeeklyCount: {
+          type: Number,
+          default: 0
+        },
+        activityWeeklyKey: {
+          type: String,
+          default: ''
+        },
+        joinedAt: Date,
         weeklyPoints: {
           type: Number,
           default: 0

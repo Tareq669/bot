@@ -1296,6 +1296,79 @@ class GroupGamesHandler {
     return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
   }
 
+  static normalizeActivityCounters(row, now = new Date()) {
+    const todayKey = this.getDateKey(now);
+    const weekKey = this.getWeekKey(now);
+
+    if (!Number.isFinite(row.messagesCount)) row.messagesCount = 0;
+    if (!Number.isFinite(row.activityDailyCount)) row.activityDailyCount = 0;
+    if (!Number.isFinite(row.activityWeeklyCount)) row.activityWeeklyCount = 0;
+    if (!row.activityDailyKey || row.activityDailyKey !== todayKey) {
+      row.activityDailyKey = todayKey;
+      row.activityDailyCount = 0;
+    }
+    if (!row.activityWeeklyKey || row.activityWeeklyKey !== weekKey) {
+      row.activityWeeklyKey = weekKey;
+      row.activityWeeklyCount = 0;
+    }
+    if (!row.joinedAt) row.joinedAt = new Date(now);
+  }
+
+  static bumpActivityCounters(row, now = new Date()) {
+    this.normalizeActivityCounters(row, now);
+    row.messagesCount = Number(row.messagesCount || 0) + 1;
+    row.activityDailyCount = Number(row.activityDailyCount || 0) + 1;
+    row.activityWeeklyCount = Number(row.activityWeeklyCount || 0) + 1;
+  }
+
+  static async persistActivityCounters(ctx, group, row, isNewRow, now = new Date()) {
+    if (isNewRow) {
+      group.updatedAt = now;
+      await group.save();
+      return;
+    }
+
+    const todayKey = this.getDateKey(now);
+    const weekKey = this.getWeekKey(now);
+    const update = {
+      $set: {
+        updatedAt: now,
+        'gameSystem.scores.$.messagesCount': Number(row.messagesCount || 0),
+        'gameSystem.scores.$.activityDailyCount': Number(row.activityDailyCount || 0),
+        'gameSystem.scores.$.activityDailyKey': String(row.activityDailyKey || todayKey),
+        'gameSystem.scores.$.activityWeeklyCount': Number(row.activityWeeklyCount || 0),
+        'gameSystem.scores.$.activityWeeklyKey': String(row.activityWeeklyKey || weekKey)
+      }
+    };
+    if (row.joinedAt) {
+      update.$set['gameSystem.scores.$.joinedAt'] = new Date(row.joinedAt);
+    }
+
+    await Group.updateOne(
+      { groupId: String(ctx.chat.id), 'gameSystem.scores.userId': Number(ctx.from?.id || 0) },
+      update
+    );
+  }
+
+  static async handleMyActivityCommand(ctx, group, row) {
+    this.normalizeActivityCounters(row);
+    const userId = Number(ctx.from?.id || 0);
+    const rows = [...(group.gameSystem?.scores || [])]
+      .sort((a, b) => (Number(b.messagesCount || 0) - Number(a.messagesCount || 0))
+        || (Number(b.activityWeeklyCount || 0) - Number(a.activityWeeklyCount || 0)));
+    const rank = Math.max(1, rows.findIndex((item) => Number(item.userId) === userId) + 1);
+    const joinDate = row.joinedAt || row.createdAt || group.createdAt || new Date();
+
+    const text =
+      `• رسائلك بالتفاعل ~» ${Number(row.messagesCount || 0)}\n` +
+      `• ترتيبك بالمتفاعلين ~» ${rank}\n` +
+      `• تفاعلك اليومي ~» ${Number(row.activityDailyCount || 0)}\n` +
+      `• تفاعلك الاسبوعي ~» ${Number(row.activityWeeklyCount || 0)}\n` +
+      `• تاريخ دخولك ~» ${new Date(joinDate).toLocaleDateString('ar-EG')}`;
+
+    await ctx.reply(text);
+  }
+
   static token(prefix = 'x') {
     return `${prefix}${Math.random().toString(36).slice(2, 8)}`;
   }
@@ -1883,6 +1956,7 @@ class GroupGamesHandler {
       if (!Number.isFinite(row.luckTotalPayout)) row.luckTotalPayout = 0;
       if (!row.luckUsedDayKey) row.luckUsedDayKey = '';
       if (!Array.isArray(row.luckUsedNumbers)) row.luckUsedNumbers = [];
+      this.normalizeActivityCounters(row);
       if (typeof row.castleCreated !== 'boolean') row.castleCreated = false;
       if (!Number.isFinite(row.castleLevel)) row.castleLevel = 1;
       if (!row.castleResources || typeof row.castleResources !== 'object') {
@@ -2081,6 +2155,12 @@ class GroupGamesHandler {
         userId,
         username: user.username || user.first_name || String(userId),
         points: 0,
+        messagesCount: 0,
+        activityDailyCount: 0,
+        activityDailyKey: '',
+        activityWeeklyCount: 0,
+        activityWeeklyKey: '',
+        joinedAt: new Date(),
         weeklyPoints: 0,
         monthlyPoints: 0,
         xp: 0,
@@ -2152,6 +2232,7 @@ class GroupGamesHandler {
     if (!Number.isFinite(row.luckTotalPayout)) row.luckTotalPayout = 0;
     if (!row.luckUsedDayKey) row.luckUsedDayKey = '';
     if (!Array.isArray(row.luckUsedNumbers)) row.luckUsedNumbers = [];
+    this.normalizeActivityCounters(row);
     if (typeof row.castleCreated !== 'boolean') row.castleCreated = false;
     if (!Number.isFinite(row.castleLevel)) row.castleLevel = 1;
     if (!row.castleResources || typeof row.castleResources !== 'object') row.castleResources = { wood: 0, stone: 0, food: 0, iron: 0, gold: 0 };
@@ -3679,7 +3760,7 @@ class GroupGamesHandler {
     const luckKey = `${String(ctx.chat.id)}:${Number(ctx.from?.id || 0)}`;
     if (this.pendingLuckInputs.has(luckKey)) {
       const normalized = this.normalizeArabicDigits(String(text || '').trim());
-      const isKnownCommandLike = /^(شراء|بيع|اهداء|إهداء|ارسال|إرسال|متجر|هدايا|ممتلكاتي|حظ|كرسي|انهاء|إنهاء|سؤال|لاونج|كافيتيريا|قائمة|مزاجي|طلب|سلم|ولع|هف|انضم|نفس|اشرب|اكل|كل|كول|البس|حاكم|جلاد|متهم|حكم|ابدأ|محقق|تحديد|جنسي|جنسه|اضف|أضف|حذف|عدد|كلمات|ردود|سوالفكم|فحص|رتبتي|my|الالعاب|الألعاب|كتم|تقييد|حظر|الغاء|إلغاء|فك|رفع|تنزيل|المنشئين|المالكين|المدراء|الادمنية|الأدمنية|المميزين|تفعيل|تعطيل|الحماية|اعدادات|إعدادات|برنت|تفاعل)\b/i.test(normalized);
+      const isKnownCommandLike = /^(شراء|بيع|اهداء|إهداء|ارسال|إرسال|متجر|هدايا|ممتلكاتي|حظ|كرسي|انهاء|إنهاء|سؤال|لاونج|كافيتيريا|قائمة|مزاجي|طلب|سلم|ولع|هف|انضم|نفس|اشرب|اكل|كل|كول|البس|حاكم|جلاد|متهم|حكم|ابدأ|محقق|تحديد|جنسي|جنسه|اضف|أضف|حذف|عدد|كلمات|ردود|سوالفكم|فحص|رتبتي|my|تفاعلي|الالعاب|الألعاب|كتم|تقييد|حظر|الغاء|إلغاء|فك|رفع|تنزيل|المنشئين|المالكين|المدراء|الادمنية|الأدمنية|المميزين|تفعيل|تعطيل|الحماية|اعدادات|إعدادات|برنت|تفاعل)\b/i.test(normalized);
       if (isKnownCommandLike) {
         // Do not let pending luck block normal group commands.
         this.pendingLuckInputs.delete(luckKey);
@@ -3703,8 +3784,12 @@ class GroupGamesHandler {
 
     const groupId = String(ctx.chat.id);
     const group = await this.ensureGroupRecord(ctx);
+    const existingRow = group.gameSystem.scores.find((s) => Number(s.userId) === Number(ctx.from?.id || 0));
     const row = this.getOrCreateScoreRow(group, ctx.from);
     await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
+    const now = new Date();
+    this.bumpActivityCounters(row, now);
+    await this.persistActivityCounters(ctx, group, row, !existingRow, now);
 
     const rulerGame = this.activeRulerExecutionGames.get(groupId);
     if (rulerGame && rulerGame.phase === 'await_answer' && Number(ctx.from?.id || 0) === Number(rulerGame.accusedId)) {
@@ -3725,6 +3810,11 @@ class GroupGamesHandler {
 
     const handledGenderReply = await this.maybeHandleGenderAutoReply(ctx, group, row, text);
     if (handledGenderReply) return true;
+
+    if (norm === 'تفاعلي' || norm === 'myactivity') {
+      await this.handleMyActivityCommand(ctx, group, row);
+      return true;
+    }
 
     const round = this.activeRounds.get(groupId);
     if (!round) return false;
