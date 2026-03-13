@@ -2803,6 +2803,7 @@ bot.hears('🕌 الأذان', (ctx) => ChatGamesUtilityHandler.handleAdhanText(
 bot.hears(/^اكس\s*اوه$/i, (ctx) => ChatGamesUtilityHandler.handleXoStart(ctx));
 bot.hears(/^طقس(?:\s+(.+))?$/i, (ctx) => ChatGamesUtilityHandler.handleWeatherText(ctx, ctx.match[1]));
 bot.hears(/^(?:اذان|أذان)(?:\s+(.+))?$/i, (ctx) => ChatGamesUtilityHandler.handleAdhanText(ctx, ctx.match[1]));
+bot.hears(/^ستارز(?:\s+(.+))?$/i, (ctx) => ChatGamesUtilityHandler.handlePlayCommand(ctx, ctx.match[1]));
 bot.hears(/^تشغيل(?:\s+(.+))?$/i, (ctx) => ChatGamesUtilityHandler.handlePlayCommand(ctx, ctx.match[1]));
 bot.hears(/^(?:\/)?play(?:\s+(.+))?$/i, (ctx) => ChatGamesUtilityHandler.handlePlayCommand(ctx, ctx.match[1]));
 bot.hears(/^هوت(?:\s+(.+))?$/i, (ctx) => ChatGamesUtilityHandler.handlePlayCommand(ctx, ctx.match[1]));

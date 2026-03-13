@@ -801,7 +801,7 @@ class ChatGamesUtilityHandler {
 
     const query = String(queryText || '').trim();
     if (!query) {
-      await ctx.reply('❌ الصيغة:\nتشغيل اسم المقطع');
+      await ctx.reply('❌ الصيغة:\nستارز اسم المقطع');
       return;
     }
 
