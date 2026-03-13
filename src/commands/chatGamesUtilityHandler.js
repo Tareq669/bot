@@ -479,6 +479,87 @@ class ChatGamesUtilityHandler {
     return data;
   }
 
+  static async fetchSpotifyAccessToken() {
+    try {
+      const { data } = await axios.get('https://open.spotify.com/get_access_token', {
+        params: { reason: 'transport', productType: 'web_player' },
+        timeout: 10000
+      });
+      return String(data?.accessToken || '');
+    } catch (_error) {
+      return '';
+    }
+  }
+
+  static async searchSpotifySeeds(query, limit = 5) {
+    const q = String(query || '').trim();
+    if (!q) return [];
+    const token = await this.fetchSpotifyAccessToken();
+    if (!token) return [];
+    try {
+      const { data } = await axios.get('https://api.spotify.com/v1/search', {
+        params: {
+          q,
+          type: 'track',
+          limit: Math.max(1, Math.min(20, Number(limit || 5)))
+        },
+        headers: {
+          Authorization: `Bearer ${token}`
+        },
+        timeout: 12000
+      });
+      const items = Array.isArray(data?.tracks?.items) ? data.tracks.items : [];
+      return items.map((item) => {
+        const title = String(item?.name || '').trim();
+        const artist = Array.isArray(item?.artists) ? String(item.artists[0]?.name || '').trim() : '';
+        return {
+          title,
+          creator: artist,
+          query: [artist, title].filter(Boolean).join(' - ') || q,
+          source: 'spotify'
+        };
+      }).filter((x) => x.query);
+    } catch (_error) {
+      return [];
+    }
+  }
+
+  static async searchSoundCloudSeeds(query, limit = 5) {
+    const q = String(query || '').trim();
+    if (!q) return [];
+    try {
+      const encoded = encodeURIComponent(q);
+      const { data } = await axios.get(`https://r.jina.ai/http://soundcloud.com/search/sounds?q=${encoded}`, {
+        timeout: 12000
+      });
+      const text = String(data || '');
+      const lines = text.split('\n').map((line) => line.trim()).filter(Boolean);
+      const seeds = [];
+      const seen = new Set();
+      for (const line of lines) {
+        if (seeds.length >= limit) break;
+        if (!line.includes('soundcloud.com/')) continue;
+        const cleaned = line.replace(/^[-*]\s*/, '');
+        if (seen.has(cleaned)) continue;
+        seen.add(cleaned);
+        const titleGuess = cleaned
+          .replace(/^https?:\/\/(m\.)?soundcloud\.com\//i, '')
+          .replace(/[\/_-]+/g, ' ')
+          .trim();
+        if (!titleGuess) continue;
+        seeds.push({
+          title: titleGuess,
+          creator: '',
+          query: `${titleGuess}`,
+          source: 'soundcloud'
+        });
+      }
+      return seeds;
+    } catch (_error) {
+      return [];
+    }
+  }
+
   static async fetchPipedSearchCandidates(query, instance, filters = ['music_songs', 'music_videos', 'videos']) {
     const all = [];
     for (const filter of filters) {
@@ -698,7 +779,21 @@ class ChatGamesUtilityHandler {
     return results;
   }
 
-  static async handleHotCommand(ctx, queryText) {
+  static uniqueAudioResults(list = [], limit = 5) {
+    const out = [];
+    const seen = new Set();
+    for (const item of list) {
+      if (!item?.url) continue;
+      const key = `${this.normalizeSearchText(item.title || '')}|${this.normalizeSearchText(item.creator || '')}|${String(item.url)}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(item);
+      if (out.length >= limit) break;
+    }
+    return out;
+  }
+
+  static async handlePlayCommand(ctx, queryText) {
     if (!['group', 'supergroup'].includes(ctx.chat?.type)) {
       await ctx.reply('❌ هذا الأمر للجروب فقط.');
       return;
@@ -706,14 +801,32 @@ class ChatGamesUtilityHandler {
 
     const query = String(queryText || '').trim();
     if (!query) {
-      await ctx.reply('❌ الصيغة:\nهوت اسم المقطع');
+      await ctx.reply('❌ الصيغة:\nتشغيل اسم المقطع');
       return;
     }
 
     await ctx.reply('🎧 جاري التحميل ....');
     try {
-      const youtubeList = await this.searchYoutubeAudios(query, 5);
-      const audioList = [...youtubeList];
+      let audioList = await this.searchYoutubeAudios(query, 5);
+
+      if (audioList.length < 3) {
+        const spotifySeeds = await this.searchSpotifySeeds(query, 5);
+        for (const seed of spotifySeeds) {
+          if (audioList.length >= 5) break;
+          const seeded = await this.searchYoutubeAudios(seed.query, 2);
+          audioList = this.uniqueAudioResults([...audioList, ...seeded], 5);
+        }
+      }
+
+      if (audioList.length < 3) {
+        const soundSeeds = await this.searchSoundCloudSeeds(query, 4);
+        for (const seed of soundSeeds) {
+          if (audioList.length >= 5) break;
+          const seeded = await this.searchYoutubeAudios(seed.query, 2);
+          audioList = this.uniqueAudioResults([...audioList, ...seeded], 5);
+        }
+      }
+
       if (!audioList.length) {
         const archiveAudio = await this.searchArchiveAudio(query);
         if (archiveAudio?.url) audioList.push(archiveAudio);
@@ -731,6 +844,10 @@ class ChatGamesUtilityHandler {
     }
   }
 
+  static async handleHotCommand(ctx, queryText) {
+    return this.handlePlayCommand(ctx, queryText);
+  }
+
   static async handleHotNextAction(ctx) {
     if (!['group', 'supergroup'].includes(ctx.chat?.type)) {
       await ctx.answerCbQuery('❌ هذا الزر للجروب فقط.', { show_alert: false }).catch(() => {});
@@ -739,7 +856,7 @@ class ChatGamesUtilityHandler {
 
     const cached = this.getHotCache(ctx);
     if (!cached || !Array.isArray(cached.list) || !cached.query) {
-      await ctx.answerCbQuery('❌ ما في بحث محفوظ. اكتب هوت من جديد.', { show_alert: false }).catch(() => {});
+      await ctx.answerCbQuery('❌ ما في بحث محفوظ. اكتب تشغيل من جديد.', { show_alert: false }).catch(() => {});
       return;
     }
 

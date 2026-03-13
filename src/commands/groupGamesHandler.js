@@ -4072,6 +4072,15 @@ class GroupGamesHandler {
     );
   }
 
+  static async handleClassicRiddleCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const status = await this.canStartRound(ctx);
+    if (!status.ok) return;
+    const round = this.buildRiddleRound();
+    round.timeoutSec = Math.max(12, status.group.gameSystem.settings.questionTimeoutSec || 25);
+    await this.startRoundInternal(ctx.chat.id, round, false);
+  }
+
   static async handleTypingCommand(ctx) {
     if (!this.isGroupChat(ctx)) return;
     const status = await this.canStartRound(ctx);
