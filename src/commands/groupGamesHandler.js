@@ -3761,7 +3761,7 @@ class GroupGamesHandler {
     const luckKey = `${String(ctx.chat.id)}:${Number(ctx.from?.id || 0)}`;
     if (this.pendingLuckInputs.has(luckKey)) {
       const normalized = this.normalizeArabicDigits(String(text || '').trim());
-      const isKnownCommandLike = /^(شراء|بيع|اهداء|إهداء|ارسال|إرسال|متجر|هدايا|ممتلكاتي|حظ|كرسي|انهاء|إنهاء|سؤال|لاونج|كافيتيريا|قائمة|مزاجي|طلب|سلم|ولع|هف|انضم|نفس|اشرب|اكل|كل|كول|البس|حاكم|جلاد|متهم|حكم|ابدأ|محقق|تحديد|جنسي|جنسه|اضف|أضف|حذف|عدد|كلمات|ردود|سوالفكم|فحص|رتبتي|my|تفاعلي|الالعاب|الألعاب|كتم|تقييد|حظر|الغاء|إلغاء|فك|رفع|تنزيل|المنشئين|المالكين|المدراء|الادمنية|الأدمنية|المميزين|تفعيل|تعطيل|الحماية|اعدادات|إعدادات|برنت|تفاعل)\b/i.test(normalized);
+      const isKnownCommandLike = /^(شراء|بيع|اهداء|إهداء|ارسال|إرسال|متجر|هدايا|ممتلكاتي|حظ|كرسي|انهاء|إنهاء|سؤال|لاونج|كافيتيريا|قائمة|مزاجي|طلب|سلم|ولع|هف|انضم|نفس|اشرب|اكل|كل|كول|البس|حاكم|جلاد|متهم|حكم|ابدأ|محقق|تحديد|جنسي|جنسه|اضف|أضف|حذف|عدد|كلمات|ردود|سوالفكم|فحص|رتبتي|my|تفاعلي|رسائلي|الالعاب|الألعاب|كتم|تقييد|حظر|الغاء|إلغاء|فك|رفع|تنزيل|المنشئين|المالكين|المدراء|الادمنية|الأدمنية|المميزين|تفعيل|تعطيل|الحماية|اعدادات|إعدادات|برنت|تفاعل)\b/i.test(normalized);
       if (isKnownCommandLike) {
         // Do not let pending luck block normal group commands.
         this.pendingLuckInputs.delete(luckKey);
@@ -3814,6 +3814,11 @@ class GroupGamesHandler {
 
     if (norm === 'تفاعلي' || norm === 'myactivity') {
       await this.handleMyActivityCommand(ctx, group, row);
+      return true;
+    }
+    if (norm === 'رسائلي') {
+      const count = Number(row.messagesCount || 0).toLocaleString('en-US');
+      await ctx.reply(`• عدد رسائلك هنا ~» ${count}`);
       return true;
     }
 
