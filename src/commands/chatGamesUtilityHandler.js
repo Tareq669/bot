@@ -425,7 +425,7 @@ class ChatGamesUtilityHandler {
   static buildHotKeyboard(canNext = true) {
     if (!canNext) return undefined;
     return Markup.inlineKeyboard([
-      [Markup.button.callback('🎵 نتيجة أخرى', 'hot:next')]
+      [Markup.button.callback('🟢🎵 نتيجة أخرى', 'hot:next')]
     ]);
   }
 
@@ -864,14 +864,16 @@ class ChatGamesUtilityHandler {
   }
 
   static async handleHotNextAction(ctx) {
-    if (!['group', 'supergroup'].includes(ctx.chat?.type)) {
-      await ctx.answerCbQuery('❌ هذا الزر للجروب فقط.', { show_alert: false }).catch(() => {});
+    const chatType = String(ctx.chat?.type || ctx.callbackQuery?.message?.chat?.type || '');
+    if (!['group', 'supergroup'].includes(chatType)) {
+      await ctx.answerCbQuery().catch(() => {});
       return;
     }
 
     const cached = this.getHotCache(ctx);
     if (!cached || !Array.isArray(cached.list) || !cached.query) {
-      await ctx.answerCbQuery('❌ ما في بحث محفوظ. اكتب ستارز من جديد.', { show_alert: false }).catch(() => {});
+      await ctx.answerCbQuery().catch(() => {});
+      await ctx.reply('❌ ما في بحث محفوظ. اكتب ستارز من جديد.');
       return;
     }
 
@@ -885,7 +887,8 @@ class ChatGamesUtilityHandler {
     }
 
     if (!list.length) {
-      await ctx.answerCbQuery('❌ ما في نتائج إضافية حالياً.', { show_alert: false }).catch(() => {});
+      await ctx.answerCbQuery().catch(() => {});
+      await ctx.reply('❌ ما في نتائج إضافية حالياً.');
       return;
     }
 
@@ -896,7 +899,7 @@ class ChatGamesUtilityHandler {
     cached.createdAt = Date.now();
     this.setHotCache(ctx, cached.query, list, nextIndex);
 
-    await ctx.answerCbQuery('🎵 تم اختيار نتيجة أخرى', { show_alert: false }).catch(() => {});
+    await ctx.answerCbQuery().catch(() => {});
     await this.sendHotAudioResult(ctx, list[nextIndex], true);
   }
 
