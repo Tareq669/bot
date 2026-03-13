@@ -455,6 +455,7 @@ class ChatGamesUtilityHandler {
           performer: audio.creator || undefined
         }
       );
+      await ctx.reply('♪ تم التحميل بنجاح ♪');
     } catch (_error) {
       await ctx.reply('❌ تعذر تحميل الصوت الآن. حاول بعد قليل.');
     }
