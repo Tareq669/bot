@@ -367,6 +367,21 @@ class ChatGamesUtilityHandler {
       .trim();
   }
 
+  static queryTokens(value) {
+    const norm = this.normalizeSearchText(value);
+    if (!norm) return [];
+    return norm.split(' ').filter((token) => token.length >= 2);
+  }
+
+  static queryMatchRatio(query, text) {
+    const tokens = this.queryTokens(query);
+    if (!tokens.length) return 0;
+    const hay = this.normalizeSearchText(text);
+    if (!hay) return 0;
+    const hit = tokens.filter((token) => hay.includes(token)).length;
+    return hit / tokens.length;
+  }
+
   static hasAnyTerm(text, terms = []) {
     if (!text) return false;
     return terms.some((term) => text.includes(this.normalizeSearchText(term)));
@@ -377,7 +392,7 @@ class ChatGamesUtilityHandler {
     const t = this.normalizeSearchText(`${title || ''} ${creator || ''}`);
     if (!q || !t) return 0;
 
-    const tokens = q.split(' ').filter((token) => token.length >= 2);
+    const tokens = this.queryTokens(q);
     let score = 0;
 
     if (t.includes(q)) score += 20;
@@ -422,6 +437,10 @@ class ChatGamesUtilityHandler {
       .map((entry) => entry.doc);
 
     for (const doc of rankedDocs) {
+      const docTitle = String(doc?.title || '');
+      const docCreator = String(doc?.creator || '');
+      const ratio = this.queryMatchRatio(query, `${docTitle} ${docCreator}`);
+      if (ratio < 1) continue;
       const identifier = String(doc?.identifier || '').trim();
       if (!identifier) continue;
       try {
@@ -477,6 +496,8 @@ class ChatGamesUtilityHandler {
       .map((entry) => entry.item);
 
     for (const candidate of candidates) {
+      const ratio = this.queryMatchRatio(query, `${candidate?.title || ''} ${candidate?.uploader || candidate?.author || ''}`);
+      if (ratio < 1) continue;
       try {
         const { data: streamData } = await axios.get(`${this.YT_STREAMS_URL}/${encodeURIComponent(candidate.id)}`, {
           timeout: 15000
@@ -514,6 +535,7 @@ class ChatGamesUtilityHandler {
 
       const captionParts = [`🎵 ${audio.title}`];
       if (audio.creator) captionParts.push(`👤 ${audio.creator}`);
+      captionParts.push('♪ تم التح🎧ميل بنجاح ♪');
       await ctx.replyWithAudio(
         { url: audio.url },
         {
@@ -522,7 +544,6 @@ class ChatGamesUtilityHandler {
           performer: audio.creator || undefined
         }
       );
-      await ctx.reply('♪ تم التح🎧ميل بنجاح ♪');
     } catch (_error) {
       await ctx.reply('♪ عذرا غير متوفر ..');
     }
