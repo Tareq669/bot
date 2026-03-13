@@ -8,6 +8,16 @@ class ChatGamesUtilityHandler {
   static ARCHIVE_METADATA_URL = 'https://archive.org/metadata';
   static YT_SEARCH_URL = 'https://piped.video/api/v1/search';
   static YT_STREAMS_URL = 'https://piped.video/api/v1/streams';
+  static RELIGIOUS_AUDIO_TERMS = [
+    'قرآن', 'قران', 'quran', 'qur', 'مصحف', 'تلاوة', 'تلاوه', 'سورة', 'سوره', 'surah',
+    'اذكار', 'أذكار', 'ذكر', 'duaa', 'dua', 'دعاء', 'دعاء', 'رقية', 'رقيه', 'ادعية',
+    'انشودة', 'انشوده', 'nasheed', 'اناشيد', 'الشيخ', 'imam', 'azan', 'adhan', 'اذان', 'أذان'
+  ];
+
+  static MUSIC_HINT_TERMS = [
+    'اغنية', 'أغنية', 'اغاني', 'أغاني', 'music', 'song', 'mp3', 'كليب', 'حفلة', 'حفله',
+    'ام كلثوم', 'فيروز', 'عبد الحليم', 'كاظم', 'اصالة', 'أصالة'
+  ];
 
   static cityAliases = {
     '\u063A\u0632\u0629': 'Gaza',
@@ -349,6 +359,44 @@ class ChatGamesUtilityHandler {
     return original || candidates[0];
   }
 
+  static normalizeSearchText(value) {
+    return String(value || '')
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  static hasAnyTerm(text, terms = []) {
+    if (!text) return false;
+    return terms.some((term) => text.includes(this.normalizeSearchText(term)));
+  }
+
+  static scoreAudioCandidate(query, title, creator = '') {
+    const q = this.normalizeSearchText(query);
+    const t = this.normalizeSearchText(`${title || ''} ${creator || ''}`);
+    if (!q || !t) return 0;
+
+    const tokens = q.split(' ').filter((token) => token.length >= 2);
+    let score = 0;
+
+    if (t.includes(q)) score += 20;
+    for (const token of tokens) {
+      if (t.includes(token)) score += 5;
+    }
+
+    const queryIsReligious = this.hasAnyTerm(q, this.RELIGIOUS_AUDIO_TERMS);
+    const queryHintsMusic = this.hasAnyTerm(q, this.MUSIC_HINT_TERMS);
+    const itemIsReligious = this.hasAnyTerm(t, this.RELIGIOUS_AUDIO_TERMS);
+    const itemHintsMusic = this.hasAnyTerm(t, this.MUSIC_HINT_TERMS);
+
+    if (queryHintsMusic && itemHintsMusic) score += 8;
+    if (!queryIsReligious && itemIsReligious) score -= 18;
+    if (!queryIsReligious && itemHintsMusic) score += 6;
+
+    return score;
+  }
+
   static async searchArchiveAudio(query) {
     const q = String(query || '').trim();
     if (!q) return null;
@@ -365,7 +413,15 @@ class ChatGamesUtilityHandler {
     const docs = data?.response?.docs || [];
     if (!docs.length) return null;
 
-    for (const doc of docs) {
+    const rankedDocs = docs
+      .map((doc) => ({
+        doc,
+        score: this.scoreAudioCandidate(query, doc?.title, doc?.creator)
+      }))
+      .sort((a, b) => b.score - a.score)
+      .map((entry) => entry.doc);
+
+    for (const doc of rankedDocs) {
       const identifier = String(doc?.identifier || '').trim();
       if (!identifier) continue;
       try {
@@ -410,24 +466,35 @@ class ChatGamesUtilityHandler {
       timeout: 15000
     });
 
-    const first = Array.isArray(data)
-      ? data.find((item) => item?.id && (item?.type === 'stream' || item?.type === 'video'))
-      : null;
-    if (!first?.id) return null;
+    const candidates = (Array.isArray(data) ? data : [])
+      .filter((item) => item?.id && (item?.type === 'stream' || item?.type === 'video'))
+      .map((item) => ({
+        item,
+        score: this.scoreAudioCandidate(query, item?.title, item?.uploader || item?.author || '')
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 6)
+      .map((entry) => entry.item);
 
-    const { data: streamData } = await axios.get(`${this.YT_STREAMS_URL}/${encodeURIComponent(first.id)}`, {
-      timeout: 15000
-    });
+    for (const candidate of candidates) {
+      try {
+        const { data: streamData } = await axios.get(`${this.YT_STREAMS_URL}/${encodeURIComponent(candidate.id)}`, {
+          timeout: 15000
+        });
+        const audioStream = this.pickYoutubeAudioStream(streamData?.audioStreams || []);
+        if (!audioStream?.url) continue;
+        return {
+          title: String(candidate?.title || 'مقطع صوتي'),
+          creator: String(candidate?.uploader || candidate?.author || ''),
+          url: String(audioStream.url),
+          source: 'youtube'
+        };
+      } catch (_innerError) {
+        continue;
+      }
+    }
 
-    const audioStream = this.pickYoutubeAudioStream(streamData?.audioStreams || []);
-    if (!audioStream?.url) return null;
-
-    return {
-      title: String(first?.title || 'مقطع صوتي'),
-      creator: String(first?.uploader || first?.author || ''),
-      url: String(audioStream.url),
-      source: 'youtube'
-    };
+    return null;
   }
 
   static async handleHotCommand(ctx, queryText) {
