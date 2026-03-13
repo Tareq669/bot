@@ -1358,14 +1358,14 @@ class GroupGamesHandler {
         || (Number(b.activityWeeklyCount || 0) - Number(a.activityWeeklyCount || 0)));
     const rank = Math.max(1, rows.findIndex((item) => Number(item.userId) === userId) + 1);
     const joinDate = row.joinedAt || row.createdAt || group.createdAt || new Date();
-
-    const joinDateKey = this.getDateKey(new Date(joinDate));
+    const joinDateObj = new Date(joinDate);
+    const joinDateKey = this.getDateKey(joinDateObj);
     const text =
       `• رسائلك بالتفاعل ~» ${Number(row.messagesCount || 0)} \n` +
       `• ترتيبك بالمتفاعلين ~» ${rank} \n` +
-      `• تفاعلك اليومي ~»${Number(row.activityDailyCount || 0)}\n` +
-      `• تفاعلك الاسبوعي ~»${Number(row.activityWeeklyCount || 0)}\n` +
-      `• تاريخ دخولك ~»${joinDateKey}\n` +
+      `• تفاعلك اليومي ~» ${Number(row.activityDailyCount || 0)}\n` +
+      `• تفاعلك الاسبوعي ~» ${Number(row.activityWeeklyCount || 0)}\n` +
+      `• تاريخ دخولك ~» Joined on ${joinDateKey}\n` +
       '-';
 
     await ctx.reply(text);
