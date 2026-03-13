@@ -423,7 +423,7 @@ class ChatGamesUtilityHandler {
     return `${chatId}:${userId}`;
   }
 
-  static buildHotKeyboard(canNext = false) {
+  static buildHotKeyboard(canNext = true) {
     if (!canNext) return undefined;
     return Markup.inlineKeyboard([
       [Markup.button.callback('🎵 نتيجة أخرى', 'hot:next')]
@@ -453,7 +453,7 @@ class ChatGamesUtilityHandler {
     return cached;
   }
 
-  static async sendHotAudioResult(ctx, audio, canNext = false) {
+  static async sendHotAudioResult(ctx, audio, canNext = true) {
     const captionParts = [`🎵 ${audio.title}`];
     if (audio.creator) captionParts.push(`👤 ${audio.creator}`);
     captionParts.push('♪ تم التح🎧ميل بنجاح ♪');
@@ -705,7 +705,7 @@ class ChatGamesUtilityHandler {
       }
 
       this.setHotCache(ctx, query, audioList, 0);
-      await this.sendHotAudioResult(ctx, audioList[0], audioList.length > 1);
+      await this.sendHotAudioResult(ctx, audioList[0], true);
     } catch (_error) {
       await ctx.reply('♪ عذرا غير متوفر ..');
     }
@@ -713,17 +713,34 @@ class ChatGamesUtilityHandler {
 
   static async handleHotNextAction(ctx) {
     const cached = this.getHotCache(ctx);
-    if (!cached || !Array.isArray(cached.list) || cached.list.length < 2) {
+    if (!cached || !Array.isArray(cached.list) || !cached.query) {
+      await ctx.answerCbQuery('❌ ما في بحث محفوظ. اكتب هوت من جديد.', { show_alert: false }).catch(() => {});
+      return;
+    }
+
+    let list = cached.list;
+    if (list.length < 2) {
+      const refreshed = await this.searchYoutubeAudios(cached.query, 5);
+      if (Array.isArray(refreshed) && refreshed.length > list.length) {
+        list = refreshed;
+      }
+      this.setHotCache(ctx, cached.query, list, Number(cached.index || 0));
+    }
+
+    if (!list.length) {
       await ctx.answerCbQuery('❌ ما في نتائج إضافية حالياً.', { show_alert: false }).catch(() => {});
       return;
     }
-    const nextIndex = (Number(cached.index || 0) + 1) % cached.list.length;
+
+    const nextIndex = list.length > 1
+      ? (Number(cached.index || 0) + 1) % list.length
+      : 0;
     cached.index = nextIndex;
     cached.createdAt = Date.now();
-    this.setHotCache(ctx, cached.query, cached.list, nextIndex);
+    this.setHotCache(ctx, cached.query, list, nextIndex);
 
     await ctx.answerCbQuery('🎵 تم اختيار نتيجة أخرى', { show_alert: false }).catch(() => {});
-    await this.sendHotAudioResult(ctx, cached.list[nextIndex], cached.list.length > 1);
+    await this.sendHotAudioResult(ctx, list[nextIndex], true);
   }
 
   static async handleDotCommand(ctx, queryText) {
