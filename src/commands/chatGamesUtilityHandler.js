@@ -4,6 +4,8 @@ const { User } = require('../database/models');
 
 class ChatGamesUtilityHandler {
   static xoGames = new Map();
+  static hotSearchCache = new Map();
+  static HOT_CACHE_TTL_MS = 10 * 60 * 1000;
   static ARCHIVE_SEARCH_URL = 'https://archive.org/advancedsearch.php';
   static ARCHIVE_METADATA_URL = 'https://archive.org/metadata';
   static YT_PIPED_INSTANCES = [
@@ -414,6 +416,59 @@ class ChatGamesUtilityHandler {
     return arr;
   }
 
+  static getHotCacheKey(ctx) {
+    const chatId = Number(ctx?.chat?.id || 0);
+    const userId = Number(ctx?.from?.id || 0);
+    if (!chatId || !userId) return '';
+    return `${chatId}:${userId}`;
+  }
+
+  static buildHotKeyboard(canNext = false) {
+    if (!canNext) return undefined;
+    return Markup.inlineKeyboard([
+      [Markup.button.callback('🎵 نتيجة أخرى', 'hot:next')]
+    ]);
+  }
+
+  static setHotCache(ctx, query, list = [], index = 0) {
+    const key = this.getHotCacheKey(ctx);
+    if (!key) return;
+    this.hotSearchCache.set(key, {
+      query: String(query || ''),
+      list: Array.isArray(list) ? list : [],
+      index: Number(index || 0),
+      createdAt: Date.now()
+    });
+  }
+
+  static getHotCache(ctx) {
+    const key = this.getHotCacheKey(ctx);
+    if (!key) return null;
+    const cached = this.hotSearchCache.get(key);
+    if (!cached) return null;
+    if ((Date.now() - Number(cached.createdAt || 0)) > this.HOT_CACHE_TTL_MS) {
+      this.hotSearchCache.delete(key);
+      return null;
+    }
+    return cached;
+  }
+
+  static async sendHotAudioResult(ctx, audio, canNext = false) {
+    const captionParts = [`🎵 ${audio.title}`];
+    if (audio.creator) captionParts.push(`👤 ${audio.creator}`);
+    captionParts.push('♪ تم التح🎧ميل بنجاح ♪');
+    const keyboard = this.buildHotKeyboard(canNext);
+    await ctx.replyWithAudio(
+      { url: audio.url },
+      {
+        caption: captionParts.join('\n'),
+        title: audio.title || undefined,
+        performer: audio.creator || undefined,
+        reply_markup: keyboard ? keyboard.reply_markup : undefined
+      }
+    );
+  }
+
   static async fetchPiped(path, params = {}, instanceBase = '') {
     const base = String(instanceBase || '').replace(/\/+$/, '');
     if (!base) throw new Error('PIPED_INSTANCE_EMPTY');
@@ -567,6 +622,67 @@ class ChatGamesUtilityHandler {
     return null;
   }
 
+  static async searchYoutubeAudios(query, limit = 5) {
+    const q = String(query || '').trim();
+    if (!q) return [];
+
+    const results = [];
+    const seen = new Set();
+    const instances = this.shuffleArray(this.YT_PIPED_INSTANCES);
+
+    for (const instance of instances) {
+      if (results.length >= limit) break;
+      try {
+        const data = await this.fetchPiped('/api/v1/search', { q, filter: 'videos' }, instance);
+        const candidates = (Array.isArray(data) ? data : [])
+          .filter((item) => item?.id && (item?.type === 'stream' || item?.type === 'video'))
+          .map((item) => ({
+            item,
+            score: this.scoreAudioCandidate(query, item?.title, item?.uploader || item?.author || '')
+          }))
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 50)
+          .map((entry) => entry.item);
+
+        const strictCandidates = candidates.filter((candidate) =>
+          this.isAcceptableQueryMatch(query, `${candidate?.title || ''} ${candidate?.uploader || candidate?.author || ''}`)
+        );
+        const baseCandidates = strictCandidates.length ? strictCandidates : candidates;
+        const candidatesToTry = this.isArtistOnlyQuery(query) && baseCandidates.length > 1
+          ? this.shuffleArray(baseCandidates)
+          : baseCandidates;
+
+        for (const candidate of candidatesToTry) {
+          if (results.length >= limit) break;
+          try {
+            const streamData = await this.fetchPiped(`/api/v1/streams/${encodeURIComponent(candidate.id)}`, {}, instance);
+            const audioStream = this.pickYoutubeAudioStream(streamData?.audioStreams || []);
+            if (!audioStream?.url) continue;
+
+            const title = String(candidate?.title || 'مقطع صوتي');
+            const creator = String(candidate?.uploader || candidate?.author || '');
+            const uniqueKey = `${this.normalizeSearchText(title)}|${this.normalizeSearchText(creator)}|${String(audioStream.url)}`;
+            if (seen.has(uniqueKey)) continue;
+            seen.add(uniqueKey);
+
+            results.push({
+              title,
+              creator,
+              url: String(audioStream.url),
+              source: 'youtube'
+            });
+          } catch (_innerError) {
+            continue;
+          }
+        }
+      } catch (_searchError) {
+        continue;
+      }
+    }
+
+    return results;
+  }
+
   static async handleHotCommand(ctx, queryText) {
     const query = String(queryText || '').trim();
     if (!query) {
@@ -576,26 +692,38 @@ class ChatGamesUtilityHandler {
 
     await ctx.reply('🎧 جاري التحميل ....');
     try {
-      const audio = (await this.searchYoutubeAudio(query)) || (await this.searchArchiveAudio(query));
-      if (!audio?.url) {
-        await ctx.reply('❌ ما لقيت نتيجة صوت مناسبة. جرّب كلمات بحث ثانية.');
+      const youtubeList = await this.searchYoutubeAudios(query, 5);
+      const audioList = [...youtubeList];
+      if (!audioList.length) {
+        const archiveAudio = await this.searchArchiveAudio(query);
+        if (archiveAudio?.url) audioList.push(archiveAudio);
+      }
+
+      if (!audioList.length) {
+        await ctx.reply('♪ عذرا غير متوفر ..');
         return;
       }
 
-      const captionParts = [`🎵 ${audio.title}`];
-      if (audio.creator) captionParts.push(`👤 ${audio.creator}`);
-      captionParts.push('♪ تم التح🎧ميل بنجاح ♪');
-      await ctx.replyWithAudio(
-        { url: audio.url },
-        {
-          caption: captionParts.join('\n'),
-          title: audio.title || undefined,
-          performer: audio.creator || undefined
-        }
-      );
+      this.setHotCache(ctx, query, audioList, 0);
+      await this.sendHotAudioResult(ctx, audioList[0], audioList.length > 1);
     } catch (_error) {
       await ctx.reply('♪ عذرا غير متوفر ..');
     }
+  }
+
+  static async handleHotNextAction(ctx) {
+    const cached = this.getHotCache(ctx);
+    if (!cached || !Array.isArray(cached.list) || cached.list.length < 2) {
+      await ctx.answerCbQuery('❌ ما في نتائج إضافية حالياً.', { show_alert: false }).catch(() => {});
+      return;
+    }
+    const nextIndex = (Number(cached.index || 0) + 1) % cached.list.length;
+    cached.index = nextIndex;
+    cached.createdAt = Date.now();
+    this.setHotCache(ctx, cached.query, cached.list, nextIndex);
+
+    await ctx.answerCbQuery('🎵 تم اختيار نتيجة أخرى', { show_alert: false }).catch(() => {});
+    await this.sendHotAudioResult(ctx, cached.list[nextIndex], cached.list.length > 1);
   }
 
   static async handleDotCommand(ctx, queryText) {
