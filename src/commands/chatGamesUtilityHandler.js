@@ -6,8 +6,12 @@ class ChatGamesUtilityHandler {
   static xoGames = new Map();
   static ARCHIVE_SEARCH_URL = 'https://archive.org/advancedsearch.php';
   static ARCHIVE_METADATA_URL = 'https://archive.org/metadata';
-  static YT_SEARCH_URL = 'https://piped.video/api/v1/search';
-  static YT_STREAMS_URL = 'https://piped.video/api/v1/streams';
+  static YT_PIPED_INSTANCES = [
+    'https://piped.video',
+    'https://piped.adminforge.de',
+    'https://piped.ngn.tf',
+    'https://piped.privacydev.net'
+  ];
   static RELIGIOUS_AUDIO_TERMS = [
     'قرآن', 'قران', 'quran', 'qur', 'مصحف', 'تلاوة', 'تلاوه', 'سورة', 'سوره', 'surah',
     'اذكار', 'أذكار', 'ذكر', 'duaa', 'dua', 'دعاء', 'دعاء', 'رقية', 'رقيه', 'ادعية',
@@ -410,6 +414,16 @@ class ChatGamesUtilityHandler {
     return arr;
   }
 
+  static async fetchPiped(path, params = {}, instanceBase = '') {
+    const base = String(instanceBase || '').replace(/\/+$/, '');
+    if (!base) throw new Error('PIPED_INSTANCE_EMPTY');
+    const { data } = await axios.get(`${base}${path}`, {
+      params,
+      timeout: 12000
+    });
+    return data;
+  }
+
   static hasAnyTerm(text, terms = []) {
     if (!text) return false;
     return terms.some((term) => text.includes(this.normalizeSearchText(term)));
@@ -509,47 +523,47 @@ class ChatGamesUtilityHandler {
   static async searchYoutubeAudio(query) {
     const q = String(query || '').trim();
     if (!q) return null;
-    const { data } = await axios.get(this.YT_SEARCH_URL, {
-      params: { q, filter: 'videos' },
-      timeout: 15000
-    });
-
-    const candidates = (Array.isArray(data) ? data : [])
-      .filter((item) => item?.id && (item?.type === 'stream' || item?.type === 'video'))
-      .map((item) => ({
-        item,
-        score: this.scoreAudioCandidate(query, item?.title, item?.uploader || item?.author || '')
-      }))
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 12)
-      .map((entry) => entry.item);
-
-    const strictCandidates = candidates.filter((candidate) =>
-      this.isAcceptableQueryMatch(query, `${candidate?.title || ''} ${candidate?.uploader || candidate?.author || ''}`)
-    );
-    const baseCandidates = strictCandidates.length ? strictCandidates : candidates;
-    const candidatesToTry = this.isArtistOnlyQuery(query) && baseCandidates.length > 1
-      ? this.shuffleArray(baseCandidates)
-      : baseCandidates;
-
-    for (const candidate of candidatesToTry) {
+    const instances = this.shuffleArray(this.YT_PIPED_INSTANCES);
+    for (const instance of instances) {
       try {
-        const { data: streamData } = await axios.get(`${this.YT_STREAMS_URL}/${encodeURIComponent(candidate.id)}`, {
-          timeout: 15000
-        });
-        const audioStream = this.pickYoutubeAudioStream(streamData?.audioStreams || []);
-        if (!audioStream?.url) continue;
-        return {
-          title: String(candidate?.title || 'مقطع صوتي'),
-          creator: String(candidate?.uploader || candidate?.author || ''),
-          url: String(audioStream.url),
-          source: 'youtube'
-        };
-      } catch (_innerError) {
+        const data = await this.fetchPiped('/api/v1/search', { q, filter: 'videos' }, instance);
+        const candidates = (Array.isArray(data) ? data : [])
+          .filter((item) => item?.id && (item?.type === 'stream' || item?.type === 'video'))
+          .map((item) => ({
+            item,
+            score: this.scoreAudioCandidate(query, item?.title, item?.uploader || item?.author || '')
+          }))
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 30)
+          .map((entry) => entry.item);
+
+        const strictCandidates = candidates.filter((candidate) =>
+          this.isAcceptableQueryMatch(query, `${candidate?.title || ''} ${candidate?.uploader || candidate?.author || ''}`)
+        );
+        const baseCandidates = strictCandidates.length ? strictCandidates : candidates;
+        const candidatesToTry = this.isArtistOnlyQuery(query) && baseCandidates.length > 1
+          ? this.shuffleArray(baseCandidates)
+          : baseCandidates;
+
+        for (const candidate of candidatesToTry) {
+          try {
+            const streamData = await this.fetchPiped(`/api/v1/streams/${encodeURIComponent(candidate.id)}`, {}, instance);
+            const audioStream = this.pickYoutubeAudioStream(streamData?.audioStreams || []);
+            if (!audioStream?.url) continue;
+            return {
+              title: String(candidate?.title || 'مقطع صوتي'),
+              creator: String(candidate?.uploader || candidate?.author || ''),
+              url: String(audioStream.url),
+              source: 'youtube'
+            };
+          } catch (_innerError) {
+            continue;
+          }
+        }
+      } catch (_searchError) {
         continue;
       }
     }
-
     return null;
   }
 
