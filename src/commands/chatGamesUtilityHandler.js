@@ -504,7 +504,7 @@ class ChatGamesUtilityHandler {
       return;
     }
 
-    await ctx.reply('🔎 جاري البحث عن ملف صوت...');
+    await ctx.reply('🎧 جاري التحميل ....');
     try {
       const audio = (await this.searchYoutubeAudio(query)) || (await this.searchArchiveAudio(query));
       if (!audio?.url) {
@@ -522,9 +522,9 @@ class ChatGamesUtilityHandler {
           performer: audio.creator || undefined
         }
       );
-      await ctx.reply('♪ تم التحميل بنجاح ♪');
+      await ctx.reply('♪ تم التح🎧ميل بنجاح ♪');
     } catch (_error) {
-      await ctx.reply('❌ تعذر تحميل الصوت الآن. حاول بعد قليل.');
+      await ctx.reply('♪ عذرا غير متوفر ..');
     }
   }
 
