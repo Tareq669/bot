@@ -453,8 +453,10 @@ class ChatGamesUtilityHandler {
   }
 
   static async sendHotAudioResult(ctx, audio, canNext = true) {
-    const captionParts = [`🎵 ${audio.title}`];
-    if (audio.creator) captionParts.push(`👤 ${audio.creator}`);
+    const cleanTitle = this.cleanAudioLabel(audio.title || 'مقطع صوتي');
+    const cleanCreator = this.cleanAudioLabel(audio.creator || '');
+    const captionParts = [`🎵 ${cleanTitle}`];
+    if (cleanCreator) captionParts.push(`👤 ${cleanCreator}`);
     captionParts.push('♪ تم التح🎧ميل بنجاح ♪');
     const keyboard = this.buildHotKeyboard(canNext);
     await ctx.replyWithAudio(
@@ -466,6 +468,20 @@ class ChatGamesUtilityHandler {
         reply_markup: keyboard ? keyboard.reply_markup : undefined
       }
     );
+  }
+
+  static cleanAudioLabel(value) {
+    let text = String(value || '').trim();
+    if (!text) return '';
+    text = text
+      .replace(/https?:\/\/\S+/gi, '')
+      .replace(/\b(?:www\.)?\S+\.(?:com|net|org|io|me|tv|ly|co|app)\S*/gi, '')
+      .replace(/@[\w_.-]+/g, '')
+      .replace(/(?:mazzika|mazika|مزازيكا|مزازيك|مزيكا)/gi, '')
+      .replace(/[|]+/g, ' ')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+    return text || 'مقطع صوتي';
   }
 
   static async fetchPiped(path, params = {}, instanceBase = '') {
