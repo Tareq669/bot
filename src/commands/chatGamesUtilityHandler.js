@@ -6,6 +6,9 @@ class ChatGamesUtilityHandler {
   static xoGames = new Map();
   static hotSearchCache = new Map();
   static HOT_CACHE_TTL_MS = 10 * 60 * 1000;
+  static audioQueryCache = new Map();
+  static AUDIO_QUERY_CACHE_TTL_MS = 30 * 60 * 1000;
+  static audioSearchInFlight = new Map();
   static ARCHIVE_SEARCH_URL = 'https://archive.org/advancedsearch.php';
   static ARCHIVE_METADATA_URL = 'https://archive.org/metadata';
   static YT_PIPED_INSTANCES = [
@@ -450,7 +453,7 @@ class ChatGamesUtilityHandler {
   }
 
   static async sendHotAudioResult(ctx, audio, canNext = true) {
-    const caption = '♪ تم التح🎧ميل بنجاح ♪ ☑🎶';
+    const caption = '♪ تم التح🎧ميل بنجاح ♪ ☑';
     const keyboard = this.buildHotKeyboard(canNext);
     await ctx.replyWithAudio(
       { url: audio.url },
@@ -799,6 +802,81 @@ class ChatGamesUtilityHandler {
     return out;
   }
 
+  static getAudioQueryCacheKey(query) {
+    const normalized = this.normalizeSearchText(query || '');
+    return normalized || String(query || '').trim().toLowerCase();
+  }
+
+  static getAudioQueryCache(query) {
+    const key = this.getAudioQueryCacheKey(query);
+    if (!key) return null;
+    const cached = this.audioQueryCache.get(key);
+    if (!cached) return null;
+    if ((Date.now() - Number(cached.createdAt || 0)) > this.AUDIO_QUERY_CACHE_TTL_MS) {
+      this.audioQueryCache.delete(key);
+      return null;
+    }
+    return Array.isArray(cached.list) ? cached.list : null;
+  }
+
+  static setAudioQueryCache(query, list = []) {
+    const key = this.getAudioQueryCacheKey(query);
+    if (!key || !Array.isArray(list) || !list.length) return;
+    this.audioQueryCache.set(key, { list, createdAt: Date.now() });
+  }
+
+  static async buildAudioList(query) {
+    let audioList = await this.searchYoutubeAudios(query, 5);
+
+    if (audioList.length < 3) {
+      const spotifySeeds = await this.searchSpotifySeeds(query, 5);
+      for (const seed of spotifySeeds) {
+        if (audioList.length >= 5) break;
+        const seeded = await this.searchYoutubeAudios(seed.query, 2);
+        audioList = this.uniqueAudioResults([...audioList, ...seeded], 5);
+      }
+    }
+
+    if (audioList.length < 3) {
+      const soundSeeds = await this.searchSoundCloudSeeds(query, 4);
+      for (const seed of soundSeeds) {
+        if (audioList.length >= 5) break;
+        const seeded = await this.searchYoutubeAudios(seed.query, 2);
+        audioList = this.uniqueAudioResults([...audioList, ...seeded], 5);
+      }
+    }
+
+    if (!audioList.length) {
+      const archiveAudio = await this.searchArchiveAudio(query);
+      if (archiveAudio?.url) audioList.push(archiveAudio);
+    }
+
+    return this.uniqueAudioResults(audioList, 5);
+  }
+
+  static async resolveAudioListWithCache(query) {
+    const cached = this.getAudioQueryCache(query);
+    if (cached?.length) return cached;
+
+    const key = this.getAudioQueryCacheKey(query);
+    if (!key) return [];
+
+    const inFlight = this.audioSearchInFlight.get(key);
+    if (inFlight) return inFlight;
+
+    const task = this.buildAudioList(query)
+      .then((list) => {
+        if (list?.length) this.setAudioQueryCache(query, list);
+        return list || [];
+      })
+      .finally(() => {
+        this.audioSearchInFlight.delete(key);
+      });
+
+    this.audioSearchInFlight.set(key, task);
+    return task;
+  }
+
   static async handlePlayCommand(ctx, queryText) {
     if (!['group', 'supergroup'].includes(ctx.chat?.type)) {
       await ctx.reply('❌ هذا الأمر للجروب فقط.');
@@ -813,30 +891,7 @@ class ChatGamesUtilityHandler {
 
     const loadingMsg = await ctx.reply('🎧 جاري التحميل ....');
     try {
-      let audioList = await this.searchYoutubeAudios(query, 5);
-
-      if (audioList.length < 3) {
-        const spotifySeeds = await this.searchSpotifySeeds(query, 5);
-        for (const seed of spotifySeeds) {
-          if (audioList.length >= 5) break;
-          const seeded = await this.searchYoutubeAudios(seed.query, 2);
-          audioList = this.uniqueAudioResults([...audioList, ...seeded], 5);
-        }
-      }
-
-      if (audioList.length < 3) {
-        const soundSeeds = await this.searchSoundCloudSeeds(query, 4);
-        for (const seed of soundSeeds) {
-          if (audioList.length >= 5) break;
-          const seeded = await this.searchYoutubeAudios(seed.query, 2);
-          audioList = this.uniqueAudioResults([...audioList, ...seeded], 5);
-        }
-      }
-
-      if (!audioList.length) {
-        const archiveAudio = await this.searchArchiveAudio(query);
-        if (archiveAudio?.url) audioList.push(archiveAudio);
-      }
+      const audioList = await this.resolveAudioListWithCache(query);
 
       if (!audioList.length) {
         await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
