@@ -4565,7 +4565,7 @@ class GroupAdminHandler {
     if (!ctx.message) return false;
 
     const group = await this.ensureGroupRecord(ctx);
-    const rawText = String(ctx.message.text || '').trim();
+    const rawText = String(ctx.message.text || ctx.message.caption || '').trim();
     const lowered = rawText.toLowerCase();
 
     const handledPendingSpecialFaq = await this.handlePendingSpecialFaqText(ctx, group, rawText);

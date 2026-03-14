@@ -1761,7 +1761,6 @@ bot.on('photo', async (ctx) => {
     if (GroupAdminHandler.isGroupChat(ctx)) {
       const wasModerated = await GroupAdminHandler.processGroupMessage(ctx);
       if (wasModerated) return;
-      return;
     }
     const handledSpecialFaq = await GroupAdminHandler.handleSpecialFaqMedia(ctx);
     if (handledSpecialFaq) return;
@@ -1778,7 +1777,6 @@ bot.on('video', async (ctx) => {
     if (GroupAdminHandler.isGroupChat(ctx)) {
       const wasModerated = await GroupAdminHandler.processGroupMessage(ctx);
       if (wasModerated) return;
-      return;
     }
     const handledSpecialFaq = await GroupAdminHandler.handleSpecialFaqMedia(ctx);
     if (handledSpecialFaq) return;
@@ -1793,7 +1791,6 @@ bot.on('animation', async (ctx) => {
     if (GroupAdminHandler.isGroupChat(ctx)) {
       const wasModerated = await GroupAdminHandler.processGroupMessage(ctx);
       if (wasModerated) return;
-      return;
     }
     const handledSpecialFaq = await GroupAdminHandler.handleSpecialFaqMedia(ctx);
     if (handledSpecialFaq) return;
@@ -1808,7 +1805,6 @@ bot.on('voice', async (ctx) => {
     if (GroupAdminHandler.isGroupChat(ctx)) {
       const wasModerated = await GroupAdminHandler.processGroupMessage(ctx);
       if (wasModerated) return;
-      return;
     }
     const handledSpecialFaq = await GroupAdminHandler.handleSpecialFaqMedia(ctx);
     if (handledSpecialFaq) return;
@@ -1823,7 +1819,6 @@ bot.on('audio', async (ctx) => {
     if (GroupAdminHandler.isGroupChat(ctx)) {
       const wasModerated = await GroupAdminHandler.processGroupMessage(ctx);
       if (wasModerated) return;
-      return;
     }
     const handledSpecialFaq = await GroupAdminHandler.handleSpecialFaqMedia(ctx);
     if (handledSpecialFaq) return;
@@ -1838,7 +1833,6 @@ bot.on('document', async (ctx) => {
     if (GroupAdminHandler.isGroupChat(ctx)) {
       const wasModerated = await GroupAdminHandler.processGroupMessage(ctx);
       if (wasModerated) return;
-      return;
     }
     const handledSpecialFaq = await GroupAdminHandler.handleSpecialFaqMedia(ctx);
     if (handledSpecialFaq) return;
@@ -1853,7 +1847,6 @@ bot.on('sticker', async (ctx) => {
     if (GroupAdminHandler.isGroupChat(ctx)) {
       const wasModerated = await GroupAdminHandler.processGroupMessage(ctx);
       if (wasModerated) return;
-      return;
     }
     const handledSpecialFaq = await GroupAdminHandler.handleSpecialFaqMedia(ctx);
     if (handledSpecialFaq) return;

@@ -1109,6 +1109,3 @@ class BankGameHandler {
 }
 
 module.exports = BankGameHandler;
-
-
-

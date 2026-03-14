@@ -555,7 +555,7 @@ class ChatGamesUtilityHandler {
         seen.add(cleaned);
         const titleGuess = cleaned
           .replace(/^https?:\/\/(m\.)?soundcloud\.com\//i, '')
-          .replace(/[\/_-]+/g, ' ')
+          .replace(/[/_-]+/g, ' ')
           .trim();
         if (!titleGuess) continue;
         seeds.push({
