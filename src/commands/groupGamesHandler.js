@@ -6136,24 +6136,25 @@ class GroupGamesHandler {
   static async handleArenaListCommand(ctx) {
     if (!this.isGroupChat(ctx)) return;
     const group = await this.ensureGroupRecord(ctx);
+    const maxPlayers = 15;
     const joined = (group.gameSystem.scores || []).filter((x) => x.arenaJoined);
-    if (joined.length === 0) {
-      return ctx.reply(
-        '• قائمة المنضمين للمبارزة العالمية :\n\n' +
-        '• لا يوجد احد فالتوب \n' +
-        '• للانضمام ↤ الانضمام للمبارزه'
-      );
-    }
     const lines = joined
       .sort((a, b) => this.getCastlePower(b) - this.getCastlePower(a))
-      .slice(0, 20)
+      .slice(0, maxPlayers)
       .map((x, i) => `${i + 1} l ${x.username || x.userId}`);
-    const remaining = Math.max(0, 20 - lines.length);
+
+    // Keep the layout stable even when participants are few.
+    while (lines.length < Math.min(3, maxPlayers)) {
+      lines.push(`${lines.length + 1} l `);
+    }
+
+    const actualJoined = Math.min(joined.length, maxPlayers);
+    const remaining = Math.max(0, maxPlayers - actualJoined);
     return ctx.reply(
       '• قائمة المنضمين للمبارزة العالمية :\n\n' +
       `${lines.join('\n')}\n\n` +
       `• المتبقي للاعبين ↤ ${remaining}\n` +
-      '• للانضمام ↤ الانضمام للمبارزه'
+      '• للانضمام ↤ الانضمام للمبارزه\n-'
     );
   }
 
