@@ -287,6 +287,16 @@ class GroupAdminHandler {
     return this.getRoleIds(group, 'premiumMemberIds').includes(targetUserId);
   }
 
+  static async canUseModerationCommands(ctx, userId = null) {
+    const targetUserId = Number(userId || ctx.from?.id);
+    if (!targetUserId) return false;
+    // Internal hierarchy: creator/basic-owner/owner/manager/admin
+    if (await this.isAdminOrHigher(ctx, targetUserId)) return true;
+    // Telegram admins inside the same group are also allowed.
+    if (await this.isGroupAdmin(ctx, targetUserId)) return true;
+    return false;
+  }
+
   static getRoleIds(group, key) {
     const values = Array.isArray(group?.settings?.[key]) ? group.settings[key] : [];
     return values.map(Number).filter((id) => Number.isInteger(id) && id > 0);
@@ -3758,7 +3768,7 @@ class GroupAdminHandler {
   static async handleMuteCommand(ctx) {
     if (!this.isGroupChat(ctx)) return;
 
-    const isAdmin = await this.isAdminOrHigher(ctx);
+    const isAdmin = await this.canUseModerationCommands(ctx);
     if (!isAdmin) return ctx.reply('❌ هذا الأمر للمشرفين فقط.');
 
     const botRights = await this.ensureBotModerationRights(ctx);
@@ -3815,7 +3825,7 @@ class GroupAdminHandler {
   static async handleUnmuteCommand(ctx) {
     if (!this.isGroupChat(ctx)) return;
 
-    const isAdmin = await this.isAdminOrHigher(ctx);
+    const isAdmin = await this.canUseModerationCommands(ctx);
     if (!isAdmin) return ctx.reply('❌ هذا الأمر للمشرفين فقط.');
 
     const botRights = await this.ensureBotModerationRights(ctx);
@@ -3859,7 +3869,7 @@ class GroupAdminHandler {
   static async handleRestrictCommand(ctx) {
     if (!this.isGroupChat(ctx)) return;
 
-    const isAdmin = await this.isAdminOrHigher(ctx);
+    const isAdmin = await this.canUseModerationCommands(ctx);
     if (!isAdmin) return ctx.reply('❌ هذا الأمر للمشرفين فقط.');
 
     const botRights = await this.ensureBotModerationRights(ctx);
@@ -3910,7 +3920,7 @@ class GroupAdminHandler {
   static async handleUnrestrictCommand(ctx) {
     if (!this.isGroupChat(ctx)) return;
 
-    const isAdmin = await this.isAdminOrHigher(ctx);
+    const isAdmin = await this.canUseModerationCommands(ctx);
     if (!isAdmin) return ctx.reply('❌ هذا الأمر للمشرفين فقط.');
 
     const botRights = await this.ensureBotModerationRights(ctx);
@@ -3954,7 +3964,7 @@ class GroupAdminHandler {
   static async handleBanCommand(ctx) {
     if (!this.isGroupChat(ctx)) return;
 
-    const isAdmin = await this.isGroupAdmin(ctx);
+    const isAdmin = await this.canUseModerationCommands(ctx);
     if (!isAdmin) return ctx.reply('❌ هذا الأمر للمشرفين فقط.');
 
     const botRights = await this.ensureBotModerationRights(ctx);
@@ -4000,7 +4010,7 @@ class GroupAdminHandler {
   static async handleUnbanCommand(ctx) {
     if (!this.isGroupChat(ctx)) return;
 
-    const isAdmin = await this.isGroupAdmin(ctx);
+    const isAdmin = await this.canUseModerationCommands(ctx);
     if (!isAdmin) return ctx.reply('❌ هذا الأمر للمشرفين فقط.');
 
     const botRights = await this.ensureBotModerationRights(ctx);

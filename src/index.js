@@ -4039,12 +4039,12 @@ bot.on('text', async (ctx) => {
     const message = ctx.message.text;
 
     if (GroupAdminHandler.isGroupChat(ctx)) {
+      const wasModerated = await GroupAdminHandler.processGroupMessage(ctx);
+      if (wasModerated) return;
       const handledTournament = await TournamentChallengeHandler.handleGroupText(ctx, message);
       if (handledTournament) return;
       const handledGame = await GroupGamesHandler.handleIncomingGroupText(ctx, message);
       if (handledGame) return;
-      const wasModerated = await GroupAdminHandler.processGroupMessage(ctx);
-      if (wasModerated) return;
       // Keep group chats isolated from private feature flows.
       return;
     }
