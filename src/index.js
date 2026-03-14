@@ -2889,7 +2889,7 @@ bot.action(/^tops:(rulers|arena|invaders|thieves|money|divorced_men|divorced_wom
   if (action === 'groups' || action === 'games') return BankGameHandler.handleTopGroups(ctx);
 
   if (action === 'money') {
-    return ctx.reply('• توب الفلوس غير متاح حالياً وسيتم تفعيله قريبًا.');
+    return BankGameHandler.handleTopMoney(ctx);
   }
   if (action === 'thieves') {
     return BankGameHandler.handleTopThieves(ctx);
@@ -2940,6 +2940,7 @@ bot.hears(/^تعطيل\s*البطوله$/i, (ctx) => TournamentChallengeHandler.
 bot.hears(/^توب\s*القروبات$/i, (ctx) => BankGameHandler.handleTopGroups(ctx));
 bot.hears(/^(?:توب\s*المتفاعلين|الاكثر\s*تفاعلا|الأكثر\s*تفاعلا)$/i, (ctx) => BankGameHandler.handleTopActiveInGroup(ctx));
 bot.hears(/^توب\s*الحراميه$/i, (ctx) => BankGameHandler.handleTopThieves(ctx));
+bot.hears(/^توب\s*الفلوس$/i, (ctx) => BankGameHandler.handleTopMoney(ctx));
 // Group Arabic aliases (without slash)
 bot.hears(/^العاب\s*الجروب$/i, (ctx) => GroupGamesHandler.handleGamesHelp(ctx));
 bot.hears(/^(?:الالعاب|الألعاب)$/i, (ctx) => GroupGamesHandler.handleGamesListCommand(ctx));

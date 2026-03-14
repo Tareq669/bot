@@ -64,6 +64,7 @@ class BankGameHandler {
     return {
       created: false,
       balance: 0,
+      blockedFromGame: false,
       cardType: '',
       cardNumber: '',
       salaryLastAt: 0,
@@ -96,6 +97,7 @@ class BankGameHandler {
   static normalizeProfile(p = {}) {
     const x = { ...this.defaultBankProfile(), ...(p || {}) };
     x.balance = Math.max(0, Number(x.balance || 0));
+    x.blockedFromGame = Boolean(x.blockedFromGame);
     x.cardType = String(x.cardType || '');
     x.cardNumber = String(x.cardNumber || '');
     x.salaryLastAt = Number(x.salaryLastAt || 0);
@@ -165,6 +167,7 @@ class BankGameHandler {
     const user = await this.ensureUser(ctx.from);
     if (!user) return ctx.reply('❌ تعذر الوصول لحسابك.');
     const p = this.normalizeProfile(user.bankProfile || {});
+    if (p.blockedFromGame) return ctx.reply('⛔ تم حظرك من لعبة البنك.');
     if (requireAccount && !p.created) return ctx.reply('❌ ما عندك حساب بنكي. اكتب: انشاء حساب بنكي');
     if (!allowWhenJailed && this.isJailed(p)) return ctx.reply('⛓️ أنت بالسجن بسبب ديون متأخرة. اكتب: سداد ديوني');
     const result = await fn(user, p);
@@ -1128,6 +1131,55 @@ class BankGameHandler {
       text += `${rank} ) ${stolen} 💰 l ${name}\n`;
     });
 
+    return ctx.reply(text);
+  }
+
+  static isCheaterUser(userDoc, profile) {
+    const balance = Math.max(0, Number(profile?.balance || 0));
+    const firstName = String(userDoc?.firstName || '').trim();
+    const username = String(userDoc?.username || '').trim();
+    const hasAtSignInName = firstName.includes('@');
+    const absurdBalance = balance > 9_000_000_000_000_000;
+    const hasAtInUsername = username.startsWith('@');
+    return hasAtSignInName || hasAtInUsername || absurdBalance;
+  }
+
+  static async handleTopMoney(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const users = await User.find({ 'bankProfile.created': true })
+      .select('userId firstName username bankProfile')
+      .limit(500);
+
+    if (!users.length) return ctx.reply('• لا يوجد احد فالتوب');
+
+    const rows = [];
+    for (const user of users) {
+      const p = this.normalizeProfile(user.bankProfile || {});
+      if (this.isCheaterUser(user, p)) {
+        p.balance = 0;
+        p.blockedFromGame = true;
+        user.bankProfile = p;
+        await user.save();
+        continue;
+      }
+      if (p.blockedFromGame) continue;
+      rows.push({
+        userId: Number(user.userId || 0),
+        name: String(user.firstName || user.username || `user_${user.userId}`),
+        balance: Math.max(0, Number(p.balance || 0))
+      });
+    }
+
+    rows.sort((a, b) => b.balance - a.balance);
+    const top = rows.slice(0, 30);
+    if (!top.length) return ctx.reply('• لا يوجد احد فالتوب');
+
+    let text = 'توب اغنى 30 شخص :\n\n';
+    top.forEach((row, index) => {
+      const rank = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}`;
+      const amount = Math.max(0, Number(row.balance || 0)).toLocaleString('en-US');
+      text += `${rank} ) ${amount} 💰 l ${row.name}\n`;
+    });
     return ctx.reply(text);
   }
 }
