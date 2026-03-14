@@ -825,6 +825,8 @@ class GroupAdminHandler {
     if (typeof group.settings.lockStickers !== 'boolean') group.settings.lockStickers = false;
     if (typeof group.settings.lockPremiumStickers !== 'boolean') group.settings.lockPremiumStickers = false;
     if (typeof group.settings.blockForwards !== 'boolean') group.settings.blockForwards = false;
+    if (typeof group.settings.notifyPremiumStickerBlock !== 'boolean') group.settings.notifyPremiumStickerBlock = true;
+    if (typeof group.settings.notifyForwardBlock !== 'boolean') group.settings.notifyForwardBlock = true;
     if (typeof group.settings.filterBadWords !== 'boolean') group.settings.filterBadWords = true;
     if (typeof group.settings.blockExplicitContent !== 'boolean') group.settings.blockExplicitContent = true;
     if (typeof group.settings.floodProtection !== 'boolean') group.settings.floodProtection = true;
@@ -4606,6 +4608,7 @@ class GroupAdminHandler {
       if (/^تفعيل منع الملصقات المميزة$/i.test(rawText)) {
         const result = await this.setProtectionSetting(ctx, 'lockPremiumStickers', true, 'text');
         if (!result?.ok) return true;
+        await this.setProtectionSetting(ctx, 'notifyPremiumStickerBlock', true, 'text');
         await ctx.reply('✅ تم تفعيل منع الملصقات المميزة.');
         return true;
       }
@@ -4642,6 +4645,7 @@ class GroupAdminHandler {
       if (/^(تفعيل منع التوجيه|تفعيل منع اعادة التوجيه|تفعيل منع إعادة التوجيه)$/i.test(rawText)) {
         const result = await this.setProtectionSetting(ctx, 'blockForwards', true, 'text');
         if (!result?.ok) return true;
+        await this.setProtectionSetting(ctx, 'notifyForwardBlock', true, 'text');
         await ctx.reply('✅ تم تفعيل منع التوجيه.');
         return true;
       }
@@ -4715,6 +4719,7 @@ class GroupAdminHandler {
       if (/^تفعيل منع الرسائل الطويل(?:ة|ه)$/i.test(rawText)) {
         const result = await this.setProtectionSetting(ctx, 'blockLongMessages', true, 'text');
         if (!result?.ok) return true;
+        await this.setProtectionSetting(ctx, 'notifyLongMessageBlock', true, 'text');
         await ctx.reply(`✅ تم تفعيل منع الرسائل الطويلة (الحد الحالي: ${group.settings?.maxMessageLength || 700}).`);
         return true;
       }
@@ -4878,14 +4883,16 @@ class GroupAdminHandler {
         await ctx.telegram.deleteMessage(ctx.chat.id, ctx.message.message_id);
         await this.addModerationLog(group, 'delete_forward_message', ctx.botInfo.id, ctx.from.id, 'forward blocked');
         await this.saveGroupQuietly(group);
-        const forwardedName = this.escapeHtml(
-          [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ').trim() || String(ctx.from.id)
-        );
-        await ctx.reply(
-          `• عذراً عزيزي ↤︎「 ${forwardedName} 」\n` +
-          '• ممنوع التوجيه هنا .',
-          { parse_mode: 'HTML' }
-        );
+        if (group.settings?.notifyForwardBlock !== false) {
+          const forwardedName = this.escapeHtml(
+            [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ').trim() || String(ctx.from.id)
+          );
+          await ctx.reply(
+            `• عذراً عزيزي ↤︎「 ${forwardedName} 」\n` +
+            '• ممنوع التوجيه هنا .',
+            { parse_mode: 'HTML' }
+          );
+        }
       } catch (_error) {
         await ctx.reply('⚠️ تم اكتشاف توجيه لكن لا يمكن حذفه. فعّل صلاحية حذف الرسائل للبوت.');
       }
@@ -4900,14 +4907,16 @@ class GroupAdminHandler {
           : 'premium sticker blocked';
         await this.addModerationLog(group, 'delete_premium_sticker_message', ctx.botInfo.id, ctx.from.id, reason);
         await this.saveGroupQuietly(group);
-        const blockedName = this.escapeHtml(
-          [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ').trim() || String(ctx.from.id)
-        );
-        await ctx.reply(
-          `• عذراً عزيزي ↤︎「 ${blockedName} 」\n` +
-          '• ممنوع إرسال الملصقات المميزه هنا .',
-          { parse_mode: 'HTML' }
-        );
+        if (group.settings?.notifyPremiumStickerBlock !== false) {
+          const blockedName = this.escapeHtml(
+            [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ').trim() || String(ctx.from.id)
+          );
+          await ctx.reply(
+            `• عذراً عزيزي ↤︎「 ${blockedName} 」\n` +
+            '• ممنوع إرسال الملصقات المميزه هنا .',
+            { parse_mode: 'HTML' }
+          );
+        }
       } catch (_error) {
         await ctx.reply('⚠️ تم اكتشاف ملصق مميز لكن لا يمكن حذفه. فعّل صلاحية حذف الرسائل للبوت.');
       }
