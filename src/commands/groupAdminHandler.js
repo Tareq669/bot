@@ -235,6 +235,14 @@ class GroupAdminHandler {
     }
   }
 
+  static async isTelegramAdminInGroup(ctx, userId = null) {
+    if (!this.isGroupChat(ctx)) return false;
+    const targetUserId = Number(userId || ctx.from?.id);
+    if (!targetUserId) return false;
+    const member = await this.getChatMemberSafe(ctx, targetUserId);
+    return ['creator', 'administrator'].includes(String(member?.status || ''));
+  }
+
   static async isPrimaryOwner(ctx, userId = null) {
     if (!this.isGroupChat(ctx)) return false;
     const targetUserId = Number(userId || ctx.from?.id);
@@ -3901,8 +3909,10 @@ class GroupAdminHandler {
       });
       await this.addModerationLog(group, 'mute', ctx.from.id, targetUserId, reason);
       await group.save();
+      const targetName = this.getUserDisplayName({ first_name: target?.firstName, last_name: '', username: target?.username });
       return ctx.reply(
-        `🔇 تم كتم ${this.mentionUser(targetUserId, target?.firstName || target?.username || String(targetUserId))} لمدة ${minutes} دقيقة.`,
+        '• تم كتمه في المجموعة \n' +
+        `• المستخدم ← ${targetName}`,
         { parse_mode: 'HTML' }
       );
     } catch (_error) {
@@ -3943,8 +3953,10 @@ class GroupAdminHandler {
       const group = await this.ensureGroupRecord(ctx);
       await this.addModerationLog(group, 'unmute', ctx.from.id, targetUserId);
       await group.save();
+      const targetName = this.getUserDisplayName({ first_name: target?.firstName, last_name: '', username: target?.username });
       return ctx.reply(
-        `🔊 تم إلغاء كتم ${this.mentionUser(targetUserId, target?.firstName || target?.username || String(targetUserId))}.`,
+        '• تم الغاء الكتم عنه \n' +
+        `• المستخدم ← ${targetName}`,
         { parse_mode: 'HTML' }
       );
     } catch (_error) {
@@ -3992,8 +4004,10 @@ class GroupAdminHandler {
       });
       await this.addModerationLog(group, 'restrict', ctx.from.id, targetUserId, `duration=${minutes}m`);
       await group.save();
+      const targetName = this.getUserDisplayName({ first_name: target?.firstName, last_name: '', username: target?.username });
       return ctx.reply(
-        `🔒 تم تقييد ${this.mentionUser(targetUserId, target?.firstName || target?.username || String(targetUserId))} لمدة ${minutes} دقيقة.`,
+        '• تم تقييده في المجموعة \n' +
+        `• المستخدم ← ${targetName}`,
         { parse_mode: 'HTML' }
       );
     } catch (_error) {
@@ -4034,8 +4048,10 @@ class GroupAdminHandler {
       const group = await this.ensureGroupRecord(ctx);
       await this.addModerationLog(group, 'unrestrict', ctx.from.id, targetUserId);
       await group.save();
+      const targetName = this.getUserDisplayName({ first_name: target?.firstName, last_name: '', username: target?.username });
       return ctx.reply(
-        `🔓 تم إلغاء تقييد ${this.mentionUser(targetUserId, target?.firstName || target?.username || String(targetUserId))}.`,
+        '• تم الغاء التقييد عنه \n' +
+        `• المستخدم ← ${targetName}`,
         { parse_mode: 'HTML' }
       );
     } catch (_error) {
@@ -4052,8 +4068,9 @@ class GroupAdminHandler {
     const botRights = await this.ensureBotModerationRights(ctx);
     if (!botRights.ok) return ctx.reply(botRights.message);
 
-    const targetUserId = this.getRepliedUserId(ctx);
-    if (!targetUserId) return ctx.reply('❌ يجب الرد على رسالة المستخدم للحظر.');
+    const { target } = await this.resolveModerationTarget(ctx);
+    const targetUserId = Number(target?.id || 0);
+    if (!targetUserId) return ctx.reply('❌ استخدم الحظر بالرد أو @user أو ID.');
 
     const targetIsAdmin = await this.isGroupAdmin(ctx, targetUserId);
     if (targetIsAdmin) return ctx.reply('❌ لا يمكن حظر مشرف.');
@@ -4077,7 +4094,12 @@ class GroupAdminHandler {
       });
       await this.addModerationLog(group, 'ban', ctx.from.id, targetUserId, reason);
       await group.save();
-      return ctx.reply('🚫 تم حظر المستخدم.');
+      const targetName = this.getUserDisplayName({ first_name: target?.firstName, last_name: '', username: target?.username });
+      return ctx.reply(
+        '• تم حظره في المجموعة \n' +
+        `• المستخدم ← ${targetName}`,
+        { parse_mode: 'HTML' }
+      );
     } catch (_error) {
       return ctx.reply('❌ فشل الحظر. تأكد من صلاحيات البوت.');
     }
@@ -4092,8 +4114,8 @@ class GroupAdminHandler {
     const botRights = await this.ensureBotModerationRights(ctx);
     if (!botRights.ok) return ctx.reply(botRights.message);
 
-    const args = this.parseCommandArgs(ctx);
-    const targetUserId = parseInt(args[0] || '', 10);
+    const { target, args } = await this.resolveModerationTarget(ctx);
+    const targetUserId = Number(target?.id || parseInt(args[0] || '', 10) || 0);
     if (!targetUserId) return ctx.reply('❌ استخدم: /gunban USER_ID');
 
     try {
@@ -4102,7 +4124,16 @@ class GroupAdminHandler {
       group.bannedUsers = group.bannedUsers.filter((u) => Number(u.userId) !== Number(targetUserId));
       await this.addModerationLog(group, 'unban', ctx.from.id, targetUserId);
       await group.save();
-      return ctx.reply('✅ تم إلغاء حظر المستخدم.');
+      const targetName = this.getUserDisplayName({
+        first_name: target?.firstName || String(targetUserId),
+        last_name: '',
+        username: target?.username
+      });
+      return ctx.reply(
+        '• تم الغاء الحظر عنه \n' +
+        `• المستخدم ← ${targetName}`,
+        { parse_mode: 'HTML' }
+      );
     } catch (_error) {
       return ctx.reply('❌ فشل إلغاء الحظر. تأكد من صلاحيات البوت.');
     }
@@ -4720,7 +4751,7 @@ class GroupAdminHandler {
       return true;
     }
     if (
-      /^(قفل الروابط|فتح الروابط|تفعيل منع ارسال الروابط|تعطيل منع ارسال الروابط|تفعيل منع إرسال الروابط|تعطيل منع إرسال الروابط|قفل الملصقات|فتح الملصقات|تفعيل منع الملصقات المميزة|تعطيل منع الملصقات المميزة|استثناء المشرفين من منع الملصقات المميزة|استئناف المشرفين من منع الملصقات المميزة|الغاء استثناء المشرفين من منع الملصقات المميزة|إلغاء استثناء المشرفين من منع الملصقات المميزة|تفعيل منع التوجيه|تعطيل منع التوجيه|تفعيل حماية التعديل|تعطيل حماية التعديل|تفعيل حماية تعديل الوسائط فقط|تعطيل حماية تعديل الوسائط فقط|تفعيل حماية تعديل من القنوات والادمن المجهول|تعطيل حماية تعديل من القنوات والادمن المجهول|تفعيل حماية تعديل من القنوات والأدمن المجهول|تعطيل حماية تعديل من القنوات والأدمن المجهول|استثناء المشرفين من حماية التعديل|الغاء استثناء المشرفين من حماية التعديل|إلغاء استثناء المشرفين من حماية التعديل|تفعيل حماية الحذف|تعطيل حماية الحذف|تفعيل الاشتراك الاجباري|تعطيل الاشتراك الاجباري|تفعيل الاشتراك الإجباري|تعطيل الاشتراك الإجباري|تفعيل الكلمات|تعطيل الكلمات|تفعيل التكرار|تعطيل التكرار|تفعيل منع الاباحية|تعطيل منع الاباحية|تفعيل منع الرسائل الطويل(?:ة|ه)|تعطيل منع الرسائل الطويل(?:ة|ه)|تفعيل اشعار منع الرسائل الطويل(?:ة|ه)|تعطيل اشعار منع الرسائل الطويل(?:ة|ه)|استثناء المشرفين من الحماية|الغاء استثناء المشرفين من الحماية|إلغاء استثناء المشرفين من الحماية|الحماية|\/gprotect\b)/i.test(rawText)
+      /^(قفل الروابط|فتح الروابط|تفعيل منع ارسال الروابط|تعطيل منع ارسال الروابط|تفعيل منع إرسال الروابط|تعطيل منع إرسال الروابط|قفل الملصقات|فتح الملصقات|تفعيل منع الملصقات المميزة|تعطيل منع الملصقات المميزة|استثناء المشرفين من منع الملصقات المميزة|استئناف المشرفين من منع الملصقات المميزة|الغاء استثناء المشرفين من منع الملصقات المميزة|إلغاء استثناء المشرفين من منع الملصقات المميزة|تفعيل منع التوجيه|تعطيل منع التوجيه|تفعيل منع اعادة التوجيه|تعطيل منع اعادة التوجيه|تفعيل منع إعادة التوجيه|تعطيل منع إعادة التوجيه|تفعيل حماية التعديل|تعطيل حماية التعديل|تفعيل حماية تعديل الوسائط فقط|تعطيل حماية تعديل الوسائط فقط|تفعيل حماية تعديل من القنوات والادمن المجهول|تعطيل حماية تعديل من القنوات والادمن المجهول|تفعيل حماية تعديل من القنوات والأدمن المجهول|تعطيل حماية تعديل من القنوات والأدمن المجهول|استثناء المشرفين من حماية التعديل|الغاء استثناء المشرفين من حماية التعديل|إلغاء استثناء المشرفين من حماية التعديل|تفعيل حماية الحذف|تعطيل حماية الحذف|تفعيل الاشتراك الاجباري|تعطيل الاشتراك الاجباري|تفعيل الاشتراك الإجباري|تعطيل الاشتراك الإجباري|تفعيل الكلمات|تعطيل الكلمات|تفعيل التكرار|تعطيل التكرار|تفعيل منع الاباحية|تعطيل منع الاباحية|تفعيل منع الرسائل الطويل(?:ة|ه)|تعطيل منع الرسائل الطويل(?:ة|ه)|تفعيل اشعار منع الرسائل الطويل(?:ة|ه)|تعطيل اشعار منع الرسائل الطويل(?:ة|ه)|استثناء المشرفين من الحماية|الغاء استثناء المشرفين من الحماية|إلغاء استثناء المشرفين من الحماية|الحماية|\/gprotect\b)/i.test(rawText)
     ) {
       if (/^(قفل الروابط|تفعيل منع ارسال الروابط|تفعيل منع إرسال الروابط)$/i.test(rawText)) {
         const result = await this.setProtectionSetting(ctx, 'lockLinks', true, 'text');
@@ -4770,13 +4801,13 @@ class GroupAdminHandler {
         await ctx.reply('✅ تم إلغاء استثناء المشرفين من منع الملصقات المميزة.');
         return true;
       }
-      if (/^تفعيل منع التوجيه$/i.test(rawText)) {
+      if (/^(تفعيل منع التوجيه|تفعيل منع اعادة التوجيه|تفعيل منع إعادة التوجيه)$/i.test(rawText)) {
         const result = await this.setProtectionSetting(ctx, 'blockForwards', true, 'text');
         if (!result?.ok) return true;
         await ctx.reply('✅ تم تفعيل منع التوجيه.');
         return true;
       }
-      if (/^تعطيل منع التوجيه$/i.test(rawText)) {
+      if (/^(تعطيل منع التوجيه|تعطيل منع اعادة التوجيه|تعطيل منع إعادة التوجيه)$/i.test(rawText)) {
         const result = await this.setProtectionSetting(ctx, 'blockForwards', false, 'text');
         if (!result?.ok) return true;
         await ctx.reply('✅ تم تعطيل منع التوجيه.');
@@ -5002,7 +5033,8 @@ class GroupAdminHandler {
 
     const isAdmin = await this.isGroupAdmin(ctx);
     const adminProtectionBypass = Boolean(isAdmin && group.settings?.exemptAdminsFromProtection);
-    const adminPremiumStickerBypass = Boolean(isAdmin && group.settings?.exemptAdminsFromPremiumStickers);
+    const isTelegramAdmin = await this.isTelegramAdminInGroup(ctx);
+    const adminPremiumStickerBypass = Boolean(isTelegramAdmin && group.settings?.exemptAdminsFromPremiumStickers);
 
     if (!isAdmin && group.settings?.requireNewsSubscription) {
       const subscribed = await this.isUserSubscribedToNewsChannel(ctx, group, ctx.from?.id);
@@ -5025,12 +5057,18 @@ class GroupAdminHandler {
     const text = lowered;
     const sticker = ctx.message?.sticker;
     const hasSticker = Boolean(sticker);
-    const hasPremiumSticker = Boolean(sticker?.premium_animation);
+    const hasPremiumSticker = Boolean(
+      sticker?.premium_animation
+      || sticker?.custom_emoji_id
+      || sticker?.set_name?.toLowerCase?.().includes('premium')
+    );
     const isAutomaticForward = Boolean(ctx.message?.is_automatic_forward);
     const isForwarded = Boolean(
       ctx.message?.forward_origin
       || ctx.message?.forward_from
       || ctx.message?.forward_from_chat
+      || ctx.message?.forward_sender_name
+      || ctx.message?.forward_date
       || isAutomaticForward
     );
 
