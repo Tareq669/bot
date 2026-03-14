@@ -2883,7 +2883,7 @@ bot.action(/^tops:(rulers|arena|invaders|thieves|money|divorced_men|divorced_wom
 
   if (action === 'rulers') return GroupGamesHandler.handleTopRulersCommand(ctx);
   if (action === 'arena') return GroupGamesHandler.handleArenaListCommand(ctx);
-  if (action === 'invaders') return GroupGamesHandler.handleCompetitionTopCommand(ctx);
+  if (action === 'invaders') return GroupGamesHandler.handleInvadersTopCommand(ctx);
   if (action === 'married') return BankGameHandler.handleTopMarried(ctx);
   if (action === 'active') return BankGameHandler.handleTopActiveInGroup(ctx);
   if (action === 'groups' || action === 'games') return BankGameHandler.handleTopGroups(ctx);
@@ -3061,6 +3061,7 @@ bot.hears(/^مبارزه$/i, (ctx) => GroupGamesHandler.handleCastleDuelCommand(
 bot.hears(/^الانضمام\s*للمبارزه$/i, (ctx) => GroupGamesHandler.handleArenaJoinCommand(ctx));
 bot.hears(/^المبارزين$/i, (ctx) => GroupGamesHandler.handleArenaListCommand(ctx));
 bot.hears(/^توب\s*الحكام$/i, (ctx) => GroupGamesHandler.handleTopRulersCommand(ctx));
+bot.hears(/^توب\s*الغزاه$/i, (ctx) => GroupGamesHandler.handleInvadersTopCommand(ctx));
 bot.hears(/^تحالف(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleAllianceRequestCommand(ctx));
 bot.hears(/^طلبات\s*التحالف$/i, (ctx) => GroupGamesHandler.handleAllianceRequestsCommand(ctx));
 bot.hears(/^قبول\s*تحالف$/i, (ctx) => GroupGamesHandler.handleAllianceDecisionCommand(ctx, 'accept'));

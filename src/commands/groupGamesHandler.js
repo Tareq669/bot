@@ -2985,6 +2985,83 @@ class GroupGamesHandler {
     return ctx.reply(text, { parse_mode: 'HTML', reply_to_message_id: ctx.message?.message_id });
   }
 
+  static resolveInvadersTier(points) {
+    const value = Number(points || 0);
+    if (value >= 4000) return 'diamond';
+    if (value >= 700) return 'silver';
+    if (value >= 380) return 'bronze';
+    return 'weak';
+  }
+
+  static formatInvadersRank(index) {
+    if (index === 0) return '🥇';
+    if (index === 1) return '🥈';
+    if (index === 2) return '🥉';
+    return String(index + 1);
+  }
+
+  static formatInvadersSectionLine(entry, index, requesterId) {
+    const rank = this.formatInvadersRank(index);
+    const points = Number(entry?.points || 0).toLocaleString('en-US');
+    const name = this.escapeHtml(String(entry?.name || 'no'));
+    const idValue = Number(entry?.userId || 0);
+    const showId = Boolean(idValue && (index < 2 || idValue === Number(requesterId || 0)));
+    const idText = showId ? String(idValue) : 'hide';
+    return `${rank} ) ${points} 🏅  l  ${name}    l   (${idText})`;
+  }
+
+  static async handleInvadersTopCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+
+    const docs = await User.find(
+      { 'globalGameProfile.points': { $gte: 0 } },
+      { firstName: 1, username: 1, userId: 1, globalGameProfile: 1 }
+    ).lean();
+
+    const entries = docs.map((doc) => {
+      const profile = this.normalizeGlobalGameProfile(doc.globalGameProfile || {});
+      const score = Number(profile.competitionPoints || 0);
+      const displayName = String(doc.firstName || doc.username || 'no').trim() || 'no';
+      return {
+        userId: Number(doc.userId || 0),
+        name: displayName,
+        points: score,
+        tier: this.resolveInvadersTier(score)
+      };
+    });
+
+    const tiers = {
+      diamond: entries.filter((x) => x.tier === 'diamond').sort((a, b) => b.points - a.points).slice(0, 10),
+      silver: entries.filter((x) => x.tier === 'silver').sort((a, b) => b.points - a.points).slice(0, 10),
+      bronze: entries.filter((x) => x.tier === 'bronze').sort((a, b) => b.points - a.points).slice(0, 10),
+      weak: entries.filter((x) => x.tier === 'weak').sort((a, b) => b.points - a.points).slice(0, 10)
+    };
+
+    const withFill = (list) => {
+      const rows = [...list];
+      while (rows.length < 10) rows.push({ userId: 0, name: 'no', points: 0 });
+      return rows;
+    };
+
+    const requesterId = Number(ctx.from?.id || 0);
+    const linesDiamond = withFill(tiers.diamond).map((x, i) => this.formatInvadersSectionLine(x, i, requesterId)).join('\n');
+    const linesSilver = withFill(tiers.silver).map((x, i) => this.formatInvadersSectionLine(x, i, requesterId)).join('\n');
+    const linesBronze = withFill(tiers.bronze).map((x, i) => this.formatInvadersSectionLine(x, i, requesterId)).join('\n');
+    const linesWeak = withFill(tiers.weak).map((x, i) => this.formatInvadersSectionLine(x, i, requesterId)).join('\n');
+
+    const text =
+      'توب الغزاه لمستوى ماسي 🥇 : \n\n' +
+      `${linesDiamond}\n\n\n` +
+      'توب الغزاه لمستوى فضي 🥈 : \n\n' +
+      `${linesSilver}\n\n\n` +
+      'توب الغزاه لمستوى برونزي 🥉 : \n\n' +
+      `${linesBronze}\n\n\n` +
+      'توب الغزاه لمستوى الضعيف : \n\n' +
+      `${linesWeak}`;
+
+    return ctx.reply(text, { parse_mode: 'HTML', reply_to_message_id: ctx.message?.message_id });
+  }
+
   static async handleGenderWordsCommand(ctx, action) {
     if (!this.isGroupChat(ctx)) return;
     const isAdmin = await this.isGroupAdmin(ctx);
