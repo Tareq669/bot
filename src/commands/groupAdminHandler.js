@@ -473,100 +473,9 @@ class GroupAdminHandler {
     return true;
   }
 
-  static formatProtectionTimestamp(unixSeconds) {
-    if (!Number.isFinite(Number(unixSeconds))) return 'غير متوفر';
-    return new Date(Number(unixSeconds) * 1000).toLocaleString('ar-EG', {
-      timeZone: 'Asia/Hebron',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  }
-
-  static getMessageTypeLabel(message) {
-    if (message?.photo?.length) return 'صورة';
-    if (message?.video) return 'فيديو';
-    if (message?.animation) return 'متحركة';
-    if (message?.sticker) return 'ملصق';
-    if (message?.voice) return 'بصمة';
-    if (message?.audio) return 'أغنية';
-    if (message?.document) return 'ملف';
-    if (message?.poll) return 'تصويت';
-    if (message?.contact) return 'جهة اتصال';
-    if (message?.location) return 'موقع';
-    if (message?.text || message?.caption) return 'نص';
-    return 'غير معروف';
-  }
-
-  static buildMessageLink(chat, messageId) {
-    const id = Number(messageId || 0);
-    if (!id) return '';
-    if (chat?.username) return `https://t.me/${chat.username}/${id}`;
-    const rawChatId = String(chat?.id || '');
-    if (rawChatId.startsWith('-100')) {
-      return `https://t.me/c/${rawChatId.slice(4)}/${id}`;
-    }
-    return '';
-  }
-
-  static formatProtectionLink(chat, messageId) {
-    const link = this.buildMessageLink(chat, messageId);
-    if (!link) return 'غير متوفر';
-    return `<a href="${this.escapeHtml(link)}">أضغط هنا</a>`;
-  }
-
-  static getSenderChatLabel(senderChat) {
-    return this.escapeHtml(senderChat?.title || 'غير معروف');
-  }
-
   static getUserDisplayName(user) {
     const fullName = [user?.first_name, user?.last_name].filter(Boolean).join(' ').trim();
     return this.escapeHtml(fullName || user?.first_name || 'غير معروف');
-  }
-
-  static getEditedActorInfo(message, chat) {
-    const senderChat = message?.sender_chat;
-    if (senderChat?.type === 'channel') {
-      return {
-        name: this.getSenderChatLabel(senderChat),
-        id: Number(senderChat.id || 0),
-        detectionFieldLabel: 'اسمها',
-        deleteFieldLabel: 'اسمه',
-        actionLine: '• لقد قام شخص بالتعديل عبر قناة'
-      };
-    }
-
-    if (senderChat && Number(senderChat.id) === Number(chat?.id || 0)) {
-      return {
-        name: this.escapeHtml(senderChat.title || 'الأدمن المجهول'),
-        id: Number(senderChat.id || 0),
-        detectionFieldLabel: 'اسمه',
-        deleteFieldLabel: 'اسمه',
-        actionLine: '• لقد قام الأدمن المجهول بالتعديل'
-      };
-    }
-
-    const from = message?.from;
-    return {
-      name: this.getUserDisplayName(from),
-      id: Number(from?.id || 0),
-      detectionFieldLabel: 'اسمه',
-      deleteFieldLabel: 'اسمه',
-      actionLine: '• لقد قام شخص بالتعديل'
-    };
-  }
-
-  static isEditedMediaMessage(message) {
-    return Boolean(
-      message?.photo?.length ||
-      message?.video ||
-      message?.animation ||
-      message?.document ||
-      message?.audio ||
-      message?.voice
-    );
   }
 
   static async collectMentionableMembers(group, botId = null) {
@@ -914,9 +823,6 @@ class GroupAdminHandler {
     if (typeof group.settings.blockLongMessages !== 'boolean') group.settings.blockLongMessages = true;
     if (typeof group.settings.notifyLongMessageBlock !== 'boolean') group.settings.notifyLongMessageBlock = true;
     if (typeof group.settings.enableMyInfoCommand !== 'boolean') group.settings.enableMyInfoCommand = true;
-    if (typeof group.settings.blockMediaOnlyEdits !== 'boolean') group.settings.blockMediaOnlyEdits = false;
-    if (typeof group.settings.blockChannelAnonymousEdits !== 'boolean') group.settings.blockChannelAnonymousEdits = false;
-    if (typeof group.settings.exemptAdminsFromEditProtection !== 'boolean') group.settings.exemptAdminsFromEditProtection = false;
     if (!Number.isInteger(group.settings.maxMessageLength)) group.settings.maxMessageLength = 700;
     group.settings.maxMessageLength = Math.max(100, Math.min(4000, group.settings.maxMessageLength));
 
@@ -1036,10 +942,6 @@ class GroupAdminHandler {
       `• اشعار الرسائل الطويله ↤︎ ${settings.notifyLongMessageBlock ? '✅' : '❌'}\n` +
       `• امر my ↤︎ ${settings.enableMyInfoCommand ? '✅' : '❌'}\n` +
       `• منع التوجيه ↤︎ ${settings.blockForwards ? '✅' : '❌'}\n` +
-      `• حماية التعديل ↤︎ ${settings.blockChannelEdits ? '✅' : '❌'}\n` +
-      `• حماية تعديل الوسائط ↤︎ ${settings.blockMediaOnlyEdits ? '✅' : '❌'}\n` +
-      `• حماية القنوات + الادمن المجهول ↤︎ ${settings.blockChannelAnonymousEdits ? '✅' : '❌'}\n` +
-      `• استثناء المشرفين من حماية التعديل ↤︎ ${settings.exemptAdminsFromEditProtection ? '✅' : '❌'}\n` +
       `• الاشتراك الاجباري ↤︎ ${settings.requireNewsSubscription ? '✅' : '❌'}\n` +
       `• قناة الاشتراك ↤︎ ${this.escapeHtml(subscriptionChannel?.title || 'غير محددة')}\n` +
       `• قفل الروابط ↤︎ ${settings.lockLinks ? '✅' : '❌'}\n` +
@@ -1089,9 +991,6 @@ class GroupAdminHandler {
       `• اشعار الرسائل الطويلة: ${settings.notifyLongMessageBlock ? '✅' : '❌'}\n` +
       `• أمر my: ${settings.enableMyInfoCommand ? '✅' : '❌'}\n` +
       `• منع التوجيه: ${settings.blockForwards ? '✅' : '❌'}\n` +
-      `• حماية التعديل: ${settings.blockChannelEdits ? '✅' : '❌'}\n` +
-      `• حماية تعديل الوسائط: ${settings.blockMediaOnlyEdits ? '✅' : '❌'}\n` +
-      `• حماية القنوات + الأدمن المجهول: ${settings.blockChannelAnonymousEdits ? '✅' : '❌'}\n` +
       `• الاشتراك الاجباري: ${settings.requireNewsSubscription ? '✅' : '❌'}\n` +
       `• قناة الاشتراك: ${this.escapeHtml(subscriptionChannel?.title || 'غير محددة')}\n` +
       `• استثناء المشرفين من الحماية: ${settings.exemptAdminsFromProtection ? '✅' : '❌'}\n` +
@@ -1112,7 +1011,6 @@ class GroupAdminHandler {
       '• /gprotect stickers on|off\n' +
       '• /gprotect premiumstickers on|off\n' +
       '• /gprotect premiumadmins on|off\n' +
-      '• /gprotect edits on|off\n' +
       '• /gprotect subscribe on|off\n' +
       '• /gprotect words on|off\n' +
       '• /gprotect flood on|off\n' +
@@ -1269,9 +1167,6 @@ class GroupAdminHandler {
       `• الملصقات المميزة: ${group.settings?.lockPremiumStickers ? '✅ مفعلة' : '❌ معطلة'}\n` +
       `• استثناء المشرفين من الملصقات المميزة: ${group.settings?.exemptAdminsFromPremiumStickers ? '✅ مفعّل' : '❌ معطّل'}\n` +
       `• التوجيه: ${group.settings?.blockForwards ? '✅ مفعّل' : '❌ معطّل'}\n` +
-      `• حماية التعديل: ${group.settings?.blockChannelEdits ? '✅ مفعّلة' : '❌ معطّلة'}\n` +
-      `• حماية تعديل الوسائط: ${group.settings?.blockMediaOnlyEdits ? '✅ مفعّلة' : '❌ معطّلة'}\n` +
-      `• حماية القنوات + الأدمن المجهول: ${group.settings?.blockChannelAnonymousEdits ? '✅ مفعّلة' : '❌ معطّلة'}\n` +
       `• الاشتراك الاجباري: ${group.settings?.requireNewsSubscription ? '✅ مفعّل' : '❌ معطّل'}\n` +
       `• قناة الاشتراك: ${this.escapeHtml(subscriptionChannel?.title || 'غير محددة')}\n` +
       `• الكلمات: ${group.settings?.filterBadWords ? '✅ مفعلة' : '❌ معطلة'}\n` +
@@ -1287,9 +1182,6 @@ class GroupAdminHandler {
       '• تفعيل منع الملصقات المميزة | تعطيل منع الملصقات المميزة\n' +
       '• استثناء المشرفين من منع الملصقات المميزة | الغاء استثناء المشرفين من منع الملصقات المميزة\n' +
       '• تفعيل منع التوجيه | تعطيل منع التوجيه\n' +
-      '• تفعيل حماية التعديل | تعطيل حماية التعديل\n' +
-      '• تفعيل حماية تعديل الوسائط فقط | تعطيل حماية تعديل الوسائط فقط\n' +
-      '• تفعيل حماية تعديل من القنوات والادمن المجهول | تعطيل حماية تعديل من القنوات والادمن المجهول\n' +
       '• تفعيل حماية الحذف | تعطيل حماية الحذف\n' +
       '• تفعيل الاشتراك الاجباري | تعطيل الاشتراك الاجباري\n' +
       '• ضبط قناة الاشتراك @channel\n' +
@@ -1306,7 +1198,6 @@ class GroupAdminHandler {
       '• /gprotect premiumstickers on|off\n' +
       '• /gprotect premiumadmins on|off\n' +
       '• /gprotect forwards on|off\n' +
-      '• /gprotect edits on|off\n' +
       '• /gprotect subscribe on|off\n' +
       '• /gprotect words on|off\n' +
       '• /gprotect flood on|off\n' +
@@ -1381,10 +1272,6 @@ class GroupAdminHandler {
       premiumstickers: 'lockPremiumStickers',
       premiumadmins: 'exemptAdminsFromPremiumStickers',
       forwards: 'blockForwards',
-      edits: 'blockChannelEdits',
-      mediaedits: 'blockMediaOnlyEdits',
-      channeledits: 'blockChannelAnonymousEdits',
-      editadmins: 'exemptAdminsFromEditProtection',
       subscribe: 'requireNewsSubscription',
       words: 'filterBadWords',
       flood: 'floodProtection',
@@ -1395,7 +1282,7 @@ class GroupAdminHandler {
     };
     const key = keyMap[target];
     if (!key) {
-      return ctx.reply('❌ الخيار غير معروف. استخدم: links أو stickers أو premiumstickers أو premiumadmins أو forwards أو edits أو mediaedits أو channeledits أو editadmins أو subscribe أو words أو flood أو nsfw أو long أو longnotify أو maxlen أو admins');
+      return ctx.reply('❌ الخيار غير معروف. استخدم: links أو stickers أو premiumstickers أو premiumadmins أو forwards أو subscribe أو words أو flood أو nsfw أو long أو longnotify أو maxlen أو admins');
     }
 
     if (target === 'subscribe' && switchValue === true) {
@@ -1447,9 +1334,6 @@ class GroupAdminHandler {
       'blockLongMessages',
       'notifyLongMessageBlock',
       'blockForwards',
-      'blockChannelEdits',
-      'blockMediaOnlyEdits',
-      'blockChannelAnonymousEdits',
       'requireNewsSubscription',
       'exemptAdminsFromProtection'
     ]);
@@ -4369,111 +4253,6 @@ class GroupAdminHandler {
     }
   }
 
-  static async handleEditedMessage(ctx) {
-    try {
-      const message = ctx.update?.edited_message;
-      const chat = message?.chat;
-      if (!GROUP_TYPES.has(chat?.type)) return;
-
-      const senderChat = message?.sender_chat;
-      const group = await Group.findOneAndUpdate(
-        { groupId: String(chat.id) },
-        {
-          $set: {
-            groupTitle: chat.title || 'Unknown Group',
-            groupType: chat.type || 'group',
-            updatedAt: new Date()
-          },
-          $setOnInsert: { createdAt: new Date() }
-        },
-        { upsert: true, new: true }
-      );
-      if (!group) return;
-      this.normalizeGroupState(group);
-
-      const isChannelEdit = Boolean(senderChat && senderChat.type === 'channel');
-      const isAnonymousAdminEdit = Boolean(senderChat && Number(senderChat.id) === Number(chat.id));
-      const isMediaEdit = this.isEditedMediaMessage(message);
-      const editorUserId = Number(message?.from?.id || 0);
-      const editorIsAdmin = editorUserId ? await this.isGroupAdmin(ctx, editorUserId) : false;
-
-      if (group.settings?.exemptAdminsFromEditProtection && (editorIsAdmin || isAnonymousAdminEdit)) {
-        return;
-      }
-
-      let modeLabel = '';
-      if (group.settings?.blockChannelEdits && isChannelEdit) {
-        modeLabel = 'تعديل عبر قناة';
-      } else if (group.settings?.blockMediaOnlyEdits && isMediaEdit) {
-        modeLabel = 'تعديل وسائط';
-      } else if (group.settings?.blockChannelAnonymousEdits && (isChannelEdit || isAnonymousAdminEdit)) {
-        modeLabel = isAnonymousAdminEdit ? 'تعديل من الأدمن المجهول' : 'تعديل عبر قناة';
-      } else {
-        return;
-      }
-
-      const owners = await this.collectPrimaryOwnerRecipients(ctx, group, chat.id);
-      if (!owners.size) return;
-
-      const sentAt = this.formatProtectionTimestamp(message.edit_date || message.date);
-      const messageType = this.getMessageTypeLabel(message);
-      const linkHtml = this.formatProtectionLink(chat, message.message_id);
-      const actor = this.getEditedActorInfo(message, chat);
-      const ownersMentions = [...owners]
-        .map((ownerId, idx) => `${idx + 1} - ${this.mentionUser(ownerId, `مالك ${idx + 1}`)}`)
-        .join('\n');
-
-      const detectionNote =
-        '• للمالكين الاساسين \n' +
-        '━━━━━━━━━━━━\n' +
-        `${ownersMentions}\n\n` +
-        '• حماية التعديل\n' +
-        `${actor.actionLine}\n` +
-        `• ${actor.detectionFieldLabel} ↤︎ 「 ${actor.name} 」\n` +
-        `• ايديها ↤︎ <code>${actor.id || '-'}</code>\n` +
-        `• تاريخ الرسالة ↤︎ ${this.escapeHtml(sentAt)}\n` +
-        `• النوع ↤︎ ${this.escapeHtml(messageType)}\n` +
-        `• رابط الرسالة ↤︎ ${linkHtml}\n\n` +
-        '- الرجاء حذف الرسالة في اقرب وقت ممكن \n-';
-
-      await ctx.telegram.sendMessage(chat.id, detectionNote, {
-        parse_mode: 'HTML',
-        disable_web_page_preview: true
-      }).catch(() => null);
-
-      try {
-        await ctx.telegram.deleteMessage(chat.id, message.message_id);
-        await this.addModerationLog(
-          group,
-          'delete_edited_channel_message',
-          ctx.botInfo?.id || 0,
-          null,
-          `edited message removed (${modeLabel}) from sender chat ${actor.id || '-'}`
-        );
-        await this.saveGroupQuietly(group);
-
-        const deletedNote =
-          '• حماية التعديل\n' +
-          '• لقد قام شخص بالتعديل وحذفتها\n' +
-          `• ${actor.deleteFieldLabel} ↤︎ 「 ${actor.name} 」\n` +
-          `• إيديه ↤︎ <code>${actor.id || '-'}</code>\n` +
-          `• تاريخ الرسالة ↤︎ ${this.escapeHtml(sentAt)}\n` +
-          `• النوع ↤︎ ${this.escapeHtml(messageType)}\n` +
-          `• رابط الرسالة ↤︎ ${linkHtml}\n-`;
-
-        await Promise.all(
-          [...owners].map((ownerId) => ctx.telegram.sendMessage(ownerId, deletedNote, {
-            parse_mode: 'HTML',
-            disable_web_page_preview: true
-          }).catch(() => null))
-        );
-      } catch (_error) {
-        // ignore delete failures; the first alert was already sent
-      }
-    } catch (_error) {
-      // ignore edited message protection failures
-    }
-  }
 
   static getRequiredSubscriptionChannel(group) {
     const channel = group?.settings?.requiredSubscriptionChannel || {};
@@ -4751,7 +4530,7 @@ class GroupAdminHandler {
       return true;
     }
     if (
-      /^(قفل الروابط|فتح الروابط|تفعيل منع ارسال الروابط|تعطيل منع ارسال الروابط|تفعيل منع إرسال الروابط|تعطيل منع إرسال الروابط|قفل الملصقات|فتح الملصقات|تفعيل منع الملصقات المميزة|تعطيل منع الملصقات المميزة|استثناء المشرفين من منع الملصقات المميزة|استئناف المشرفين من منع الملصقات المميزة|الغاء استثناء المشرفين من منع الملصقات المميزة|إلغاء استثناء المشرفين من منع الملصقات المميزة|تفعيل منع التوجيه|تعطيل منع التوجيه|تفعيل منع اعادة التوجيه|تعطيل منع اعادة التوجيه|تفعيل منع إعادة التوجيه|تعطيل منع إعادة التوجيه|تفعيل حماية التعديل|تعطيل حماية التعديل|تفعيل حماية تعديل الوسائط فقط|تعطيل حماية تعديل الوسائط فقط|تفعيل حماية تعديل من القنوات والادمن المجهول|تعطيل حماية تعديل من القنوات والادمن المجهول|تفعيل حماية تعديل من القنوات والأدمن المجهول|تعطيل حماية تعديل من القنوات والأدمن المجهول|استثناء المشرفين من حماية التعديل|الغاء استثناء المشرفين من حماية التعديل|إلغاء استثناء المشرفين من حماية التعديل|تفعيل حماية الحذف|تعطيل حماية الحذف|تفعيل الاشتراك الاجباري|تعطيل الاشتراك الاجباري|تفعيل الاشتراك الإجباري|تعطيل الاشتراك الإجباري|تفعيل الكلمات|تعطيل الكلمات|تفعيل التكرار|تعطيل التكرار|تفعيل منع الاباحية|تعطيل منع الاباحية|تفعيل منع الرسائل الطويل(?:ة|ه)|تعطيل منع الرسائل الطويل(?:ة|ه)|تفعيل اشعار منع الرسائل الطويل(?:ة|ه)|تعطيل اشعار منع الرسائل الطويل(?:ة|ه)|استثناء المشرفين من الحماية|الغاء استثناء المشرفين من الحماية|إلغاء استثناء المشرفين من الحماية|الحماية|\/gprotect\b)/i.test(rawText)
+      /^(قفل الروابط|فتح الروابط|تفعيل منع ارسال الروابط|تعطيل منع ارسال الروابط|تفعيل منع إرسال الروابط|تعطيل منع إرسال الروابط|قفل الملصقات|فتح الملصقات|تفعيل منع الملصقات المميزة|تعطيل منع الملصقات المميزة|استثناء المشرفين من منع الملصقات المميزة|استئناف المشرفين من منع الملصقات المميزة|الغاء استثناء المشرفين من منع الملصقات المميزة|إلغاء استثناء المشرفين من منع الملصقات المميزة|تفعيل منع التوجيه|تعطيل منع التوجيه|تفعيل منع اعادة التوجيه|تعطيل منع اعادة التوجيه|تفعيل منع إعادة التوجيه|تعطيل منع إعادة التوجيه|تفعيل حماية الحذف|تعطيل حماية الحذف|تفعيل الاشتراك الاجباري|تعطيل الاشتراك الاجباري|تفعيل الاشتراك الإجباري|تعطيل الاشتراك الإجباري|تفعيل الكلمات|تعطيل الكلمات|تفعيل التكرار|تعطيل التكرار|تفعيل منع الاباحية|تعطيل منع الاباحية|تفعيل منع الرسائل الطويل(?:ة|ه)|تعطيل منع الرسائل الطويل(?:ة|ه)|تفعيل اشعار منع الرسائل الطويل(?:ة|ه)|تعطيل اشعار منع الرسائل الطويل(?:ة|ه)|استثناء المشرفين من الحماية|الغاء استثناء المشرفين من الحماية|إلغاء استثناء المشرفين من الحماية|الحماية|\/gprotect\b)/i.test(rawText)
     ) {
       if (/^(قفل الروابط|تفعيل منع ارسال الروابط|تفعيل منع إرسال الروابط)$/i.test(rawText)) {
         const result = await this.setProtectionSetting(ctx, 'lockLinks', true, 'text');
@@ -4811,54 +4590,6 @@ class GroupAdminHandler {
         const result = await this.setProtectionSetting(ctx, 'blockForwards', false, 'text');
         if (!result?.ok) return true;
         await ctx.reply('✅ تم تعطيل منع التوجيه.');
-        return true;
-      }
-      if (/^تفعيل حماية التعديل$/i.test(rawText)) {
-        const result = await this.setProtectionSetting(ctx, 'blockChannelEdits', true, 'text');
-        if (!result?.ok) return true;
-        await ctx.reply('✅ تم تفعيل حماية التعديل.');
-        return true;
-      }
-      if (/^تعطيل حماية التعديل$/i.test(rawText)) {
-        const result = await this.setProtectionSetting(ctx, 'blockChannelEdits', false, 'text');
-        if (!result?.ok) return true;
-        await ctx.reply('✅ تم تعطيل حماية التعديل.');
-        return true;
-      }
-      if (/^تفعيل حماية تعديل الوسائط فقط$/i.test(rawText)) {
-        const result = await this.setProtectionSetting(ctx, 'blockMediaOnlyEdits', true, 'text');
-        if (!result?.ok) return true;
-        await ctx.reply('✅ تم تفعيل حماية تعديل الوسائط فقط.');
-        return true;
-      }
-      if (/^تعطيل حماية تعديل الوسائط فقط$/i.test(rawText)) {
-        const result = await this.setProtectionSetting(ctx, 'blockMediaOnlyEdits', false, 'text');
-        if (!result?.ok) return true;
-        await ctx.reply('✅ تم تعطيل حماية تعديل الوسائط فقط.');
-        return true;
-      }
-      if (/^(تفعيل حماية تعديل من القنوات والادمن المجهول|تفعيل حماية تعديل من القنوات والأدمن المجهول)$/i.test(rawText)) {
-        const result = await this.setProtectionSetting(ctx, 'blockChannelAnonymousEdits', true, 'text');
-        if (!result?.ok) return true;
-        await ctx.reply('✅ تم تفعيل حماية تعديل من القنوات + الأدمن المجهول.');
-        return true;
-      }
-      if (/^(تعطيل حماية تعديل من القنوات والادمن المجهول|تعطيل حماية تعديل من القنوات والأدمن المجهول)$/i.test(rawText)) {
-        const result = await this.setProtectionSetting(ctx, 'blockChannelAnonymousEdits', false, 'text');
-        if (!result?.ok) return true;
-        await ctx.reply('✅ تم تعطيل حماية تعديل من القنوات + الأدمن المجهول.');
-        return true;
-      }
-      if (/^استثناء المشرفين من حماية التعديل$/i.test(rawText)) {
-        const result = await this.setProtectionSetting(ctx, 'exemptAdminsFromEditProtection', true, 'text');
-        if (!result?.ok) return true;
-        await ctx.reply('✅ تم تفعيل استثناء المشرفين من حماية التعديل.');
-        return true;
-      }
-      if (/^(الغاء استثناء المشرفين من حماية التعديل|إلغاء استثناء المشرفين من حماية التعديل)$/i.test(rawText)) {
-        const result = await this.setProtectionSetting(ctx, 'exemptAdminsFromEditProtection', false, 'text');
-        if (!result?.ok) return true;
-        await ctx.reply('✅ تم إلغاء استثناء المشرفين من حماية التعديل.');
         return true;
       }
       if (/^تفعيل حماية الحذف$/i.test(rawText)) {
