@@ -34,7 +34,7 @@ const ReconnectManager = require('./utils/reconnect');
 const connectionMonitor = require('./utils/connectionMonitor');
 const healthMonitor = require('./utils/healthMonitor');
 const Formatter = require('./utils/formatter');
-const { User } = require('./database/models');
+const { User, Group } = require('./database/models');
 
 const normalizeEnvValue = (value) => {
   if (typeof value !== 'string') {
@@ -5489,5 +5489,4 @@ app.listen(PORT, () => {
 startBot();
 
 module.exports = bot;
-
 
