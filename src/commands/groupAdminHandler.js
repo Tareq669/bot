@@ -4879,22 +4879,23 @@ class GroupAdminHandler {
 
     // Keep linked-channel auto posts untouched; block manual forwards and channel-post injections.
     if (group.settings?.blockForwards && isForwarded && !isAutomaticForward && !adminProtectionBypass) {
+      const forwardedName = this.escapeHtml(
+        [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ').trim() || String(ctx.from.id)
+      );
+      const forwardNotice =
+        `• عذراً عزيزي ↤︎「 ${forwardedName} 」\n` +
+        '• ممنوع التوجيه هنا .';
       try {
         await ctx.telegram.deleteMessage(ctx.chat.id, ctx.message.message_id);
         await this.addModerationLog(group, 'delete_forward_message', ctx.botInfo.id, ctx.from.id, 'forward blocked');
         await this.saveGroupQuietly(group);
         if (group.settings?.notifyForwardBlock !== false) {
-          const forwardedName = this.escapeHtml(
-            [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ').trim() || String(ctx.from.id)
-          );
-          await ctx.reply(
-            `• عذراً عزيزي ↤︎「 ${forwardedName} 」\n` +
-            '• ممنوع التوجيه هنا .',
-            { parse_mode: 'HTML' }
-          );
+          await ctx.reply(forwardNotice, { parse_mode: 'HTML' });
         }
       } catch (_error) {
-        await ctx.reply('⚠️ تم اكتشاف توجيه لكن لا يمكن حذفه. فعّل صلاحية حذف الرسائل للبوت.');
+        if (group.settings?.notifyForwardBlock !== false) {
+          await ctx.reply(forwardNotice, { parse_mode: 'HTML' }).catch(() => null);
+        }
       }
       return true;
     }
