@@ -9,6 +9,8 @@ class ChatGamesUtilityHandler {
   static audioQueryCache = new Map();
   static AUDIO_QUERY_CACHE_TTL_MS = 30 * 60 * 1000;
   static audioSearchInFlight = new Map();
+  static audioChatQueue = new Map();
+  static AUDIO_SEARCH_TIMEOUT_MS = 25000;
   static ARCHIVE_SEARCH_URL = 'https://archive.org/advancedsearch.php';
   static ARCHIVE_METADATA_URL = 'https://archive.org/metadata';
   static YT_PIPED_INSTANCES = [
@@ -453,7 +455,7 @@ class ChatGamesUtilityHandler {
   }
 
   static async sendHotAudioResult(ctx, audio, canNext = true) {
-    const caption = '♪ تم التح🎧ميل بنجاح ♪ ☑';
+    const caption = '♪ تم التح🎧ميل بنجاح ♪';
     const keyboard = this.buildHotKeyboard(canNext);
     await ctx.replyWithAudio(
       { url: audio.url },
@@ -825,6 +827,31 @@ class ChatGamesUtilityHandler {
     this.audioQueryCache.set(key, { list, createdAt: Date.now() });
   }
 
+  static withTimeout(promise, timeoutMs, timeoutCode = 'AUDIO_SEARCH_TIMEOUT') {
+    return Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        setTimeout(() => reject(new Error(timeoutCode)), Number(timeoutMs || 0));
+      })
+    ]);
+  }
+
+  static enqueueAudioChatTask(chatId, taskFn) {
+    const key = String(chatId || '');
+    if (!key) return taskFn();
+
+    const current = this.audioChatQueue.get(key) || Promise.resolve();
+    const next = current
+      .catch(() => {})
+      .then(() => taskFn());
+
+    this.audioChatQueue.set(key, next);
+    next.finally(() => {
+      if (this.audioChatQueue.get(key) === next) this.audioChatQueue.delete(key);
+    });
+    return next;
+  }
+
   static async buildAudioList(query) {
     let audioList = await this.searchYoutubeAudios(query, 5);
 
@@ -864,7 +891,10 @@ class ChatGamesUtilityHandler {
     const inFlight = this.audioSearchInFlight.get(key);
     if (inFlight) return inFlight;
 
-    const task = this.buildAudioList(query)
+    const task = this.withTimeout(
+      this.buildAudioList(query),
+      this.AUDIO_SEARCH_TIMEOUT_MS
+    )
       .then((list) => {
         if (list?.length) this.setAudioQueryCache(query, list);
         return list || [];
@@ -889,23 +919,25 @@ class ChatGamesUtilityHandler {
       return;
     }
 
-    const loadingMsg = await ctx.reply('🎧 جاري التحميل ....');
-    try {
-      const audioList = await this.resolveAudioListWithCache(query);
+    return this.enqueueAudioChatTask(ctx.chat?.id, async () => {
+      const loadingMsg = await ctx.reply('🎧 جاري التحميل ....');
+      try {
+        const audioList = await this.resolveAudioListWithCache(query);
 
-      if (!audioList.length) {
+        if (!audioList.length) {
+          await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
+          await ctx.reply('♪ عذرا غير متوفر ..');
+          return;
+        }
+
+        this.setHotCache(ctx, query, audioList, 0);
+        await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
+        await this.sendHotAudioResult(ctx, audioList[0], true);
+      } catch (_error) {
         await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
         await ctx.reply('♪ عذرا غير متوفر ..');
-        return;
       }
-
-      this.setHotCache(ctx, query, audioList, 0);
-      await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
-      await this.sendHotAudioResult(ctx, audioList[0], true);
-    } catch (_error) {
-      await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
-      await ctx.reply('♪ عذرا غير متوفر ..');
-    }
+    });
   }
 
   static async handleHotCommand(ctx, queryText) {
