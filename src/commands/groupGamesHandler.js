@@ -6573,123 +6573,68 @@ class GroupGamesHandler {
       { label: 'هدية بابا نويل', keys: ['santa'], names: ['هدية بابا نويل', 'هديه بابا نويل', 'santa'] }
     ];
     const knownKeys = new Set(assetsLines.flatMap((x) => x.keys || []).map((k) => normalizeName(k)));
-    const dynamicExtraLines = inventory
+    const dynamicExtraItems = inventory
       .filter((x) => Number(x?.count || 0) > 0 && !knownKeys.has(normalizeName(x?.key || '')))
-      .map((x) => `( ${x?.name || x?.key} ↤︎ ${Number(x?.count || 0)} )`);
-    const rowsText = [
-      ...assetsLines.map((x) => `( ${x.label} ↤︎ ${sumBy(x.keys, x.names)} )`),
-      ...dynamicExtraLines
-    ].join('\n');
-    const loungeRows = [
-      `( قهوة ↤︎ ${row.loungeInventory.coffee || 0} )`,
-      `( شاي ↤︎ ${row.loungeInventory.tea || 0} )`,
-      `( عصير ↤︎ ${row.loungeInventory.juice || 0} )`,
-      `( عصير موهيتو ↤︎ ${row.loungeInventory.mojito || 0} )`,
-      `( عصير برتقال ↤︎ ${row.loungeInventory.orange_juice || 0} )`,
-      `( عصير ليمون ↤︎ ${row.loungeInventory.lemon_juice || 0} )`,
-      `( عصير فواكه ↤︎ ${row.loungeInventory.fruit_juice || 0} )`,
-      `( عصير موز ↤︎ ${row.loungeInventory.banana_juice || 0} )`,
-      `( عصير افوكادو ↤︎ ${row.loungeInventory.avocado_juice || 0} )`,
-      `( عصير فراولة ↤︎ ${row.loungeInventory.strawberry_juice || 0} )`,
-      `( عصير مانجا ↤︎ ${row.loungeInventory.mango_juice || 0} )`,
-      `( سفن أب ↤︎ ${row.loungeInventory.seven_up || 0} )`,
-      `( كوكاكولا ↤︎ ${row.loungeInventory.cola || 0} )`,
-      `( ماريندا ↤︎ ${row.loungeInventory.mirinda || 0} )`,
-      `( نسكفيه ↤︎ ${row.loungeInventory.nescafe || 0} )`,
-      `( كابتشينو ↤︎ ${row.loungeInventory.cappuccino || 0} )`,
-      `( شاي لاتيه ↤︎ ${row.loungeInventory.chai_latte || 0} )`,
-      `( هوت شوكليت ↤︎ ${row.loungeInventory.hot_chocolate || 0} )`,
-      `( ماء ↤︎ ${row.loungeInventory.water || 0} )`,
-      `( حليب ↤︎ ${row.loungeInventory.milk || 0} )`,
-      `( لبن ↤︎ ${row.loungeInventory.laban || 0} )`,
-      `( تمر ↤︎ ${row.loungeInventory.dates || 0} )`,
-      `( خبز ↤︎ ${row.loungeInventory.bread || 0} )`,
-      `( حلويات ↤︎ ${row.loungeInventory.sweets || 0} )`,
-      `( وجبة شاورما ↤︎ ${row.loungeInventory.shawarma_meal || 0} )`,
-      `( دجاجة مشوية ↤︎ ${row.loungeInventory.grilled_chicken || 0} )`,
-      `( وجبة كباب ↤︎ ${row.loungeInventory.kebab_meal || 0} )`,
-      `( مشاوي مشكل ↤︎ ${row.loungeInventory.mixed_grill || 0} )`,
-      `( سيجارة ↤︎ ${row.loungeInventory.cigarette || 0} )`,
-      `( سيجار ↤︎ ${row.loungeInventory.cigar || 0} )`,
-      `( فيب ↤︎ ${row.loungeInventory.vape || 0} )`,
-      `( ارجيلة ↤︎ ${row.loungeInventory.hookah || 0} )`,
-      `( راس ارجيلة ↤︎ ${row.loungeInventory.hookah_head || 0} )`,
-      `( فحم ↤︎ ${row.loungeInventory.coal || 0} )`,
-      `( معسل تفاح ↤︎ ${row.loungeInventory.molasses_apple || 0} )`,
-      `( معسل نعناع ↤︎ ${row.loungeInventory.molasses_mint || 0} )`,
-      `( سائل فيب ↤︎ ${row.loungeInventory.vape_liquid || 0} )`,
-      `( قداحة ↤︎ ${row.loungeInventory.lighter || 0} )`,
-      `( توليعات قداحة ↤︎ ${row.loungeInventory.lighterFuel || 0} )`
-    ].join('\n');
+      .map((x) => ({ label: x?.name || x?.key, count: Number(x?.count || 0) }));
 
-    const totalItems = inventory.reduce((sum, x) => sum + Number(x?.count || 0), 0)
-      + ['coffee', 'tea', 'juice', 'mojito', 'orange_juice', 'lemon_juice', 'fruit_juice', 'banana_juice',
-        'avocado_juice', 'strawberry_juice', 'mango_juice', 'seven_up', 'cola', 'mirinda',
-        'nescafe', 'cappuccino', 'chai_latte', 'hot_chocolate',
-        'water', 'milk', 'laban', 'dates', 'bread', 'sweets',
-        'shawarma_meal',
-        'grilled_chicken', 'kebab_meal', 'mixed_grill']
-        .reduce((sum, key) => sum + Number(row.loungeInventory[key] || 0), 0);
-    const totalEstimatedValue = inventory.reduce((sum, x) => {
-      const meta = UNIQUE_GIFTS.find((g) => g.key === x.key);
-      return sum + (Number(meta?.price || 0) * Number(x?.count || 0));
-    }, 0) + (
-      (row.loungeInventory.cigarette || 0) * LOUNGE_PRODUCTS.cigarette.price +
-      (row.loungeInventory.cigar || 0) * LOUNGE_PRODUCTS.cigar.price +
-      (row.loungeInventory.vape || 0) * LOUNGE_PRODUCTS.vape.price +
-      (row.loungeInventory.hookah || 0) * LOUNGE_PRODUCTS.hookah.price +
-      (row.loungeInventory.hookah_head || 0) * LOUNGE_PRODUCTS.hookah_head.price +
-      (row.loungeInventory.coal || 0) * LOUNGE_PRODUCTS.coal.price +
-      (row.loungeInventory.molasses_apple || 0) * LOUNGE_PRODUCTS.molasses_apple.price +
-      (row.loungeInventory.molasses_mint || 0) * LOUNGE_PRODUCTS.molasses_mint.price +
-      (row.loungeInventory.vape_liquid || 0) * LOUNGE_PRODUCTS.vape_liquid.price +
-      (row.loungeInventory.coffee || 0) * LOUNGE_PRODUCTS.coffee.price +
-      (row.loungeInventory.tea || 0) * LOUNGE_PRODUCTS.tea.price +
-      (row.loungeInventory.juice || 0) * LOUNGE_PRODUCTS.juice.price +
-      (row.loungeInventory.mojito || 0) * LOUNGE_PRODUCTS.mojito.price +
-      (row.loungeInventory.orange_juice || 0) * LOUNGE_PRODUCTS.orange_juice.price +
-      (row.loungeInventory.lemon_juice || 0) * LOUNGE_PRODUCTS.lemon_juice.price +
-      (row.loungeInventory.fruit_juice || 0) * LOUNGE_PRODUCTS.fruit_juice.price +
-      (row.loungeInventory.banana_juice || 0) * LOUNGE_PRODUCTS.banana_juice.price +
-      (row.loungeInventory.avocado_juice || 0) * LOUNGE_PRODUCTS.avocado_juice.price +
-      (row.loungeInventory.strawberry_juice || 0) * LOUNGE_PRODUCTS.strawberry_juice.price +
-      (row.loungeInventory.mango_juice || 0) * LOUNGE_PRODUCTS.mango_juice.price +
-      (row.loungeInventory.seven_up || 0) * LOUNGE_PRODUCTS.seven_up.price +
-      (row.loungeInventory.cola || 0) * LOUNGE_PRODUCTS.cola.price +
-      (row.loungeInventory.mirinda || 0) * LOUNGE_PRODUCTS.mirinda.price +
-      (row.loungeInventory.nescafe || 0) * LOUNGE_PRODUCTS.nescafe.price +
-      (row.loungeInventory.cappuccino || 0) * LOUNGE_PRODUCTS.cappuccino.price +
-      (row.loungeInventory.chai_latte || 0) * LOUNGE_PRODUCTS.chai_latte.price +
-      (row.loungeInventory.hot_chocolate || 0) * LOUNGE_PRODUCTS.hot_chocolate.price +
-      (row.loungeInventory.water || 0) * LOUNGE_PRODUCTS.water.price +
-      (row.loungeInventory.milk || 0) * LOUNGE_PRODUCTS.milk.price +
-      (row.loungeInventory.laban || 0) * LOUNGE_PRODUCTS.laban.price +
-      (row.loungeInventory.dates || 0) * LOUNGE_PRODUCTS.dates.price +
-      (row.loungeInventory.bread || 0) * LOUNGE_PRODUCTS.bread.price +
-      (row.loungeInventory.sweets || 0) * LOUNGE_PRODUCTS.sweets.price +
-      (row.loungeInventory.shawarma_meal || 0) * LOUNGE_PRODUCTS.shawarma_meal.price +
-      (row.loungeInventory.grilled_chicken || 0) * LOUNGE_PRODUCTS.grilled_chicken.price +
-      (row.loungeInventory.kebab_meal || 0) * LOUNGE_PRODUCTS.kebab_meal.price +
-      (row.loungeInventory.mixed_grill || 0) * LOUNGE_PRODUCTS.mixed_grill.price +
-      (row.loungeInventory.lighter || 0) * LOUNGE_PRODUCTS.lighter.price
-    );
+    const mainItems = assetsLines
+      .map((x) => ({ label: x.label, count: sumBy(x.keys, x.names) }))
+      .filter((x) => Number(x.count || 0) > 0);
 
-    const activeBoost = row.activeBoost?.expiresAt && new Date(row.activeBoost.expiresAt).getTime() > Date.now()
-      ? `✅ ${row.activeBoost.multiplier || 1}x حتى ${new Date(row.activeBoost.expiresAt).toLocaleString('ar-EG')}`
-      : '❌ غير مفعل';
+    const loungeMap = [
+      { key: 'coffee', label: 'قهوة' },
+      { key: 'tea', label: 'شاي' },
+      { key: 'juice', label: 'عصير' },
+      { key: 'mojito', label: 'عصير موهيتو' },
+      { key: 'orange_juice', label: 'عصير برتقال' },
+      { key: 'lemon_juice', label: 'عصير ليمون' },
+      { key: 'fruit_juice', label: 'عصير فواكه' },
+      { key: 'banana_juice', label: 'عصير موز' },
+      { key: 'avocado_juice', label: 'عصير افوكادو' },
+      { key: 'strawberry_juice', label: 'عصير فراولة' },
+      { key: 'mango_juice', label: 'عصير مانجا' },
+      { key: 'seven_up', label: 'سفن أب' },
+      { key: 'cola', label: 'كوكاكولا' },
+      { key: 'mirinda', label: 'ماريندا' },
+      { key: 'nescafe', label: 'نسكفيه' },
+      { key: 'cappuccino', label: 'كابتشينو' },
+      { key: 'chai_latte', label: 'شاي لاتيه' },
+      { key: 'hot_chocolate', label: 'هوت شوكليت' },
+      { key: 'water', label: 'ماء' },
+      { key: 'milk', label: 'حليب' },
+      { key: 'laban', label: 'لبن' },
+      { key: 'dates', label: 'تمر' },
+      { key: 'bread', label: 'خبز' },
+      { key: 'sweets', label: 'حلويات' },
+      { key: 'shawarma_meal', label: 'وجبة شاورما' },
+      { key: 'grilled_chicken', label: 'دجاجة مشوية' },
+      { key: 'kebab_meal', label: 'وجبة كباب' },
+      { key: 'mixed_grill', label: 'مشاوي مشكل' },
+      { key: 'cigarette', label: 'سيجارة' },
+      { key: 'cigar', label: 'سيجار' },
+      { key: 'vape', label: 'فيب' },
+      { key: 'hookah', label: 'ارجيلة' },
+      { key: 'hookah_head', label: 'راس ارجيلة' },
+      { key: 'coal', label: 'فحم' },
+      { key: 'molasses_apple', label: 'معسل تفاح' },
+      { key: 'molasses_mint', label: 'معسل نعناع' },
+      { key: 'vape_liquid', label: 'سائل فيب' },
+      { key: 'lighter', label: 'قداحة' },
+      { key: 'lighterFuel', label: 'توليعات قداحة' }
+    ];
+    const loungeItems = loungeMap
+      .map((x) => ({ label: x.label, count: Number(row.loungeInventory[x.key] || 0) }))
+      .filter((x) => Number(x.count || 0) > 0);
+
+    const ownedItems = [...mainItems, ...dynamicExtraItems, ...loungeItems];
+    const rowsText = ownedItems.length
+      ? ownedItems.map((x) => `( ${x.label} ~ ${x.count} )`).join('\n')
+      : '( لا يوجد ممتلكات )';
 
     await group.save();
     return ctx.reply(
-      `📦 <b>أهلاً بك في قائمة ممتلكاتك</b>\n\n` +
-      `${rowsText}\n\n` +
-      `🪩 <b>قسم اللاونج</b>\n` +
-      `${loungeRows}\n\n` +
-      `🏷️ اللقب الحالي: ${row.title || 'مبتدئ'}\n` +
-      `🚀 المعزز النشط: ${activeBoost}\n` +
-      `🎁 إجمالي الهدايا: ${totalItems}\n` +
-      `💎 القيمة التقديرية: ${this.formatCurrency(totalEstimatedValue)}\n\n` +
-      `💡 للزيادة: استخدم /ggift أو /gbuygift أو "شراء [اسم الهدية]" أو "بيع [اسم الهدية]"`,
-      { parse_mode: 'HTML' }
+      '• اهلا بك في قائمة ممتلكاتك .\n' +
+      `${rowsText}`
     );
   }
 
