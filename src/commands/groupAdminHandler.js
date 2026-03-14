@@ -4833,6 +4833,10 @@ class GroupAdminHandler {
     const hasPremiumEmojiEntity = [...entities, ...captionEntities].some((entity) => String(entity?.type) === 'custom_emoji');
     const hasPremiumVisual = hasPremiumSticker || hasPremiumEmojiEntity;
     const isAutomaticForward = Boolean(ctx.message?.is_automatic_forward);
+    const isChannelPostInGroup = Boolean(
+      ctx.message?.sender_chat
+      && String(ctx.message?.sender_chat?.type || '').toLowerCase() === 'channel'
+    );
     const isForwarded = Boolean(
       ctx.message?.forward_origin
       || ctx.message?.forward_from
@@ -4840,9 +4844,10 @@ class GroupAdminHandler {
       || ctx.message?.forward_sender_name
       || ctx.message?.forward_date
       || isAutomaticForward
+      || isChannelPostInGroup
     );
 
-    // Keep linked-channel auto posts untouched; only block manual user forwards.
+    // Keep linked-channel auto posts untouched; block manual forwards and channel-post injections.
     if (group.settings?.blockForwards && isForwarded && !isAutomaticForward && !adminProtectionBypass) {
       try {
         await ctx.telegram.deleteMessage(ctx.chat.id, ctx.message.message_id);
