@@ -196,6 +196,7 @@ bot.use(async (ctx, next) => {
     isGroup &&
     ctx.callbackQuery?.data &&
     !ctx.callbackQuery.data.startsWith('group:') &&
+    !ctx.callbackQuery.data.startsWith('tops:') &&
     !ctx.callbackQuery.data.startsWith('bank:create:') &&
     !ctx.callbackQuery.data.startsWith('xo:')
   ) {
