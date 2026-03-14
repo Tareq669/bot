@@ -2805,6 +2805,75 @@ bot.hears(/^طقس(?:\s+(.+))?$/i, (ctx) => ChatGamesUtilityHandler.handleWeathe
 bot.hears(/^(?:اذان|أذان)(?:\s+(.+))?$/i, (ctx) => ChatGamesUtilityHandler.handleAdhanText(ctx, ctx.match[1]));
 bot.hears(/^ستارز(?:\s+(.+))?$/i, (ctx) => ChatGamesUtilityHandler.handlePlayCommand(ctx, ctx.match[1]));
 bot.action('hot:next', (ctx) => ChatGamesUtilityHandler.handleHotNextAction(ctx));
+
+const buildTopMenuKeyboard = () => Markup.inlineKeyboard([
+  [
+    Markup.button.callback('👑 توب الحكام', 'tops:rulers'),
+    Markup.button.callback('⚔️ المبارزات العالمية', 'tops:arena')
+  ],
+  [
+    Markup.button.callback('🥇 توب الغزاه', 'tops:invaders'),
+    Markup.button.callback('🕵️ توب الحراميه', 'tops:thieves')
+  ],
+  [
+    Markup.button.callback('💰 توب الفلوس', 'tops:money'),
+    Markup.button.callback('💍 توب المتزوجين', 'tops:married')
+  ],
+  [
+    Markup.button.callback('🙎‍♂️ توب المخلوعين', 'tops:divorced_men'),
+    Markup.button.callback('🙎‍♀️ توب المطلقات', 'tops:divorced_women')
+  ],
+  [
+    Markup.button.callback('🔥 توب المتفاعلين', 'tops:active'),
+    Markup.button.callback('🏘️ توب القروبات', 'tops:groups')
+  ],
+  [
+    Markup.button.callback('🎮 توب الالعاب', 'tops:games')
+  ],
+  [
+    Markup.button.callback('❌ اخفاء التوب', 'tops:hide')
+  ]
+]);
+
+bot.hears(/^توب$/i, async (ctx) => {
+  if (!['group', 'supergroup'].includes(ctx.chat?.type)) return;
+  await ctx.reply(
+    '- ‌‌‏أهلاً بك عزيزي في قائمة الاوامر :\n• اختر نوع التوب من الازرار',
+    buildTopMenuKeyboard()
+  );
+});
+
+bot.action(/^tops:(rulers|arena|invaders|thieves|money|divorced_men|divorced_women|married|active|groups|games|hide)$/i, async (ctx) => {
+  await ctx.answerCbQuery().catch(() => {});
+  const action = String(ctx.match?.[1] || '').toLowerCase();
+
+  if (action === 'hide') {
+    await ctx.editMessageReplyMarkup({ inline_keyboard: [] }).catch(() => {});
+    await ctx.reply('• تم اخفاء الاوامر بنجاح');
+    return;
+  }
+
+  if (action === 'rulers') return GroupGamesHandler.handleTopRulersCommand(ctx);
+  if (action === 'arena') return GroupGamesHandler.handleArenaListCommand(ctx);
+  if (action === 'invaders') return GroupGamesHandler.handleCompetitionTopCommand(ctx);
+  if (action === 'married') return BankGameHandler.handleTopMarried(ctx);
+  if (action === 'active') return BankGameHandler.handleTopActiveInGroup(ctx);
+  if (action === 'groups' || action === 'games') return BankGameHandler.handleTopGroups(ctx);
+
+  if (action === 'money') {
+    return ctx.reply('• توب الفلوس غير متاح حالياً وسيتم تفعيله قريبًا.');
+  }
+  if (action === 'thieves') {
+    return ctx.reply('• توب الحراميه غير متاح حالياً وسيتم تفعيله قريبًا.');
+  }
+  if (action === 'divorced_men') {
+    return ctx.reply('• توب المخلوعين غير متاح حالياً وسيتم تفعيله قريبًا.');
+  }
+  if (action === 'divorced_women') {
+    return ctx.reply('• توب المطلقات غير متاح حالياً وسيتم تفعيله قريبًا.');
+  }
+});
+
 // Group Bank Game commands
 bot.hears(/^انشاء\s*حساب\s*بنكي$/i, (ctx) => BankGameHandler.handleCreateAccount(ctx));
 bot.hears(/^حسابي$/i, (ctx) => BankGameHandler.handleAccountInfo(ctx));

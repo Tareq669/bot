@@ -6137,12 +6137,24 @@ class GroupGamesHandler {
     if (!this.isGroupChat(ctx)) return;
     const group = await this.ensureGroupRecord(ctx);
     const joined = (group.gameSystem.scores || []).filter((x) => x.arenaJoined);
-    if (joined.length === 0) return ctx.reply('ℹ️ لا يوجد مشاركين بعد. اكتب: الانضمام للمبارزه');
+    if (joined.length === 0) {
+      return ctx.reply(
+        '• قائمة المنضمين للمبارزة العالمية :\n\n' +
+        '• لا يوجد احد فالتوب \n' +
+        '• للانضمام ↤ الانضمام للمبارزه'
+      );
+    }
     const lines = joined
       .sort((a, b) => this.getCastlePower(b) - this.getCastlePower(a))
       .slice(0, 20)
-      .map((x, i) => `${i + 1}. ${x.username || x.userId} — قوة: ${this.getCastlePower(x)}`);
-    return ctx.reply(`🌍 <b>المبارزين</b>\n\n${lines.join('\n')}`, { parse_mode: 'HTML' });
+      .map((x, i) => `${i + 1} l ${x.username || x.userId}`);
+    const remaining = Math.max(0, 20 - lines.length);
+    return ctx.reply(
+      '• قائمة المنضمين للمبارزة العالمية :\n\n' +
+      `${lines.join('\n')}\n\n` +
+      `• المتبقي للاعبين ↤ ${remaining}\n` +
+      '• للانضمام ↤ الانضمام للمبارزه'
+    );
   }
 
   static async handleTopRulersCommand(ctx) {
@@ -6158,7 +6170,12 @@ class GroupGamesHandler {
         return Number(b.points || 0) - Number(a.points || 0);
       })
       .slice(0, 10);
-    if (list.length === 0) return ctx.reply('ℹ️ لا يوجد حكام بعد. ابدأوا بـ انشاء قلعه');
+    if (list.length === 0) {
+      return ctx.reply(
+        '• لا يوجد احد فالتوب \n' +
+        '• بارز بالعالميه وخذ لقب الحاكم 🤴🏻\n-'
+      );
+    }
 
     (group.gameSystem.scores || []).forEach((r) => {
       if (['🤴🏻 الحاكم', '🫅🏻 الحاكمة'].includes(String(r.title || ''))) {
@@ -6172,8 +6189,8 @@ class GroupGamesHandler {
     top.customTitle = true;
     await group.save();
 
-    const lines = list.map((x, i) => `${i + 1}. ${x.username || x.userId} — مستوى القلعة ${x.castleLevel} | قوة ${this.getCastlePower(x)}`);
-    return ctx.reply(`👑 <b>توب الحكام</b>\n\n${lines.join('\n')}`, { parse_mode: 'HTML' });
+    const lines = list.map((x, i) => `${i + 1}~ ${x.username || x.userId}`);
+    return ctx.reply(`• توب الحكام هم \n${lines.join('\n')}`);
   }
 
   static async handleAllianceRequestCommand(ctx) {
