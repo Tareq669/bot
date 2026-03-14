@@ -65,6 +65,7 @@ class BankGameHandler {
       created: false,
       balance: 0,
       blockedFromGame: false,
+      divorcedWomenCount: 0,
       cardType: '',
       cardNumber: '',
       salaryLastAt: 0,
@@ -98,6 +99,7 @@ class BankGameHandler {
     const x = { ...this.defaultBankProfile(), ...(p || {}) };
     x.balance = Math.max(0, Number(x.balance || 0));
     x.blockedFromGame = Boolean(x.blockedFromGame);
+    x.divorcedWomenCount = Math.max(0, Number(x.divorcedWomenCount || 0));
     x.cardType = String(x.cardType || '');
     x.cardNumber = String(x.cardNumber || '');
     x.salaryLastAt = Number(x.salaryLastAt || 0);
@@ -464,6 +466,7 @@ class BankGameHandler {
       wp.marriages.husbandMahr = 0;
       wp.marriages.husbandSince = 0;
       wp.marriages.wifeSlot = 0;
+      wp.divorcedWomenCount = Math.max(0, Number(wp.divorcedWomenCount || 0)) + 1;
     }
     husband.bankProfile = hp;
     wifeDoc.bankProfile = wp;
@@ -486,6 +489,7 @@ class BankGameHandler {
         wp.marriages.husbandMahr = 0;
         wp.marriages.husbandSince = 0;
         wp.marriages.wifeSlot = 0;
+        wp.divorcedWomenCount = Math.max(0, Number(wp.divorcedWomenCount || 0)) + 1;
       }
       wifeDoc.bankProfile = wp;
       await wifeDoc.save();
@@ -514,6 +518,7 @@ class BankGameHandler {
     wp.marriages.husbandMahr = 0;
     wp.marriages.husbandSince = 0;
     wp.marriages.wifeSlot = 0;
+    wp.divorcedWomenCount = Math.max(0, Number(wp.divorcedWomenCount || 0)) + 1;
     husbandDoc.bankProfile = hp;
     wifeDoc.bankProfile = wp;
     await Promise.all([husbandDoc.save(), wifeDoc.save()]);
@@ -1180,6 +1185,27 @@ class BankGameHandler {
       const amount = Math.max(0, Number(row.balance || 0)).toLocaleString('en-US');
       text += `${rank} ) ${amount} 💰 l ${row.name}\n`;
     });
+    return ctx.reply(text);
+  }
+
+  static async handleTopDivorcedWomen(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const users = await User.find({ 'bankProfile.divorcedWomenCount': { $gt: 0 } })
+      .select('firstName username bankProfile.divorcedWomenCount')
+      .sort({ 'bankProfile.divorcedWomenCount': -1 })
+      .limit(20)
+      .lean();
+
+    if (!users.length) return ctx.reply('• لا يوجد احد فالتوب');
+
+    let text = 'توب اكثر 20 مطلقه بالبوت :\n\n';
+    users.forEach((u, index) => {
+      const rank = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}`;
+      const count = Math.max(0, Number(u?.bankProfile?.divorcedWomenCount || 0));
+      const name = String(u.firstName || u.username || 'no').trim() || 'no';
+      text += `${rank} ) ${count} 🙎🏻‍♀️ l ${name}\n`;
+    });
+    text += ' ━━━━━━━━━\n\n-';
     return ctx.reply(text);
   }
 }

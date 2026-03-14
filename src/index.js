@@ -2898,7 +2898,7 @@ bot.action(/^tops:(rulers|arena|invaders|thieves|money|divorced_men|divorced_wom
     return ctx.reply('• توب المخلوعين غير متاح حالياً وسيتم تفعيله قريبًا.');
   }
   if (action === 'divorced_women') {
-    return ctx.reply('• توب المطلقات غير متاح حالياً وسيتم تفعيله قريبًا.');
+    return BankGameHandler.handleTopDivorcedWomen(ctx);
   }
 });
 
@@ -2941,6 +2941,7 @@ bot.hears(/^توب\s*القروبات$/i, (ctx) => BankGameHandler.handleTopGrou
 bot.hears(/^(?:توب\s*المتفاعلين|الاكثر\s*تفاعلا|الأكثر\s*تفاعلا)$/i, (ctx) => BankGameHandler.handleTopActiveInGroup(ctx));
 bot.hears(/^توب\s*الحراميه$/i, (ctx) => BankGameHandler.handleTopThieves(ctx));
 bot.hears(/^توب\s*الفلوس$/i, (ctx) => BankGameHandler.handleTopMoney(ctx));
+bot.hears(/^توب\s*المطلقات$/i, (ctx) => BankGameHandler.handleTopDivorcedWomen(ctx));
 // Group Arabic aliases (without slash)
 bot.hears(/^العاب\s*الجروب$/i, (ctx) => GroupGamesHandler.handleGamesHelp(ctx));
 bot.hears(/^(?:الالعاب|الألعاب)$/i, (ctx) => GroupGamesHandler.handleGamesListCommand(ctx));
