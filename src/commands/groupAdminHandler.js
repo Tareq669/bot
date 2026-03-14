@@ -4333,7 +4333,8 @@ class GroupAdminHandler {
       const member = await ctx.telegram.getChatMember(targetChat, targetUserId);
       return ['member', 'administrator', 'creator'].includes(member?.status);
     } catch (_error) {
-      return true;
+      // If we cannot verify membership, treat as not subscribed so forced-subscribe flow still appears.
+      return false;
     }
   }
 
@@ -4915,7 +4916,7 @@ class GroupAdminHandler {
           await this.saveGroupQuietly(group);
           if (group.settings?.notifyLongMessageBlock) {
             const longMessageName = this.escapeHtml(
-              ctx.from.username ? `@${ctx.from.username}` : (ctx.from.first_name || String(ctx.from.id))
+              [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ').trim() || String(ctx.from.id)
             );
             await ctx.reply(
               `• عذراً عزيزي ~»「 ${longMessageName} 」\n` +
