@@ -4582,7 +4582,19 @@ class GroupAdminHandler {
         await ctx.reply('✅ تم تفعيل استثناء المشرفين من منع الملصقات المميزة.');
         return true;
       }
+      if (/^تفعيل استثناء المشرفين من منع الملصقات المميزة$/i.test(rawText)) {
+        const result = await this.setProtectionSetting(ctx, 'exemptAdminsFromPremiumStickers', true, 'text');
+        if (!result?.ok) return true;
+        await ctx.reply('✅ تم تفعيل استثناء المشرفين من منع الملصقات المميزة.');
+        return true;
+      }
       if (/^(الغاء استثناء المشرفين من منع الملصقات المميزة|إلغاء استثناء المشرفين من منع الملصقات المميزة)$/i.test(rawText)) {
+        const result = await this.setProtectionSetting(ctx, 'exemptAdminsFromPremiumStickers', false, 'text');
+        if (!result?.ok) return true;
+        await ctx.reply('✅ تم إلغاء استثناء المشرفين من منع الملصقات المميزة.');
+        return true;
+      }
+      if (/^تعطيل استثناء المشرفين من منع الملصقات المميزة$/i.test(rawText)) {
         const result = await this.setProtectionSetting(ctx, 'exemptAdminsFromPremiumStickers', false, 'text');
         if (!result?.ok) return true;
         await ctx.reply('✅ تم إلغاء استثناء المشرفين من منع الملصقات المميزة.');
@@ -4801,7 +4813,10 @@ class GroupAdminHandler {
       || sticker?.is_premium
       || sticker?.custom_emoji_id
       || sticker?.type === 'custom_emoji'
+      || sticker?.sticker_type === 'custom_emoji'
+      || sticker?.needs_repainting
       || sticker?.set_name?.toLowerCase?.().includes('premium')
+      || sticker?.set_name?.toLowerCase?.().includes('emoji')
     );
     const entities = Array.isArray(ctx.message?.entities) ? ctx.message.entities : [];
     const captionEntities = Array.isArray(ctx.message?.caption_entities) ? ctx.message.caption_entities : [];
