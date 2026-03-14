@@ -4854,7 +4854,7 @@ class GroupAdminHandler {
         await this.addModerationLog(group, 'delete_forward_message', ctx.botInfo.id, ctx.from.id, 'forward blocked');
         await this.saveGroupQuietly(group);
         const forwardedName = this.escapeHtml(
-          ctx.from.username ? `@${ctx.from.username}` : (ctx.from.first_name || String(ctx.from.id))
+          [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ').trim() || String(ctx.from.id)
         );
         await ctx.reply(
           `• عذراً عزيزي ↤︎「 ${forwardedName} 」\n` +
@@ -4875,10 +4875,12 @@ class GroupAdminHandler {
           : 'premium sticker blocked';
         await this.addModerationLog(group, 'delete_premium_sticker_message', ctx.botInfo.id, ctx.from.id, reason);
         await this.saveGroupQuietly(group);
-        const blockedName = this.getUserDisplayName(ctx.from);
+        const blockedName = this.escapeHtml(
+          [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ').trim() || String(ctx.from.id)
+        );
         await ctx.reply(
-          `• عذرا عزيزي ← ${blockedName} .\n` +
-          '• ممنوع ارسال الملصقات المميزة هنا .',
+          `• عذراً عزيزي ↤︎「 ${blockedName} 」\n` +
+          '• ممنوع إرسال الملصقات المميزه هنا .',
           { parse_mode: 'HTML' }
         );
       } catch (_error) {
