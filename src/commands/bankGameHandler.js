@@ -1098,11 +1098,45 @@ class BankGameHandler {
       .limit(20)
       .select('groupTitle statistics.messagesCount gameSystem.scores');
     if (!groups.length) return ctx.reply('ℹ️ لا توجد بيانات قروبات بعد.');
-    let text = '🏆 توب القروبات (Top 20)\n\n';
+    let text = 'توب اكثر 20 قروب :\n\n';
     groups.forEach((g, i) => {
-      const msgCount = Number(g.statistics?.messagesCount || 0);
-      const players = Number(Array.isArray(g.gameSystem?.scores) ? g.gameSystem.scores.length : 0);
-      text += `${i + 1}. ${g.groupTitle || 'Group'} — رسائل: ${msgCount} | لاعبين: ${players}\n`;
+      const rank = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}`;
+      const msgCount = Number(g.statistics?.messagesCount || 0).toLocaleString('en-US');
+      const name = String(g.groupTitle || 'Group').trim() || 'Group';
+      text += `${rank} ) ${msgCount}   l  ${name}\n`;
+    });
+    return ctx.reply(text);
+  }
+
+  static async handleTopGames(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const groups = await Group.find({})
+      .limit(50)
+      .select('groupTitle gameSystem.scores');
+    if (!groups.length) return ctx.reply('ℹ️ لا توجد بيانات ألعاب بعد.');
+
+    const rows = groups.map((g) => {
+      const scores = Array.isArray(g.gameSystem?.scores) ? g.gameSystem.scores : [];
+      const gameScore = scores.reduce((sum, row) => {
+        return sum
+          + Number(row?.messageCount || 0)
+          + Number(row?.weeklyPoints || 0)
+          + Number(row?.monthlyPoints || 0);
+      }, 0);
+      return {
+        title: String(g.groupTitle || 'Group').trim() || 'Group',
+        score: Math.max(0, Number(gameScore || 0))
+      };
+    }).sort((a, b) => b.score - a.score).slice(0, 20);
+
+    if (!rows.length || rows.every((x) => x.score <= 0)) {
+      return ctx.reply('• لا يوجد احد فالتوب');
+    }
+
+    let text = 'توب اكثر 20 قروب يلعبون :\n\n';
+    rows.forEach((row, i) => {
+      const rank = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}`;
+      text += `${rank} ) ${Number(row.score || 0).toLocaleString('en-US')}   l  ${row.title}\n`;
     });
     return ctx.reply(text);
   }

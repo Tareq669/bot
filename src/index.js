@@ -2886,7 +2886,8 @@ bot.action(/^tops:(rulers|arena|invaders|thieves|money|divorced_men|divorced_wom
   if (action === 'invaders') return GroupGamesHandler.handleInvadersTopCommand(ctx);
   if (action === 'married') return BankGameHandler.handleTopMarried(ctx);
   if (action === 'active') return BankGameHandler.handleTopActiveInGroup(ctx);
-  if (action === 'groups' || action === 'games') return BankGameHandler.handleTopGroups(ctx);
+  if (action === 'groups') return BankGameHandler.handleTopGroups(ctx);
+  if (action === 'games') return BankGameHandler.handleTopGames(ctx);
 
   if (action === 'money') {
     return BankGameHandler.handleTopMoney(ctx);
@@ -2938,6 +2939,7 @@ bot.hears(/^انا$/i, (ctx) => TournamentChallengeHandler.handleParticipantJoin
 bot.hears(/^تفعيل\s*البطوله$/i, (ctx) => TournamentChallengeHandler.handleGroupTournamentToggle(ctx, true));
 bot.hears(/^تعطيل\s*البطوله$/i, (ctx) => TournamentChallengeHandler.handleGroupTournamentToggle(ctx, false));
 bot.hears(/^توب\s*القروبات$/i, (ctx) => BankGameHandler.handleTopGroups(ctx));
+bot.hears(/^توب\s*الالعاب$/i, (ctx) => BankGameHandler.handleTopGames(ctx));
 bot.hears(/^(?:توب\s*المتفاعلين|الاكثر\s*تفاعلا|الأكثر\s*تفاعلا)$/i, (ctx) => BankGameHandler.handleTopActiveInGroup(ctx));
 bot.hears(/^توب\s*الحراميه$/i, (ctx) => BankGameHandler.handleTopThieves(ctx));
 bot.hears(/^توب\s*الفلوس$/i, (ctx) => BankGameHandler.handleTopMoney(ctx));
@@ -3140,6 +3142,7 @@ bot.hears(/^(?:\/)?(?:انا|tme)$/i, (ctx) => TournamentChallengeHandler.handle
 bot.hears(/^(?:\/)?(?:تفعيل_البطوله|tenable)$/i, (ctx) => TournamentChallengeHandler.handleGroupTournamentToggle(ctx, true));
 bot.hears(/^(?:\/)?(?:تعطيل_البطوله|tdisable)$/i, (ctx) => TournamentChallengeHandler.handleGroupTournamentToggle(ctx, false));
 bot.hears(/^(?:\/)?(?:توب_القروبات|topgroups)$/i, (ctx) => BankGameHandler.handleTopGroups(ctx));
+bot.hears(/^(?:\/)?(?:توب_الالعاب|topgames)$/i, (ctx) => BankGameHandler.handleTopGames(ctx));
 bot.hears(/^(?:\/)?(?:توب_المتفاعلين|topactive)$/i, (ctx) => BankGameHandler.handleTopActiveInGroup(ctx));
 bot.hears(/^(?:\/)?(?:مين_انا|مينانا)$/i, (ctx) => GroupGamesHandler.handleWhoAmICommand(ctx));
 bot.hears(/^(?:\/)?(?:الغاز|الغاز_ذكية|لغز)$/i, (ctx) => GroupGamesHandler.handleClassicRiddleCommand(ctx));
