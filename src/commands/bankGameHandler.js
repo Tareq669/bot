@@ -69,6 +69,7 @@ class BankGameHandler {
       salaryLastAt: 0,
       tipLastAt: 0,
       stealLastAt: 0,
+      stealTotal: 0,
       investLastAt: 0,
       luckLastAt: 0,
       luckDayKey: '',
@@ -100,6 +101,7 @@ class BankGameHandler {
     x.salaryLastAt = Number(x.salaryLastAt || 0);
     x.tipLastAt = Number(x.tipLastAt || 0);
     x.stealLastAt = Number(x.stealLastAt || 0);
+    x.stealTotal = Math.max(0, Number(x.stealTotal || 0));
     x.investLastAt = Number(x.investLastAt || 0);
     x.luckLastAt = Number(x.luckLastAt || 0);
     x.luckDayKey = String(x.luckDayKey || '');
@@ -713,6 +715,7 @@ class BankGameHandler {
       const amount = Math.min(stealAmount, tp.balance);
       tp.balance -= amount;
       p.balance += this.applyBoost(amount, p);
+      p.stealTotal = Math.max(0, Number(p.stealTotal || 0)) + amount;
       meDoc.bankProfile = p;
       targetDoc.bankProfile = tp;
       await Promise.all([meDoc.save(), targetDoc.save()]);
@@ -1104,6 +1107,27 @@ class BankGameHandler {
     top.forEach((r, i) => {
       text += `${i + 1}. ${r.username || r.userId} — ${this.fmt(r.points || 0)}\n`;
     });
+    return ctx.reply(text);
+  }
+
+  static async handleTopThieves(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const users = await User.find({ 'bankProfile.stealTotal': { $gt: 0 } })
+      .select('userId firstName username bankProfile.stealTotal')
+      .sort({ 'bankProfile.stealTotal': -1 })
+      .limit(20)
+      .lean();
+
+    if (!users.length) return ctx.reply('• لا يوجد احد فالتوب');
+
+    let text = 'توب اكثر 20 شخص حرامية فلوس:\n\n';
+    users.forEach((u, index) => {
+      const rank = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}`;
+      const stolen = Math.max(0, Number(u?.bankProfile?.stealTotal || 0)).toLocaleString('en-US');
+      const name = String(u.firstName || u.username || `user_${u.userId}`).trim() || `user_${u.userId}`;
+      text += `${rank} ) ${stolen} 💰 l ${name}\n`;
+    });
+
     return ctx.reply(text);
   }
 }

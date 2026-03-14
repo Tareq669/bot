@@ -2892,7 +2892,7 @@ bot.action(/^tops:(rulers|arena|invaders|thieves|money|divorced_men|divorced_wom
     return ctx.reply('• توب الفلوس غير متاح حالياً وسيتم تفعيله قريبًا.');
   }
   if (action === 'thieves') {
-    return ctx.reply('• توب الحراميه غير متاح حالياً وسيتم تفعيله قريبًا.');
+    return BankGameHandler.handleTopThieves(ctx);
   }
   if (action === 'divorced_men') {
     return ctx.reply('• توب المخلوعين غير متاح حالياً وسيتم تفعيله قريبًا.');
@@ -2939,6 +2939,7 @@ bot.hears(/^تفعيل\s*البطوله$/i, (ctx) => TournamentChallengeHandler.
 bot.hears(/^تعطيل\s*البطوله$/i, (ctx) => TournamentChallengeHandler.handleGroupTournamentToggle(ctx, false));
 bot.hears(/^توب\s*القروبات$/i, (ctx) => BankGameHandler.handleTopGroups(ctx));
 bot.hears(/^(?:توب\s*المتفاعلين|الاكثر\s*تفاعلا|الأكثر\s*تفاعلا)$/i, (ctx) => BankGameHandler.handleTopActiveInGroup(ctx));
+bot.hears(/^توب\s*الحراميه$/i, (ctx) => BankGameHandler.handleTopThieves(ctx));
 // Group Arabic aliases (without slash)
 bot.hears(/^العاب\s*الجروب$/i, (ctx) => GroupGamesHandler.handleGamesHelp(ctx));
 bot.hears(/^(?:الالعاب|الألعاب)$/i, (ctx) => GroupGamesHandler.handleGamesListCommand(ctx));
