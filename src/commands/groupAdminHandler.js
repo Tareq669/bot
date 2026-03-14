@@ -4803,9 +4803,15 @@ class GroupAdminHandler {
     const hasSticker = Boolean(sticker);
     const hasPremiumSticker = Boolean(
       sticker?.premium_animation
+      || sticker?.is_premium
       || sticker?.custom_emoji_id
+      || sticker?.type === 'custom_emoji'
       || sticker?.set_name?.toLowerCase?.().includes('premium')
     );
+    const entities = Array.isArray(ctx.message?.entities) ? ctx.message.entities : [];
+    const captionEntities = Array.isArray(ctx.message?.caption_entities) ? ctx.message.caption_entities : [];
+    const hasPremiumEmojiEntity = [...entities, ...captionEntities].some((entity) => String(entity?.type) === 'custom_emoji');
+    const hasPremiumVisual = hasPremiumSticker || hasPremiumEmojiEntity;
     const isAutomaticForward = Boolean(ctx.message?.is_automatic_forward);
     const isForwarded = Boolean(
       ctx.message?.forward_origin
@@ -4836,10 +4842,13 @@ class GroupAdminHandler {
       return true;
     }
 
-    if (group.settings?.lockPremiumStickers && hasPremiumSticker && !adminPremiumStickerBypass) {
+    if (group.settings?.lockPremiumStickers && hasPremiumVisual && !adminPremiumStickerBypass) {
       try {
         await ctx.telegram.deleteMessage(ctx.chat.id, ctx.message.message_id);
-        await this.addModerationLog(group, 'delete_premium_sticker_message', ctx.botInfo.id, ctx.from.id, 'premium sticker blocked');
+        const reason = hasPremiumEmojiEntity && !hasPremiumSticker
+          ? 'premium emoji blocked'
+          : 'premium sticker blocked';
+        await this.addModerationLog(group, 'delete_premium_sticker_message', ctx.botInfo.id, ctx.from.id, reason);
         await this.saveGroupQuietly(group);
         const blockedName = this.getUserDisplayName(ctx.from);
         await ctx.reply(
