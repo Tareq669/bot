@@ -65,6 +65,7 @@ class BankGameHandler {
       created: false,
       balance: 0,
       blockedFromGame: false,
+      divorcedMenCount: 0,
       divorcedWomenCount: 0,
       cardType: '',
       cardNumber: '',
@@ -99,6 +100,7 @@ class BankGameHandler {
     const x = { ...this.defaultBankProfile(), ...(p || {}) };
     x.balance = Math.max(0, Number(x.balance || 0));
     x.blockedFromGame = Boolean(x.blockedFromGame);
+    x.divorcedMenCount = Math.max(0, Number(x.divorcedMenCount || 0));
     x.divorcedWomenCount = Math.max(0, Number(x.divorcedWomenCount || 0));
     x.cardType = String(x.cardType || '');
     x.cardNumber = String(x.cardNumber || '');
@@ -519,6 +521,7 @@ class BankGameHandler {
     wp.marriages.husbandSince = 0;
     wp.marriages.wifeSlot = 0;
     wp.divorcedWomenCount = Math.max(0, Number(wp.divorcedWomenCount || 0)) + 1;
+    hp.divorcedMenCount = Math.max(0, Number(hp.divorcedMenCount || 0)) + 1;
     husbandDoc.bankProfile = hp;
     wifeDoc.bankProfile = wp;
     await Promise.all([husbandDoc.save(), wifeDoc.save()]);
@@ -1204,6 +1207,27 @@ class BankGameHandler {
       const count = Math.max(0, Number(u?.bankProfile?.divorcedWomenCount || 0));
       const name = String(u.firstName || u.username || 'no').trim() || 'no';
       text += `${rank} ) ${count} 🙎🏻‍♀️ l ${name}\n`;
+    });
+    text += ' ━━━━━━━━━\n\n-';
+    return ctx.reply(text);
+  }
+
+  static async handleTopDivorcedMen(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const users = await User.find({ 'bankProfile.divorcedMenCount': { $gt: 0 } })
+      .select('firstName username bankProfile.divorcedMenCount')
+      .sort({ 'bankProfile.divorcedMenCount': -1 })
+      .limit(20)
+      .lean();
+
+    if (!users.length) return ctx.reply('• لا يوجد احد فالتوب');
+
+    let text = 'توب اكثر 20 مخلوع بالبوت :\n\n';
+    users.forEach((u, index) => {
+      const rank = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}`;
+      const count = Math.max(0, Number(u?.bankProfile?.divorcedMenCount || 0));
+      const name = String(u.firstName || u.username || 'no').trim() || 'no';
+      text += `${rank} ) ${count} 🙎🏻‍♂️ l ${name}\n`;
     });
     text += ' ━━━━━━━━━\n\n-';
     return ctx.reply(text);
