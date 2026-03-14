@@ -450,18 +450,12 @@ class ChatGamesUtilityHandler {
   }
 
   static async sendHotAudioResult(ctx, audio, canNext = true) {
-    const cleanTitle = this.cleanAudioLabel(audio.title || 'مقطع صوتي');
-    const cleanCreator = this.cleanAudioLabel(audio.creator || '');
-    const captionParts = [`🎵 ${cleanTitle}`];
-    if (cleanCreator) captionParts.push(`👤 ${cleanCreator}`);
-    captionParts.push('♪ تم التح🎧ميل بنجاح ♪');
+    const caption = '♪ تم التح🎧ميل بنجاح ♪ ☑🎶';
     const keyboard = this.buildHotKeyboard(canNext);
     await ctx.replyWithAudio(
       { url: audio.url },
       {
-        caption: captionParts.join('\n'),
-        title: audio.title || undefined,
-        performer: audio.creator || undefined,
+        caption,
         reply_markup: keyboard ? keyboard.reply_markup : undefined
       }
     );
@@ -817,7 +811,7 @@ class ChatGamesUtilityHandler {
       return;
     }
 
-    await ctx.reply('🎧 جاري التحميل ....');
+    const loadingMsg = await ctx.reply('🎧 جاري التحميل ....');
     try {
       let audioList = await this.searchYoutubeAudios(query, 5);
 
@@ -845,13 +839,16 @@ class ChatGamesUtilityHandler {
       }
 
       if (!audioList.length) {
+        await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
         await ctx.reply('♪ عذرا غير متوفر ..');
         return;
       }
 
       this.setHotCache(ctx, query, audioList, 0);
+      await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
       await this.sendHotAudioResult(ctx, audioList[0], true);
     } catch (_error) {
+      await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
       await ctx.reply('♪ عذرا غير متوفر ..');
     }
   }
