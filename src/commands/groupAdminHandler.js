@@ -1238,12 +1238,7 @@ class GroupAdminHandler {
   }
 
   static async canManageProtection(ctx) {
-    const isOwner = await this.isOwnerOrBasic(ctx);
-    if (isOwner) return true;
-    const isManager = await this.isManagerOrHigher(ctx);
-    if (isManager) return true;
-    const isTelegramAdmin = await this.isGroupAdmin(ctx);
-    return Boolean(isTelegramAdmin);
+    return this.isOwnerOrBasic(ctx);
   }
 
   static async handleProtectCommand(ctx) {
@@ -4690,13 +4685,13 @@ class GroupAdminHandler {
         await ctx.reply('✅ تم تعطيل اشعار منع الرسائل الطويلة.');
         return true;
       }
-      if (/^استثناء المشرفين من الحماية$/i.test(rawText)) {
+      if (/^(استثناء المشرفين من الحماية|تفعيل استثناء المشرفين من الحماية)$/i.test(rawText)) {
         const result = await this.setProtectionSetting(ctx, 'exemptAdminsFromProtection', true, 'text');
         if (!result?.ok) return true;
         await ctx.reply('✅ تم تفعيل استثناء المشرفين من الحماية.');
         return true;
       }
-      if (/^(الغاء استثناء المشرفين من الحماية|إلغاء استثناء المشرفين من الحماية)$/i.test(rawText)) {
+      if (/^(الغاء استثناء المشرفين من الحماية|إلغاء استثناء المشرفين من الحماية|تعطيل استثناء المشرفين من الحماية)$/i.test(rawText)) {
         const result = await this.setProtectionSetting(ctx, 'exemptAdminsFromProtection', false, 'text');
         if (!result?.ok) return true;
         await ctx.reply('✅ تم إلغاء استثناء المشرفين من الحماية.');
