@@ -1,4 +1,4 @@
-﻿const Markup = require('telegraf/markup');
+const Markup = require('telegraf/markup');
 const { Group, User } = require('../database/models');
 const Config = require('../database/models/Config');
 
@@ -1211,9 +1211,9 @@ class GroupAdminHandler {
   static async setProtectionSetting(ctx, key, value, source = 'manual') {
     if (!this.isGroupChat(ctx)) return false;
 
-    const isAdmin = await this.isManagerOrHigher(ctx);
-    if (!isAdmin) {
-      await ctx.reply('❌ أوامر الحماية للمشرفين فقط.');
+    const canManage = await this.canManageProtection(ctx);
+    if (!canManage) {
+      await ctx.reply(this.getProtectionDeniedMessage());
       return { ok: false };
     }
 
@@ -1233,11 +1233,24 @@ class GroupAdminHandler {
     return null;
   }
 
+  static getProtectionDeniedMessage() {
+    return '• عذراً الامر يخص ↤︎ 〖  المالك 〗 فقط .';
+  }
+
+  static async canManageProtection(ctx) {
+    const isOwner = await this.isOwnerOrBasic(ctx);
+    if (isOwner) return true;
+    const isManager = await this.isManagerOrHigher(ctx);
+    if (isManager) return true;
+    const isTelegramAdmin = await this.isGroupAdmin(ctx);
+    return Boolean(isTelegramAdmin);
+  }
+
   static async handleProtectCommand(ctx) {
     if (!this.isGroupChat(ctx)) return;
 
-    const isAdmin = await this.isManagerOrHigher(ctx);
-    if (!isAdmin) return ctx.reply('❌ هذا الأمر للمشرفين فقط.');
+    const canManage = await this.canManageProtection(ctx);
+    if (!canManage) return ctx.reply(this.getProtectionDeniedMessage());
 
     const group = await this.ensureGroupRecord(ctx);
     this.normalizeGroupState(group);
@@ -1320,9 +1333,9 @@ class GroupAdminHandler {
   static async handleToggleSetting(ctx, key) {
     if (!this.isGroupChat(ctx)) return;
 
-    const isAdmin = await this.isManagerOrHigher(ctx);
-    if (!isAdmin) {
-      await ctx.answerCbQuery('❌ للمشرفين فقط', { show_alert: false });
+    const canManage = await this.canManageProtection(ctx);
+    if (!canManage) {
+      await ctx.answerCbQuery(this.getProtectionDeniedMessage(), { show_alert: false });
       return;
     }
 
@@ -1428,7 +1441,7 @@ class GroupAdminHandler {
   static async handleAdminInteractionCommand(ctx) {
     if (!this.isGroupChat(ctx)) return;
     const canUse = await this.isOwnerOrBasic(ctx);
-    if (!canUse) return ctx.reply('❌ هذا الأمر للمالك الأساسي أو الأساسي فقط.');
+    if (!canUse) return ctx.reply('• عذراً الامر يخص ↤︎ 〖  المالك 〗 فقط .');
 
     const args = this.parseCommandArgs(ctx);
     const normalizedArgs = args[0] === 'مشرف' ? args.slice(1) : args;
@@ -1811,7 +1824,7 @@ class GroupAdminHandler {
   static async handleReasonsToggle(ctx) {
     if (!this.isGroupChat(ctx)) return;
     const canUse = await this.isOwnerOrBasic(ctx);
-    if (!canUse) return ctx.reply('❌ هذا الأمر للمالك الأساسي أو الأساسي فقط.');
+    if (!canUse) return ctx.reply('• عذراً الامر يخص ↤︎ 〖  المالك 〗 فقط .');
 
     const group = await this.ensureGroupRecord(ctx);
     const text = String(ctx.message?.text || '').trim().toLowerCase();
@@ -1839,7 +1852,7 @@ class GroupAdminHandler {
   static async handleGameEngagementToggle(ctx) {
     if (!this.isGroupChat(ctx)) return;
     const canUse = await this.isOwnerOrBasic(ctx);
-    if (!canUse) return ctx.reply('❌ هذا الأمر للمالك الأساسي أو الأساسي فقط.');
+    if (!canUse) return ctx.reply('• عذراً الامر يخص ↤︎ 〖  المالك 〗 فقط .');
 
     const group = await this.ensureGroupRecord(ctx);
     const text = String(ctx.message?.text || '').trim();
@@ -1909,8 +1922,8 @@ class GroupAdminHandler {
 
   static async handleProtectionPresetCommand(ctx) {
     if (!this.isGroupChat(ctx)) return;
-    const canUse = await this.isOwnerOrBasic(ctx);
-    if (!canUse) return ctx.reply('❌ هذا الأمر للمالك الأساسي أو الأساسي فقط.');
+    const canManage = await this.canManageProtection(ctx);
+    if (!canManage) return ctx.reply(this.getProtectionDeniedMessage());
 
     const group = await this.ensureGroupRecord(ctx);
     const rawText = String(ctx.message?.text || '').trim();
@@ -1986,8 +1999,8 @@ class GroupAdminHandler {
 
   static async handleProtectionSettingsCommand(ctx) {
     if (!this.isGroupChat(ctx)) return;
-    const canUse = await this.isAdminOrHigher(ctx);
-    if (!canUse) return ctx.reply('❌ هذا الأمر للمشرفين فقط.');
+    const canManage = await this.canManageProtection(ctx);
+    if (!canManage) return ctx.reply(this.getProtectionDeniedMessage());
     const group = await this.ensureGroupRecord(ctx);
     return ctx.reply(this.buildProtectionSettingsText(group), { parse_mode: 'HTML' });
   }
@@ -2338,7 +2351,7 @@ class GroupAdminHandler {
   static async handleOnlineToggle(ctx) {
     if (!this.isGroupChat(ctx)) return;
     const canUse = await this.isOwnerOrBasic(ctx);
-    if (!canUse) return ctx.reply('❌ هذا الأمر للمالك الأساسي أو الأساسي فقط.');
+    if (!canUse) return ctx.reply('• عذراً الامر يخص ↤︎ 〖  المالك 〗 فقط .');
     const group = await this.ensureGroupRecord(ctx);
     const text = String(ctx.message?.text || '').trim();
     if (/^(قفل الانلاين للكل|\/gonline\s+lock)$/i.test(text)) {
@@ -2358,7 +2371,7 @@ class GroupAdminHandler {
   static async handleAdminLeaveToggle(ctx) {
     if (!this.isGroupChat(ctx)) return;
     const canUse = await this.isOwnerOrBasic(ctx);
-    if (!canUse) return ctx.reply('❌ هذا الأمر للمالك الأساسي أو الأساسي فقط.');
+    if (!canUse) return ctx.reply('• عذراً الامر يخص ↤︎ 〖  المالك 〗 فقط .');
     const group = await this.ensureGroupRecord(ctx);
     const text = String(ctx.message?.text || '').trim();
     if (/^(تفعيل مغادره المشرفين|\/gadminleave\s+on)$/i.test(text)) {
