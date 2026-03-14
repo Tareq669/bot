@@ -4097,14 +4097,7 @@ class GroupAdminHandler {
       const subscribed = await this.isUserSubscribedToNewsChannel(ctx, group, ctx.from?.id);
       if (!subscribed) {
         await ctx.answerCbQuery('❌ ما زلت غير مشترك بالقناة', { show_alert: false }).catch(() => {});
-        try {
-          await ctx.editMessageText(this.getForcedSubscriptionNotice(ctx.from, group), {
-            reply_markup: this.forcedSubscriptionKeyboard(channel).reply_markup,
-            disable_web_page_preview: true
-          });
-        } catch (_error) {
-          // ignore
-        }
+        await this.sendForcedSubscriptionPrompt(ctx, group);
         return;
       }
 
@@ -4356,6 +4349,41 @@ class GroupAdminHandler {
       [Markup.button.url(channel?.title || 'اشترك الآن', channel?.url || 'https://t.me')],
       [Markup.button.callback('✅ تحقق من الاشتراك', 'group:subscribe:verify')]
     ]);
+  }
+
+  static async sendForcedSubscriptionPrompt(ctx, group) {
+    const channel = this.getRequiredSubscriptionChannel(group);
+    const text = this.getForcedSubscriptionNotice(ctx.from, group);
+    const keyboard = this.forcedSubscriptionKeyboard(channel).reply_markup;
+    const chatId = ctx.chat?.id;
+    if (!chatId) return;
+
+    try {
+      await ctx.reply(text, {
+        parse_mode: 'HTML',
+        reply_markup: keyboard,
+        disable_web_page_preview: true
+      });
+      return;
+    } catch (_error) {
+      // fallback below
+    }
+
+    try {
+      await ctx.telegram.sendMessage(chatId, text, {
+        parse_mode: 'HTML',
+        reply_markup: keyboard,
+        disable_web_page_preview: true
+      });
+      return;
+    } catch (_error) {
+      // fallback below
+    }
+
+    await ctx.telegram.sendMessage(chatId, text, {
+      reply_markup: keyboard,
+      disable_web_page_preview: true
+    }).catch(() => null);
   }
 
   static async processGroupMessage(ctx) {
@@ -4807,11 +4835,7 @@ class GroupAdminHandler {
         } catch (_error) {
           // ignore delete errors
         }
-        await ctx.reply(this.getForcedSubscriptionNotice(ctx.from, group), {
-          parse_mode: 'HTML',
-          reply_markup: this.forcedSubscriptionKeyboard(channel).reply_markup,
-          disable_web_page_preview: true
-        }).catch(() => null);
+        await this.sendForcedSubscriptionPrompt(ctx, group);
         return true;
       }
     }
