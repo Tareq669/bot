@@ -3779,7 +3779,7 @@ class GroupAdminHandler {
     if (!targetUserId) return ctx.reply('❌ استخدم الكتم بالرد أو @user أو ID.');
 
     const targetIsAdmin = await this.isGroupAdmin(ctx, targetUserId);
-    if (targetIsAdmin) return ctx.reply('❌ لا يمكن كتم مشرف.');
+    if (targetIsAdmin) return ctx.reply('• عذراً الامر يخص ↤︎ 〖  الادمن 〗 فقط .');
 
     const minutes = Math.max(1, parseInt(args[0] || '10', 10) || 10);
     const group = await this.ensureGroupRecord(ctx);
@@ -3880,7 +3880,7 @@ class GroupAdminHandler {
     if (!targetUserId) return ctx.reply('❌ استخدم التقييد بالرد أو @user أو ID.');
 
     const targetIsAdmin = await this.isGroupAdmin(ctx, targetUserId);
-    if (targetIsAdmin) return ctx.reply('❌ لا يمكن تقييد مشرف.');
+    if (targetIsAdmin) return ctx.reply('• عذراً الامر يخص ↤︎ 〖  الادمن 〗 فقط .');
 
     const minutes = Math.max(1, parseInt(args[0] || '10', 10) || 10);
     const untilDate = Math.floor(Date.now() / 1000) + minutes * 60;
