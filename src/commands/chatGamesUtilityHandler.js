@@ -1047,11 +1047,7 @@ class ChatGamesUtilityHandler {
     let ranked = (strictRankedEntries.length ? strictRankedEntries : rankingEntries)
       .map((entry) => entry.item);
 
-    if (!ranked.length) {
-      const archive = await this.searchArchiveAudio(q).catch(() => null);
-      if (archive?.url) return this.uniqueAudioResults([archive], limit);
-      return [];
-    }
+    if (!ranked.length) return [];
 
     const queryTokens = this.queryTokens(cleaned || normalizedQuery);
     const candidatesToResolve = ranked
@@ -1109,9 +1105,6 @@ class ChatGamesUtilityHandler {
 
     const final = this.uniqueAudioResults(Array.isArray(resolved) ? resolved : [], limit);
     if (final.length) return final;
-
-    const archive = await this.searchArchiveAudio(q).catch(() => null);
-    if (archive?.url) return this.uniqueAudioResults([archive], limit);
     return [];
   }
 
@@ -1179,12 +1172,6 @@ class ChatGamesUtilityHandler {
 
   static async buildAudioList(query) {
     const audioList = await this.searchYoutubeAudios(query, 5);
-
-    if (!audioList.length) {
-      const archiveAudio = await this.searchArchiveAudio(query);
-      if (archiveAudio?.url) audioList.push(archiveAudio);
-    }
-
     return this.uniqueAudioResults(audioList, 5);
   }
 
