@@ -64,9 +64,25 @@ const groupSchema = new mongoose.Schema({
       type: Boolean,
       default: false
     },
+    lockPremiumStickers: {
+      type: Boolean,
+      default: false
+    },
+    exemptAdminsFromPremiumStickers: {
+      type: Boolean,
+      default: false
+    },
+    notifyPremiumStickerBlock: {
+      type: Boolean,
+      default: true
+    },
     blockForwards: {
       type: Boolean,
       default: false
+    },
+    notifyForwardBlock: {
+      type: Boolean,
+      default: true
     },
     blockChannelEdits: {
       type: Boolean,
