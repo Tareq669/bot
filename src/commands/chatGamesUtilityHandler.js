@@ -623,10 +623,14 @@ class ChatGamesUtilityHandler {
 
   static async sendHotAudioResult(ctx, audio, canNext = true) {
     const caption = '♪ تم التح🎧ميل بنجاح ♪';
+    const safeTitle = this.cleanAudioLabel(audio?.title || 'مقطع صوتي').slice(0, 120);
+    const safePerformer = this.cleanAudioLabel(audio?.creator || '').slice(0, 80) || undefined;
     await ctx.replyWithAudio(
       { url: audio.url },
       {
-        caption
+        caption,
+        title: safeTitle,
+        performer: safePerformer
       }
     );
   }
