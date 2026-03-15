@@ -1237,6 +1237,10 @@ const CHANCE_CHALLENGES = [
   'اكتب دعاء قصير',
   'اذكر فائدة واحدة للقراءة'
 ];
+const HAZAR_WORDS = [
+  'تفاحة', 'قلم', 'سيارة', 'شمس', 'قمر', 'كتاب', 'مفتاح', 'بحر', 'جبل', 'وردة',
+  'مدرسة', 'هاتف', 'طائرة', 'باب', 'كوب', 'مطر', 'نار', 'ثلج', 'ساعة', 'مدينة'
+];
 const LEVEL_TIERS = [
   { index: 1, key: 'bronze', name: 'البرونزي', icon: '🥉', minXp: 0, maxXp: 99 },
   { index: 2, key: 'silver', name: 'الفضي', icon: '🥈', minXp: 100, maxXp: 249 },
@@ -1263,6 +1267,9 @@ class GroupGamesHandler {
   static activeHookahSessions = new Map();
   static activeRulerExecutionGames = new Map();
   static rulerExecutionTimers = new Map();
+  static activeHazarGames = new Map();
+  static hazarTimers = new Map();
+  static HAZAR_MUTE_SECONDS = 180;
   static activeCupGames = new Map();
   static CUPS_GAME_TIMEOUT_MS = 45 * 1000;
   static CUPS_BASE_REWARD = 100;
@@ -3884,6 +3891,39 @@ class GroupGamesHandler {
     if (handledStory) return true;
 
     const norm = this.normalizeText(String(text || ''));
+    if (norm === 'حزر') {
+      await this.startHazarGame(ctx);
+      return true;
+    }
+
+    if (norm === 'انا') {
+      const joined = await this.joinHazarGame(ctx);
+      if (joined) return true;
+    }
+
+    if (norm === 'نعم') {
+      const started = await this.beginHazarRound(ctx);
+      if (started) return true;
+    }
+
+    const hazarGame = this.activeHazarGames.get(groupId);
+    if (
+      hazarGame &&
+      String(hazarGame.stage) === 'running' &&
+      Number(ctx.from?.id || 0) === Number(hazarGame.guesserId || 0)
+    ) {
+      const guess = this.normalizeText(String(text || ''));
+      if (guess && guess === String(hazarGame.answerNorm || '')) {
+        const toUnmute = Array.isArray(hazarGame.mutedIds) ? hazarGame.mutedIds : [];
+        for (const uid of toUnmute) {
+          await this.unmuteMemberForHazar(ctx.chat.id, uid);
+        }
+        this.clearHazarGame(ctx.chat.id);
+        await ctx.reply('• كفو ي ذكي تم فك الكتم عنك .', { reply_to_message_id: ctx.message?.message_id });
+        return true;
+      }
+    }
+
     if (norm === 'نفس') {
       const handledSessionPuff = await this.handleHookahSessionPuff(ctx);
       if (handledSessionPuff) return true;
@@ -6863,6 +6903,190 @@ class GroupGamesHandler {
       `${requester}\n♪ ${joke}`,
       { parse_mode: 'HTML', reply_to_message_id: ctx.message?.message_id }
     );
+  }
+
+  static clearHazarGame(chatId) {
+    const key = String(chatId);
+    this.activeHazarGames.delete(key);
+    const timer = this.hazarTimers.get(key);
+    if (timer) clearTimeout(timer);
+    this.hazarTimers.delete(key);
+  }
+
+  static async muteMemberForHazar(chatId, userId, seconds = 180) {
+    const until = Math.floor(Date.now() / 1000) + Math.max(10, Number(seconds || 180));
+    try {
+      await this.bot.telegram.restrictChatMember(Number(chatId), Number(userId), {
+        permissions: {
+          can_send_messages: false,
+          can_send_audios: false,
+          can_send_documents: false,
+          can_send_photos: false,
+          can_send_videos: false,
+          can_send_video_notes: false,
+          can_send_voice_notes: false,
+          can_send_polls: false,
+          can_send_other_messages: false,
+          can_add_web_page_previews: false,
+          can_change_info: false,
+          can_invite_users: false,
+          can_pin_messages: false,
+          can_manage_topics: false
+        },
+        until_date: until
+      });
+      return true;
+    } catch (_error) {
+      return false;
+    }
+  }
+
+  static async unmuteMemberForHazar(chatId, userId) {
+    try {
+      await this.bot.telegram.restrictChatMember(Number(chatId), Number(userId), {
+        permissions: {
+          can_send_messages: true,
+          can_send_audios: true,
+          can_send_documents: true,
+          can_send_photos: true,
+          can_send_videos: true,
+          can_send_video_notes: true,
+          can_send_voice_notes: true,
+          can_send_polls: true,
+          can_send_other_messages: true,
+          can_add_web_page_previews: true,
+          can_change_info: false,
+          can_invite_users: true,
+          can_pin_messages: false,
+          can_manage_topics: false
+        }
+      });
+      return true;
+    } catch (_error) {
+      return false;
+    }
+  }
+
+  static buildHazarAnswerKeyboard(token) {
+    return Markup.inlineKeyboard([
+      [Markup.button.callback('🧩 الاجابة', `group:hazar:answer:${token}`)]
+    ]);
+  }
+
+  static async handleHazarAnswerAction(ctx, token) {
+    if (!this.isGroupChat(ctx)) return;
+    const game = this.activeHazarGames.get(String(ctx.chat.id));
+    if (!game || String(game.token) !== String(token) || String(game.stage) !== 'running') {
+      return ctx.answerCbQuery('ما في لعبة حزر شغالة حالياً.', { show_alert: true }).catch(() => {});
+    }
+    if (Number(ctx.from?.id || 0) !== Number(game.guesserId || 0)) {
+      return ctx.answerCbQuery('هذا الزر للمُخمن فقط.', { show_alert: true }).catch(() => {});
+    }
+    return ctx.answerCbQuery('اكتب تخمينك الآن برسالة في الجروب.', { show_alert: true }).catch(() => {});
+  }
+
+  static async startHazarGame(ctx) {
+    const key = String(ctx.chat.id);
+    const exists = this.activeHazarGames.get(key);
+    if (exists) return ctx.reply('ℹ️ في لعبة حزر شغالة بالفعل.');
+
+    const hostId = Number(ctx.from?.id || 0);
+    const hostName = ctx.from?.first_name || ctx.from?.username || String(hostId || 'عضو');
+    this.activeHazarGames.set(key, {
+      token: this.token('hazar'),
+      stage: 'lobby',
+      hostId,
+      hostName,
+      participants: [hostId],
+      names: { [hostId]: hostName },
+      createdAt: Date.now()
+    });
+
+    return ctx.reply(
+      '• تم بدأ لعبة حزر و تم تسجيلك\n' +
+      '• الي بيلعب يكتب كلمة ~ (انا) .',
+      { reply_to_message_id: ctx.message?.message_id }
+    );
+  }
+
+  static async joinHazarGame(ctx) {
+    const key = String(ctx.chat.id);
+    const game = this.activeHazarGames.get(key);
+    if (!game || String(game.stage) !== 'lobby') return false;
+
+    const userId = Number(ctx.from?.id || 0);
+    const userName = ctx.from?.first_name || ctx.from?.username || String(userId || 'عضو');
+    if (!game.participants.includes(userId)) game.participants.push(userId);
+    game.names[userId] = userName;
+
+    await ctx.reply(
+      '• تم ضفتك للعبة حزر .\n' +
+      '• للانتهاء يرسل نعم الي بدأ اللعبة .',
+      { reply_to_message_id: ctx.message?.message_id }
+    );
+    return true;
+  }
+
+  static async beginHazarRound(ctx) {
+    const key = String(ctx.chat.id);
+    const game = this.activeHazarGames.get(key);
+    if (!game || String(game.stage) !== 'lobby') return false;
+    if (Number(ctx.from?.id || 0) !== Number(game.hostId || 0)) return false;
+
+    const candidates = (game.participants || []).filter((id) => Number(id) !== Number(game.hostId));
+    if (!candidates.length) {
+      await ctx.reply('❌ ما في لاعبين. خلي الأعضاء يكتبوا: انا');
+      return true;
+    }
+
+    const guesserId = Number(candidates[candidates.length - 1]);
+    const guesserName = String(game.names?.[guesserId] || guesserId);
+    const muteTargets = (game.participants || []).filter((id) => Number(id) !== guesserId);
+    const mutedDone = [];
+    for (const uid of muteTargets) {
+      const ok = await this.muteMemberForHazar(ctx.chat.id, uid, this.HAZAR_MUTE_SECONDS);
+      if (ok) mutedDone.push(Number(uid));
+    }
+
+    const answer = this.pickNonRepeating(
+      HAZAR_WORDS.map((w) => ({ question: w, answers: [w] })),
+      `hazar:${String(ctx.chat.id)}`
+    );
+    const answerWord = String(answer?.question || 'قلم');
+
+    game.stage = 'running';
+    game.startedAt = Date.now();
+    game.guesserId = guesserId;
+    game.guesserName = guesserName;
+    game.answer = answerWord;
+    game.answerNorm = this.normalizeText(answerWord);
+    game.mutedIds = mutedDone;
+
+    const timer = setTimeout(async () => {
+      const current = this.activeHazarGames.get(key);
+      if (!current || String(current.stage) !== 'running') return;
+      const toUnmute = Array.isArray(current.mutedIds) ? current.mutedIds : [];
+      for (const uid of toUnmute) {
+        await this.unmuteMemberForHazar(ctx.chat.id, uid);
+      }
+      this.clearHazarGame(ctx.chat.id);
+      await this.bot.telegram.sendMessage(
+        Number(ctx.chat.id),
+        '⌛ انتهت مدة لعبة حزر (3 دقائق) وتم فك الكتم.'
+      ).catch(() => {});
+    }, this.HAZAR_MUTE_SECONDS * 1000);
+    this.hazarTimers.set(key, timer);
+
+    await ctx.reply(
+      `• الهمسه للجميع ما عدا (${this.escapeHtml(guesserName)})\n` +
+      '• تم كتمك لمدة 3 دقائق حتى تحزر الاجابة .',
+      {
+        parse_mode: 'HTML',
+        reply_to_message_id: ctx.message?.message_id,
+        reply_markup: this.buildHazarAnswerKeyboard(game.token).reply_markup
+      }
+    );
+    return true;
   }
 
   static clearCupGame(chatId) {

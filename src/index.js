@@ -1760,6 +1760,7 @@ bot.action('owner:cleanup:confirm', async (ctx) => {
 bot.action(/^group:mcq:([a-z0-9]+):(\d+)$/i, (ctx) => GroupGamesHandler.handleMcqCallback(ctx, ctx.match[1], ctx.match[2]));
 bot.action(/^group:vote:([a-z0-9]+):(\d+)$/i, (ctx) => GroupGamesHandler.handleVoteCallback(ctx, ctx.match[1], ctx.match[2]));
 bot.action(/^group:duel:(accept|decline):([a-z0-9]+)$/i, (ctx) => GroupGamesHandler.handleDuelAction(ctx, ctx.match[1], ctx.match[2]));
+bot.action(/^group:hazar:answer:([a-z0-9]+)$/i, (ctx) => GroupGamesHandler.handleHazarAnswerAction(ctx, ctx.match[1]));
 bot.action(/^group:confess:(end):([a-z0-9]+)$/i, (ctx) => GroupGamesHandler.handleConfessionAction(ctx, ctx.match[1].toLowerCase(), ctx.match[2]));
 bot.action(/^group:games:(gquiz|gmath|gword|gwho|griddle|gtype|gduel|gcups|gchance|gdaily|gmcq|gvote|gleader|gweekly|gmonth|glevels|glounge|gconfess|gconfess_end)$/i, (ctx) => GroupGamesHandler.handleGamesMenuAction(ctx, ctx.match[1].toLowerCase()));
 bot.action(/^group:cups:pick:([a-z0-9]+):([1-3])$/i, (ctx) => GroupGamesHandler.handleCupsPickAction(ctx, ctx.match[1], Number(ctx.match[2])));
