@@ -7765,6 +7765,24 @@ class GroupGamesHandler {
     if (action === 'gtype') return this.handleTypingCommand(ctx);
     if (action === 'gduel') return this.handleDuelCommand(ctx);
     if (action === 'gcups') return this.handleCupsCommand(ctx);
+    if (action === 'greligious') return this.handleReligiousMcqCommand(ctx);
+    if (action === 'gscience') return this.handleScienceMcqCommand(ctx);
+    if (action === 'ghistory') return this.handleHistoryMcqCommand(ctx);
+    if (action === 'gfiqh') return this.handleFiqhMcqCommand(ctx);
+    if (action === 'ggeography') return this.handleGeographyMcqCommand(ctx);
+    if (action === 'gphysics') return this.handlePhysicsMcqCommand(ctx);
+    if (action === 'gcalculations') return this.handleCalculationsMcqCommand(ctx);
+    if (action === 'gdetective' || action === 'gcrime') return this.handleDetectiveCommand(ctx);
+    if (action === 'gruler') return this.handleRulerExecutionCommand(ctx);
+    if (action === 'gstory') return this.handleStoryTalkStart(ctx);
+    if (action === 'gchair') return this.handleConfessionStart(ctx);
+    if (action === 'gstore') return this.handleStoreCommand(ctx);
+    if (action === 'ggroupgames') return this.handleGamesHelp(ctx);
+    if (action === 'gxo') {
+      // Lazy require to avoid potential circular init issues.
+      const ChatGamesUtilityHandler = require('./chatGamesUtilityHandler');
+      return ChatGamesUtilityHandler.handleXoStart(ctx);
+    }
     if (action === 'gchance') return this.handleChanceCommand(ctx);
     if (action === 'gdaily') return this.handleDailyCommand(ctx);
     if (action === 'gmcq') return this.handleMcqCommand(ctx);
@@ -7777,6 +7795,71 @@ class GroupGamesHandler {
     if (action === 'gconfess') return this.handleConfessionStart(ctx);
     if (action === 'gconfess_end') return this.handleConfessionEnd(ctx);
     return null;
+  }
+
+  static getGamesMenuPages() {
+    return [
+      [
+        { label: '❓ سؤال سريع / كويز', action: 'gquiz' },
+        { label: '🧠 ألغاز', action: 'griddle' },
+        { label: '⚡ سرعة الكتابة', action: 'gtype' },
+        { label: '🕵️ مين أنا', action: 'gwho' },
+        { label: '🧮 حساب ذهني', action: 'gmath' }
+      ],
+      [
+        { label: '🔤 ترتيب كلمة', action: 'gword' },
+        { label: '⚔️ تحدي', action: 'gduel' },
+        { label: '🥤 اكواب', action: 'gcups' },
+        { label: '📿 ديني', action: 'greligious' },
+        { label: '🔬 علمي', action: 'gscience' }
+      ],
+      [
+        { label: '🏺 تاريخي', action: 'ghistory' },
+        { label: '📖 فقهي', action: 'gfiqh' },
+        { label: '🌍 جغرافي', action: 'ggeography' },
+        { label: '⚛️ فيزيائي', action: 'gphysics' },
+        { label: '🧮 حسابات', action: 'gcalculations' }
+      ],
+      [
+        { label: '🕵️ المحقق', action: 'gdetective' },
+        { label: '🚨 الجريمة', action: 'gcrime' },
+        { label: '🎭 حاكم جلاد', action: 'gruler' },
+        { label: '🗣️ سوالفكم', action: 'gstory' },
+        { label: '🪑 كرسي الاعتراف', action: 'gchair' }
+      ],
+      [
+        { label: '🛒 متجر القروب', action: 'gstore' },
+        { label: '🎲 روليت', action: 'gchance' },
+        { label: '🎮 العاب الجروب', action: 'ggroupgames' },
+        { label: '🗳️ تصويت', action: 'gvote' },
+        { label: '📅 تحدي يومي', action: 'gdaily' },
+        { label: '❌⭕ اكس اوه', action: 'gxo' }
+      ]
+    ];
+  }
+
+  static buildGamesMenuPagerKeyboard(pageIndex = 0) {
+    const pages = this.getGamesMenuPages();
+    const total = Math.max(1, pages.length);
+    const current = Math.max(0, Math.min(total - 1, Number(pageIndex) || 0));
+    const items = pages[current] || [];
+    const rows = [];
+    for (let i = 0; i < items.length; i += 2) {
+      const left = items[i];
+      const right = items[i + 1];
+      const row = [Markup.button.callback(left.label, `group:games:${left.action}`)];
+      if (right) row.push(Markup.button.callback(right.label, `group:games:${right.action}`));
+      rows.push(row);
+    }
+    const prev = (current - 1 + total) % total;
+    const next = (current + 1) % total;
+    rows.push([
+      Markup.button.callback('⬅️ السابق', `group:games:page:${prev}`),
+      Markup.button.callback(`📄 ${current + 1}/${total}`, 'group:games:noop'),
+      Markup.button.callback('التالي ➡️', `group:games:page:${next}`)
+    ]);
+    rows.push([Markup.button.callback('❌ اخفاء الالعاب', 'group:games:hide')]);
+    return Markup.inlineKeyboard(rows);
   }
 
   static buildGamesShowcaseKeyboard() {
@@ -7809,21 +7892,46 @@ class GroupGamesHandler {
 
   static async handleGamesListCommand(ctx) {
     if (!this.isGroupChat(ctx)) return;
+    const firstPage = this.getGamesMenuPages()[0] || [];
     const text =
       '• الالعاب للبوت 🎲🎰.\n' +
       '↓ ↓ ↓ ↓\n' +
-      '• سؤال سريع\n' +
-      '• ألغاز\n' +
-      '• سرعة الكتابة\n' +
-      '• مين أنا\n' +
-      '• حساب ذهني\n' +
-      '• ترتيب كلمة\n' +
-      '• تحدي\n' +
-      '• الأكواب';
+      firstPage.map((item) => `• ${item.label.replace(/^[^\s]+\s*/, '')}`).join('\n');
     return ctx.reply(text, {
       reply_to_message_id: ctx.message?.message_id,
-      reply_markup: this.buildGamesShowcaseKeyboard().reply_markup
+      reply_markup: this.buildGamesMenuPagerKeyboard(0).reply_markup
     });
+  }
+
+  static async handleGamesMenuPageAction(ctx, page = 0) {
+    if (!this.isGroupChat(ctx)) return;
+    if (ctx.callbackQuery) await ctx.answerCbQuery().catch(() => {});
+    const pages = this.getGamesMenuPages();
+    const total = Math.max(1, pages.length);
+    const safePage = ((Number(page) || 0) % total + total) % total;
+    const currentItems = pages[safePage] || [];
+    const text =
+      '• الالعاب للبوت 🎲🎰.\n' +
+      '↓ ↓ ↓ ↓\n' +
+      currentItems.map((item) => `• ${item.label.replace(/^[^\s]+\s*/, '')}`).join('\n');
+
+    if (ctx.callbackQuery?.message?.message_id) {
+      return ctx.editMessageText(text, {
+        reply_markup: this.buildGamesMenuPagerKeyboard(safePage).reply_markup
+      }).catch(() => null);
+    }
+    return ctx.reply(text, { reply_markup: this.buildGamesMenuPagerKeyboard(safePage).reply_markup });
+  }
+
+  static async handleGamesMenuMetaAction(ctx, action = '') {
+    if (!this.isGroupChat(ctx)) return;
+    const act = String(action || '').toLowerCase();
+    if (ctx.callbackQuery) await ctx.answerCbQuery().catch(() => {});
+    if (act === 'noop') return;
+    if (act === 'hide') {
+      await ctx.editMessageReplyMarkup({ inline_keyboard: [] }).catch(() => {});
+      await ctx.reply('• تم اخفاء الاوامر بنجاح');
+    }
   }
 
   static getGamesHelpPages() {
