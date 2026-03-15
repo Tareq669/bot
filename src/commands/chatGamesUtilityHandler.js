@@ -1,4 +1,4 @@
-﻿const axios = require('axios');
+const axios = require('axios');
 const Markup = require('telegraf/markup');
 const { User } = require('../database/models');
 
@@ -10,7 +10,22 @@ class ChatGamesUtilityHandler {
   static AUDIO_QUERY_CACHE_TTL_MS = 30 * 60 * 1000;
   static audioSearchInFlight = new Map();
   static audioChatQueue = new Map();
-  static AUDIO_SEARCH_TIMEOUT_MS = 25000;
+  static AUDIO_SEARCH_TIMEOUT_MS = 15000;
+  static YT_PIPED_TIMEOUT_MS = 8000;
+  static FAST_SEARCH_INSTANCES = 1;
+  static FAST_SEARCH_FALLBACK_INSTANCES = 2;
+  static AUDIO_FAST_TIMEOUT_MS = 2400;
+  static AUDIO_RESOLVE_TIMEOUT_MS = 3600;
+  static AUDIO_QUERY_MAX_VARIANTS = 4;
+  static AUDIO_QUERY_FAST_VARIANTS = 2;
+  static FAST_YT_RESULTS_LIMIT = 12;
+  static FAST_YT_VARIANTS = 3;
+  static FAST_YT_PER_QUERY_LIMIT = 10;
+  static FAST_SEARCH_MIN_MATCHES = 4;
+  static AUDIO_RESOLVE_BATCH_SIZE = 4;
+  static AUDIO_STRICT_MATCH_RATIO = 0.45;
+  static AUDIO_STRICT_SCORE_THRESHOLD = 0.45;
+  static YT_HTML_SEARCH_TIMEOUT_MS = 4500;
   static ARCHIVE_SEARCH_URL = 'https://archive.org/advancedsearch.php';
   static ARCHIVE_METADATA_URL = 'https://archive.org/metadata';
   static YT_PIPED_INSTANCES = [
@@ -28,6 +43,11 @@ class ChatGamesUtilityHandler {
   static MUSIC_HINT_TERMS = [
     'اغنية', 'أغنية', 'اغاني', 'أغاني', 'music', 'song', 'mp3', 'كليب', 'حفلة', 'حفله',
     'ام كلثوم', 'فيروز', 'عبد الحليم', 'كاظم', 'اصالة', 'أصالة'
+  ];
+
+  static MUSIC_STOP_WORDS = [
+    'اغنية', 'اغاني', 'اغنيه', 'music', 'song', 'mp3', 'موسيقى', 'موسيقي', 'كليب',
+    'فيلم', 'clip', 'lyric', 'lyrics', 'صوت', 'صوتيات', 'فيديو', 'video'
   ];
 
   static cityAliases = {
@@ -378,6 +398,38 @@ class ChatGamesUtilityHandler {
       .trim();
   }
 
+  static hasOrderedTokenMatch(query, text) {
+    const normalizedQuery = this.normalizeSearchText(query);
+    const normalizedText = this.normalizeSearchText(text);
+    if (!normalizedQuery || !normalizedText) return false;
+    if (normalizedText.includes(normalizedQuery)) return true;
+    const qTokens = normalizedQuery.split(' ').filter(Boolean);
+    const tTokens = normalizedText.split(' ').filter(Boolean);
+    if (!qTokens.length || !tTokens.length) return false;
+
+    let cursor = 0;
+    for (const qToken of qTokens) {
+      let found = false;
+      for (let i = cursor; i < tTokens.length; i += 1) {
+        if (tTokens[i] === qToken) {
+          cursor = i + 1;
+          found = true;
+          break;
+        }
+      }
+      if (!found) return false;
+    }
+    return true;
+  }
+
+  static stripNoiseFromSearchQuery(query) {
+    const norm = this.normalizeSearchText(query);
+    if (!norm) return '';
+    const tokens = norm.split(' ').filter((token) => token.length >= 2);
+    const cleaned = tokens.filter((token) => !this.MUSIC_STOP_WORDS.includes(token));
+    return cleaned.join(' ');
+  }
+
   static queryTokens(value) {
     const norm = this.normalizeSearchText(value);
     if (!norm) return [];
@@ -410,6 +462,100 @@ class ChatGamesUtilityHandler {
     const songHints = ['اغنيه', 'اغنية', 'song', 'mp3', 'lyrics', 'كليب', 'موسيقى', 'music'];
     if (this.hasAnyTerm(normalized, songHints)) return false;
     return true;
+  }
+  static isMatchForRequest(query, title, creator = '') {
+    const normalizedQuery = this.normalizeSearchText(query);
+    const normalizedText = this.normalizeSearchText(`${title || ''} ${creator || ''}`);
+    if (!normalizedQuery || !normalizedText) return false;
+
+    const normalizedCore = this.stripNoiseFromSearchQuery(normalizedQuery);
+    const exactText = this.normalizeSearchText(`${creator || ''} ${title || ''}`);
+    if (exactText.includes(normalizedQuery) || (normalizedCore && exactText.includes(normalizedCore))) {
+      return true;
+    }
+
+    const queryTokens = this.queryTokens(normalizedQuery).filter((token) => token.length >= 2);
+    if (!queryTokens.length) return false;
+    const coreTokens = this.queryTokens(normalizedCore).filter((token) => token.length >= 2);
+    const tokens = coreTokens.length ? coreTokens : queryTokens;
+
+    const titleText = this.normalizeSearchText(title);
+    const creatorText = this.normalizeSearchText(creator);
+    const textMatched = tokens.filter((token) => normalizedText.includes(token)).length;
+    const titleMatched = tokens.filter((token) => titleText.includes(token)).length;
+    const creatorMatched = tokens.filter((token) => creatorText.includes(token)).length;
+
+    const required = Math.max(1, Math.ceil(tokens.length * 0.55));
+
+    if (this.isArtistOnlyQuery(normalizedQuery)) {
+      const artistText = creatorText || titleText;
+      const artistMatch = tokens.filter((token) => artistText.includes(token)).length;
+      if (artistMatch >= required) {
+        return true;
+      }
+    }
+
+    if (titleMatched >= required || creatorMatched >= required || textMatched >= required) {
+      return true;
+    }
+
+    if (tokens.length <= 2 && this.isPhraseMatch(normalizedQuery, title, creator)) {
+      return true;
+    }
+
+    return false;
+  }
+  static async resolveAudioCandidatesConcurrently(candidates, instances, limit) {
+    const out = [];
+    const seen = new Set();
+    const maxCandidates = Math.min(Array.isArray(candidates) ? candidates.length : 0, 10);
+    const orderedInstances = this.shuffleArray(Array.isArray(instances) ? [...instances] : []).slice(0, 2);
+    const concurrency = 3;
+
+    const tryResolveCandidate = async (candidate) => {
+      if (!candidate?.id) return null;
+      const jobs = orderedInstances.map((instance) => this.withTimeout(
+        this.fetchPiped(`/api/v1/streams/${encodeURIComponent(candidate.id)}`, {}, instance)
+          .then((streamData) => {
+            const audioStream = this.pickYoutubeAudioStream(streamData?.audioStreams || []);
+            if (!audioStream?.url) return null;
+            return {
+              title: String(candidate?.title || 'مقطع صوتي'),
+              creator: String(candidate?.uploader || candidate?.author || ''),
+              url: String(audioStream.url),
+              source: 'youtube'
+            };
+          }),
+        this.AUDIO_RESOLVE_TIMEOUT_MS,
+        'AUDIO_STREAM_TIMEOUT'
+      ).catch(() => null));
+
+      const settled = await Promise.allSettled(jobs);
+      for (const s of settled) {
+        if (s.status === 'fulfilled' && s.value?.url) return s.value;
+      }
+      return null;
+    };
+
+    for (let i = 0; i < maxCandidates && out.length < limit; i += concurrency) {
+      const batch = [];
+      for (let j = i; j < Math.min(i + concurrency, maxCandidates); j += 1) {
+        batch.push(tryResolveCandidate(candidates[j]));
+      }
+
+      const settled = await Promise.allSettled(batch);
+      for (const item of settled) {
+        if (out.length >= limit) break;
+        if (item.status !== 'fulfilled' || !item.value?.url) continue;
+        const reply = item.value;
+        const key = `${this.normalizeSearchText(reply.url)}|${this.normalizeSearchText(reply.title)}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push(reply);
+      }
+    }
+
+    return out;
   }
 
   static shuffleArray(items = []) {
@@ -488,7 +634,7 @@ class ChatGamesUtilityHandler {
     if (!base) throw new Error('PIPED_INSTANCE_EMPTY');
     const { data } = await axios.get(`${base}${path}`, {
       params,
-      timeout: 12000
+      timeout: this.YT_PIPED_TIMEOUT_MS
     });
     return data;
   }
@@ -574,12 +720,22 @@ class ChatGamesUtilityHandler {
     }
   }
 
-  static async fetchPipedSearchCandidates(query, instance, filters = ['music_songs', 'music_videos', 'videos']) {
+  static async fetchPipedSearchCandidates(query, instance, filters = ['music_songs', 'music_videos', 'videos'], maxResults = 20) {
     const all = [];
-    for (const filter of filters) {
+    const searchFilters = Array.isArray(filters) ? filters.slice(0, 2) : ['music_songs'];
+    const requests = searchFilters.map((filter) =>
+      this.fetchPiped('/api/v1/search', {
+        q: query,
+        filter,
+        maxResults
+      }, instance)
+    );
+    const responses = await Promise.allSettled(requests);
+    for (const response of responses) {
+      if (response.status !== 'fulfilled') continue;
       try {
-        const data = await this.fetchPiped('/api/v1/search', { q: query, filter }, instance);
-        const items = (Array.isArray(data) ? data : [])
+        const data = response.value;
+        const items = (Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : [])
           .filter((item) => item?.id && (item?.type === 'stream' || item?.type === 'video'));
         all.push(...items);
       } catch (_error) {
@@ -587,6 +743,65 @@ class ChatGamesUtilityHandler {
       }
     }
     return all;
+  }
+
+  static parseYoutubeVideoIdFromUrl(url = '') {
+    const text = String(url || '').trim();
+    if (!text) return '';
+    const short = text.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+    if (short?.[1]) return short[1];
+    const full = text.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+    if (full?.[1]) return full[1];
+    const embed = text.match(/\/embed\/([a-zA-Z0-9_-]{11})/);
+    if (embed?.[1]) return embed[1];
+    return '';
+  }
+
+  static async fetchYoutubeHtmlCandidates(query, maxResults = 12) {
+    const q = String(query || '').trim();
+    if (!q) return [];
+    try {
+      const encoded = encodeURIComponent(q);
+      const { data } = await axios.get(
+        `https://r.jina.ai/http://www.youtube.com/results?search_query=${encoded}`,
+        { timeout: this.YT_HTML_SEARCH_TIMEOUT_MS }
+      );
+      const text = String(data || '');
+      if (!text) return [];
+
+      const lines = text.split('\n').map((line) => String(line || '').trim()).filter(Boolean);
+      const out = [];
+      const seen = new Set();
+
+      for (const line of lines) {
+        if (out.length >= maxResults) break;
+        if (!line.toLowerCase().includes('youtube.com/watch')) continue;
+
+        const id = this.parseYoutubeVideoIdFromUrl(line);
+        if (!id) continue;
+        if (seen.has(id)) continue;
+        seen.add(id);
+
+        let title = line
+          .replace(/^[-*]\s*/, '')
+          .replace(/https?:\/\/\S+/gi, '')
+          .replace(/\[[^\]]+\]/g, '')
+          .trim();
+
+        if (!title || title.length < 3) title = `YouTube ${id}`;
+
+        out.push({
+          id,
+          type: 'video',
+          title,
+          uploader: ''
+        });
+      }
+
+      return out;
+    } catch (_error) {
+      return [];
+    }
   }
 
   static hasAnyTerm(text, terms = []) {
@@ -617,6 +832,21 @@ class ChatGamesUtilityHandler {
     if (!queryIsReligious && itemHintsMusic) score += 6;
 
     return score;
+  }
+
+  static isPhraseMatch(query, title, creator = '') {
+    const normalizedQuery = this.normalizeSearchText(query);
+    const normalizedText = this.normalizeSearchText(`${title || ''} ${creator || ''}`);
+    if (!normalizedQuery || !normalizedText) return false;
+
+    if (normalizedText.includes(normalizedQuery)) return true;
+
+    const tokens = this.queryTokens(normalizedQuery);
+    if (!tokens.length) return false;
+    if (tokens.length > 2) {
+      return tokens.every((token) => normalizedText.includes(token));
+    }
+    return false;
   }
 
   static async searchArchiveAudio(query) {
@@ -686,111 +916,179 @@ class ChatGamesUtilityHandler {
   }
 
   static async searchYoutubeAudio(query) {
-    const q = String(query || '').trim();
-    if (!q) return null;
-    const instances = this.shuffleArray(this.YT_PIPED_INSTANCES);
-    for (const instance of instances) {
-      try {
-        const items = await this.fetchPipedSearchCandidates(q, instance, ['music_songs', 'music_videos', 'videos']);
-        const candidates = items
-          .filter((item) => item?.id && (item?.type === 'stream' || item?.type === 'video'))
-          .map((item) => ({
-            item,
-            score: this.scoreAudioCandidate(query, item?.title, item?.uploader || item?.author || '')
-          }))
-          .sort((a, b) => b.score - a.score)
-          .slice(0, 30)
-          .map((entry) => entry.item);
-
-        const strictCandidates = candidates.filter((candidate) =>
-          this.isAcceptableQueryMatch(query, `${candidate?.title || ''} ${candidate?.uploader || candidate?.author || ''}`)
-        );
-        const baseCandidates = strictCandidates.length ? strictCandidates : candidates;
-        const candidatesToTry = this.isArtistOnlyQuery(query) && baseCandidates.length > 1
-          ? this.shuffleArray(baseCandidates)
-          : baseCandidates;
-
-        for (const candidate of candidatesToTry) {
-          try {
-            const streamData = await this.fetchPiped(`/api/v1/streams/${encodeURIComponent(candidate.id)}`, {}, instance);
-            const audioStream = this.pickYoutubeAudioStream(streamData?.audioStreams || []);
-            if (!audioStream?.url) continue;
-            return {
-              title: String(candidate?.title || 'مقطع صوتي'),
-              creator: String(candidate?.uploader || candidate?.author || ''),
-              url: String(audioStream.url),
-              source: 'youtube'
-            };
-          } catch (_innerError) {
-            continue;
-          }
-        }
-      } catch (_searchError) {
-        continue;
-      }
-    }
-    return null;
+    const results = await this.searchYoutubeAudios(query, 1);
+    return results[0] || null;
   }
-
   static async searchYoutubeAudios(query, limit = 5) {
     const q = String(query || '').trim();
     if (!q) return [];
 
-    const results = [];
-    const seen = new Set();
+    const normalizedQuery = this.normalizeSearchText(q);
+    const artistOnly = this.isArtistOnlyQuery(normalizedQuery);
+    const variants = new Set([normalizedQuery]);
+    const cleaned = this.stripNoiseFromSearchQuery(normalizedQuery);
+
+    if (cleaned) {
+      variants.add(cleaned);
+      if (!artistOnly) {
+        variants.add(`${cleaned} اغنية`);
+        variants.add(`${cleaned} mp3`);
+      }
+    }
+    if (!artistOnly) {
+      variants.add(`${normalizedQuery} اغنية`);
+      variants.add(`${normalizedQuery} mp3`);
+      variants.add(`${normalizedQuery} lyrics`);
+    }
+
     const instances = this.shuffleArray(this.YT_PIPED_INSTANCES);
+    const fastInstances = instances.slice(0, Math.max(1, this.FAST_SEARCH_INSTANCES));
+    const fallbackInstances = instances.slice(
+      Math.max(1, this.FAST_SEARCH_INSTANCES),
+      Math.max(1, this.FAST_SEARCH_INSTANCES) + Math.max(1, this.FAST_SEARCH_FALLBACK_INSTANCES)
+    );
+    const variantList = Array.from(variants);
+    const maxVariants = Math.min(variantList.length, this.AUDIO_QUERY_MAX_VARIANTS);
 
-    for (const instance of instances) {
-      if (results.length >= limit) break;
-      try {
-        const items = await this.fetchPipedSearchCandidates(q, instance, ['music_songs', 'music_videos', 'videos']);
-        const candidates = items
-          .filter((item) => item?.id && (item?.type === 'stream' || item?.type === 'video'))
-          .map((item) => ({
-            item,
-            score: this.scoreAudioCandidate(query, item?.title, item?.uploader || item?.author || '')
-          }))
-          .sort((a, b) => b.score - a.score)
-          .slice(0, 50)
-          .map((entry) => entry.item);
-
-        const strictCandidates = candidates.filter((candidate) =>
-          this.isAcceptableQueryMatch(query, `${candidate?.title || ''} ${candidate?.uploader || candidate?.author || ''}`)
-        );
-        const baseCandidates = strictCandidates.length ? strictCandidates : candidates;
-        const candidatesToTry = this.isArtistOnlyQuery(query) && baseCandidates.length > 1
-          ? this.shuffleArray(baseCandidates)
-          : baseCandidates;
-
-        for (const candidate of candidatesToTry) {
-          if (results.length >= limit) break;
-          try {
-            const streamData = await this.fetchPiped(`/api/v1/streams/${encodeURIComponent(candidate.id)}`, {}, instance);
-            const audioStream = this.pickYoutubeAudioStream(streamData?.audioStreams || []);
-            if (!audioStream?.url) continue;
-
-            const title = String(candidate?.title || 'مقطع صوتي');
-            const creator = String(candidate?.uploader || candidate?.author || '');
-            const uniqueKey = `${this.normalizeSearchText(title)}|${this.normalizeSearchText(creator)}|${String(audioStream.url)}`;
-            if (seen.has(uniqueKey)) continue;
-            seen.add(uniqueKey);
-
-            results.push({
-              title,
-              creator,
-              url: String(audioStream.url),
-              source: 'youtube'
-            });
-          } catch (_innerError) {
-            continue;
-          }
+    const collectCandidates = async (text, useInstances = fastInstances, maxResults = this.FAST_YT_PER_QUERY_LIMIT) => {
+      const requestInstances = Array.isArray(useInstances) && useInstances.length ? useInstances : fastInstances;
+      const requestLimit = Number(maxResults) > 0 ? Number(maxResults) : this.FAST_YT_PER_QUERY_LIMIT;
+      const buckets = await Promise.allSettled(
+        requestInstances.map((instance) => this.withTimeout(
+          this.fetchPipedSearchCandidates(text, instance, ['music_songs'], requestLimit).catch(() => []),
+          this.AUDIO_FAST_TIMEOUT_MS,
+          'AUDIO_SEARCH_TIMEOUT'
+        ).catch(() => []))
+      );
+      const htmlFallback = await this.fetchYoutubeHtmlCandidates(text, requestLimit).catch(() => []);
+      const candidates = [];
+      const seen = new Set();
+      for (const bucket of buckets) {
+        if (bucket.status !== 'fulfilled') continue;
+        for (const item of Array.isArray(bucket.value) ? bucket.value : []) {
+          if (!item?.id || !['stream', 'video'].includes(item?.type)) continue;
+          const key = this.normalizeSearchText(item.id);
+          if (seen.has(key)) continue;
+          seen.add(key);
+          candidates.push(item);
         }
-      } catch (_searchError) {
-        continue;
+      }
+      for (const item of Array.isArray(htmlFallback) ? htmlFallback : []) {
+        if (!item?.id || !['stream', 'video'].includes(item?.type)) continue;
+        const key = this.normalizeSearchText(item.id);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        candidates.push(item);
+      }
+      return candidates;
+    };
+
+    const fastVariants = variantList
+      .slice(0, Math.min(this.AUDIO_QUERY_FAST_VARIANTS, maxVariants));
+    const collectTasks = fastVariants
+      .map((variant) => collectCandidates(String(variant || '').trim(), fastInstances, this.FAST_YT_PER_QUERY_LIMIT));
+    const collectSettled = await Promise.allSettled(collectTasks);
+    const dedup = new Map();
+    for (const bucket of collectSettled) {
+      if (bucket.status !== 'fulfilled') continue;
+      for (const candidate of Array.isArray(bucket.value) ? bucket.value : []) {
+        if (!candidate?.id) continue;
+        const key = this.normalizeSearchText(candidate.id);
+        if (!dedup.has(key)) dedup.set(key, candidate);
       }
     }
 
-    return results;
+    let ranked = Array.from(dedup.values())
+      .map((item) => {
+        const creator = item?.uploader || item?.author || '';
+        const text = `${creator} ${item?.title || ''}`;
+        const titleNormalized = this.normalizeSearchText(item?.title || '');
+        const creatorNormalized = this.normalizeSearchText(creator || '');
+        const cleanQuery = cleaned || normalizedQuery;
+        const exactPhrase = this.hasOrderedTokenMatch(cleanQuery, text) ? 90 : 0;
+        const orderedMatch = this.hasOrderedTokenMatch(cleaned, text) ? 35 : 0;
+        const titleCreatorMatch = this.isMatchForRequest(normalizedQuery, item?.title, creator) ? 30 : 0;
+        const ratio = this.queryMatchRatio(cleanQuery, text);
+        const ratioBonus = ratio >= this.AUDIO_STRICT_MATCH_RATIO ? 25 : 0;
+        const strictMatchBonus = ratio >= 0.9 ? 20 : 0;
+        const cleanMatchPenalty = this.isArtistOnlyQuery(normalizedQuery)
+          ? ((this.hasOrderedTokenMatch(cleanQuery, creatorNormalized) || this.hasOrderedTokenMatch(cleanQuery, titleNormalized)) ? 0 : -40)
+          : 0;
+        return {
+          item,
+          score: this.scoreAudioCandidate(normalizedQuery, item?.title, creator)
+            + exactPhrase + orderedMatch + titleCreatorMatch + ratioBonus + strictMatchBonus + cleanMatchPenalty
+        };
+      })
+      .sort((a, b) => b.score - a.score || this.queryMatchRatio(cleaned || normalizedQuery, `${b.item?.uploader || b.item?.author || ''} ${b.item?.title || ''}`) - this.queryMatchRatio(cleaned || normalizedQuery, `${a.item?.uploader || a.item?.author || ''} ${a.item?.title || ''}`))
+      .map((entry) => entry.item);
+
+    if (!ranked.length) {
+      const archive = await this.searchArchiveAudio(q).catch(() => null);
+      if (archive?.url) return this.uniqueAudioResults([archive], limit);
+      return [];
+    }
+
+    const queryTokens = this.queryTokens(cleaned || normalizedQuery);
+    const candidatesToResolve = ranked
+      .filter((item) => item?.title || item?.uploader || item?.author)
+      .slice(0, Math.max(limit * 3, this.FAST_SEARCH_MIN_MATCHES, 8));
+
+    // إذا كانت النتائج قليلة جدًا، أضف بحث إضافي سريع من متغيرات إضافية قبل الترسيم النهائي.
+    if (candidatesToResolve.length < this.FAST_SEARCH_MIN_MATCHES && maxVariants > this.AUDIO_QUERY_FAST_VARIANTS) {
+      const fallbackVariants = variantList
+        .slice(this.AUDIO_QUERY_FAST_VARIANTS, maxVariants);
+      const fallbackTasks = fallbackVariants.map((variant) => collectCandidates(
+        String(variant || '').trim(),
+        fallbackInstances,
+        Math.min(this.FAST_YT_PER_QUERY_LIMIT, 8)
+      ));
+      const fallbackSettled = await Promise.allSettled(fallbackTasks);
+
+      const fallbackCandidates = [];
+      const seenFallback = new Set(ranked.map((item) => this.normalizeSearchText(item?.id || item?.title || '')));
+      for (const bucket of fallbackSettled) {
+        if (bucket.status !== 'fulfilled') continue;
+        for (const item of Array.isArray(bucket.value) ? bucket.value : []) {
+          if (!item?.id) continue;
+          const key = this.normalizeSearchText(item.id);
+          if (seenFallback.has(key)) continue;
+          seenFallback.add(key);
+          fallbackCandidates.push(item);
+        }
+      }
+
+      if (fallbackCandidates.length) {
+        const fallbackRanked = fallbackCandidates
+          .map((item) => ({
+            item,
+            score: this.scoreAudioCandidate(normalizedQuery, item?.title, item?.uploader || item?.author || '')
+              + (this.hasOrderedTokenMatch(cleaned || normalizedQuery, `${item?.uploader || item?.author || ''} ${item?.title || ''}`) ? 25 : 0)
+              + (this.isMatchForRequest(normalizedQuery, item?.title, item?.uploader || item?.author || '') ? 20 : 0)
+          }))
+          .sort((a, b) => b.score - a.score || this.queryMatchRatio(cleaned || normalizedQuery, `${b.item?.uploader || b.item?.author || ''} ${b.item?.title || ''}`) - this.queryMatchRatio(cleaned || normalizedQuery, `${a.item?.uploader || a.item?.author || ''} ${a.item?.title || ''}`))
+          .map((entry) => entry.item);
+        ranked = ranked.concat(fallbackRanked);
+        candidatesToResolve.push(...fallbackRanked.filter((item) => !candidatesToResolve.includes(item)));
+      }
+    }
+
+    const resolved = await this.withTimeout(
+      this.resolveAudioCandidatesConcurrently(
+        candidatesToResolve,
+        instances,
+        Math.max(limit, this.FAST_SEARCH_MIN_MATCHES)
+      ),
+      this.AUDIO_SEARCH_TIMEOUT_MS,
+      'AUDIO_STREAM_TIMEOUT'
+    ).catch(() => []);
+
+    const final = this.uniqueAudioResults(Array.isArray(resolved) ? resolved : [], limit);
+    if (final.length) return final;
+
+    const archive = await this.searchArchiveAudio(q).catch(() => null);
+    if (archive?.url) return this.uniqueAudioResults([archive], limit);
+    return [];
   }
 
   static uniqueAudioResults(list = [], limit = 5) {
@@ -856,25 +1154,7 @@ class ChatGamesUtilityHandler {
   }
 
   static async buildAudioList(query) {
-    let audioList = await this.searchYoutubeAudios(query, 5);
-
-    if (audioList.length < 3) {
-      const spotifySeeds = await this.searchSpotifySeeds(query, 5);
-      for (const seed of spotifySeeds) {
-        if (audioList.length >= 5) break;
-        const seeded = await this.searchYoutubeAudios(seed.query, 2);
-        audioList = this.uniqueAudioResults([...audioList, ...seeded], 5);
-      }
-    }
-
-    if (audioList.length < 3) {
-      const soundSeeds = await this.searchSoundCloudSeeds(query, 4);
-      for (const seed of soundSeeds) {
-        if (audioList.length >= 5) break;
-        const seeded = await this.searchYoutubeAudios(seed.query, 2);
-        audioList = this.uniqueAudioResults([...audioList, ...seeded], 5);
-      }
-    }
+    const audioList = await this.searchYoutubeAudios(query, 5);
 
     if (!audioList.length) {
       const archiveAudio = await this.searchArchiveAudio(query);
@@ -1323,3 +1603,4 @@ class ChatGamesUtilityHandler {
 }
 
 module.exports = ChatGamesUtilityHandler;
+
