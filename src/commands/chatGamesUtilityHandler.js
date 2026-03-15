@@ -505,6 +505,27 @@ class ChatGamesUtilityHandler {
 
     return false;
   }
+
+  static isStrictAudioCandidateMatch(query, title, creator = '') {
+    const normalizedQuery = this.normalizeSearchText(query);
+    const cleanQuery = this.stripNoiseFromSearchQuery(normalizedQuery) || normalizedQuery;
+    const text = this.normalizeSearchText(`${creator || ''} ${title || ''}`);
+    const titleText = this.normalizeSearchText(title || '');
+    const creatorText = this.normalizeSearchText(creator || '');
+    if (!cleanQuery || !text) return false;
+
+    if (titleText.includes(cleanQuery) || text.includes(cleanQuery)) return true;
+
+    const ratio = this.queryMatchRatio(cleanQuery, text);
+    if (ratio >= 0.85 && this.hasOrderedTokenMatch(cleanQuery, text)) return true;
+
+    if (this.isArtistOnlyQuery(normalizedQuery)) {
+      if (creatorText.includes(cleanQuery)) return true;
+      if (this.hasOrderedTokenMatch(cleanQuery, creatorText || titleText)) return true;
+    }
+
+    return false;
+  }
   static async resolveAudioCandidatesConcurrently(candidates, instances, limit) {
     const out = [];
     const seen = new Set();
@@ -573,11 +594,8 @@ class ChatGamesUtilityHandler {
     return `${chatId}`;
   }
 
-  static buildHotKeyboard(canNext = true) {
-    if (!canNext) return undefined;
-    return Markup.inlineKeyboard([
-      [Markup.button.callback('🔄 نتيجة أخرى', 'hot:next')]
-    ]);
+  static buildHotKeyboard() {
+    return undefined;
   }
 
   static setHotCache(ctx, query, list = [], index = 0) {
@@ -605,12 +623,10 @@ class ChatGamesUtilityHandler {
 
   static async sendHotAudioResult(ctx, audio, canNext = true) {
     const caption = '♪ تم التح🎧ميل بنجاح ♪';
-    const keyboard = this.buildHotKeyboard(canNext);
     await ctx.replyWithAudio(
       { url: audio.url },
       {
-        caption,
-        reply_markup: keyboard ? keyboard.reply_markup : undefined
+        caption
       }
     );
   }
@@ -998,7 +1014,7 @@ class ChatGamesUtilityHandler {
       }
     }
 
-    let ranked = Array.from(dedup.values())
+    const rankingEntries = Array.from(dedup.values())
       .map((item) => {
         const creator = item?.uploader || item?.author || '';
         const text = `${creator} ${item?.title || ''}`;
@@ -1020,7 +1036,15 @@ class ChatGamesUtilityHandler {
             + exactPhrase + orderedMatch + titleCreatorMatch + ratioBonus + strictMatchBonus + cleanMatchPenalty
         };
       })
-      .sort((a, b) => b.score - a.score || this.queryMatchRatio(cleaned || normalizedQuery, `${b.item?.uploader || b.item?.author || ''} ${b.item?.title || ''}`) - this.queryMatchRatio(cleaned || normalizedQuery, `${a.item?.uploader || a.item?.author || ''} ${a.item?.title || ''}`))
+      .sort((a, b) => b.score - a.score || this.queryMatchRatio(cleaned || normalizedQuery, `${b.item?.uploader || b.item?.author || ''} ${b.item?.title || ''}`) - this.queryMatchRatio(cleaned || normalizedQuery, `${a.item?.uploader || a.item?.author || ''} ${a.item?.title || ''}`));
+
+    const strictRankedEntries = rankingEntries.filter((entry) => {
+      const item = entry?.item || {};
+      const creator = item?.uploader || item?.author || '';
+      return this.isStrictAudioCandidateMatch(cleaned || normalizedQuery, item?.title, creator);
+    });
+
+    let ranked = (strictRankedEntries.length ? strictRankedEntries : rankingEntries)
       .map((entry) => entry.item);
 
     if (!ranked.length) {
