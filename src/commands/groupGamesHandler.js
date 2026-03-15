@@ -1265,7 +1265,7 @@ class GroupGamesHandler {
   static rulerExecutionTimers = new Map();
   static activeCupGames = new Map();
   static CUPS_GAME_TIMEOUT_MS = 45 * 1000;
-  static CUPS_BASE_REWARD = 5;
+  static CUPS_BASE_REWARD = 100;
   static RULER_LOBBY_TIMEOUT_MS = 10 * 60 * 1000;
   static RULER_JUDGE_TIMEOUT_MS = 5 * 60 * 1000;
   static QUESTION_COOLDOWN_DAYS = 30;
@@ -6932,6 +6932,11 @@ class GroupGamesHandler {
     const game = this.getCupGame(ctx.chat.id);
     if (!game || String(game.token) !== String(token)) {
       return ctx.answerCbQuery('انتهت الجولة. اكتب اكواب لبدء جولة جديدة.', { show_alert: true }).catch(() => {});
+    }
+
+    const actorId = Number(ctx.from?.id || 0);
+    if (actorId !== Number(game.hostId || 0)) {
+      return ctx.answerCbQuery('هذه الجولة لصاحب الطلب فقط.', { show_alert: true }).catch(() => {});
     }
 
     const pick = Number(selectedCup || 0);
