@@ -4869,7 +4869,7 @@ class GroupGamesHandler {
     const item = GROUP_STORE.find((x) => x.key === key)
       || GROUP_STORE.find((x) => this.normalizeText(x.title) === normalizedInput)
       || GROUP_STORE.find((x) => normalizedInput.length > 2 && this.normalizeText(x.title).includes(normalizedInput));
-    if (!item) return ctx.reply('❌ عنصر غير موجود. استخدم /gstore');
+    if (!item) return ctx.reply('• عذرا هذا غير متوفر .');
 
     const group = await this.ensureGroupRecord(ctx);
     const row = this.getOrCreateScoreRow(group, ctx.from);
