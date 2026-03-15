@@ -5402,6 +5402,25 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json({ limit: '256kb' }));
 app.use(express.urlencoded({ extended: true }));
 
+// Register early shutdown handlers before async startup to avoid npm SIGTERM error noise.
+let earlyShutdownInProgress = false;
+const handleEarlyShutdown = (signal) => {
+  if (earlyShutdownInProgress) return;
+  earlyShutdownInProgress = true;
+  try {
+    logger.warn(`🛑 استلام إشارة ${signal} قبل اكتمال الإقلاع، إيقاف نظيف...`);
+    try {
+      bot.stop(signal);
+    } catch (_error) {
+      // ignore
+    }
+  } finally {
+    process.exit(0);
+  }
+};
+process.prependOnceListener('SIGTERM', () => handleEarlyShutdown('SIGTERM'));
+process.prependOnceListener('SIGINT', () => handleEarlyShutdown('SIGINT'));
+
 const parseRewardUserId = (req) => {
   const body = req.body || {};
   const query = req.query || {};
