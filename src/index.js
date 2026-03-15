@@ -2950,7 +2950,11 @@ bot.hears(/^حذف\s*اسئله\s*البطوله$/i, (ctx) => TournamentChalleng
 bot.hears(/^منضمين\s*البطوله$/i, (ctx) => TournamentChallengeHandler.handleTournamentJoinedGroups(ctx));
 bot.hears(/^البطولات$/i, (ctx) => TournamentChallengeHandler.handleListTournaments(ctx));
 bot.hears(/^الانضمام\s*للبطوله$/i, (ctx) => TournamentChallengeHandler.handleGroupJoinTournament(ctx));
-bot.hears(/^انا$/i, (ctx) => TournamentChallengeHandler.handleParticipantJoin(ctx));
+bot.hears(/^انا$/i, async (ctx) => {
+  const handledHazar = await GroupGamesHandler.joinHazarGame(ctx);
+  if (handledHazar) return;
+  return TournamentChallengeHandler.handleParticipantJoin(ctx);
+});
 bot.hears(/^تفعيل\s*البطوله$/i, (ctx) => TournamentChallengeHandler.handleGroupTournamentToggle(ctx, true));
 bot.hears(/^تعطيل\s*البطوله$/i, (ctx) => TournamentChallengeHandler.handleGroupTournamentToggle(ctx, false));
 bot.hears(/^توب\s*القروبات$/i, (ctx) => BankGameHandler.handleTopGroups(ctx));
