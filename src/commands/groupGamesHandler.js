@@ -3914,10 +3914,6 @@ class GroupGamesHandler {
     ) {
       const guess = this.normalizeText(String(text || ''));
       if (guess && guess === String(hazarGame.answerNorm || '')) {
-        const toUnmute = Array.isArray(hazarGame.mutedIds) ? hazarGame.mutedIds : [];
-        for (const uid of toUnmute) {
-          await this.unmuteMemberForHazar(ctx.chat.id, uid);
-        }
         this.clearHazarGame(ctx.chat.id);
         await ctx.reply('• كفو ي ذكي تم فك الكتم عنك .', { reply_to_message_id: ctx.message?.message_id });
         return true;
@@ -6971,7 +6967,7 @@ class GroupGamesHandler {
 
   static buildHazarAnswerKeyboard(token) {
     return Markup.inlineKeyboard([
-      [Markup.button.callback('🤫 همسه', `group:hazar:answer:${token}`)]
+      [Markup.button.callback('همسه', `group:hazar:answer:${token}`)]
     ]);
   }
 
@@ -6981,8 +6977,12 @@ class GroupGamesHandler {
     if (!game || String(game.token) !== String(token) || String(game.stage) !== 'running') {
       return ctx.answerCbQuery('ما في لعبة حزر شغالة حالياً.', { show_alert: true }).catch(() => {});
     }
-    if (Number(ctx.from?.id || 0) !== Number(game.guesserId || 0)) {
-      return ctx.answerCbQuery('هذا الزر للمُخمن فقط.', { show_alert: true }).catch(() => {});
+    const userId = Number(ctx.from?.id || 0);
+    const hostId = Number(game.hostId || 0);
+    const participants = Array.isArray(game.participants) ? game.participants.map((x) => Number(x)) : [];
+    const isParticipant = participants.includes(userId) && userId !== hostId;
+    if (isParticipant) {
+      return ctx.answerCbQuery('الهمسه متاحة لصاحب البداية وغير المشاركين فقط.', { show_alert: true }).catch(() => {});
     }
     return ctx.answerCbQuery(`همسه: الكلمة هي (${game.answer})\nاكتبها الآن في الجروب.`, { show_alert: true }).catch(() => {});
   }
@@ -7035,21 +7035,13 @@ class GroupGamesHandler {
     if (!game || String(game.stage) !== 'lobby') return false;
 
     const participants = (game.participants || []).map((id) => Number(id)).filter((id) => Number.isInteger(id));
-    if (participants.length < 2) {
+    const joiners = participants.filter((id) => Number(id) !== Number(game.hostId || 0));
+    if (joiners.length < 1) {
       await ctx.reply('❌ لازم لاعبين على الأقل. خلي الأعضاء يكتبوا: انا');
       return true;
     }
-    const requesterId = Number(ctx.from?.id || 0);
-    const poolWithoutRequester = participants.filter((id) => id !== requesterId);
-    const candidates = poolWithoutRequester.length ? poolWithoutRequester : participants;
-    const guesserId = Number(this.pickRandom(candidates));
+    const guesserId = Number(this.pickRandom(joiners));
     const guesserName = String(game.names?.[guesserId] || guesserId);
-    const muteTargets = (game.participants || []).filter((id) => Number(id) !== guesserId);
-    const mutedDone = [];
-    for (const uid of muteTargets) {
-      const ok = await this.muteMemberForHazar(ctx.chat.id, uid, this.HAZAR_MUTE_SECONDS);
-      if (ok) mutedDone.push(Number(uid));
-    }
 
     const answer = this.pickNonRepeating(
       HAZAR_WORDS.map((w) => ({ question: w, answers: [w] })),
@@ -7063,15 +7055,11 @@ class GroupGamesHandler {
     game.guesserName = guesserName;
     game.answer = answerWord;
     game.answerNorm = this.normalizeText(answerWord);
-    game.mutedIds = mutedDone;
+    game.mutedIds = [guesserId];
 
     const timer = setTimeout(async () => {
       const current = this.activeHazarGames.get(key);
       if (!current || String(current.stage) !== 'running') return;
-      const toUnmute = Array.isArray(current.mutedIds) ? current.mutedIds : [];
-      for (const uid of toUnmute) {
-        await this.unmuteMemberForHazar(ctx.chat.id, uid);
-      }
       this.clearHazarGame(ctx.chat.id);
       await this.bot.telegram.sendMessage(
         Number(ctx.chat.id),
