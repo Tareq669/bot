@@ -4919,7 +4919,16 @@ class GroupAdminHandler {
           );
         }
       } catch (_error) {
-        await ctx.reply('⚠️ تم اكتشاف ملصق مميز لكن لا يمكن حذفه. فعّل صلاحية حذف الرسائل للبوت.');
+        if (group.settings?.notifyPremiumStickerBlock !== false) {
+          const blockedName = this.escapeHtml(
+            [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ').trim() || String(ctx.from.id)
+          );
+          await ctx.reply(
+            `• عذراً عزيزي ↤︎「 ${blockedName} 」\n` +
+            '• ممنوع إرسال الملصقات المميزه هنا .',
+            { parse_mode: 'HTML' }
+          ).catch(() => null);
+        }
       }
       return true;
     }
@@ -4944,22 +4953,23 @@ class GroupAdminHandler {
     if (group.settings?.blockLongMessages && !adminProtectionBypass) {
       const maxLength = Number.isInteger(group.settings?.maxMessageLength) ? group.settings.maxMessageLength : 700;
       if (rawText.length > maxLength) {
+        const longMessageName = this.escapeHtml(
+          [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ').trim() || String(ctx.from.id)
+        );
+        const longMessageNotice =
+          `• عذراً عزيزي ~»「 ${longMessageName} 」\n` +
+          '• ممنوع الرسائل الطويلة هنا .';
         try {
           await ctx.telegram.deleteMessage(ctx.chat.id, ctx.message.message_id);
           await this.addModerationLog(group, 'delete_long_message', ctx.botInfo.id, ctx.from.id, `len=${rawText.length}, max=${maxLength}`);
           await this.saveGroupQuietly(group);
           if (group.settings?.notifyLongMessageBlock) {
-            const longMessageName = this.escapeHtml(
-              [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ').trim() || String(ctx.from.id)
-            );
-            await ctx.reply(
-              `• عذراً عزيزي ~»「 ${longMessageName} 」\n` +
-              '• ممنوع الرسائل الطويلة هنا .',
-              { parse_mode: 'HTML' }
-            );
+            await ctx.reply(longMessageNotice, { parse_mode: 'HTML' });
           }
         } catch (_error) {
-          await ctx.reply('⚠️ تم اكتشاف رسالة طويلة لكن لا يمكن حذفها. فعّل صلاحية حذف الرسائل للبوت.');
+          if (group.settings?.notifyLongMessageBlock) {
+            await ctx.reply(longMessageNotice, { parse_mode: 'HTML' }).catch(() => null);
+          }
         }
         return true;
       }
