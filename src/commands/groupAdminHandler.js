@@ -4605,38 +4605,38 @@ class GroupAdminHandler {
         await ctx.reply('✅ تم فتح الملصقات.');
         return true;
       }
-      if (/^تفعيل منع الملصقات المميزة$/i.test(rawText)) {
+      if (/^تفعيل منع الملصقات المميز(?:ة|ه)$/i.test(rawText)) {
         const result = await this.setProtectionSetting(ctx, 'lockPremiumStickers', true, 'text');
         if (!result?.ok) return true;
         await this.setProtectionSetting(ctx, 'notifyPremiumStickerBlock', true, 'text');
         await ctx.reply('✅ تم تفعيل منع الملصقات المميزة.');
         return true;
       }
-      if (/^تعطيل منع الملصقات المميزة$/i.test(rawText)) {
+      if (/^تعطيل منع الملصقات المميز(?:ة|ه)$/i.test(rawText)) {
         const result = await this.setProtectionSetting(ctx, 'lockPremiumStickers', false, 'text');
         if (!result?.ok) return true;
         await ctx.reply('✅ تم تعطيل منع الملصقات المميزة.');
         return true;
       }
-      if (/^(استثناء المشرفين من منع الملصقات المميزة|استئناف المشرفين من منع الملصقات المميزة)$/i.test(rawText)) {
+      if (/^(استثناء المشرفين من منع الملصقات المميز(?:ة|ه)|استئناف المشرفين من منع الملصقات المميز(?:ة|ه))$/i.test(rawText)) {
         const result = await this.setProtectionSetting(ctx, 'exemptAdminsFromPremiumStickers', true, 'text');
         if (!result?.ok) return true;
         await ctx.reply('✅ تم تفعيل استثناء المشرفين من منع الملصقات المميزة.');
         return true;
       }
-      if (/^تفعيل استثناء المشرفين من منع الملصقات المميزة$/i.test(rawText)) {
+      if (/^تفعيل استثناء المشرفين من منع الملصقات المميز(?:ة|ه)$/i.test(rawText)) {
         const result = await this.setProtectionSetting(ctx, 'exemptAdminsFromPremiumStickers', true, 'text');
         if (!result?.ok) return true;
         await ctx.reply('✅ تم تفعيل استثناء المشرفين من منع الملصقات المميزة.');
         return true;
       }
-      if (/^(الغاء استثناء المشرفين من منع الملصقات المميزة|إلغاء استثناء المشرفين من منع الملصقات المميزة)$/i.test(rawText)) {
+      if (/^(الغاء استثناء المشرفين من منع الملصقات المميز(?:ة|ه)|إلغاء استثناء المشرفين من منع الملصقات المميز(?:ة|ه))$/i.test(rawText)) {
         const result = await this.setProtectionSetting(ctx, 'exemptAdminsFromPremiumStickers', false, 'text');
         if (!result?.ok) return true;
         await ctx.reply('✅ تم إلغاء استثناء المشرفين من منع الملصقات المميزة.');
         return true;
       }
-      if (/^تعطيل استثناء المشرفين من منع الملصقات المميزة$/i.test(rawText)) {
+      if (/^تعطيل استثناء المشرفين من منع الملصقات المميز(?:ة|ه)$/i.test(rawText)) {
         const result = await this.setProtectionSetting(ctx, 'exemptAdminsFromPremiumStickers', false, 'text');
         if (!result?.ok) return true;
         await ctx.reply('✅ تم إلغاء استثناء المشرفين من منع الملصقات المميزة.');
@@ -4860,8 +4860,12 @@ class GroupAdminHandler {
     );
     const entities = Array.isArray(ctx.message?.entities) ? ctx.message.entities : [];
     const captionEntities = Array.isArray(ctx.message?.caption_entities) ? ctx.message.caption_entities : [];
-    const hasPremiumEmojiEntity = [...entities, ...captionEntities].some((entity) => String(entity?.type) === 'custom_emoji');
-    const hasPremiumVisual = hasPremiumSticker || hasPremiumEmojiEntity;
+    const hasPremiumEmojiEntity = [...entities, ...captionEntities].some((entity) => (
+      String(entity?.type) === 'custom_emoji'
+      || Boolean(entity?.custom_emoji_id)
+    ));
+    const hasPremiumMessageEffect = Boolean(ctx.message?.message_effect_id || ctx.message?.effect_id);
+    const hasPremiumVisual = hasPremiumSticker || hasPremiumEmojiEntity || hasPremiumMessageEffect;
     const isAutomaticForward = Boolean(ctx.message?.is_automatic_forward);
     const isChannelPostInGroup = Boolean(
       ctx.message?.sender_chat

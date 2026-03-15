@@ -10,6 +10,19 @@ if (!isRailwayEnvironment) {
   require('dotenv').config();
 }
 
+// Silence Node's known punycode deprecation warning only (DEP0040).
+const originalEmitWarning = process.emitWarning.bind(process);
+process.emitWarning = (warning, ...args) => {
+  const warningCode = typeof warning === 'object' && warning ? warning.code : null;
+  const warningText = typeof warning === 'string' ? warning : String(warning?.message || '');
+  const warningType = typeof args[0] === 'string' ? args[0] : '';
+  const isPunycodeDeprecation =
+    warningCode === 'DEP0040'
+    || (warningType === 'DeprecationWarning' && warningText.includes('punycode'));
+  if (isPunycodeDeprecation) return;
+  originalEmitWarning(warning, ...args);
+};
+
 const { Telegraf, session, Markup } = require('telegraf');
 const express = require('express');
 const https = require('https');
