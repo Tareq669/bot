@@ -7773,6 +7773,7 @@ class GroupGamesHandler {
     if (action === 'gphysics') return this.handlePhysicsMcqCommand(ctx);
     if (action === 'gcalculations') return this.handleCalculationsMcqCommand(ctx);
     if (action === 'gdetective' || action === 'gcrime') return this.handleDetectiveCommand(ctx);
+    if (action === 'ghazar') return this.startHazarGame(ctx);
     if (action === 'gruler') return this.handleRulerExecutionCommand(ctx);
     if (action === 'gstory') return this.handleStoryTalkStart(ctx);
     if (action === 'gchair') return this.handleConfessionStart(ctx);
@@ -7823,6 +7824,7 @@ class GroupGamesHandler {
       [
         { label: '🕵️ المحقق', action: 'gdetective' },
         { label: '🚨 الجريمة', action: 'gcrime' },
+        { label: '🧩 حزر', action: 'ghazar' },
         { label: '🎭 حاكم جلاد', action: 'gruler' },
         { label: '🗣️ سوالفكم', action: 'gstory' },
         { label: '🪑 كرسي الاعتراف', action: 'gchair' }
