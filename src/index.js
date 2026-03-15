@@ -1761,7 +1761,8 @@ bot.action(/^group:mcq:([a-z0-9]+):(\d+)$/i, (ctx) => GroupGamesHandler.handleMc
 bot.action(/^group:vote:([a-z0-9]+):(\d+)$/i, (ctx) => GroupGamesHandler.handleVoteCallback(ctx, ctx.match[1], ctx.match[2]));
 bot.action(/^group:duel:(accept|decline):([a-z0-9]+)$/i, (ctx) => GroupGamesHandler.handleDuelAction(ctx, ctx.match[1], ctx.match[2]));
 bot.action(/^group:confess:(end):([a-z0-9]+)$/i, (ctx) => GroupGamesHandler.handleConfessionAction(ctx, ctx.match[1].toLowerCase(), ctx.match[2]));
-bot.action(/^group:games:(gquiz|gmath|gword|gwho|griddle|gtype|gduel|gchance|gdaily|gmcq|gvote|gleader|gweekly|gmonth|glevels|glounge|gconfess|gconfess_end)$/i, (ctx) => GroupGamesHandler.handleGamesMenuAction(ctx, ctx.match[1].toLowerCase()));
+bot.action(/^group:games:(gquiz|gmath|gword|gwho|griddle|gtype|gduel|gcups|gchance|gdaily|gmcq|gvote|gleader|gweekly|gmonth|glevels|glounge|gconfess|gconfess_end)$/i, (ctx) => GroupGamesHandler.handleGamesMenuAction(ctx, ctx.match[1].toLowerCase()));
+bot.action(/^group:cups:pick:([a-z0-9]+):([1-3])$/i, (ctx) => GroupGamesHandler.handleCupsPickAction(ctx, ctx.match[1], Number(ctx.match[2])));
 bot.action(/^group:help:page:(\d+)$/i, (ctx) => GroupGamesHandler.handleGamesHelpPageAction(ctx, Number(ctx.match[1] || 0)));
 bot.action(/^group:help:noop$/i, (ctx) => ctx.answerCbQuery().catch(() => {}));
 bot.action(/^group:quick:(quiz|who|riddle|typing|duel|chance|profile|leader|levels|store|gifts|assets|lounge|supplies|help)$/i, (ctx) => GroupGamesHandler.handleQuickAction(ctx, ctx.match[1]));
@@ -2975,6 +2976,7 @@ bot.hears(/^(?:الغاز|ألغاز|لغز)$/i, (ctx) => GroupGamesHandler.hand
 bot.hears(/^(?:لغزي)$/i, (ctx) => GroupGamesHandler.handleRiddleCommand(ctx));
 bot.hears(/^سرعة\s*الكتابة$/i, (ctx) => GroupGamesHandler.handleTypingCommand(ctx));
 bot.hears(/^روليت$/i, (ctx) => GroupGamesHandler.handleChanceCommand(ctx));
+bot.hears(/^(?:اكواب|الاكواب|الثلاث\s*اكواب|لعبة\s*الاكواب)$/i, (ctx) => GroupGamesHandler.handleCupsCommand(ctx));
 bot.hears(/^كرسي\s*الاعتراف$/i, (ctx) => GroupGamesHandler.handleConfessionStart(ctx));
 bot.hears(/^انهاء\s*كرسي\s*الاعتراف$/i, (ctx) => GroupGamesHandler.handleConfessionEnd(ctx));
 bot.hears(/^(?:لاونج|كافيتيريا|كافتيريا)$/i, (ctx) => GroupGamesHandler.handleLoungeMenuCommand(ctx));

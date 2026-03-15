@@ -1263,6 +1263,9 @@ class GroupGamesHandler {
   static activeHookahSessions = new Map();
   static activeRulerExecutionGames = new Map();
   static rulerExecutionTimers = new Map();
+  static activeCupGames = new Map();
+  static CUPS_GAME_TIMEOUT_MS = 45 * 1000;
+  static CUPS_BASE_REWARD = 5;
   static RULER_LOBBY_TIMEOUT_MS = 10 * 60 * 1000;
   static RULER_JUDGE_TIMEOUT_MS = 5 * 60 * 1000;
   static QUESTION_COOLDOWN_DAYS = 30;
@@ -6862,6 +6865,107 @@ class GroupGamesHandler {
     );
   }
 
+  static clearCupGame(chatId) {
+    this.activeCupGames.delete(String(chatId));
+  }
+
+  static getCupGame(chatId) {
+    const key = String(chatId);
+    const game = this.activeCupGames.get(key);
+    if (!game) return null;
+    if ((Date.now() - Number(game.createdAt || 0)) > this.CUPS_GAME_TIMEOUT_MS) {
+      this.clearCupGame(chatId);
+      return null;
+    }
+    return game;
+  }
+
+  static buildCupGameKeyboard(token) {
+    return Markup.inlineKeyboard([
+      [
+        Markup.button.callback('🥤 الكوب 1', `group:cups:pick:${token}:1`),
+        Markup.button.callback('🥤 الكوب 2', `group:cups:pick:${token}:2`),
+        Markup.button.callback('🥤 الكوب 3', `group:cups:pick:${token}:3`)
+      ]
+    ]);
+  }
+
+  static async handleCupsCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    if (this.checkCooldown(ctx, 'cups:start', 1200)) return;
+
+    const status = await this.canStartRound(ctx);
+    if (!status.ok) return;
+
+    const key = String(ctx.chat.id);
+    const token = this.token('cups');
+    const ballCup = Math.floor(Math.random() * 3) + 1;
+    this.activeCupGames.set(key, {
+      token,
+      hostId: Number(ctx.from?.id || 0),
+      ballCup,
+      createdAt: Date.now()
+    });
+
+    const mention = this.mentionUser(
+      ctx.from?.id,
+      ctx.from?.first_name || ctx.from?.username || String(ctx.from?.id || 'عضو')
+    );
+
+    return ctx.reply(
+      `${mention}\n🥤 <b>لعبة الثلاث اكواب</b>\n\n` +
+      '• اختر الكوب اللي فيه الطبة.\n' +
+      '• اضغط على زر الكوب مباشرة.',
+      {
+        parse_mode: 'HTML',
+        reply_to_message_id: ctx.message?.message_id,
+        reply_markup: this.buildCupGameKeyboard(token).reply_markup
+      }
+    );
+  }
+
+  static async handleCupsPickAction(ctx, token, selectedCup) {
+    if (!this.isGroupChat(ctx)) return;
+    await ctx.answerCbQuery().catch(() => {});
+
+    const key = String(ctx.chat.id);
+    const game = this.getCupGame(ctx.chat.id);
+    if (!game || String(game.token) !== String(token)) {
+      return ctx.answerCbQuery('انتهت الجولة. اكتب اكواب لبدء جولة جديدة.', { show_alert: true }).catch(() => {});
+    }
+
+    const pick = Number(selectedCup || 0);
+    if (![1, 2, 3].includes(pick)) return;
+    this.clearCupGame(ctx.chat.id);
+
+    const winnerName = ctx.from?.first_name || ctx.from?.username || String(ctx.from?.id || 'عضو');
+    const winnerMention = this.mentionUser(ctx.from?.id, winnerName);
+    const cupLine = `🥤1   🥤2   🥤3\n🎯 الطبة كانت في الكوب: <b>${game.ballCup}</b>`;
+
+    if (pick === Number(game.ballCup)) {
+      const group = await this.ensureGroupRecordByChatId(ctx.chat.id);
+      const row = this.getOrCreateScoreRow(group, ctx.from);
+      await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
+      const scoreMeta = await this.updateScore(group, ctx.from, this.CUPS_BASE_REWARD);
+      group.updatedAt = new Date();
+      await group.save();
+
+      return ctx.editMessageText(
+        `🎉 <b>مبروك! اخترت الكوب الصحيح</b>\n` +
+        `• الفائز ~» ${winnerMention}\n` +
+        `• ربحك ~» ${this.formatCurrency(scoreMeta.finalReward)}\n\n${cupLine}`,
+        { parse_mode: 'HTML' }
+      ).catch(() => {});
+    }
+
+    return ctx.editMessageText(
+      `❌ <b>حظ اوفر</b>\n` +
+      `• اختيارك كان الكوب: <b>${pick}</b>\n` +
+      `• ${winnerMention}\n\n${cupLine}`,
+      { parse_mode: 'HTML' }
+    ).catch(() => {});
+  }
+
   static async handleRulerExecutionCommand(ctx) {
     if (!this.isGroupChat(ctx)) return;
     const key = String(ctx.chat.id);
@@ -7440,6 +7544,7 @@ class GroupGamesHandler {
     if (action === 'griddle') return this.handleRiddleCommand(ctx);
     if (action === 'gtype') return this.handleTypingCommand(ctx);
     if (action === 'gduel') return this.handleDuelCommand(ctx);
+    if (action === 'gcups') return this.handleCupsCommand(ctx);
     if (action === 'gchance') return this.handleChanceCommand(ctx);
     if (action === 'gdaily') return this.handleDailyCommand(ctx);
     if (action === 'gmcq') return this.handleMcqCommand(ctx);
@@ -7473,7 +7578,10 @@ class GroupGamesHandler {
         Markup.button.callback('🎲 روليت', 'group:games:gchance')
       ],
       [
-        Markup.button.callback('🗳️ تصويت', 'group:games:gvote'),
+        Markup.button.callback('🥤 الأكواب', 'group:games:gcups'),
+        Markup.button.callback('🗳️ تصويت', 'group:games:gvote')
+      ],
+      [
         Markup.button.callback('🏆 المتصدرين', 'group:games:gleader')
       ]
     ]);
@@ -7490,7 +7598,8 @@ class GroupGamesHandler {
       '• مين أنا\n' +
       '• حساب ذهني\n' +
       '• ترتيب كلمة\n' +
-      '• تحدي';
+      '• تحدي\n' +
+      '• الأكواب';
     return ctx.reply(text, {
       reply_to_message_id: ctx.message?.message_id,
       reply_markup: this.buildGamesShowcaseKeyboard().reply_markup
