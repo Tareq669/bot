@@ -3843,6 +3843,28 @@ class GroupGamesHandler {
 
   static async handleIncomingGroupText(ctx, text) {
     if (!this.isGroupChat(ctx)) return false;
+    const groupId = String(ctx.chat?.id || '');
+    const rawText = String(text || '');
+
+    // Hazar lock: selected player can only keep the correct answer message.
+    const hazarGate = this.activeHazarGames.get(groupId);
+    if (
+      hazarGate &&
+      String(hazarGate.stage) === 'running' &&
+      Number(ctx.from?.id || 0) === Number(hazarGate.guesserId || 0)
+    ) {
+      const guess = this.normalizeText(rawText);
+      if (guess && guess === String(hazarGate.answerNorm || '')) {
+        this.clearHazarGame(ctx.chat.id);
+        await ctx.reply('• كفو ي ذكي تم فك الكتم عنك .', { reply_to_message_id: ctx.message?.message_id });
+        return true;
+      }
+      if (rawText.trim()) {
+        await ctx.deleteMessage(ctx.message?.message_id).catch(() => {});
+        return true;
+      }
+    }
+
     if (!text || text.startsWith('/')) return false;
 
     const luckKey = `${String(ctx.chat.id)}:${Number(ctx.from?.id || 0)}`;
@@ -3870,7 +3892,6 @@ class GroupGamesHandler {
     const handledConfession = await this.handleIncomingConfessionText(ctx, text);
     if (handledConfession) return true;
 
-    const groupId = String(ctx.chat.id);
     const group = await this.ensureGroupRecord(ctx);
     const existingRow = group.gameSystem.scores.find((s) => Number(s.userId) === Number(ctx.from?.id || 0));
     const row = this.getOrCreateScoreRow(group, ctx.from);
@@ -3904,22 +3925,6 @@ class GroupGamesHandler {
     if (norm === 'نعم') {
       const started = await this.beginHazarRound(ctx);
       if (started) return true;
-    }
-
-    const hazarGame = this.activeHazarGames.get(groupId);
-    if (
-      hazarGame &&
-      String(hazarGame.stage) === 'running' &&
-      Number(ctx.from?.id || 0) === Number(hazarGame.guesserId || 0)
-    ) {
-      const guess = this.normalizeText(String(text || ''));
-      if (guess && guess === String(hazarGame.answerNorm || '')) {
-        this.clearHazarGame(ctx.chat.id);
-        await ctx.reply('• كفو ي ذكي تم فك الكتم عنك .', { reply_to_message_id: ctx.message?.message_id });
-        return true;
-      }
-      await ctx.deleteMessage(ctx.message?.message_id).catch(() => {});
-      return true;
     }
 
     if (norm === 'نفس') {
