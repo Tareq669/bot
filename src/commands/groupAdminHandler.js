@@ -1340,6 +1340,9 @@ class GroupAdminHandler {
     if (!this.isBotOwner(ctx.from?.id)) return false;
 
     const text = String(rawText || '').trim();
+    const isWordCommand = /^(الكلمات الممنوعة|مسح الكلمات الممنوعة|اضف كلمة ممنوعة\s+.+|حذف كلمة ممنوعة\s+.+|الكلمات (?:الاباحية|الإباحية)|مسح الكلمات (?:الاباحية|الإباحية)|اضف كلمة (?:اباحية|إباحية)\s+.+|حذف كلمة (?:اباحية|إباحية)\s+.+)$/i.test(text);
+    if (!isWordCommand) return false;
+
     const globalLists = await this.getGlobalWordLists();
     const badList = this.normalizeWordList(globalLists.bad || []);
     const explicitList = this.normalizeWordList(globalLists.explicit || []);
