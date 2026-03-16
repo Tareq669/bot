@@ -721,6 +721,13 @@ class BankGameHandler {
   static async handleSteal(ctx) {
     if (!this.isGroupChat(ctx)) return;
     return this.withBank(ctx, async (meDoc, p) => {
+      const STEAL_COOLDOWN_MS = 2 * 60 * 1000;
+      const now = this.now();
+      const lastStealAt = Number(p.stealLastAt || 0);
+      if (lastStealAt > 0 && (now - lastStealAt) < STEAL_COOLDOWN_MS) {
+        return ctx.reply('• لساتك زارف يالحرامي انتظر 2 دقيقة .');
+      }
+
       const target = this.parseTargetFromReply(ctx);
       if (!target) return ctx.reply('❌ الزرف يكون بالرد على رسالة الشخص.');
       if (Number(target.id) === Number(ctx.from.id)) return ctx.reply('❌ ما بصير تزرف حالك 😅');
@@ -730,7 +737,7 @@ class BankGameHandler {
       if (!tp.created) return ctx.reply('❌ الشخص ما عنده حساب بنكي.');
       if (tp.balance <= 0) return ctx.reply('❌ رصيد الشخص صفر.');
 
-      p.stealLastAt = this.now();
+      p.stealLastAt = now;
       const ok = Math.random() < 0.55;
       if (!ok) {
         const fine = Math.min(Math.max(1000, Math.floor(p.balance * 0.03)), p.balance);
