@@ -3841,29 +3841,36 @@ class GroupGamesHandler {
     };
   }
 
-  static async handleIncomingGroupText(ctx, text) {
+  static async handleHazarLockedGuesserInput(ctx, text) {
     if (!this.isGroupChat(ctx)) return false;
     const groupId = String(ctx.chat?.id || '');
     const rawText = String(text || '');
+    const game = this.activeHazarGames.get(groupId);
+    if (!game || String(game.stage) !== 'running') return false;
 
-    // Hazar lock: selected player can only keep the correct answer message.
-    const hazarGate = this.activeHazarGames.get(groupId);
-    if (
-      hazarGate &&
-      String(hazarGate.stage) === 'running' &&
-      Number(ctx.from?.id || 0) === Number(hazarGate.guesserId || 0)
-    ) {
-      const guess = this.normalizeText(rawText);
-      if (guess && guess === String(hazarGate.answerNorm || '')) {
-        this.clearHazarGame(ctx.chat.id);
-        await ctx.reply('• كفو ي ذكي تم فك الكتم عنك .', { reply_to_message_id: ctx.message?.message_id });
-        return true;
-      }
-      if (rawText.trim()) {
-        await ctx.deleteMessage(ctx.message?.message_id).catch(() => {});
-        return true;
-      }
+    const userId = Number(ctx.from?.id || 0);
+    if (!userId || userId !== Number(game.guesserId || 0)) return false;
+
+    const guess = this.normalizeText(rawText);
+    if (guess && guess === String(game.answerNorm || '')) {
+      await this.unmuteMemberForHazar(ctx.chat.id, userId);
+      this.clearHazarGame(ctx.chat.id);
+      await ctx.reply('• كفو ي ذكي تم فك الكتم عنك .', { reply_to_message_id: ctx.message?.message_id });
+      return true;
     }
+
+    if (rawText.trim()) {
+      await ctx.deleteMessage(ctx.message?.message_id).catch(() => {});
+      return true;
+    }
+
+    return false;
+  }
+
+  static async handleIncomingGroupText(ctx, text) {
+    if (!this.isGroupChat(ctx)) return false;
+    const handledHazarLock = await this.handleHazarLockedGuesserInput(ctx, text);
+    if (handledHazarLock) return true;
 
     if (!text || text.startsWith('/')) return false;
 
@@ -7066,10 +7073,11 @@ class GroupGamesHandler {
     const timer = setTimeout(async () => {
       const current = this.activeHazarGames.get(key);
       if (!current || String(current.stage) !== 'running') return;
+      await this.unmuteMemberForHazar(ctx.chat.id, Number(current.guesserId || 0));
       this.clearHazarGame(ctx.chat.id);
       await this.bot.telegram.sendMessage(
         Number(ctx.chat.id),
-        '• حظ اوفر عزيزي .'
+        '• حظ اوفر تم فك الكتم عنك .'
       ).catch(() => {});
     }, this.HAZAR_MUTE_SECONDS * 1000);
     this.hazarTimers.set(key, timer);

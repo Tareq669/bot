@@ -4061,6 +4061,8 @@ bot.on('text', async (ctx) => {
     const message = ctx.message.text;
 
     if (GroupAdminHandler.isGroupChat(ctx)) {
+      const handledHazarLock = await GroupGamesHandler.handleHazarLockedGuesserInput(ctx, message);
+      if (handledHazarLock) return;
       const wasModerated = await GroupAdminHandler.processGroupMessage(ctx);
       if (wasModerated) return;
       const handledTournament = await TournamentChallengeHandler.handleGroupText(ctx, message);
