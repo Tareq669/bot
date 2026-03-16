@@ -37,6 +37,16 @@ class BankGameHandler {
     return `${Math.floor(x).toLocaleString('en-US')} دولار 💸`;
   }
 
+  static formatEnglishDate(ts) {
+    const date = new Date(Number(ts || 0));
+    if (!Number.isFinite(date.getTime())) return 'N/A';
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  }
+
   static generateCardNumber(cardType = 'visa') {
     const digits = String(Date.now()).slice(-10) + String(Math.floor(100000 + Math.random() * 900000));
     const body = digits.slice(0, 15);
@@ -679,10 +689,20 @@ class BankGameHandler {
   static async handleSalary(ctx) {
     if (!this.isGroupChat(ctx)) return;
     return this.withBank(ctx, async (_user, p) => {
+      const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+      const now = this.now();
+      const lastSalaryAt = Number(p.salaryLastAt || 0);
+      const nextSalaryAt = lastSalaryAt + WEEK_MS;
+      if (lastSalaryAt > 0 && now < nextSalaryAt) {
+        return ctx.reply(
+          '• عذرا تم صرف راتبك الاسبوعي .\n' +
+          `• تاريخ صرف الراتب ← ${this.formatEnglishDate(nextSalaryAt)}`
+        );
+      }
       const base = Math.floor(15000 + Math.random() * 10000);
       const amount = this.applyBoost(base, p);
       p.balance += amount;
-      p.salaryLastAt = this.now();
+      p.salaryLastAt = now;
       return ctx.reply(`💼 تم صرف راتبك: +${this.fmt(amount)}\n• رصيدك: ${this.fmt(p.balance)}`);
     });
   }
