@@ -40,9 +40,17 @@ const groupSchema = new mongoose.Schema({
       type: Boolean,
       default: true
     },
+    customBadWords: {
+      type: [String],
+      default: []
+    },
     blockExplicitContent: {
       type: Boolean,
       default: true
+    },
+    customExplicitWords: {
+      type: [String],
+      default: []
     },
     floodProtection: {
       type: Boolean,

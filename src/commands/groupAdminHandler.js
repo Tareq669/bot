@@ -5,6 +5,9 @@ const Config = require('../database/models/Config');
 const GROUP_TYPES = new Set(['group', 'supergroup']);
 
 class GroupAdminHandler {
+  static DEFAULT_BAD_WORDS = ['سب', 'شتيمة', 'كلمة_ممنوعة'];
+  static DEFAULT_EXPLICIT_WORDS = ['porn', 'xxx', 'sex', 'xvideos', 'xnxx', 'redtube', 'onlyfans', 'nsfw', 'اباحي', 'اباحية', 'سكس', 'جنس صريح', 'نيك'];
+
   static async saveGroupQuietly(group) {
     try {
       await group.save();
@@ -218,6 +221,24 @@ class GroupAdminHandler {
     return boundaryPattern.test(normalizedText);
   }
 
+  static normalizeWordList(list) {
+    const src = Array.isArray(list) ? list : [];
+    const normalized = src
+      .map((w) => this.normalizePlainText(w))
+      .filter(Boolean);
+    return [...new Set(normalized)].slice(0, 500);
+  }
+
+  static getMergedBadWords(group) {
+    const custom = this.normalizeWordList(group?.settings?.customBadWords || []);
+    return [...new Set([...this.DEFAULT_BAD_WORDS, ...custom])];
+  }
+
+  static getMergedExplicitWords(group) {
+    const custom = this.normalizeWordList(group?.settings?.customExplicitWords || []);
+    return [...new Set([...this.DEFAULT_EXPLICIT_WORDS, ...custom])];
+  }
+
   static getWeekStart(date = new Date()) {
     const d = new Date(date);
     const day = d.getDay();
@@ -290,11 +311,8 @@ class GroupAdminHandler {
   static async canUseModerationCommands(ctx, userId = null) {
     const targetUserId = Number(userId || ctx.from?.id);
     if (!targetUserId) return false;
-    // Internal hierarchy: creator/basic-owner/owner/manager/admin
-    if (await this.isAdminOrHigher(ctx, targetUserId)) return true;
-    // Telegram admins inside the same group are also allowed.
-    if (await this.isGroupAdmin(ctx, targetUserId)) return true;
-    return false;
+    // Moderation actions rely only on Telegram group privileges (owner/admin).
+    return this.isGroupAdmin(ctx, targetUserId);
   }
 
   static getRoleIds(group, key) {
@@ -828,7 +846,9 @@ class GroupAdminHandler {
     if (typeof group.settings.notifyPremiumStickerBlock !== 'boolean') group.settings.notifyPremiumStickerBlock = true;
     if (typeof group.settings.notifyForwardBlock !== 'boolean') group.settings.notifyForwardBlock = true;
     if (typeof group.settings.filterBadWords !== 'boolean') group.settings.filterBadWords = true;
+    if (!Array.isArray(group.settings.customBadWords)) group.settings.customBadWords = [];
     if (typeof group.settings.blockExplicitContent !== 'boolean') group.settings.blockExplicitContent = true;
+    if (!Array.isArray(group.settings.customExplicitWords)) group.settings.customExplicitWords = [];
     if (typeof group.settings.floodProtection !== 'boolean') group.settings.floodProtection = true;
     if (typeof group.settings.exemptAdminsFromProtection !== 'boolean') group.settings.exemptAdminsFromProtection = false;
     if (typeof group.settings.exemptAdminsFromPremiumStickers !== 'boolean') group.settings.exemptAdminsFromPremiumStickers = false;
@@ -873,6 +893,8 @@ class GroupAdminHandler {
     group.settings.managerIds = group.settings.managerIds.map(Number).filter((id) => Number.isInteger(id) && id > 0);
     group.settings.adminIds = group.settings.adminIds.map(Number).filter((id) => Number.isInteger(id) && id > 0);
     group.settings.premiumMemberIds = group.settings.premiumMemberIds.map(Number).filter((id) => Number.isInteger(id) && id > 0);
+    group.settings.customBadWords = this.normalizeWordList(group.settings.customBadWords);
+    group.settings.customExplicitWords = this.normalizeWordList(group.settings.customExplicitWords);
     this.syncLegacyRoleFields(group);
     if (!Array.isArray(group.settings.exceptions)) group.settings.exceptions = [];
     if (!group.settings.templates) group.settings.templates = {};
@@ -949,7 +971,9 @@ class GroupAdminHandler {
       `• مستوى الحمايه ↤︎ ${this.getProtectionPresetLabel(settings.protectionPresetLevel)}\n` +
       `• حماية التكرار ↤︎ ${settings.floodProtection ? '✅' : '❌'}\n` +
       `• فلتر الكلمات ↤︎ ${settings.filterBadWords ? '✅' : '❌'}\n` +
+      `• كلمات ممنوعة مخصصة ↤︎ ${Array.isArray(settings.customBadWords) ? settings.customBadWords.length : 0}\n` +
       `• منع الاباحيه ↤︎ ${settings.blockExplicitContent ? '✅' : '❌'}\n` +
+      `• كلمات اباحية مخصصة ↤︎ ${Array.isArray(settings.customExplicitWords) ? settings.customExplicitWords.length : 0}\n` +
       `• منع الرسائل الطويله ↤︎ ${settings.blockLongMessages ? '✅' : '❌'}\n` +
       `• اشعار الرسائل الطويله ↤︎ ${settings.notifyLongMessageBlock ? '✅' : '❌'}\n` +
       `• امر my ↤︎ ${settings.enableMyInfoCommand ? '✅' : '❌'}\n` +
@@ -997,7 +1021,9 @@ class GroupAdminHandler {
       `• منع الملصقات المميزة: ${settings.lockPremiumStickers ? '✅' : '❌'}\n` +
       `• استثناء المشرفين من الملصقات المميزة: ${settings.exemptAdminsFromPremiumStickers ? '✅' : '❌'}\n` +
       `• فلتر الكلمات: ${settings.filterBadWords ? '✅' : '❌'}\n` +
+      `• كلمات ممنوعة مخصصة: ${Array.isArray(settings.customBadWords) ? settings.customBadWords.length : 0}\n` +
       `• منع الإباحي: ${settings.blockExplicitContent ? '✅' : '❌'}\n` +
+      `• كلمات إباحية مخصصة: ${Array.isArray(settings.customExplicitWords) ? settings.customExplicitWords.length : 0}\n` +
       `• حماية التكرار: ${settings.floodProtection ? '✅' : '❌'}\n` +
       `• منع الرسائل الطويلة: ${settings.blockLongMessages ? '✅' : '❌'} (الحد: ${settings.maxMessageLength})\n` +
       `• اشعار الرسائل الطويلة: ${settings.notifyLongMessageBlock ? '✅' : '❌'}\n` +
@@ -1183,6 +1209,8 @@ class GroupAdminHandler {
       `• قناة الاشتراك: ${this.escapeHtml(subscriptionChannel?.title || 'غير محددة')}\n` +
       `• الكلمات: ${group.settings?.filterBadWords ? '✅ مفعلة' : '❌ معطلة'}\n` +
       `• الإباحي: ${group.settings?.blockExplicitContent ? '✅ مفعلة' : '❌ معطلة'}\n` +
+      `• كلمات ممنوعة مخصصة: ${Array.isArray(group.settings?.customBadWords) ? group.settings.customBadWords.length : 0}\n` +
+      `• كلمات إباحية مخصصة: ${Array.isArray(group.settings?.customExplicitWords) ? group.settings.customExplicitWords.length : 0}\n` +
       `• التكرار: ${group.settings?.floodProtection ? '✅ مفعلة' : '❌ معطلة'}\n` +
       `• الرسائل الطويلة: ${group.settings?.blockLongMessages ? '✅ مفعلة' : '❌ معطلة'} (الحد: ${group.settings?.maxMessageLength || 700})\n` +
       `• اشعار الرسائل الطويلة: ${group.settings?.notifyLongMessageBlock ? '✅ مفعّل' : '❌ معطّل'}\n` +
@@ -1196,6 +1224,8 @@ class GroupAdminHandler {
       '• تفعيل منع التوجيه | تعطيل منع التوجيه\n' +
       '• تفعيل حماية الحذف | تعطيل حماية الحذف\n' +
       '• تفعيل الاشتراك الاجباري | تعطيل الاشتراك الاجباري\n' +
+      '• اضف كلمة ممنوعة ... | حذف كلمة ممنوعة ... | الكلمات الممنوعة | مسح الكلمات الممنوعة\n' +
+      '• اضف كلمة اباحية ... | حذف كلمة اباحية ... | الكلمات الاباحية | مسح الكلمات الاباحية\n' +
       '• ضبط قناة الاشتراك @channel\n' +
       '• قناة الاشتراك | حذف قناة الاشتراك\n' +
       '• تفعيل الكلمات | تعطيل الكلمات\n' +
@@ -1251,6 +1281,103 @@ class GroupAdminHandler {
 
   static async canManageProtection(ctx) {
     return this.isOwnerOrBasic(ctx);
+  }
+
+  static splitWordsInput(value) {
+    return String(value || '')
+      .split(/[,\n،]/)
+      .map((w) => this.normalizePlainText(w))
+      .filter(Boolean);
+  }
+
+  static formatWordList(words) {
+    if (!Array.isArray(words) || !words.length) return 'لا يوجد.';
+    return words.map((w) => `• ${this.escapeHtml(w)}`).join('\n');
+  }
+
+  static async handleCustomWordListCommand(ctx, rawText) {
+    if (!this.isGroupChat(ctx)) return false;
+    const canManage = await this.canManageProtection(ctx);
+    if (!canManage) {
+      await ctx.reply(this.getProtectionDeniedMessage());
+      return true;
+    }
+
+    const group = await this.ensureGroupRecord(ctx);
+    this.normalizeGroupState(group);
+    const text = String(rawText || '').trim();
+
+    if (/^الكلمات الممنوعة$/i.test(text)) {
+      return ctx.reply(
+        '🧾 الكلمات الممنوعة\n\n' +
+        `<b>• الافتراضية:</b>\n${this.formatWordList(this.DEFAULT_BAD_WORDS)}\n\n` +
+        `<b>• المضافة يدويًا:</b>\n${this.formatWordList(group.settings.customBadWords)}`,
+        { parse_mode: 'HTML' }
+      );
+    }
+    if (/^الكلمات (?:الاباحية|الإباحية)$/i.test(text)) {
+      return ctx.reply(
+        '🧾 الكلمات الإباحية\n\n' +
+        `<b>• الافتراضية:</b>\n${this.formatWordList(this.DEFAULT_EXPLICIT_WORDS)}\n\n` +
+        `<b>• المضافة يدويًا:</b>\n${this.formatWordList(group.settings.customExplicitWords)}`,
+        { parse_mode: 'HTML' }
+      );
+    }
+
+    if (/^مسح الكلمات الممنوعة$/i.test(text)) {
+      group.settings.customBadWords = [];
+      await group.save();
+      return ctx.reply('✅ تم مسح الكلمات الممنوعة المضافة يدويًا.');
+    }
+    if (/^مسح الكلمات (?:الاباحية|الإباحية)$/i.test(text)) {
+      group.settings.customExplicitWords = [];
+      await group.save();
+      return ctx.reply('✅ تم مسح الكلمات الإباحية المضافة يدويًا.');
+    }
+
+    const addBad = text.match(/^اضف كلمة ممنوعة\s+(.+)$/i);
+    if (addBad) {
+      const items = this.splitWordsInput(addBad[1]);
+      if (!items.length) return ctx.reply('❌ اكتب الكلمة بعد الأمر.\nمثال: اضف كلمة ممنوعة سب');
+      const before = new Set(this.normalizeWordList(group.settings.customBadWords));
+      items.forEach((x) => before.add(x));
+      group.settings.customBadWords = this.normalizeWordList([...before]);
+      await group.save();
+      return ctx.reply(`✅ تم إضافة ${items.length} كلمة ممنوعة.`);
+    }
+
+    const delBad = text.match(/^حذف كلمة ممنوعة\s+(.+)$/i);
+    if (delBad) {
+      const items = new Set(this.splitWordsInput(delBad[1]));
+      if (!items.size) return ctx.reply('❌ اكتب الكلمة بعد الأمر.\nمثال: حذف كلمة ممنوعة سب');
+      group.settings.customBadWords = this.normalizeWordList(group.settings.customBadWords)
+        .filter((w) => !items.has(w));
+      await group.save();
+      return ctx.reply('✅ تم حذف الكلمات المطلوبة من قائمة الكلمات الممنوعة.');
+    }
+
+    const addExplicit = text.match(/^اضف كلمة (?:اباحية|إباحية)\s+(.+)$/i);
+    if (addExplicit) {
+      const items = this.splitWordsInput(addExplicit[1]);
+      if (!items.length) return ctx.reply('❌ اكتب الكلمة بعد الأمر.\nمثال: اضف كلمة اباحية سكس');
+      const before = new Set(this.normalizeWordList(group.settings.customExplicitWords));
+      items.forEach((x) => before.add(x));
+      group.settings.customExplicitWords = this.normalizeWordList([...before]);
+      await group.save();
+      return ctx.reply(`✅ تم إضافة ${items.length} كلمة إباحية.`);
+    }
+
+    const delExplicit = text.match(/^حذف كلمة (?:اباحية|إباحية)\s+(.+)$/i);
+    if (delExplicit) {
+      const items = new Set(this.splitWordsInput(delExplicit[1]));
+      if (!items.size) return ctx.reply('❌ اكتب الكلمة بعد الأمر.\nمثال: حذف كلمة اباحية سكس');
+      group.settings.customExplicitWords = this.normalizeWordList(group.settings.customExplicitWords)
+        .filter((w) => !items.has(w));
+      await group.save();
+      return ctx.reply('✅ تم حذف الكلمات المطلوبة من قائمة الكلمات الإباحية.');
+    }
+
+    return false;
   }
 
   static async handleProtectCommand(ctx) {
@@ -3771,7 +3898,7 @@ class GroupAdminHandler {
     if (!this.isGroupChat(ctx)) return;
 
     const isAdmin = await this.canUseModerationCommands(ctx);
-    if (!isAdmin) return ctx.reply('❌ هذا الأمر للمشرفين فقط.');
+    if (!isAdmin) return ctx.reply('❌ هذا الأمر للمشرفين والمالك فقط.');
 
     const botRights = await this.ensureBotModerationRights(ctx);
     if (!botRights.ok) return ctx.reply(botRights.message);
@@ -3828,7 +3955,7 @@ class GroupAdminHandler {
     if (!this.isGroupChat(ctx)) return;
 
     const isAdmin = await this.canUseModerationCommands(ctx);
-    if (!isAdmin) return ctx.reply('❌ هذا الأمر للمشرفين فقط.');
+    if (!isAdmin) return ctx.reply('❌ هذا الأمر للمشرفين والمالك فقط.');
 
     const botRights = await this.ensureBotModerationRights(ctx);
     if (!botRights.ok) return ctx.reply(botRights.message);
@@ -3872,7 +3999,7 @@ class GroupAdminHandler {
     if (!this.isGroupChat(ctx)) return;
 
     const isAdmin = await this.canUseModerationCommands(ctx);
-    if (!isAdmin) return ctx.reply('❌ هذا الأمر للمشرفين فقط.');
+    if (!isAdmin) return ctx.reply('❌ هذا الأمر للمشرفين والمالك فقط.');
 
     const botRights = await this.ensureBotModerationRights(ctx);
     if (!botRights.ok) return ctx.reply(botRights.message);
@@ -3923,7 +4050,7 @@ class GroupAdminHandler {
     if (!this.isGroupChat(ctx)) return;
 
     const isAdmin = await this.canUseModerationCommands(ctx);
-    if (!isAdmin) return ctx.reply('❌ هذا الأمر للمشرفين فقط.');
+    if (!isAdmin) return ctx.reply('❌ هذا الأمر للمشرفين والمالك فقط.');
 
     const botRights = await this.ensureBotModerationRights(ctx);
     if (!botRights.ok) return ctx.reply(botRights.message);
@@ -3967,7 +4094,7 @@ class GroupAdminHandler {
     if (!this.isGroupChat(ctx)) return;
 
     const isAdmin = await this.canUseModerationCommands(ctx);
-    if (!isAdmin) return ctx.reply('❌ هذا الأمر للمشرفين فقط.');
+    if (!isAdmin) return ctx.reply('❌ هذا الأمر للمشرفين والمالك فقط.');
 
     const botRights = await this.ensureBotModerationRights(ctx);
     if (!botRights.ok) return ctx.reply(botRights.message);
@@ -4013,7 +4140,7 @@ class GroupAdminHandler {
     if (!this.isGroupChat(ctx)) return;
 
     const isAdmin = await this.canUseModerationCommands(ctx);
-    if (!isAdmin) return ctx.reply('❌ هذا الأمر للمشرفين فقط.');
+    if (!isAdmin) return ctx.reply('❌ هذا الأمر للمشرفين والمالك فقط.');
 
     const botRights = await this.ensureBotModerationRights(ctx);
     if (!botRights.ok) return ctx.reply(botRights.message);
@@ -4579,6 +4706,12 @@ class GroupAdminHandler {
       return true;
     }
     if (
+      /^(اضف كلمة ممنوعة\s+.+|حذف كلمة ممنوعة\s+.+|الكلمات الممنوعة|مسح الكلمات الممنوعة|اضف كلمة (?:اباحية|إباحية)\s+.+|حذف كلمة (?:اباحية|إباحية)\s+.+|الكلمات (?:الاباحية|الإباحية)|مسح الكلمات (?:الاباحية|الإباحية))$/i.test(rawText)
+    ) {
+      const handledWordList = await this.handleCustomWordListCommand(ctx, rawText);
+      if (handledWordList) return true;
+    }
+    if (
       /^(قفل الروابط|فتح الروابط|تفعيل منع ارسال الروابط|تعطيل منع ارسال الروابط|تفعيل منع إرسال الروابط|تعطيل منع إرسال الروابط|قفل الملصقات|فتح الملصقات|تفعيل منع الملصقات المميزة|تعطيل منع الملصقات المميزة|استثناء المشرفين من منع الملصقات المميزة|استئناف المشرفين من منع الملصقات المميزة|الغاء استثناء المشرفين من منع الملصقات المميزة|إلغاء استثناء المشرفين من منع الملصقات المميزة|تفعيل منع التوجيه|تعطيل منع التوجيه|تفعيل منع اعادة التوجيه|تعطيل منع اعادة التوجيه|تفعيل منع إعادة التوجيه|تعطيل منع إعادة التوجيه|تفعيل حماية الحذف|تعطيل حماية الحذف|تفعيل الاشتراك الاجباري|تعطيل الاشتراك الاجباري|تفعيل الاشتراك الإجباري|تعطيل الاشتراك الإجباري|تفعيل الكلمات|تعطيل الكلمات|تفعيل التكرار|تعطيل التكرار|تفعيل منع الاباحية|تعطيل منع الاباحية|تفعيل منع الرسائل الطويل(?:ة|ه)|تعطيل منع الرسائل الطويل(?:ة|ه)|تفعيل اشعار منع الرسائل الطويل(?:ة|ه)|تعطيل اشعار منع الرسائل الطويل(?:ة|ه)|استثناء المشرفين من الحماية|الغاء استثناء المشرفين من الحماية|إلغاء استثناء المشرفين من الحماية|الحماية|\/gprotect\b)/i.test(rawText)
     ) {
       if (/^(قفل الروابط|تفعيل منع ارسال الروابط|تفعيل منع إرسال الروابط)$/i.test(rawText)) {
@@ -5002,8 +5135,9 @@ class GroupAdminHandler {
     }
 
     if (group.settings?.blockExplicitContent && !adminProtectionBypass) {
-      const explicitPattern = /(?:\b(?:porn|xxx|sex|xvideos|xnxx|redtube|onlyfans|nsfw)\b|اباحي|اباحية|سكس|جنس صريح|نيك)/i;
-      if (explicitPattern.test(text)) {
+      const explicitWords = this.getMergedExplicitWords(group);
+      const explicitFound = explicitWords.some((w) => this.hasBoundedPhrase(text, w));
+      if (explicitFound) {
         try {
           await ctx.telegram.deleteMessage(ctx.chat.id, ctx.message.message_id);
           await this.addModerationLog(group, 'delete_explicit_message', ctx.botInfo.id, ctx.from.id, 'explicit content blocked');
@@ -5017,7 +5151,7 @@ class GroupAdminHandler {
     }
 
     if (group.settings?.filterBadWords && !adminProtectionBypass) {
-      const blockedWords = ['سب', 'شتيمة', 'كلمة_ممنوعة'];
+      const blockedWords = this.getMergedBadWords(group);
       const found = blockedWords.some((w) => this.hasBoundedPhrase(text, w));
       if (found) {
         try {
