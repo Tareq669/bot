@@ -6978,11 +6978,8 @@ class GroupGamesHandler {
       return ctx.answerCbQuery('ما في لعبة حزر شغالة حالياً.', { show_alert: true }).catch(() => {});
     }
     const userId = Number(ctx.from?.id || 0);
-    const hostId = Number(game.hostId || 0);
-    const participants = Array.isArray(game.participants) ? game.participants.map((x) => Number(x)) : [];
-    const isParticipant = participants.includes(userId) && userId !== hostId;
-    if (isParticipant) {
-      return ctx.answerCbQuery('الهمسه متاحة لصاحب البداية وغير المشاركين فقط.', { show_alert: true }).catch(() => {});
+    if (userId === Number(game.guesserId || 0)) {
+      return ctx.answerCbQuery('الهمسه ظاهرة للجميع ما عدا المختار.', { show_alert: true }).catch(() => {});
     }
     return ctx.answerCbQuery(`همسه: الكلمة هي (${game.answer})\nاكتبها الآن في الجروب.`, { show_alert: true }).catch(() => {});
   }
@@ -7033,6 +7030,10 @@ class GroupGamesHandler {
     const key = String(ctx.chat.id);
     const game = this.activeHazarGames.get(key);
     if (!game || String(game.stage) !== 'lobby') return false;
+    if (Number(ctx.from?.id || 0) !== Number(game.hostId || 0)) {
+      await ctx.reply('• فقط من بدأ اللعبة يكتب نعم للبدء .', { reply_to_message_id: ctx.message?.message_id });
+      return true;
+    }
 
     const participants = (game.participants || []).map((id) => Number(id)).filter((id) => Number.isInteger(id));
     const joiners = participants.filter((id) => Number(id) !== Number(game.hostId || 0));
