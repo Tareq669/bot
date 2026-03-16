@@ -3869,6 +3869,7 @@ class GroupGamesHandler {
 
   static async handleIncomingGroupText(ctx, text) {
     if (!this.isGroupChat(ctx)) return false;
+    const groupId = String(ctx.chat?.id || '');
     const handledHazarLock = await this.handleHazarLockedGuesserInput(ctx, text);
     if (handledHazarLock) return true;
 
