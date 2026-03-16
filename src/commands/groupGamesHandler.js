@@ -3860,7 +3860,14 @@ class GroupGamesHandler {
     }
 
     if (rawText.trim()) {
-      await ctx.deleteMessage(ctx.message?.message_id).catch(() => {});
+      const deleted = await ctx.deleteMessage(ctx.message?.message_id).then(() => true).catch(() => false);
+      if (!deleted && !game.warnedNoDeletePermission) {
+        game.warnedNoDeletePermission = true;
+        await ctx.reply(
+          '• ما قدرت احذف الرسائل.\n• تأكد أن البوت معه صلاحية حذف الرسائل.',
+          { reply_to_message_id: ctx.message?.message_id }
+        ).catch(() => {});
+      }
       return true;
     }
 
@@ -7054,7 +7061,16 @@ class GroupGamesHandler {
       await ctx.reply('❌ لازم لاعبين على الأقل. خلي الأعضاء يكتبوا: انا');
       return true;
     }
-    const guesserId = Number(this.pickRandom(joiners));
+    const nonPrivilegedJoiners = [];
+    for (const uid of joiners) {
+      const isPrivileged = await this.isGroupAdmin(ctx, uid);
+      if (!isPrivileged) nonPrivilegedJoiners.push(uid);
+    }
+    if (nonPrivilegedJoiners.length < 1) {
+      await ctx.reply('❌ لازم لاعب غير مشرف في (انا) حتى تشتغل حزر.');
+      return true;
+    }
+    const guesserId = Number(this.pickRandom(nonPrivilegedJoiners));
     const guesserName = String(game.names?.[guesserId] || guesserId);
 
     const answer = this.pickNonRepeating(

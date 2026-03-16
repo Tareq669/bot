@@ -170,6 +170,15 @@ bot.use(async (ctx, next) => {
   await trackUserIdentity(ctx);
   return next();
 });
+bot.use(async (ctx, next) => {
+  const isGroup = ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
+  const text = ctx.message?.text;
+  if (isGroup && typeof text === 'string' && text.trim()) {
+    const handled = await GroupGamesHandler.handleHazarLockedGuesserInput(ctx, text);
+    if (handled) return;
+  }
+  return next();
+});
 GroupGamesHandler.setup(bot);
 TournamentChallengeHandler.setup(bot);
 
