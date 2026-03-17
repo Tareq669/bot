@@ -25,6 +25,8 @@ class ChatGamesUtilityHandler {
   static AUDIO_RESOLVE_BATCH_SIZE = 4;
   static AUDIO_STRICT_MATCH_RATIO = 0.45;
   static AUDIO_STRICT_SCORE_THRESHOLD = 0.45;
+  static VIDEO_SEARCH_TIMEOUT_MS = 18000;
+  static VIDEO_RESOLVE_TIMEOUT_MS = 4000;
   static JOE_UPDATES_CHANNEL_URL = 'https://t.me/joam909';
   static YT_HTML_SEARCH_TIMEOUT_MS = 4500;
   static ARCHIVE_SEARCH_URL = 'https://archive.org/advancedsearch.php';
@@ -944,6 +946,174 @@ class ChatGamesUtilityHandler {
     const results = await this.searchYoutubeAudios(query, 1);
     return results[0] || null;
   }
+
+  static pickYoutubeVideoStream(streams = []) {
+    if (!Array.isArray(streams) || !streams.length) return null;
+    const withUrl = streams.filter((stream) => stream?.url);
+    if (!withUrl.length) return null;
+
+    const ranked = withUrl
+      .map((stream) => {
+        const qualityLabel = String(stream?.quality || stream?.qualityLabel || '').toLowerCase();
+        const match = qualityLabel.match(/(\d{3,4})p/);
+        const qualityScore = match ? Number(match[1]) : 0;
+        return {
+          ...stream,
+          qualityScore
+        };
+      })
+      .sort((a, b) => {
+        if (b.qualityScore !== a.qualityScore) return b.qualityScore - a.qualityScore;
+        return Number(b?.bitrate || 0) - Number(a?.bitrate || 0);
+      });
+
+    return ranked[0] || null;
+  }
+
+  static async resolveYoutubeVideoById(videoId, instance, candidate = null) {
+    const id = String(videoId || '').trim();
+    if (!id || !instance) return null;
+    try {
+      const streamData = await this.withTimeout(
+        this.fetchPiped(`/api/v1/streams/${encodeURIComponent(id)}`, {}, instance),
+        this.VIDEO_RESOLVE_TIMEOUT_MS,
+        'VIDEO_STREAM_TIMEOUT'
+      );
+      const videoStream = this.pickYoutubeVideoStream(streamData?.videoStreams || []);
+      if (!videoStream?.url) return null;
+      return {
+        title: String(candidate?.title || streamData?.title || 'فيديو'),
+        creator: String(candidate?.uploader || candidate?.author || streamData?.uploader || ''),
+        url: String(videoStream.url),
+        source: 'youtube_video'
+      };
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  static async searchYoutubeVideos(query, limit = 5) {
+    const q = String(query || '').trim();
+    if (!q) return [];
+
+    const instances = this.shuffleArray(this.YT_PIPED_INSTANCES);
+    const fastInstances = instances.slice(0, Math.max(1, this.FAST_SEARCH_INSTANCES));
+    const candidates = await this.fetchPipedSearchCandidates(q, fastInstances[0], ['videos'], Math.max(8, limit * 3))
+      .catch(() => []);
+    const htmlFallback = await this.fetchYoutubeHtmlCandidates(q, Math.max(8, limit * 3)).catch(() => []);
+
+    const allCandidates = [];
+    const seen = new Set();
+    const sourceList = [...(Array.isArray(candidates) ? candidates : []), ...(Array.isArray(htmlFallback) ? htmlFallback : [])];
+    for (const item of sourceList) {
+      const id = String(item?.id || '').trim();
+      if (!id) continue;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      allCandidates.push(item);
+    }
+
+    const ranked = allCandidates
+      .map((item) => ({
+        item,
+        score: this.scoreAudioCandidate(q, item?.title, item?.uploader || item?.author || '')
+      }))
+      .sort((a, b) => b.score - a.score)
+      .map((entry) => entry.item)
+      .slice(0, Math.max(limit * 3, 10));
+
+    if (!ranked.length) return [];
+
+    const results = [];
+    for (const candidate of ranked) {
+      if (results.length >= limit) break;
+      const id = String(candidate?.id || '').trim();
+      if (!id) continue;
+
+      let resolved = null;
+      for (const instance of instances) {
+        resolved = await this.resolveYoutubeVideoById(id, instance, candidate);
+        if (resolved?.url) break;
+      }
+      if (!resolved?.url) continue;
+
+      const key = `${this.normalizeSearchText(resolved.title)}|${resolved.url}`;
+      if (results.some((x) => `${this.normalizeSearchText(x.title)}|${x.url}` === key)) continue;
+      results.push(resolved);
+    }
+
+    return results;
+  }
+
+  static async sendHotVideoResult(ctx, video) {
+    const caption = '♪ تم التح🎧ميل بنجاح ♪';
+    const safeTitle = this.cleanAudioLabel(video?.title || 'فيديو').slice(0, 120);
+    const updatesButton = Markup.inlineKeyboard([
+      [Markup.button.url('تحديثات جو', this.JOE_UPDATES_CHANNEL_URL)]
+    ]);
+
+    await ctx.replyWithVideo(
+      { url: video.url },
+      {
+        caption,
+        supports_streaming: true,
+        reply_markup: updatesButton.reply_markup
+      }
+    );
+
+    if (safeTitle) {
+      await ctx.reply(`🎬 ${safeTitle}`).catch(() => {});
+    }
+  }
+
+  static async handlePlayVideoCommand(ctx, queryText) {
+    if (!['group', 'supergroup'].includes(ctx.chat?.type)) {
+      await ctx.reply('❌ هذا الأمر للجروب فقط.');
+      return;
+    }
+
+    const query = String(queryText || '').trim();
+    if (!query) {
+      await ctx.reply('❌ الصيغة:\nستارز فيديو اسم المقطع');
+      return;
+    }
+
+    return this.enqueueAudioChatTask(ctx.chat?.id, async () => {
+      const loadingMsg = await ctx.reply('🎧 جاري التحميل ....');
+      try {
+        let result = null;
+        const directVideoId = this.parseYoutubeVideoIdFromUrl(query);
+        if (directVideoId) {
+          const instances = this.shuffleArray(this.YT_PIPED_INSTANCES);
+          for (const instance of instances) {
+            result = await this.resolveYoutubeVideoById(directVideoId, instance, { title: query });
+            if (result?.url) break;
+          }
+        }
+
+        if (!result?.url) {
+          const list = await this.withTimeout(
+            this.searchYoutubeVideos(query, 1),
+            this.VIDEO_SEARCH_TIMEOUT_MS,
+            'VIDEO_SEARCH_TIMEOUT'
+          ).catch(() => []);
+          result = list[0] || null;
+        }
+
+        await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
+        if (!result?.url) {
+          await ctx.reply('♪ عذرا غير متوفر ..');
+          return;
+        }
+
+        await this.sendHotVideoResult(ctx, result);
+      } catch (_error) {
+        await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
+        await ctx.reply('♪ عذرا غير متوفر ..');
+      }
+    });
+  }
+
   static async searchYoutubeAudios(query, limit = 5) {
     const q = String(query || '').trim();
     if (!q) return [];
