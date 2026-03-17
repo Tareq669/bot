@@ -25,6 +25,7 @@ class ChatGamesUtilityHandler {
   static AUDIO_RESOLVE_BATCH_SIZE = 4;
   static AUDIO_STRICT_MATCH_RATIO = 0.45;
   static AUDIO_STRICT_SCORE_THRESHOLD = 0.45;
+  static JOE_UPDATES_CHANNEL_URL = 'https://t.me/joam909';
   static YT_HTML_SEARCH_TIMEOUT_MS = 4500;
   static ARCHIVE_SEARCH_URL = 'https://archive.org/advancedsearch.php';
   static ARCHIVE_METADATA_URL = 'https://archive.org/metadata';
@@ -625,12 +626,16 @@ class ChatGamesUtilityHandler {
     const caption = '♪ تم التح🎧ميل بنجاح ♪';
     const safeTitle = this.cleanAudioLabel(audio?.title || 'مقطع صوتي').slice(0, 120);
     const safePerformer = this.cleanAudioLabel(audio?.creator || '').slice(0, 80) || undefined;
+    const updatesButton = Markup.inlineKeyboard([
+      [Markup.button.url('تحديثات جو', this.JOE_UPDATES_CHANNEL_URL)]
+    ]);
     await ctx.replyWithAudio(
       { url: audio.url },
       {
         caption,
         title: safeTitle,
-        performer: safePerformer
+        performer: safePerformer,
+        reply_markup: updatesButton.reply_markup
       }
     );
   }
