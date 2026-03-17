@@ -7,6 +7,8 @@ const GROUP_TYPES = new Set(['group', 'supergroup']);
 class GroupAdminHandler {
   static DEFAULT_BAD_WORDS = ['سب', 'شتيمة', 'كلمة_ممنوعة'];
   static DEFAULT_EXPLICIT_WORDS = ['porn', 'xxx', 'sex', 'xvideos', 'xnxx', 'redtube', 'onlyfans', 'nsfw', 'اباحي', 'اباحية', 'سكس', 'جنس صريح', 'نيك'];
+  static GLOBAL_WORD_LISTS_CACHE = { bad: [], explicit: [], loadedAt: 0 };
+  static GLOBAL_WORD_LISTS_TTL_MS = 60 * 1000;
 
   static async saveGroupQuietly(group) {
     try {
@@ -229,14 +231,58 @@ class GroupAdminHandler {
     return [...new Set(normalized)].slice(0, 500);
   }
 
-  static getMergedBadWords(group) {
-    const custom = this.normalizeWordList(group?.settings?.customBadWords || []);
-    return [...new Set([...this.DEFAULT_BAD_WORDS, ...custom])];
+  static async getGlobalWordLists(force = false) {
+    const now = Date.now();
+    const cache = this.GLOBAL_WORD_LISTS_CACHE || { bad: [], explicit: [], loadedAt: 0 };
+    if (!force && cache.loadedAt && (now - Number(cache.loadedAt || 0)) < this.GLOBAL_WORD_LISTS_TTL_MS) {
+      return {
+        bad: this.normalizeWordList(cache.bad || []),
+        explicit: this.normalizeWordList(cache.explicit || [])
+      };
+    }
+
+    const rows = await Config.find({ key: { $in: ['globalCustomBadWords', 'globalCustomExplicitWords'] } }).lean();
+    const byKey = new Map(rows.map((row) => [String(row.key || ''), row]));
+    const bad = this.normalizeWordList(byKey.get('globalCustomBadWords')?.value || []);
+    const explicit = this.normalizeWordList(byKey.get('globalCustomExplicitWords')?.value || []);
+    this.GLOBAL_WORD_LISTS_CACHE = { bad, explicit, loadedAt: now };
+    return { bad, explicit };
   }
 
-  static getMergedExplicitWords(group) {
-    const custom = this.normalizeWordList(group?.settings?.customExplicitWords || []);
-    return [...new Set([...this.DEFAULT_EXPLICIT_WORDS, ...custom])];
+  static async saveGlobalWordList(kind, words, updatedBy = null) {
+    const isExplicit = String(kind) === 'explicit';
+    const key = isExplicit ? 'globalCustomExplicitWords' : 'globalCustomBadWords';
+    const normalized = this.normalizeWordList(words);
+    await Config.findOneAndUpdate(
+      { key },
+      {
+        $set: {
+          value: normalized,
+          description: isExplicit
+            ? 'Global explicit words managed by bot owner in private chat.'
+            : 'Global blocked words managed by bot owner in private chat.',
+          category: 'protection',
+          updatedBy: Number(updatedBy || 0) || null,
+          updatedAt: new Date()
+        },
+        $setOnInsert: { key }
+      },
+      { upsert: true, new: true }
+    );
+    this.GLOBAL_WORD_LISTS_CACHE.loadedAt = 0;
+    return normalized;
+  }
+
+  static getMergedBadWords(group, globalLists = null) {
+    const legacyCustom = this.normalizeWordList(group?.settings?.customBadWords || []);
+    const globalCustom = this.normalizeWordList(globalLists?.bad || []);
+    return [...new Set([...this.DEFAULT_BAD_WORDS, ...globalCustom, ...legacyCustom])];
+  }
+
+  static getMergedExplicitWords(group, globalLists = null) {
+    const legacyCustom = this.normalizeWordList(group?.settings?.customExplicitWords || []);
+    const globalCustom = this.normalizeWordList(globalLists?.explicit || []);
+    return [...new Set([...this.DEFAULT_EXPLICIT_WORDS, ...globalCustom, ...legacyCustom])];
   }
 
   static getWeekStart(date = new Date()) {
@@ -971,9 +1017,7 @@ class GroupAdminHandler {
       `• مستوى الحمايه ↤︎ ${this.getProtectionPresetLabel(settings.protectionPresetLevel)}\n` +
       `• حماية التكرار ↤︎ ${settings.floodProtection ? '✅' : '❌'}\n` +
       `• فلتر الكلمات ↤︎ ${settings.filterBadWords ? '✅' : '❌'}\n` +
-      `• كلمات ممنوعة مخصصة ↤︎ ${Array.isArray(settings.customBadWords) ? settings.customBadWords.length : 0}\n` +
       `• منع الاباحيه ↤︎ ${settings.blockExplicitContent ? '✅' : '❌'}\n` +
-      `• كلمات اباحية مخصصة ↤︎ ${Array.isArray(settings.customExplicitWords) ? settings.customExplicitWords.length : 0}\n` +
       `• منع الرسائل الطويله ↤︎ ${settings.blockLongMessages ? '✅' : '❌'}\n` +
       `• اشعار الرسائل الطويله ↤︎ ${settings.notifyLongMessageBlock ? '✅' : '❌'}\n` +
       `• امر my ↤︎ ${settings.enableMyInfoCommand ? '✅' : '❌'}\n` +
@@ -1021,9 +1065,7 @@ class GroupAdminHandler {
       `• منع الملصقات المميزة: ${settings.lockPremiumStickers ? '✅' : '❌'}\n` +
       `• استثناء المشرفين من الملصقات المميزة: ${settings.exemptAdminsFromPremiumStickers ? '✅' : '❌'}\n` +
       `• فلتر الكلمات: ${settings.filterBadWords ? '✅' : '❌'}\n` +
-      `• كلمات ممنوعة مخصصة: ${Array.isArray(settings.customBadWords) ? settings.customBadWords.length : 0}\n` +
       `• منع الإباحي: ${settings.blockExplicitContent ? '✅' : '❌'}\n` +
-      `• كلمات إباحية مخصصة: ${Array.isArray(settings.customExplicitWords) ? settings.customExplicitWords.length : 0}\n` +
       `• حماية التكرار: ${settings.floodProtection ? '✅' : '❌'}\n` +
       `• منع الرسائل الطويلة: ${settings.blockLongMessages ? '✅' : '❌'} (الحد: ${settings.maxMessageLength})\n` +
       `• اشعار الرسائل الطويلة: ${settings.notifyLongMessageBlock ? '✅' : '❌'}\n` +
@@ -1209,8 +1251,6 @@ class GroupAdminHandler {
       `• قناة الاشتراك: ${this.escapeHtml(subscriptionChannel?.title || 'غير محددة')}\n` +
       `• الكلمات: ${group.settings?.filterBadWords ? '✅ مفعلة' : '❌ معطلة'}\n` +
       `• الإباحي: ${group.settings?.blockExplicitContent ? '✅ مفعلة' : '❌ معطلة'}\n` +
-      `• كلمات ممنوعة مخصصة: ${Array.isArray(group.settings?.customBadWords) ? group.settings.customBadWords.length : 0}\n` +
-      `• كلمات إباحية مخصصة: ${Array.isArray(group.settings?.customExplicitWords) ? group.settings.customExplicitWords.length : 0}\n` +
       `• التكرار: ${group.settings?.floodProtection ? '✅ مفعلة' : '❌ معطلة'}\n` +
       `• الرسائل الطويلة: ${group.settings?.blockLongMessages ? '✅ مفعلة' : '❌ معطلة'} (الحد: ${group.settings?.maxMessageLength || 700})\n` +
       `• اشعار الرسائل الطويلة: ${group.settings?.notifyLongMessageBlock ? '✅ مفعّل' : '❌ معطّل'}\n` +
@@ -1224,8 +1264,8 @@ class GroupAdminHandler {
       '• تفعيل منع التوجيه | تعطيل منع التوجيه\n' +
       '• تفعيل حماية الحذف | تعطيل حماية الحذف\n' +
       '• تفعيل الاشتراك الاجباري | تعطيل الاشتراك الاجباري\n' +
-      '• اضف كلمة ممنوعة ... | حذف كلمة ممنوعة ... | الكلمات الممنوعة | مسح الكلمات الممنوعة\n' +
-      '• اضف كلمة اباحية ... | حذف كلمة اباحية ... | الكلمات الاباحية | مسح الكلمات الاباحية\n' +
+      '• (بالخاص للمالك) اضف كلمة ممنوعة ... | حذف كلمة ممنوعة ... | الكلمات الممنوعة | مسح الكلمات الممنوعة\n' +
+      '• (بالخاص للمالك) اضف كلمة اباحية ... | حذف كلمة اباحية ... | الكلمات الاباحية | مسح الكلمات الاباحية\n' +
       '• ضبط قناة الاشتراك @channel\n' +
       '• قناة الاشتراك | حذف قناة الاشتراك\n' +
       '• تفعيل الكلمات | تعطيل الكلمات\n' +
@@ -1296,22 +1336,19 @@ class GroupAdminHandler {
   }
 
   static async handleCustomWordListCommand(ctx, rawText) {
-    if (!this.isGroupChat(ctx)) return false;
-    const canManage = await this.canManageProtection(ctx);
-    if (!canManage) {
-      await ctx.reply(this.getProtectionDeniedMessage());
-      return true;
-    }
+    if (ctx.chat?.type !== 'private') return false;
+    if (!this.isBotOwner(ctx.from?.id)) return false;
 
-    const group = await this.ensureGroupRecord(ctx);
-    this.normalizeGroupState(group);
     const text = String(rawText || '').trim();
+    const globalLists = await this.getGlobalWordLists();
+    const badList = this.normalizeWordList(globalLists.bad || []);
+    const explicitList = this.normalizeWordList(globalLists.explicit || []);
 
     if (/^الكلمات الممنوعة$/i.test(text)) {
       return ctx.reply(
         '🧾 الكلمات الممنوعة\n\n' +
         `<b>• الافتراضية:</b>\n${this.formatWordList(this.DEFAULT_BAD_WORDS)}\n\n` +
-        `<b>• المضافة يدويًا:</b>\n${this.formatWordList(group.settings.customBadWords)}`,
+        `<b>• المضافة عالميًا:</b>\n${this.formatWordList(badList)}`,
         { parse_mode: 'HTML' }
       );
     }
@@ -1319,62 +1356,56 @@ class GroupAdminHandler {
       return ctx.reply(
         '🧾 الكلمات الإباحية\n\n' +
         `<b>• الافتراضية:</b>\n${this.formatWordList(this.DEFAULT_EXPLICIT_WORDS)}\n\n` +
-        `<b>• المضافة يدويًا:</b>\n${this.formatWordList(group.settings.customExplicitWords)}`,
+        `<b>• المضافة عالميًا:</b>\n${this.formatWordList(explicitList)}`,
         { parse_mode: 'HTML' }
       );
     }
 
     if (/^مسح الكلمات الممنوعة$/i.test(text)) {
-      group.settings.customBadWords = [];
-      await group.save();
-      return ctx.reply('✅ تم مسح الكلمات الممنوعة المضافة يدويًا.');
+      await this.saveGlobalWordList('bad', [], ctx.from?.id);
+      return ctx.reply('✅ تم مسح الكلمات الممنوعة العالمية.');
     }
     if (/^مسح الكلمات (?:الاباحية|الإباحية)$/i.test(text)) {
-      group.settings.customExplicitWords = [];
-      await group.save();
-      return ctx.reply('✅ تم مسح الكلمات الإباحية المضافة يدويًا.');
+      await this.saveGlobalWordList('explicit', [], ctx.from?.id);
+      return ctx.reply('✅ تم مسح الكلمات الإباحية العالمية.');
     }
 
     const addBad = text.match(/^اضف كلمة ممنوعة\s+(.+)$/i);
     if (addBad) {
       const items = this.splitWordsInput(addBad[1]);
       if (!items.length) return ctx.reply('❌ اكتب الكلمة بعد الأمر.\nمثال: اضف كلمة ممنوعة سب');
-      const before = new Set(this.normalizeWordList(group.settings.customBadWords));
+      const before = new Set(badList);
       items.forEach((x) => before.add(x));
-      group.settings.customBadWords = this.normalizeWordList([...before]);
-      await group.save();
-      return ctx.reply(`✅ تم إضافة ${items.length} كلمة ممنوعة.`);
+      const saved = await this.saveGlobalWordList('bad', [...before], ctx.from?.id);
+      return ctx.reply(`✅ تم إضافة ${items.length} كلمة ممنوعة عالميًا.\n• الإجمالي الآن: ${saved.length}`);
     }
 
     const delBad = text.match(/^حذف كلمة ممنوعة\s+(.+)$/i);
     if (delBad) {
       const items = new Set(this.splitWordsInput(delBad[1]));
       if (!items.size) return ctx.reply('❌ اكتب الكلمة بعد الأمر.\nمثال: حذف كلمة ممنوعة سب');
-      group.settings.customBadWords = this.normalizeWordList(group.settings.customBadWords)
-        .filter((w) => !items.has(w));
-      await group.save();
-      return ctx.reply('✅ تم حذف الكلمات المطلوبة من قائمة الكلمات الممنوعة.');
+      const saved = badList.filter((w) => !items.has(w));
+      await this.saveGlobalWordList('bad', saved, ctx.from?.id);
+      return ctx.reply('✅ تم حذف الكلمات المطلوبة من قائمة الكلمات الممنوعة العالمية.');
     }
 
     const addExplicit = text.match(/^اضف كلمة (?:اباحية|إباحية)\s+(.+)$/i);
     if (addExplicit) {
       const items = this.splitWordsInput(addExplicit[1]);
       if (!items.length) return ctx.reply('❌ اكتب الكلمة بعد الأمر.\nمثال: اضف كلمة اباحية سكس');
-      const before = new Set(this.normalizeWordList(group.settings.customExplicitWords));
+      const before = new Set(explicitList);
       items.forEach((x) => before.add(x));
-      group.settings.customExplicitWords = this.normalizeWordList([...before]);
-      await group.save();
-      return ctx.reply(`✅ تم إضافة ${items.length} كلمة إباحية.`);
+      const saved = await this.saveGlobalWordList('explicit', [...before], ctx.from?.id);
+      return ctx.reply(`✅ تم إضافة ${items.length} كلمة إباحية عالميًا.\n• الإجمالي الآن: ${saved.length}`);
     }
 
     const delExplicit = text.match(/^حذف كلمة (?:اباحية|إباحية)\s+(.+)$/i);
     if (delExplicit) {
       const items = new Set(this.splitWordsInput(delExplicit[1]));
       if (!items.size) return ctx.reply('❌ اكتب الكلمة بعد الأمر.\nمثال: حذف كلمة اباحية سكس');
-      group.settings.customExplicitWords = this.normalizeWordList(group.settings.customExplicitWords)
-        .filter((w) => !items.has(w));
-      await group.save();
-      return ctx.reply('✅ تم حذف الكلمات المطلوبة من قائمة الكلمات الإباحية.');
+      const saved = explicitList.filter((w) => !items.has(w));
+      await this.saveGlobalWordList('explicit', saved, ctx.from?.id);
+      return ctx.reply('✅ تم حذف الكلمات المطلوبة من قائمة الكلمات الإباحية العالمية.');
     }
 
     return false;
@@ -2729,6 +2760,9 @@ class GroupAdminHandler {
   static async handleOwnerPrivateSpecialFaqText(ctx, rawText) {
     if (ctx.chat?.type !== 'private') return false;
     if (!this.isBotOwner(ctx.from?.id)) return false;
+
+    const handledWordList = await this.handleCustomWordListCommand(ctx, rawText);
+    if (handledWordList) return true;
 
     const handledPending = await this.handlePendingGlobalSpecialFaqText(ctx, rawText);
     if (handledPending) return true;
@@ -4708,8 +4742,8 @@ class GroupAdminHandler {
     if (
       /^(اضف كلمة ممنوعة\s+.+|حذف كلمة ممنوعة\s+.+|الكلمات الممنوعة|مسح الكلمات الممنوعة|اضف كلمة (?:اباحية|إباحية)\s+.+|حذف كلمة (?:اباحية|إباحية)\s+.+|الكلمات (?:الاباحية|الإباحية)|مسح الكلمات (?:الاباحية|الإباحية))$/i.test(rawText)
     ) {
-      const handledWordList = await this.handleCustomWordListCommand(ctx, rawText);
-      if (handledWordList) return true;
+      await ctx.reply('• هذا الأمر للمالك في الخاص فقط.');
+      return true;
     }
     if (
       /^(قفل الروابط|فتح الروابط|تفعيل منع ارسال الروابط|تعطيل منع ارسال الروابط|تفعيل منع إرسال الروابط|تعطيل منع إرسال الروابط|قفل الملصقات|فتح الملصقات|تفعيل منع الملصقات المميزة|تعطيل منع الملصقات المميزة|استثناء المشرفين من منع الملصقات المميزة|استئناف المشرفين من منع الملصقات المميزة|الغاء استثناء المشرفين من منع الملصقات المميزة|إلغاء استثناء المشرفين من منع الملصقات المميزة|تفعيل منع التوجيه|تعطيل منع التوجيه|تفعيل منع اعادة التوجيه|تعطيل منع اعادة التوجيه|تفعيل منع إعادة التوجيه|تعطيل منع إعادة التوجيه|تفعيل حماية الحذف|تعطيل حماية الحذف|تفعيل الاشتراك الاجباري|تعطيل الاشتراك الاجباري|تفعيل الاشتراك الإجباري|تعطيل الاشتراك الإجباري|تفعيل الكلمات|تعطيل الكلمات|تفعيل التكرار|تعطيل التكرار|تفعيل منع الاباحية|تعطيل منع الاباحية|تفعيل منع الرسائل الطويل(?:ة|ه)|تعطيل منع الرسائل الطويل(?:ة|ه)|تفعيل اشعار منع الرسائل الطويل(?:ة|ه)|تعطيل اشعار منع الرسائل الطويل(?:ة|ه)|استثناء المشرفين من الحماية|الغاء استثناء المشرفين من الحماية|إلغاء استثناء المشرفين من الحماية|الحماية|\/gprotect\b)/i.test(rawText)
@@ -5135,7 +5169,8 @@ class GroupAdminHandler {
     }
 
     if (group.settings?.blockExplicitContent && !adminProtectionBypass) {
-      const explicitWords = this.getMergedExplicitWords(group);
+      const globalWords = await this.getGlobalWordLists();
+      const explicitWords = this.getMergedExplicitWords(group, globalWords);
       const explicitFound = explicitWords.some((w) => this.hasBoundedPhrase(text, w));
       if (explicitFound) {
         try {
@@ -5151,7 +5186,8 @@ class GroupAdminHandler {
     }
 
     if (group.settings?.filterBadWords && !adminProtectionBypass) {
-      const blockedWords = this.getMergedBadWords(group);
+      const globalWords = await this.getGlobalWordLists();
+      const blockedWords = this.getMergedBadWords(group, globalWords);
       const found = blockedWords.some((w) => this.hasBoundedPhrase(text, w));
       if (found) {
         try {
