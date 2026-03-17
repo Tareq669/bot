@@ -1340,7 +1340,7 @@ class GroupAdminHandler {
     if (!this.isBotOwner(ctx.from?.id)) return false;
 
     const text = String(rawText || '').trim();
-    const isWordCommand = /^(الكلمات الممنوعة|مسح الكلمات الممنوعة|اضف كلمة ممنوعة\s+.+|حذف كلمة ممنوعة\s+.+|الكلمات (?:الاباحية|الإباحية)|مسح الكلمات (?:الاباحية|الإباحية)|اضف كلمة (?:اباحية|إباحية)\s+.+|حذف كلمة (?:اباحية|إباحية)\s+.+)$/i.test(text);
+    const isWordCommand = /^(الكلمات الممنوعة|مسح الكلمات الممنوعة|اضف كلمة ممنوعة(?:\s+.+)?|حذف كلمة ممنوعة(?:\s+.+)?|الكلمات (?:الاباحية|الإباحية)|مسح الكلمات (?:الاباحية|الإباحية)|اضف كلمة (?:اباحية|إباحية)(?:\s+.+)?|حذف كلمة (?:اباحية|إباحية)(?:\s+.+)?)$/i.test(text);
     if (!isWordCommand) return false;
 
     const globalLists = await this.getGlobalWordLists();
@@ -1373,6 +1373,9 @@ class GroupAdminHandler {
       return ctx.reply('✅ تم مسح الكلمات الإباحية العالمية.');
     }
 
+    if (/^اضف كلمة ممنوعة$/i.test(text)) {
+      return ctx.reply('✍️ اكتب الكلمة بعد الأمر.\nمثال: اضف كلمة ممنوعة سب');
+    }
     const addBad = text.match(/^اضف كلمة ممنوعة\s+(.+)$/i);
     if (addBad) {
       const items = this.splitWordsInput(addBad[1]);
@@ -1383,6 +1386,9 @@ class GroupAdminHandler {
       return ctx.reply(`✅ تم إضافة ${items.length} كلمة ممنوعة عالميًا.\n• الإجمالي الآن: ${saved.length}`);
     }
 
+    if (/^حذف كلمة ممنوعة$/i.test(text)) {
+      return ctx.reply('✍️ اكتب الكلمة بعد الأمر.\nمثال: حذف كلمة ممنوعة سب');
+    }
     const delBad = text.match(/^حذف كلمة ممنوعة\s+(.+)$/i);
     if (delBad) {
       const items = new Set(this.splitWordsInput(delBad[1]));
@@ -1392,6 +1398,9 @@ class GroupAdminHandler {
       return ctx.reply('✅ تم حذف الكلمات المطلوبة من قائمة الكلمات الممنوعة العالمية.');
     }
 
+    if (/^اضف كلمة (?:اباحية|إباحية)$/i.test(text)) {
+      return ctx.reply('✍️ اكتب الكلمة بعد الأمر.\nمثال: اضف كلمة اباحية سكس');
+    }
     const addExplicit = text.match(/^اضف كلمة (?:اباحية|إباحية)\s+(.+)$/i);
     if (addExplicit) {
       const items = this.splitWordsInput(addExplicit[1]);
@@ -1402,6 +1411,9 @@ class GroupAdminHandler {
       return ctx.reply(`✅ تم إضافة ${items.length} كلمة إباحية عالميًا.\n• الإجمالي الآن: ${saved.length}`);
     }
 
+    if (/^حذف كلمة (?:اباحية|إباحية)$/i.test(text)) {
+      return ctx.reply('✍️ اكتب الكلمة بعد الأمر.\nمثال: حذف كلمة اباحية سكس');
+    }
     const delExplicit = text.match(/^حذف كلمة (?:اباحية|إباحية)\s+(.+)$/i);
     if (delExplicit) {
       const items = new Set(this.splitWordsInput(delExplicit[1]));
