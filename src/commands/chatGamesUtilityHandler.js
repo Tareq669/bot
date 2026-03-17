@@ -1,5 +1,9 @@
 const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
+const { execFile } = require('child_process');
 const Markup = require('telegraf/markup');
+const YTDlpWrap = require('yt-dlp-wrap').default;
 const { User } = require('../database/models');
 
 class ChatGamesUtilityHandler {
@@ -25,6 +29,7 @@ class ChatGamesUtilityHandler {
   static AUDIO_RESOLVE_BATCH_SIZE = 4;
   static AUDIO_STRICT_MATCH_RATIO = 0.35;
   static AUDIO_STRICT_SCORE_THRESHOLD = 0.4;
+  static YT_DLP_TIMEOUT_MS = 90000;
   static VIDEO_SEARCH_TIMEOUT_MS = 18000;
   static VIDEO_RESOLVE_TIMEOUT_MS = 4000;
   static JOE_UPDATES_CHANNEL_URL = 'https://t.me/joam909';
@@ -62,6 +67,174 @@ class ChatGamesUtilityHandler {
       .replace(/ة/g, 'ه')
       .replace(/\u0640/g, '')
       .replace(/[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06ED]/g, '');
+  }
+
+  static sanitizeAudioFileName(value) {
+    const cleaned = this.cleanAudioLabel(value || 'audio')
+      .replace(/[<>:"/\\|?*\u0000-\u001F]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    return (cleaned || 'audio').slice(0, 80);
+  }
+
+  static execFileAsync(command, args = [], options = {}) {
+    return new Promise((resolve, reject) => {
+      execFile(command, args, {
+        windowsHide: true,
+        maxBuffer: 50 * 1024 * 1024,
+        ...options
+      }, (error, stdout, stderr) => {
+        if (error) {
+          error.stdout = stdout;
+          error.stderr = stderr;
+          reject(error);
+          return;
+        }
+        resolve({ stdout, stderr });
+      });
+    });
+  }
+
+  static async resolveYtDlpCommand() {
+    if (this.ytDlpCommandPromise) return this.ytDlpCommandPromise;
+
+    this.ytDlpCommandPromise = (async () => {
+      try {
+        await this.execFileAsync('python', ['-c', 'import yt_dlp'], { timeout: 12000 });
+        return { command: 'python', baseArgs: ['-m', 'yt_dlp'] };
+      } catch (_error) {
+        const binDir = path.join(process.cwd(), 'bin');
+        const binName = process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp';
+        const binPath = path.join(binDir, binName);
+        if (!fs.existsSync(binPath)) {
+          fs.mkdirSync(binDir, { recursive: true });
+          await YTDlpWrap.downloadFromGithub(binPath);
+        }
+        if (process.platform !== 'win32') {
+          try {
+            fs.chmodSync(binPath, 0o755);
+          } catch (_error) {}
+        }
+        return { command: binPath, baseArgs: [] };
+      }
+    })();
+
+    return this.ytDlpCommandPromise;
+  }
+
+  static parseYtDlpResult(data) {
+    if (!data) return null;
+    const entry = data?._type === 'playlist' && Array.isArray(data.entries)
+      ? data.entries.find((item) => item && (item.requested_downloads || item.url || item.webpage_url))
+      : data;
+    if (!entry) return null;
+
+    const requested = Array.isArray(entry.requested_downloads) ? entry.requested_downloads[0] : null;
+    const directUrl = String(requested?.url || entry.url || '').trim();
+    const pageUrl = String(entry.webpage_url || entry.original_url || '').trim();
+    return {
+      title: String(entry.title || '').trim(),
+      creator: String(entry.uploader || entry.channel || entry.creator || '').trim(),
+      url: directUrl,
+      webpageUrl: pageUrl,
+      ext: String(requested?.ext || entry.ext || '').trim(),
+      id: String(entry.id || '').trim()
+    };
+  }
+
+  static async runYtDlpJson(target, extraArgs = []) {
+    const executable = await this.resolveYtDlpCommand();
+    const args = [
+      ...executable.baseArgs,
+      target,
+      '--dump-single-json',
+      '--no-playlist',
+      '--skip-download',
+      '--no-warnings',
+      '--quiet',
+      '--extractor-args',
+      'youtube:player_client=android_vr;lang=en',
+      '--js-runtimes',
+      'node',
+      ...extraArgs
+    ];
+    const { stdout } = await this.execFileAsync(executable.command, args, {
+      timeout: this.YT_DLP_TIMEOUT_MS
+    });
+    const text = String(stdout || '').trim();
+    if (!text) return null;
+    return JSON.parse(text);
+  }
+
+  static async resolveAudioWithYtDlp(target) {
+    const data = await this.runYtDlpJson(target, [
+      '-f',
+      'bestaudio[ext=m4a]/bestaudio[acodec^=mp4a]/bestaudio'
+    ]);
+    const parsed = this.parseYtDlpResult(data);
+    if (!parsed?.url) return null;
+    return {
+      title: parsed.title || 'مقطع صوتي',
+      creator: parsed.creator || '',
+      url: parsed.url,
+      source: 'youtube_ytdlp',
+      ext: parsed.ext || 'm4a',
+      webpageUrl: parsed.webpageUrl || ''
+    };
+  }
+
+  static buildYtDlpSearchQueries(query) {
+    const variants = this.generateSearchVariants(query);
+    const out = [];
+    for (const variant of variants) {
+      const trimmed = String(variant || '').trim();
+      if (!trimmed) continue;
+      out.push(`ytsearch1:${trimmed}`);
+      out.push(`ytsearch1:${trimmed} audio`);
+      out.push(`ytsearch1:${trimmed} official audio`);
+    }
+    return Array.from(new Set(out)).slice(0, 8);
+  }
+
+  static async resolveAudioListViaYtDlp(query, limit = 5) {
+    const trimmed = String(query || '').trim();
+    if (!trimmed) return [];
+
+    const directVideoId = this.parseYoutubeVideoIdFromUrl(trimmed);
+    if (directVideoId) {
+      const direct = await this.resolveAudioWithYtDlp(`https://www.youtube.com/watch?v=${directVideoId}`).catch(() => null);
+      return direct ? [direct] : [];
+    }
+
+    const results = [];
+    const seen = new Set();
+    const targets = this.buildYtDlpSearchQueries(trimmed);
+    for (const target of targets) {
+      if (results.length >= limit) break;
+      const audio = await this.resolveAudioWithYtDlp(target).catch(() => null);
+      if (!audio?.url) continue;
+      const key = `${this.normalizeSearchText(audio.title)}|${audio.url}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      results.push(audio);
+    }
+    return results;
+  }
+
+  static async resolveVideoWithYtDlp(target) {
+    const data = await this.runYtDlpJson(target, [
+      '-f',
+      'best[ext=mp4][height<=720]/best[ext=mp4]/best'
+    ]);
+    const parsed = this.parseYtDlpResult(data);
+    if (!parsed?.url) return null;
+    return {
+      title: parsed.title || 'فيديو',
+      creator: parsed.creator || '',
+      url: parsed.url,
+      source: 'youtube_ytdlp_video',
+      ext: parsed.ext || 'mp4'
+    };
   }
 
   static cityAliases = {
@@ -1130,9 +1303,9 @@ class ChatGamesUtilityHandler {
     return this.enqueueAudioChatTask(ctx.chat?.id, async () => {
       const loadingMsg = await ctx.reply('🎧 جاري التحميل ....');
       try {
-        let result = null;
+        let result = await this.resolveVideoWithYtDlp(query).catch(() => null);
         const directVideoId = this.parseYoutubeVideoIdFromUrl(query);
-        if (directVideoId) {
+        if (!result?.url && directVideoId) {
           const instances = this.shuffleArray(this.YT_PIPED_INSTANCES);
           for (const instance of instances) {
             result = await this.resolveYoutubeVideoById(directVideoId, instance, { title: query });
@@ -1432,7 +1605,10 @@ class ChatGamesUtilityHandler {
   }
 
   static async buildAudioList(query) {
-    const audioList = await this.searchYoutubeAudios(query, 5);
+    let audioList = await this.resolveAudioListViaYtDlp(query, 5).catch(() => []);
+    if (!audioList.length) {
+      audioList = await this.searchYoutubeAudios(query, 5);
+    }
     if (!audioList.length) {
       const archiveAudio = await this.searchArchiveAudio(query);
       if (archiveAudio?.url) audioList.push(archiveAudio);

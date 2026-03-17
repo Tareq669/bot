@@ -39,7 +39,8 @@
     "node-fetch": "^2.7.0",
     "p-retry": "^7.1.1",
     "socks-proxy-agent": "^8.0.5",
-    "telegraf": "^4.14.0"
+    "telegraf": "^4.14.0",
+    "yt-dlp-wrap": "^2.3.12"
   },
   "devDependencies": {
     "@types/jest": "^29.5.11",
