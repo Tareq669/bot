@@ -23,8 +23,8 @@ class ChatGamesUtilityHandler {
   static FAST_YT_PER_QUERY_LIMIT = 10;
   static FAST_SEARCH_MIN_MATCHES = 4;
   static AUDIO_RESOLVE_BATCH_SIZE = 4;
-  static AUDIO_STRICT_MATCH_RATIO = 0.45;
-  static AUDIO_STRICT_SCORE_THRESHOLD = 0.45;
+  static AUDIO_STRICT_MATCH_RATIO = 0.35;
+  static AUDIO_STRICT_SCORE_THRESHOLD = 0.4;
   static VIDEO_SEARCH_TIMEOUT_MS = 18000;
   static VIDEO_RESOLVE_TIMEOUT_MS = 4000;
   static JOE_UPDATES_CHANNEL_URL = 'https://t.me/joam909';
@@ -52,6 +52,17 @@ class ChatGamesUtilityHandler {
     'اغنية', 'اغاني', 'اغنيه', 'music', 'song', 'mp3', 'موسيقى', 'موسيقي', 'كليب',
     'فيلم', 'clip', 'lyric', 'lyrics', 'صوت', 'صوتيات', 'فيديو', 'video'
   ];
+
+  static normalizeArabicLetters(value) {
+    return String(value || '')
+      .replace(/[إأآٱ]/g, 'ا')
+      .replace(/ى/g, 'ي')
+      .replace(/ؤ/g, 'و')
+      .replace(/ئ/g, 'ي')
+      .replace(/ة/g, 'ه')
+      .replace(/\u0640/g, '')
+      .replace(/[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06ED]/g, '');
+  }
 
   static cityAliases = {
     '\u063A\u0632\u0629': 'Gaza',
@@ -394,11 +405,42 @@ class ChatGamesUtilityHandler {
   }
 
   static normalizeSearchText(value) {
-    return String(value || '')
+    const normalizedArabic = this.normalizeArabicLetters(value);
+    return String(normalizedArabic || '')
       .toLowerCase()
       .replace(/[^\p{L}\p{N}\s]/gu, ' ')
       .replace(/\s+/g, ' ')
       .trim();
+  }
+
+  static generateSearchVariants(query) {
+    const original = this.normalizeSearchText(query);
+    if (!original) return [];
+
+    const out = new Set([original]);
+    const noStop = this.stripNoiseFromSearchQuery(original);
+    if (noStop) out.add(noStop);
+
+    const addTokenAlternates = (text) => {
+      const tokens = String(text || '').split(' ').filter(Boolean);
+      if (!tokens.length) return;
+
+      const withNoAl = tokens.map((token) => {
+        if (token.startsWith('ال') && token.length > 3) return token.slice(2);
+        return token;
+      }).join(' ');
+      if (withNoAl && withNoAl !== text) out.add(withNoAl);
+
+      const withTaMarbuta = tokens.map((token) => token.replace(/ه\b/g, 'ة')).join(' ');
+      if (withTaMarbuta && withTaMarbuta !== text) out.add(this.normalizeSearchText(withTaMarbuta));
+
+      const withHa = tokens.map((token) => token.replace(/ة\b/g, 'ه')).join(' ');
+      if (withHa && withHa !== text) out.add(this.normalizeSearchText(withHa));
+    };
+
+    addTokenAlternates(original);
+    if (noStop) addTokenAlternates(noStop);
+    return Array.from(out).filter(Boolean);
   }
 
   static hasOrderedTokenMatch(query, text) {
@@ -436,7 +478,14 @@ class ChatGamesUtilityHandler {
   static queryTokens(value) {
     const norm = this.normalizeSearchText(value);
     if (!norm) return [];
-    return norm.split(' ').filter((token) => token.length >= 2);
+    const raw = norm.split(' ').filter((token) => token.length >= 2);
+    const expanded = new Set(raw);
+    for (const token of raw) {
+      if (token.startsWith('ال') && token.length > 3) expanded.add(token.slice(2));
+      if (token.endsWith('ه') && token.length > 2) expanded.add(`${token.slice(0, -1)}ة`);
+      if (token.endsWith('ة') && token.length > 2) expanded.add(`${token.slice(0, -1)}ه`);
+    }
+    return Array.from(expanded);
   }
 
   static queryMatchRatio(query, text) {
@@ -749,7 +798,7 @@ class ChatGamesUtilityHandler {
 
   static async fetchPipedSearchCandidates(query, instance, filters = ['music_songs', 'music_videos', 'videos'], maxResults = 20) {
     const all = [];
-    const searchFilters = Array.isArray(filters) ? filters.slice(0, 2) : ['music_songs'];
+    const searchFilters = Array.isArray(filters) ? filters.slice(0, 3) : ['music_songs', 'videos'];
     const requests = searchFilters.map((filter) =>
       this.fetchPiped('/api/v1/search', {
         q: query,
@@ -1120,7 +1169,7 @@ class ChatGamesUtilityHandler {
 
     const normalizedQuery = this.normalizeSearchText(q);
     const artistOnly = this.isArtistOnlyQuery(normalizedQuery);
-    const variants = new Set([normalizedQuery]);
+    const variants = new Set(this.generateSearchVariants(normalizedQuery));
     const cleaned = this.stripNoiseFromSearchQuery(normalizedQuery);
 
     if (cleaned) {
@@ -1143,14 +1192,14 @@ class ChatGamesUtilityHandler {
       Math.max(1, this.FAST_SEARCH_INSTANCES) + Math.max(1, this.FAST_SEARCH_FALLBACK_INSTANCES)
     );
     const variantList = Array.from(variants);
-    const maxVariants = Math.min(variantList.length, this.AUDIO_QUERY_MAX_VARIANTS);
+    const maxVariants = Math.min(variantList.length, Math.max(this.AUDIO_QUERY_MAX_VARIANTS, 8));
 
     const collectCandidates = async (text, useInstances = fastInstances, maxResults = this.FAST_YT_PER_QUERY_LIMIT) => {
       const requestInstances = Array.isArray(useInstances) && useInstances.length ? useInstances : fastInstances;
       const requestLimit = Number(maxResults) > 0 ? Number(maxResults) : this.FAST_YT_PER_QUERY_LIMIT;
       const buckets = await Promise.allSettled(
         requestInstances.map((instance) => this.withTimeout(
-          this.fetchPipedSearchCandidates(text, instance, ['music_songs'], requestLimit).catch(() => []),
+          this.fetchPipedSearchCandidates(text, instance, ['music_songs', 'videos', 'music_videos'], requestLimit).catch(() => []),
           this.AUDIO_FAST_TIMEOUT_MS,
           'AUDIO_SEARCH_TIMEOUT'
         ).catch(() => []))
@@ -1218,6 +1267,39 @@ class ChatGamesUtilityHandler {
       .sort((a, b) => b.score - a.score || this.queryMatchRatio(cleaned || normalizedQuery, `${b.item?.uploader || b.item?.author || ''} ${b.item?.title || ''}`) - this.queryMatchRatio(cleaned || normalizedQuery, `${a.item?.uploader || a.item?.author || ''} ${a.item?.title || ''}`));
 
     let ranked = rankingEntries.map((entry) => entry.item);
+
+    if (!ranked.length) {
+      const seedQueries = [];
+      const [spotifySeeds, soundSeeds] = await Promise.all([
+        this.searchSpotifySeeds(q, 4).catch(() => []),
+        this.searchSoundCloudSeeds(q, 3).catch(() => [])
+      ]);
+      for (const seed of [...spotifySeeds, ...soundSeeds]) {
+        const text = this.normalizeSearchText(seed?.query || '');
+        if (text) seedQueries.push(text);
+      }
+
+      if (seedQueries.length) {
+        const seededBuckets = await Promise.allSettled(
+          seedQueries.slice(0, 5).map((text) => collectCandidates(text, fallbackInstances, Math.min(this.FAST_YT_PER_QUERY_LIMIT, 8)))
+        );
+        for (const bucket of seededBuckets) {
+          if (bucket.status !== 'fulfilled') continue;
+          for (const item of Array.isArray(bucket.value) ? bucket.value : []) {
+            if (!item?.id) continue;
+            const key = this.normalizeSearchText(item.id);
+            if (!dedup.has(key)) dedup.set(key, item);
+          }
+        }
+        ranked = Array.from(dedup.values())
+          .map((item) => ({
+            item,
+            score: this.scoreAudioCandidate(normalizedQuery, item?.title, item?.uploader || item?.author || '')
+          }))
+          .sort((a, b) => b.score - a.score)
+          .map((entry) => entry.item);
+      }
+    }
 
     if (!ranked.length) {
       const archive = await this.searchArchiveAudio(q).catch(() => null);
