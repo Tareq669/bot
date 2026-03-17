@@ -7055,22 +7055,12 @@ class GroupGamesHandler {
       return true;
     }
 
-    const participants = (game.participants || []).map((id) => Number(id)).filter((id) => Number.isInteger(id));
-    const joiners = participants.filter((id) => Number(id) !== Number(game.hostId || 0));
+    const joiners = (game.participants || []).map((id) => Number(id)).filter((id) => Number.isInteger(id));
     if (joiners.length < 1) {
-      await ctx.reply('❌ لازم لاعبين على الأقل. خلي الأعضاء يكتبوا: انا');
+      await ctx.reply('❌ لازم لاعب واحد على الأقل. خلي الأعضاء يكتبوا: انا');
       return true;
     }
-    const nonPrivilegedJoiners = [];
-    for (const uid of joiners) {
-      const isPrivileged = await this.isGroupAdmin(ctx, uid);
-      if (!isPrivileged) nonPrivilegedJoiners.push(uid);
-    }
-    if (nonPrivilegedJoiners.length < 1) {
-      await ctx.reply('❌ لازم لاعب غير مشرف في (انا) حتى تشتغل حزر.');
-      return true;
-    }
-    const guesserId = Number(this.pickRandom(nonPrivilegedJoiners));
+    const guesserId = Number(this.pickRandom(joiners));
     const guesserName = String(game.names?.[guesserId] || guesserId);
 
     const answer = this.pickNonRepeating(
