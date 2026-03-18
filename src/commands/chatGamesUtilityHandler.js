@@ -1838,8 +1838,7 @@ class ChatGamesUtilityHandler {
     await ctx.answerCbQuery('جاري التحميل...').catch(() => {});
     const loadingMsg = await ctx.reply('🎧 جاري التحميل ....');
     try {
-      const target = selected?.webpageUrl || `https://www.youtube.com/watch?v=${selected?.id || ''}`;
-      const audio = await this.resolveAudioWithYtDlp(target).catch(() => null);
+      const audio = await this.resolveAudioFromPickedItem(selected, cached.query).catch(() => null);
       await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
       if (!audio?.url) {
         await ctx.reply('♪ عذرا غير متوفر ..');
@@ -1850,6 +1849,38 @@ class ChatGamesUtilityHandler {
       await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
       await ctx.reply('♪ عذرا غير متوفر ..');
     }
+  }
+
+  static async resolveAudioFromPickedItem(selected, fallbackQuery = '') {
+    const item = selected || {};
+    const candidateTargets = [];
+
+    const webpage = String(item.webpageUrl || '').trim();
+    const id = String(item.id || '').trim();
+    const title = String(item.title || '').trim();
+    const creator = String(item.creator || '').trim();
+
+    if (webpage) candidateTargets.push(webpage);
+    if (id) candidateTargets.push(`https://www.youtube.com/watch?v=${id}`);
+    if (title || creator) {
+      const lookup = `${title} ${creator}`.trim();
+      if (lookup) candidateTargets.push(`ytsearch1:${lookup}`);
+    }
+    if (fallbackQuery) candidateTargets.push(`ytsearch1:${String(fallbackQuery).trim()}`);
+
+    for (const target of candidateTargets) {
+      if (!target) continue;
+      const audio = await this.resolveAudioWithYtDlp(target).catch(() => null);
+      if (audio?.url) return audio;
+    }
+
+    // آخر محاولة: محرك البحث الكامل الموجود عندنا (يشمل مصادر fallback).
+    const fullQuery = `${title} ${creator}`.trim() || String(fallbackQuery || '').trim();
+    if (fullQuery) {
+      const list = await this.resolveAudioListWithCache(fullQuery).catch(() => []);
+      if (Array.isArray(list) && list[0]?.url) return list[0];
+    }
+    return null;
   }
 
   static async handleHotCommand(ctx, queryText) {
