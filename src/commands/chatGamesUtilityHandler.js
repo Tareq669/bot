@@ -190,51 +190,6 @@ class ChatGamesUtilityHandler {
     };
   }
 
-  static async downloadAudioFileWithYtDlp(target, titleHint = 'audio') {
-    const executable = await this.resolveYtDlpCommand();
-    const tempDir = path.join(process.cwd(), 'temp');
-    fs.mkdirSync(tempDir, { recursive: true });
-
-    const baseName = `stars_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
-    const outputTpl = path.join(tempDir, `${baseName}.%(ext)s`);
-    const args = [
-      ...executable.baseArgs,
-      target,
-      '-f',
-      'bestaudio',
-      '--no-playlist',
-      '--no-warnings',
-      '--quiet',
-      '-o',
-      outputTpl,
-      '--print',
-      'after_move:filepath'
-    ];
-
-    const { stdout } = await this.execFileAsync(executable.command, args, {
-      timeout: Math.max(this.YT_DLP_TIMEOUT_MS, 120000)
-    });
-
-    const lines = String(stdout || '')
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean);
-
-    let filePath = lines.length ? lines[lines.length - 1] : '';
-    if (!filePath || !fs.existsSync(filePath)) {
-      const candidates = fs.readdirSync(tempDir)
-        .filter((name) => name.startsWith(baseName))
-        .map((name) => path.join(tempDir, name));
-      filePath = candidates.find((p) => fs.existsSync(p)) || '';
-    }
-    if (!filePath || !fs.existsSync(filePath)) return null;
-
-    const ext = path.extname(filePath).replace('.', '').toLowerCase();
-    const safeTitle = this.sanitizeAudioFileName(titleHint || 'audio');
-    const fileName = `${safeTitle}.${ext || 'mp3'}`;
-    return { filePath, fileName };
-  }
-
   static async searchYoutubeCandidatesViaYtDlp(query, limit = 5) {
     const trimmed = String(query || '').trim();
     if (!trimmed) return [];
@@ -1137,32 +1092,15 @@ class ChatGamesUtilityHandler {
     const updatesButton = Markup.inlineKeyboard([
       [Markup.button.url('تحديثات جو', this.JOE_UPDATES_CHANNEL_URL)]
     ]);
-    const payload = {
-      caption,
-      title: safeTitle,
-      performer: safePerformer,
-      reply_markup: updatesButton.reply_markup
-    };
-
-    const primaryError = await ctx.replyWithAudio({ url: audio.url }, payload)
-      .then(() => null)
-      .catch((err) => err);
-    if (!primaryError) return;
-
-    const fallbackTarget = String(audio?.webpageUrl || '').trim()
-      || (audio?.id ? `https://www.youtube.com/watch?v=${audio.id}` : '')
-      || `ytsearch1:${[safePerformer, safeTitle].filter(Boolean).join(' - ')}`;
-
-    const downloaded = await this.downloadAudioFileWithYtDlp(fallbackTarget, safeTitle).catch(() => null);
-    if (!downloaded?.filePath) throw primaryError;
-    try {
-      await ctx.replyWithAudio(
-        { source: downloaded.filePath, filename: downloaded.fileName },
-        payload
-      );
-    } finally {
-      fs.unlink(downloaded.filePath, () => {});
-    }
+    await ctx.replyWithAudio(
+      { url: audio.url },
+      {
+        caption,
+        title: safeTitle,
+        performer: safePerformer,
+        reply_markup: updatesButton.reply_markup
+      }
+    );
   }
 
   static cleanAudioLabel(value) {
