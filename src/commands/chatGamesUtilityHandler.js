@@ -42,6 +42,7 @@ class ChatGamesUtilityHandler {
   static VIDEO_SEARCH_TIMEOUT_MS = 18000;
   static VIDEO_RESOLVE_TIMEOUT_MS = 4000;
   static JOE_UPDATES_CHANNEL_URL = 'https://t.me/joam909';
+  static STARS_TEMP_DIR = path.join(process.cwd(), 'temp', 'stars');
   static YT_HTML_SEARCH_TIMEOUT_MS = 4500;
   static ARCHIVE_SEARCH_URL = 'https://archive.org/advancedsearch.php';
   static ARCHIVE_METADATA_URL = 'https://archive.org/metadata';
@@ -89,6 +90,10 @@ class ChatGamesUtilityHandler {
 
   static ensureMusicDir() {
     fs.mkdirSync(this.MUSIC_DIR, { recursive: true });
+  }
+
+  static ensureStarsTempDir() {
+    fs.mkdirSync(this.STARS_TEMP_DIR, { recursive: true });
   }
 
   static buildMusicKeywords(title) {
@@ -276,6 +281,63 @@ class ChatGamesUtilityHandler {
       ...audio,
       title: this.cleanAudioLabel(audio.title || candidate.title || searchQuery) || 'مقطع صوتي',
       creator: this.cleanAudioLabel(audio.creator || candidate.creator || '').trim()
+    };
+  }
+
+  static async downloadStarsAudioTemp(audio) {
+    this.ensureStarsTempDir();
+    const baseName = this.sanitizeAudioFileName(audio?.title || 'audio');
+    const uniquePrefix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${baseName}`;
+    const outTemplate = path.join(this.STARS_TEMP_DIR, `${uniquePrefix}.%(ext)s`);
+    const target = String(audio?.webpageUrl || '').trim();
+    if (!target) return null;
+
+    const executable = await this.resolveYtDlpCommand();
+    const args = [
+      ...executable.baseArgs,
+      target,
+      '-f',
+      'bestaudio[ext=m4a]/bestaudio',
+      '--no-playlist',
+      '--no-warnings',
+      '--quiet',
+      '--no-part',
+      '-o',
+      outTemplate
+    ];
+
+    await this.execFileAsync(executable.command, args, {
+      timeout: Math.max(this.YT_DLP_TIMEOUT_MS, 240000)
+    }).catch(() => null);
+
+    const matches = fs.readdirSync(this.STARS_TEMP_DIR, { withFileTypes: true })
+      .filter((entry) => entry.isFile() && entry.name.startsWith(uniquePrefix))
+      .map((entry) => path.join(this.STARS_TEMP_DIR, entry.name));
+
+    if (!matches.length) return null;
+
+    matches.sort((a, b) => {
+      try {
+        return fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs;
+      } catch (_error) {
+        return 0;
+      }
+    });
+
+    const fullPath = matches[0];
+    try {
+      const stat = fs.statSync(fullPath);
+      if (!stat.size) {
+        fs.unlinkSync(fullPath);
+        return null;
+      }
+    } catch (_error) {
+      return null;
+    }
+
+    return {
+      path: fullPath,
+      filename: path.basename(fullPath)
     };
   }
 
@@ -1193,6 +1255,36 @@ class ChatGamesUtilityHandler {
     );
   }
 
+  static async sendStarsAudioResult(ctx, audio) {
+    const tempFile = await this.downloadStarsAudioTemp(audio).catch(() => null);
+    if (!tempFile?.path || !fs.existsSync(tempFile.path)) {
+      return null;
+    }
+
+    const caption = '♪ تم التح🎧ميل بنجاح ♪';
+    const safeTitle = this.cleanAudioLabel(audio?.title || 'مقطع صوتي').slice(0, 120) || 'مقطع صوتي';
+    const safePerformer = this.cleanAudioLabel(audio?.creator || '').slice(0, 80) || undefined;
+    const updatesButton = Markup.inlineKeyboard([
+      [Markup.button.url('تحديثات جو', this.JOE_UPDATES_CHANNEL_URL)]
+    ]);
+
+    try {
+      return await ctx.replyWithAudio(
+        { source: tempFile.path, filename: tempFile.filename },
+        {
+          caption,
+          title: safeTitle,
+          performer: safePerformer,
+          reply_markup: updatesButton.reply_markup
+        }
+      );
+    } finally {
+      try {
+        fs.unlinkSync(tempFile.path);
+      } catch (_error) {}
+    }
+  }
+
   static cleanAudioLabel(value) {
     let text = String(value || '').trim();
     if (!text) return '';
@@ -2028,7 +2120,11 @@ class ChatGamesUtilityHandler {
           return;
         }
 
-        const sent = await this.sendHotAudioResult(ctx, audio, false);
+        const sent = await this.sendStarsAudioResult(ctx, audio);
+        if (!sent) {
+          await ctx.reply('♪ عذرا غير متوفر ..');
+          return;
+        }
         const fileId = String(sent?.audio?.file_id || '').trim();
         if (fileId) this.setStarsCachedFileId(query, fileId);
       } catch (_error) {
