@@ -240,6 +240,45 @@ class ChatGamesUtilityHandler {
     }
   }
 
+  static async resolveStarsAudio(queryText) {
+    const raw = String(queryText || '').trim();
+    if (!raw) return null;
+
+    const directUrl = this.extractFirstUrl(raw);
+    const directKind = this.classifyMediaUrl(directUrl);
+    if (directKind === 'youtube' || directKind === 'tiktok' || directKind === 'snaptube') {
+      return this.resolveAudioWithYtDlp(directUrl).catch(() => null);
+    }
+
+    let searchQuery = raw;
+    if (directKind === 'spotify') {
+      const spotifyQuery = await this.resolveSpotifySearchQuery(directUrl);
+      if (spotifyQuery) searchQuery = spotifyQuery;
+    }
+
+    let candidate = null;
+    if (this.getYoutubeApiKey()) {
+      const apiResults = await this.searchYoutubeCandidatesViaApi(searchQuery, 1).catch(() => []);
+      candidate = apiResults[0] || null;
+    }
+
+    if (!candidate) {
+      const ytDlpResults = await this.searchYoutubeCandidatesViaYtDlp(searchQuery, 1).catch(() => []);
+      candidate = ytDlpResults[0] || null;
+    }
+
+    if (!candidate?.webpageUrl) return null;
+
+    const audio = await this.resolveAudioWithYtDlp(candidate.webpageUrl).catch(() => null);
+    if (!audio?.url) return null;
+
+    return {
+      ...audio,
+      title: this.cleanAudioLabel(audio.title || candidate.title || searchQuery) || 'مقطع صوتي',
+      creator: this.cleanAudioLabel(audio.creator || candidate.creator || '').trim()
+    };
+  }
+
   static execFileAsync(command, args = [], options = {}) {
     return new Promise((resolve, reject) => {
       execFile(command, args, {
@@ -1974,37 +2013,22 @@ class ChatGamesUtilityHandler {
           return;
         }
 
-        await this.loadMusicLibrary(false);
-        let local = this.searchLocalMusic(query);
+        await ctx.telegram.editMessageText(
+          ctx.chat.id,
+          loadingMsg.message_id,
+          undefined,
+          '⏳ تجهيز الصوت...'
+        ).catch(() => {});
 
-        if (!local) {
-          await ctx.telegram.editMessageText(
-            ctx.chat.id,
-            loadingMsg.message_id,
-            undefined,
-            '⏳ تجهيز الصوت...'
-          ).catch(() => {});
-          local = await this.downloadFromYoutubeToMusic(query).catch(() => null);
-        }
+        const audio = await this.resolveStarsAudio(query);
 
         await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
-        if (!local?.path || !fs.existsSync(local.path)) {
+        if (!audio?.url) {
           await ctx.reply('♪ عذرا غير متوفر ..');
           return;
         }
 
-        const updatesButton = Markup.inlineKeyboard([
-          [Markup.button.url('تحديثات جو', this.JOE_UPDATES_CHANNEL_URL)]
-        ]);
-        const sent = await ctx.replyWithAudio(
-          { source: local.path, filename: `${this.sanitizeAudioFileName(local.title || query)}.mp3` },
-          {
-            caption: '♪ تم التح🎧ميل بنجاح ♪',
-            title: this.cleanAudioLabel(local.title || query).slice(0, 120) || 'مقطع صوتي',
-            performer: undefined,
-            reply_markup: updatesButton.reply_markup
-          }
-        );
+        const sent = await this.sendHotAudioResult(ctx, audio, false);
         const fileId = String(sent?.audio?.file_id || '').trim();
         if (fileId) this.setStarsCachedFileId(query, fileId);
       } catch (_error) {
