@@ -16,6 +16,11 @@ class ChatGamesUtilityHandler {
   static starsFileIdCache = new Map();
   static AUDIO_QUERY_CACHE_TTL_MS = 30 * 60 * 1000;
   static STARS_FILEID_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+  static MUSIC_DIR = path.join(process.cwd(), 'music');
+  static MUSIC_INDEX_FILE = path.join(process.cwd(), 'music', 'music_index.json');
+  static MUSIC_INDEX_RESCAN_MS = 2 * 60 * 1000;
+  static musicLibrary = [];
+  static musicLibraryLastScan = 0;
   static audioSearchInFlight = new Map();
   static audioChatQueue = new Map();
   static AUDIO_SEARCH_TIMEOUT_MS = 15000;
@@ -80,6 +85,122 @@ class ChatGamesUtilityHandler {
       .replace(/\s+/g, ' ')
       .trim();
     return (cleaned || 'audio').slice(0, 80);
+  }
+
+  static ensureMusicDir() {
+    fs.mkdirSync(this.MUSIC_DIR, { recursive: true });
+  }
+
+  static buildMusicKeywords(title) {
+    const norm = this.normalizeSearchText(title || '');
+    if (!norm) return [];
+    const parts = norm.split(' ').filter(Boolean);
+    const keywords = new Set(parts);
+    keywords.add(norm);
+    for (let i = 0; i < parts.length - 1; i += 1) {
+      keywords.add(`${parts[i]} ${parts[i + 1]}`);
+    }
+    return Array.from(keywords);
+  }
+
+  static async loadMusicLibrary(force = false) {
+    const now = Date.now();
+    if (!force && this.musicLibrary.length && (now - this.musicLibraryLastScan) < this.MUSIC_INDEX_RESCAN_MS) {
+      return this.musicLibrary;
+    }
+
+    this.ensureMusicDir();
+    const files = fs.readdirSync(this.MUSIC_DIR, { withFileTypes: true })
+      .filter((d) => d.isFile() && d.name.toLowerCase().endsWith('.mp3'))
+      .map((d) => d.name);
+
+    const index = files.map((name) => {
+      const full = path.join(this.MUSIC_DIR, name);
+      const title = path.basename(name, path.extname(name));
+      return {
+        title,
+        normTitle: this.normalizeSearchText(title),
+        keywords: this.buildMusicKeywords(title),
+        path: full
+      };
+    });
+
+    this.musicLibrary = index;
+    this.musicLibraryLastScan = now;
+    try {
+      fs.writeFileSync(this.MUSIC_INDEX_FILE, JSON.stringify(index, null, 2), 'utf-8');
+    } catch (_error) {}
+    return index;
+  }
+
+  static searchLocalMusic(query) {
+    const q = this.normalizeSearchText(query || '');
+    if (!q || !this.musicLibrary.length) return null;
+
+    const qTokens = q.split(' ').filter(Boolean);
+    let best = null;
+    let bestScore = 0;
+
+    for (const item of this.musicLibrary) {
+      const normTitle = String(item?.normTitle || '');
+      const keywords = Array.isArray(item?.keywords) ? item.keywords : [];
+      const kwSet = new Set(keywords);
+      let score = 0;
+
+      if (q === normTitle) score += 100;
+      if (normTitle.includes(q)) score += 60;
+      for (const token of qTokens) {
+        if (kwSet.has(token)) score += 12;
+        else if (normTitle.includes(token)) score += 7;
+      }
+
+      if (score > bestScore) {
+        bestScore = score;
+        best = item;
+      }
+    }
+
+    return bestScore > 0 ? best : null;
+  }
+
+  static async downloadFromYoutubeToMusic(query) {
+    const q = String(query || '').trim();
+    if (!q) return null;
+
+    this.ensureMusicDir();
+    const search = await this.runYtDlpJson(`ytsearch1:${q}`, ['--flat-playlist']).catch(() => null);
+    const entry = search?._type === 'playlist' && Array.isArray(search.entries) ? search.entries[0] : null;
+    if (!entry) return null;
+
+    const videoId = String(entry.id || '').trim();
+    if (!videoId) return null;
+    const title = this.cleanAudioLabel(entry.title || q) || q;
+
+    await this.loadMusicLibrary(false);
+    const existing = this.searchLocalMusic(title) || this.searchLocalMusic(q);
+    if (existing?.path && fs.existsSync(existing.path)) return existing;
+
+    const safeTitle = this.sanitizeAudioFileName(title);
+    const outTemplate = path.join(this.MUSIC_DIR, `${safeTitle}.%(ext)s`);
+    const executable = await this.resolveYtDlpCommand();
+    const args = [
+      ...executable.baseArgs,
+      `https://www.youtube.com/watch?v=${videoId}`,
+      '-x',
+      '--audio-format', 'mp3',
+      '--audio-quality', '0',
+      '--no-playlist',
+      '--no-warnings',
+      '--quiet',
+      '-o',
+      outTemplate
+    ];
+    await this.execFileAsync(executable.command, args, {
+      timeout: Math.max(this.YT_DLP_TIMEOUT_MS, 120000)
+    }).catch(() => null);
+
+    await this.loadMusicLibrary(true);
+    return this.searchLocalMusic(title) || this.searchLocalMusic(q);
   }
 
   static getYoutubeApiKey() {
@@ -1853,95 +1974,39 @@ class ChatGamesUtilityHandler {
           return;
         }
 
-        const directUrl = this.extractFirstUrl(query);
-        const directType = this.classifyMediaUrl(directUrl);
-        let targetUrl = '';
-        let titleHint = query;
-        let performerHint = '';
+        await this.loadMusicLibrary(false);
+        let local = this.searchLocalMusic(query);
 
-        // 1) رابط مباشر: يوتيوب / تيك توك / سناب تيوب
-        if (directUrl && directType && directType !== 'spotify') {
-          targetUrl = directUrl;
-        }
-
-        // 2) رابط سبوتيفاي: نحوله لعبارة بحث ثم نجيب أول نتيجة من يوتيوب
-        if (!targetUrl && directUrl && directType === 'spotify') {
-          const spotifyQuery = await this.resolveSpotifySearchQuery(directUrl);
-          if (spotifyQuery) {
-            const top = await this.searchYoutubeCandidatesViaApi(spotifyQuery, 1).catch(() => []);
-            const pick = Array.isArray(top) ? top[0] : null;
-            if (pick?.webpageUrl) {
-              targetUrl = pick.webpageUrl;
-              titleHint = pick.title || spotifyQuery;
-              performerHint = pick.creator || '';
-            } else {
-              targetUrl = `ytsearch1:${spotifyQuery}`;
-              titleHint = spotifyQuery;
-            }
-          }
-        }
-
-        // 3) نص عادي: أول نتيجة فقط (مثل بحث يوتيوب مباشر)
-        if (!targetUrl) {
-          const top = await this.searchYoutubeCandidatesViaApi(query, 1).catch(() => []);
-          const pick = Array.isArray(top) ? top[0] : null;
-          if (pick?.webpageUrl) {
-            targetUrl = pick.webpageUrl;
-            titleHint = pick.title || query;
-            performerHint = pick.creator || '';
-          } else {
-            const topYt = await this.searchYoutubeCandidatesViaYtDlp(query, 1).catch(() => []);
-            const yPick = Array.isArray(topYt) ? topYt[0] : null;
-            if (yPick?.webpageUrl) {
-              targetUrl = yPick.webpageUrl;
-              titleHint = yPick.title || query;
-              performerHint = yPick.creator || '';
-            }
-          }
-        }
-
-        if (!targetUrl) {
-          await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
-          await ctx.reply('♪ عذرا غير متوفر ..');
-          return;
-        }
-
-        await ctx.telegram.editMessageText(
-          ctx.chat.id,
-          loadingMsg.message_id,
-          undefined,
-          '⏳ تجهيز الصوت...'
-        ).catch(() => {});
-
-        let downloaded = await this.downloadAudioFileWithYtDlp(targetUrl, titleHint).catch(() => null);
-        if (!downloaded?.filePath) {
-          downloaded = await this.downloadAudioFileWithYtDlp(`ytsearch1:${query}`, titleHint).catch(() => null);
+        if (!local) {
+          await ctx.telegram.editMessageText(
+            ctx.chat.id,
+            loadingMsg.message_id,
+            undefined,
+            '⏳ تجهيز الصوت...'
+          ).catch(() => {});
+          local = await this.downloadFromYoutubeToMusic(query).catch(() => null);
         }
 
         await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
-        if (!downloaded?.filePath) {
+        if (!local?.path || !fs.existsSync(local.path)) {
           await ctx.reply('♪ عذرا غير متوفر ..');
           return;
         }
 
-        try {
-          const updatesButton = Markup.inlineKeyboard([
-            [Markup.button.url('تحديثات جو', this.JOE_UPDATES_CHANNEL_URL)]
-          ]);
-          const sent = await ctx.replyWithAudio(
-            { source: downloaded.filePath, filename: downloaded.fileName },
-            {
-              caption: '♪ تم التح🎧ميل بنجاح ♪',
-              title: this.cleanAudioLabel(titleHint || query).slice(0, 120) || 'مقطع صوتي',
-              performer: this.cleanAudioLabel(performerHint || '').slice(0, 80) || undefined,
-              reply_markup: updatesButton.reply_markup
-            }
-          );
-          const fileId = String(sent?.audio?.file_id || '').trim();
-          if (fileId) this.setStarsCachedFileId(query, fileId);
-        } finally {
-          fs.unlink(downloaded.filePath, () => {});
-        }
+        const updatesButton = Markup.inlineKeyboard([
+          [Markup.button.url('تحديثات جو', this.JOE_UPDATES_CHANNEL_URL)]
+        ]);
+        const sent = await ctx.replyWithAudio(
+          { source: local.path, filename: `${this.sanitizeAudioFileName(local.title || query)}.mp3` },
+          {
+            caption: '♪ تم التح🎧ميل بنجاح ♪',
+            title: this.cleanAudioLabel(local.title || query).slice(0, 120) || 'مقطع صوتي',
+            performer: undefined,
+            reply_markup: updatesButton.reply_markup
+          }
+        );
+        const fileId = String(sent?.audio?.file_id || '').trim();
+        if (fileId) this.setStarsCachedFileId(query, fileId);
       } catch (_error) {
         await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
         await ctx.reply('♪ عذرا غير متوفر ..');
