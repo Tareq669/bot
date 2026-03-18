@@ -16,6 +16,8 @@ class ChatGamesUtilityHandler {
   static AUDIO_QUERY_CACHE_TTL_MS = 30 * 60 * 1000;
   static audioSearchInFlight = new Map();
   static audioChatQueue = new Map();
+  static starsFileIdCache = new Map();
+  static STARS_FILEID_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
   static AUDIO_SEARCH_TIMEOUT_MS = 15000;
   static YT_PIPED_TIMEOUT_MS = 8000;
   static FAST_SEARCH_INSTANCES = 1;
@@ -82,6 +84,29 @@ class ChatGamesUtilityHandler {
 
   static getYoutubeApiKey() {
     return String(process.env.YOUTUBE_DATA_API_KEY || process.env.YOUTUBE_API_KEY || '').trim();
+  }
+
+  static getStarsFileCacheKey(query) {
+    return this.normalizeSearchText(String(query || '').trim());
+  }
+
+  static getStarsCachedFileId(query) {
+    const key = this.getStarsFileCacheKey(query);
+    if (!key) return null;
+    const cached = this.starsFileIdCache.get(key);
+    if (!cached) return null;
+    if ((Date.now() - Number(cached.createdAt || 0)) > this.STARS_FILEID_CACHE_TTL_MS) {
+      this.starsFileIdCache.delete(key);
+      return null;
+    }
+    return String(cached.fileId || '').trim() || null;
+  }
+
+  static setStarsCachedFileId(query, fileId) {
+    const key = this.getStarsFileCacheKey(query);
+    const fid = String(fileId || '').trim();
+    if (!key || !fid) return;
+    this.starsFileIdCache.set(key, { fileId: fid, createdAt: Date.now() });
   }
 
   static execFileAsync(command, args = [], options = {}) {
@@ -1154,7 +1179,7 @@ class ChatGamesUtilityHandler {
     return cached;
   }
 
-  static async sendHotAudioResult(ctx, audio, canNext = true) {
+  static async sendHotAudioResult(ctx, audio, canNext = true, cacheQuery = '') {
     const caption = '♪ تم التح🎧ميل بنجاح ♪';
     const safeTitle = this.cleanAudioLabel(audio?.title || 'مقطع صوتي').slice(0, 120);
     const safePerformer = this.cleanAudioLabel(audio?.creator || '').slice(0, 80) || undefined;
@@ -1168,10 +1193,15 @@ class ChatGamesUtilityHandler {
       reply_markup: updatesButton.reply_markup
     };
 
-    const primaryError = await ctx.replyWithAudio({ url: audio.url }, payload)
-      .then(() => null)
+    const sentByUrl = await ctx.replyWithAudio({ url: audio.url }, payload)
+      .then((msg) => msg)
       .catch((err) => err);
-    if (!primaryError) return;
+    if (sentByUrl && !sentByUrl.message) {
+      const fileId = String(sentByUrl?.audio?.file_id || '').trim();
+      if (fileId && cacheQuery) this.setStarsCachedFileId(cacheQuery, fileId);
+      return sentByUrl;
+    }
+    const primaryError = sentByUrl;
 
     const fallbackTarget = String(audio?.webpageUrl || '').trim()
       || (audio?.id ? `https://www.youtube.com/watch?v=${audio.id}` : '')
@@ -1180,10 +1210,13 @@ class ChatGamesUtilityHandler {
     const downloaded = await this.downloadAudioFileWithYtDlp(fallbackTarget, safeTitle).catch(() => null);
     if (!downloaded?.filePath) throw primaryError;
     try {
-      await ctx.replyWithAudio(
+      const sentByFile = await ctx.replyWithAudio(
         { source: downloaded.filePath, filename: downloaded.fileName },
         payload
       );
+      const fileId = String(sentByFile?.audio?.file_id || '').trim();
+      if (fileId && cacheQuery) this.setStarsCachedFileId(cacheQuery, fileId);
+      return sentByFile;
     } finally {
       fs.unlink(downloaded.filePath, () => {});
     }
@@ -1980,6 +2013,21 @@ class ChatGamesUtilityHandler {
     }
 
     return this.enqueueAudioChatTask(ctx.chat?.id, async () => {
+      const cachedFileId = this.getStarsCachedFileId(query);
+      if (cachedFileId) {
+        const updatesButton = Markup.inlineKeyboard([
+          [Markup.button.url('تحديثات جو', this.JOE_UPDATES_CHANNEL_URL)]
+        ]);
+        await ctx.replyWithAudio(
+          cachedFileId,
+          {
+            caption: '♪ تم التح🎧ميل بنجاح ♪',
+            reply_markup: updatesButton.reply_markup
+          }
+        ).catch(() => {});
+        return;
+      }
+
       const loadingMsg = await ctx.reply('🎧 جاري التحميل ....');
       try {
         const audio = await this.resolveStarsAudio(query).catch(() => null);
@@ -2006,7 +2054,10 @@ class ChatGamesUtilityHandler {
                   performer: undefined,
                   reply_markup: updatesButton.reply_markup
                 }
-              );
+              ).then((msg) => {
+                const fileId = String(msg?.audio?.file_id || '').trim();
+                if (fileId) this.setStarsCachedFileId(query, fileId);
+              });
               fs.unlink(downloaded.filePath, () => {});
               return;
             } catch (_sendErr) {
@@ -2016,7 +2067,7 @@ class ChatGamesUtilityHandler {
           await ctx.reply('♪ عذرا غير متوفر ..');
           return;
         }
-        await this.sendHotAudioResult(ctx, audio, false);
+        await this.sendHotAudioResult(ctx, audio, false, query);
       } catch (_error) {
         await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
         await ctx.reply('♪ عذرا غير متوفر ..');
