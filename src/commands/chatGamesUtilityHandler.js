@@ -1791,24 +1791,26 @@ class ChatGamesUtilityHandler {
     return this.enqueueAudioChatTask(ctx.chat?.id, async () => {
       const loadingMsg = await ctx.reply('🎧 جاري التحميل ....');
       try {
-        const picksFromApi = await this.searchYoutubeCandidatesViaApi(query, 5).catch(() => []);
-        const picks = picksFromApi.length
-          ? picksFromApi
-          : await this.searchYoutubeCandidatesViaYtDlp(query, 5).catch(() => []);
+        let audio = null;
+        const directList = await this.resolveAudioListWithCache(query).catch(() => []);
+        if (Array.isArray(directList) && directList[0]?.url) {
+          audio = directList[0];
+        }
+
+        if (!audio) {
+          const picksFromApi = await this.searchYoutubeCandidatesViaApi(query, 8).catch(() => []);
+          for (const pick of picksFromApi) {
+            audio = await this.resolveAudioFromPickedItem(pick, query).catch(() => null);
+            if (audio?.url) break;
+          }
+        }
+
         await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
-        if (!picks.length) {
+        if (!audio?.url) {
           await ctx.reply('♪ عذرا غير متوفر ..');
           return;
         }
-        this.setStarsSelectionCache(ctx, query, picks);
-        const lines = picks.map((item, idx) => {
-          const channel = item.creator ? ` - ${item.creator}` : '';
-          return `${idx + 1}) ${item.title}${channel}`.slice(0, 130);
-        });
-        await ctx.reply(
-          '🎵 اختر النتيجة المطلوبة من الأزرار:\n\n' + lines.join('\n'),
-          { reply_markup: this.buildStarsSelectionKeyboard(picks).reply_markup }
-        );
+        await this.sendHotAudioResult(ctx, audio, false);
       } catch (_error) {
         await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
         await ctx.reply('♪ عذرا غير متوفر ..');
