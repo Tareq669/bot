@@ -13,7 +13,9 @@ class ChatGamesUtilityHandler {
   static HOT_CACHE_TTL_MS = 10 * 60 * 1000;
   static STARS_SELECTION_TTL_MS = 5 * 60 * 1000;
   static audioQueryCache = new Map();
+  static starsFileIdCache = new Map();
   static AUDIO_QUERY_CACHE_TTL_MS = 30 * 60 * 1000;
+  static STARS_FILEID_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
   static audioSearchInFlight = new Map();
   static audioChatQueue = new Map();
   static AUDIO_SEARCH_TIMEOUT_MS = 15000;
@@ -1020,7 +1022,7 @@ class ChatGamesUtilityHandler {
     const updatesButton = Markup.inlineKeyboard([
       [Markup.button.url('تحديثات جو', this.JOE_UPDATES_CHANNEL_URL)]
     ]);
-    await ctx.replyWithAudio(
+    return ctx.replyWithAudio(
       { url: audio.url },
       {
         caption,
@@ -1728,6 +1730,25 @@ class ChatGamesUtilityHandler {
     return normalized || String(query || '').trim().toLowerCase();
   }
 
+  static getStarsCachedFileId(query) {
+    const key = this.getAudioQueryCacheKey(query);
+    if (!key) return '';
+    const row = this.starsFileIdCache.get(key);
+    if (!row) return '';
+    if ((Date.now() - Number(row.createdAt || 0)) > this.STARS_FILEID_CACHE_TTL_MS) {
+      this.starsFileIdCache.delete(key);
+      return '';
+    }
+    return String(row.fileId || '');
+  }
+
+  static setStarsCachedFileId(query, fileId) {
+    const key = this.getAudioQueryCacheKey(query);
+    const fid = String(fileId || '').trim();
+    if (!key || !fid) return;
+    this.starsFileIdCache.set(key, { fileId: fid, createdAt: Date.now() });
+  }
+
   static getAudioQueryCache(query) {
     const key = this.getAudioQueryCacheKey(query);
     if (!key) return null;
@@ -1820,6 +1841,19 @@ class ChatGamesUtilityHandler {
       const loadingMsg = await ctx.reply('🎧 جاري التحميل ....');
       try {
         let audio = null;
+        const cachedFileId = this.getStarsCachedFileId(query);
+        if (cachedFileId) {
+          await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
+          const updatesButton = Markup.inlineKeyboard([
+            [Markup.button.url('تحديثات جو', this.JOE_UPDATES_CHANNEL_URL)]
+          ]);
+          await ctx.replyWithAudio(cachedFileId, {
+            caption: '♪ تم التح🎧ميل بنجاح ♪',
+            reply_markup: updatesButton.reply_markup
+          }).catch(() => {});
+          return;
+        }
+
         const directUrl = this.extractFirstUrl(query);
         const directType = this.classifyMediaUrl(directUrl);
 
@@ -1839,6 +1873,13 @@ class ChatGamesUtilityHandler {
         }
 
         if (!audio) {
+          const fastTop = await this.searchYoutubeCandidatesViaApi(query, 1).catch(() => []);
+          if (Array.isArray(fastTop) && fastTop[0]) {
+            audio = await this.resolveAudioFromPickedItem(fastTop[0], query).catch(() => null);
+          }
+        }
+
+        if (!audio) {
           const directList = await this.resolveAudioListWithCache(query).catch(() => []);
           if (Array.isArray(directList) && directList[0]?.url) {
             audio = directList[0];
@@ -1846,7 +1887,7 @@ class ChatGamesUtilityHandler {
         }
 
         if (!audio) {
-          const picksFromApi = await this.searchYoutubeCandidatesViaApi(query, 8).catch(() => []);
+          const picksFromApi = await this.searchYoutubeCandidatesViaApi(query, 3).catch(() => []);
           for (const pick of picksFromApi) {
             audio = await this.resolveAudioFromPickedItem(pick, query).catch(() => null);
             if (audio?.url) break;
@@ -1858,7 +1899,9 @@ class ChatGamesUtilityHandler {
           await ctx.reply('♪ عذرا غير متوفر ..');
           return;
         }
-        await this.sendHotAudioResult(ctx, audio, false);
+        const sent = await this.sendHotAudioResult(ctx, audio, false);
+        const fileId = String(sent?.audio?.file_id || '').trim();
+        if (fileId) this.setStarsCachedFileId(query, fileId);
       } catch (_error) {
         await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
         await ctx.reply('♪ عذرا غير متوفر ..');
