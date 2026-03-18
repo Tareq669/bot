@@ -5,6 +5,7 @@ const { execFile } = require('child_process');
 const Markup = require('telegraf/markup');
 const YTDlpWrap = require('yt-dlp-wrap').default;
 const { User } = require('../database/models');
+const starsCacheStore = require('../utils/starsCacheStore');
 
 class ChatGamesUtilityHandler {
   static xoGames = new Map();
@@ -84,6 +85,10 @@ class ChatGamesUtilityHandler {
 
   static getYoutubeApiKey() {
     return String(process.env.YOUTUBE_DATA_API_KEY || process.env.YOUTUBE_API_KEY || '').trim();
+  }
+
+  static getStarsStore() {
+    return starsCacheStore;
   }
 
   static async checkBinaryRuntime(command, args = ['--version'], timeout = 8000) {
@@ -611,6 +616,56 @@ class ChatGamesUtilityHandler {
       rows.push([Markup.button.callback(`${i + 1}) ${items[i].title.slice(0, 40)}`, `stars:pick:${i}`)]);
     }
     return Markup.inlineKeyboard(rows);
+  }
+
+  static async buildRankedStarsCandidates(query) {
+    const q = String(query || '').trim();
+    if (!q) return [];
+    const artistOnly = this.isArtistOnlyQuery(q);
+    const variants = [q];
+    if (artistOnly) {
+      variants.push(`${q} اغاني`);
+      variants.push(`${q} كوكتيل`);
+      variants.push(`${q} official audio`);
+    }
+    const collected = [];
+    const seen = new Set();
+    for (const variant of variants) {
+      const fromApi = await this.searchYoutubeCandidatesViaApi(variant, 10).catch(() => []);
+      const fromYt = await this.searchYoutubeCandidatesViaYtDlp(variant, 8).catch(() => []);
+      for (const item of [...fromApi, ...fromYt]) {
+        const key = String(item?.id || `${item?.title}|${item?.creator}`).trim();
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        if (!this.isStarsCandidateAllowed(q, item?.title, item?.creator)) continue;
+        collected.push(item);
+      }
+    }
+    return collected
+      .map((item) => ({ item, score: this.rankStarsCandidate(q, item) }))
+      .sort((a, b) => b.score - a.score)
+      .map((x) => x.item);
+  }
+
+  static async getStarsCandidates(query, chatId, limit = 5) {
+    const q = String(query || '').trim();
+    if (!q) return [];
+    const queryKey = this.getAudioQueryCacheKey(q);
+    const store = this.getStarsStore();
+
+    let ranked = store.getCachedResults(queryKey, 6 * 60 * 60 * 1000);
+    if (!Array.isArray(ranked) || !ranked.length) {
+      ranked = await this.buildRankedStarsCandidates(q);
+      store.setCachedResults(queryKey, ranked.slice(0, 30));
+    }
+
+    const used = store.getUsedVideoSet(chatId, queryKey);
+    let filtered = ranked.filter((x) => !used.has(String(x?.id || '')));
+    if (!filtered.length) {
+      store.clearUsedVideos(chatId, queryKey);
+      filtered = ranked;
+    }
+    return filtered.slice(0, Math.max(1, Math.min(10, Number(limit || 5))));
   }
 
   static buildYtDlpSearchQueries(query) {
@@ -2105,11 +2160,52 @@ class ChatGamesUtilityHandler {
     }
 
     return this.enqueueAudioChatTask(ctx.chat?.id, async () => {
-      const cachedFileId = this.getStarsCachedFileId(query);
+      const loadingMsg = await ctx.reply('🔍 جاري البحث...');
+      try {
+        const candidates = await this.getStarsCandidates(query, ctx.chat?.id, 5).catch(() => []);
+        if (!candidates.length) {
+          await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
+          await ctx.reply('❌ لا يوجد نتائج');
+          return;
+        }
+        await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
+        this.setStarsSelectionCache(ctx, query, candidates);
+        const lines = candidates
+          .slice(0, 5)
+          .map((item, i) => `${i + 1}. ${item.title}`)
+          .join('\n');
+        await ctx.reply(
+          `🎧 اختر رقم الأغنية:\n${lines}`,
+          { reply_markup: this.buildStarsSelectionKeyboard(candidates).reply_markup }
+        );
+      } catch (_error) {
+        await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
+        await ctx.reply('❌ لا يوجد نتائج');
+      }
+    });
+  }
+
+  static async handleStarsSelectionByIndex(ctx, pickIndex) {
+    const cached = this.getStarsSelectionCache(ctx);
+    if (!cached || !Array.isArray(cached.list) || !cached.list.length) {
+      await ctx.reply('❌ لا يوجد بحث محفوظ. اكتب ستارز من جديد.');
+      return true;
+    }
+    if (!Number.isInteger(pickIndex) || pickIndex < 0 || pickIndex >= cached.list.length) {
+      await ctx.reply('❌ الرقم غير صحيح. اختر رقم من 1 إلى 5.');
+      return true;
+    }
+
+    const selected = cached.list[pickIndex];
+    const loadingMsg = await ctx.reply('⏳ تجهيز الصوت...');
+    try {
+      const store = this.getStarsStore();
+      const cachedFileId = store.getCachedFileId(selected?.id);
+      const updatesButton = Markup.inlineKeyboard([
+        [Markup.button.url('تحديثات جو', this.JOE_UPDATES_CHANNEL_URL)]
+      ]);
       if (cachedFileId) {
-        const updatesButton = Markup.inlineKeyboard([
-          [Markup.button.url('تحديثات جو', this.JOE_UPDATES_CHANNEL_URL)]
-        ]);
+        await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
         await ctx.replyWithAudio(
           cachedFileId,
           {
@@ -2117,76 +2213,57 @@ class ChatGamesUtilityHandler {
             reply_markup: updatesButton.reply_markup
           }
         ).catch(() => {});
-        return;
+        store.markVideoUsed(ctx.chat?.id, this.getAudioQueryCacheKey(cached.query), selected?.id);
+        return true;
       }
 
-      const loadingMsg = await ctx.reply('🔍 جاري البحث...');
-      try {
-        const best = await this.findBestStarsCandidate(query).catch(() => null);
-        if (!best?.id) {
-          await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
-          await ctx.reply('❌ لم يتم العثور على أغاني');
-          return;
-        }
+      const targetUrl = String(selected?.webpageUrl || `https://www.youtube.com/watch?v=${selected?.id || ''}`).trim();
+      let downloaded = await this.downloadAudioFileWithYtDlp(targetUrl, selected?.title || cached.query).catch(() => null);
+      if (!downloaded?.filePath) {
+        downloaded = await this.downloadAudioFileWithYtDlp(`ytsearch1:${cached.query}`, selected?.title || cached.query).catch(() => null);
+      }
 
-        await ctx.telegram.editMessageText(
-          ctx.chat.id,
-          loadingMsg.message_id,
-          undefined,
-          '⏳ تجهيز الصوت...'
-        ).catch(() => {});
-
-        const targetUrl = String(best.webpageUrl || `https://www.youtube.com/watch?v=${best.id}`).trim();
-        let downloaded = await this.downloadAudioFileWithYtDlp(
-          targetUrl,
-          best.title || query
-        ).catch(() => null);
-
-        if (!downloaded?.filePath) {
-          downloaded = await this.downloadAudioFileWithYtDlp(
-            `ytsearch1:${query}`,
-            best.title || query
-          ).catch(() => null);
-        }
-
-        await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
-        if (!downloaded?.filePath) {
-          await ctx.reply('❌ لم يتم العثور على أغاني');
-          return;
-        }
-
-        try {
-          const updatesButton = Markup.inlineKeyboard([
-            [Markup.button.url('تحديثات جو', this.JOE_UPDATES_CHANNEL_URL)]
-          ]);
-          const sent = await ctx.replyWithAudio(
-            { source: downloaded.filePath, filename: downloaded.fileName },
-            {
-              caption: '♪ تم التح🎧ميل بنجاح ♪',
-              title: this.cleanAudioLabel(best.title || query).slice(0, 120) || 'مقطع صوتي',
-              performer: this.cleanAudioLabel(best.creator || '').slice(0, 80) || undefined,
-              reply_markup: updatesButton.reply_markup
-            }
-          );
-          const fileId = String(sent?.audio?.file_id || '').trim();
-          if (fileId) this.setStarsCachedFileId(query, fileId);
-        } finally {
-          fs.unlink(downloaded.filePath, () => {});
-        }
-      } catch (_error) {
-        await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
+      await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
+      if (!downloaded?.filePath) {
         await ctx.reply('❌ لم يتم العثور على أغاني');
+        return true;
       }
-    });
+
+      try {
+        const sent = await ctx.replyWithAudio(
+          { source: downloaded.filePath, filename: downloaded.fileName },
+          {
+            caption: '♪ تم التح🎧ميل بنجاح ♪',
+            title: this.cleanAudioLabel(selected?.title || cached.query).slice(0, 120) || 'مقطع صوتي',
+            performer: this.cleanAudioLabel(selected?.creator || '').slice(0, 80) || undefined,
+            reply_markup: updatesButton.reply_markup
+          }
+        );
+        const fileId = String(sent?.audio?.file_id || '').trim();
+        if (fileId) store.setCachedFileId(String(selected?.id || ''), fileId, selected?.title || cached.query);
+        store.markVideoUsed(ctx.chat?.id, this.getAudioQueryCacheKey(cached.query), selected?.id);
+      } finally {
+        fs.unlink(downloaded.filePath, () => {});
+      }
+      return true;
+    } catch (_error) {
+      await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
+      await ctx.reply('❌ لم يتم العثور على أغاني');
+      return true;
+    }
+  }
+
+  static async handleStarsNumberSelection(ctx, text) {
+    const value = String(text || '').trim();
+    if (!/^[1-5]$/.test(value)) return false;
+    const cached = this.getStarsSelectionCache(ctx);
+    if (!cached) return false;
+    const idx = Number(value) - 1;
+    await this.handleStarsSelectionByIndex(ctx, idx);
+    return true;
   }
 
   static async handleStarsPickAction(ctx) {
-    const chatType = String(ctx.chat?.type || ctx.callbackQuery?.message?.chat?.type || '');
-    if (!['group', 'supergroup'].includes(chatType)) {
-      await ctx.answerCbQuery().catch(() => {});
-      return;
-    }
-
     const pickIndex = Number(ctx.match?.[1]);
     const cached = this.getStarsSelectionCache(ctx);
     if (!cached || !Array.isArray(cached.list) || !cached.list.length) {
@@ -2198,21 +2275,8 @@ class ChatGamesUtilityHandler {
       return;
     }
 
-    const selected = cached.list[pickIndex];
     await ctx.answerCbQuery('جاري التحميل...').catch(() => {});
-    const loadingMsg = await ctx.reply('🎧 جاري التحميل ....');
-    try {
-      const audio = await this.resolveAudioFromPickedItem(selected, cached.query).catch(() => null);
-      await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
-      if (!audio?.url) {
-        await ctx.reply('♪ عذرا غير متوفر ..');
-        return;
-      }
-      await this.sendHotAudioResult(ctx, audio, false);
-    } catch (_error) {
-      await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
-      await ctx.reply('♪ عذرا غير متوفر ..');
-    }
+    await this.handleStarsSelectionByIndex(ctx, pickIndex);
   }
 
   static async resolveAudioFromPickedItem(selected, fallbackQuery = '') {

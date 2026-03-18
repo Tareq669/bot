@@ -4093,6 +4093,8 @@ bot.on('text', async (ctx) => {
       if (handledHazarLock) return;
       const wasModerated = await GroupAdminHandler.processGroupMessage(ctx);
       if (wasModerated) return;
+      const handledStarsNumber = await ChatGamesUtilityHandler.handleStarsNumberSelection(ctx, message);
+      if (handledStarsNumber) return;
       const handledTournament = await TournamentChallengeHandler.handleGroupText(ctx, message);
       if (handledTournament) return;
       const handledGame = await GroupGamesHandler.handleIncomingGroupText(ctx, message);
@@ -4100,6 +4102,9 @@ bot.on('text', async (ctx) => {
       // Keep group chats isolated from private feature flows.
       return;
     }
+
+    const handledStarsNumberPrivate = await ChatGamesUtilityHandler.handleStarsNumberSelection(ctx, message);
+    if (handledStarsNumberPrivate) return;
 
     // ⭐ CHECK GUESS GAME INPUT FIRST (before all other handlers)
     const GuessNumberGame = require('./games/guessNumberGame');
