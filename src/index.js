@@ -153,6 +153,7 @@ const httpsAgent = new https.Agent({
 
 // Initialize bot with proper config
 const bot = new Telegraf(process.env.BOT_TOKEN, {
+  handlerTimeout: 300000,
   telegram: {
     agent: httpsAgent,
     apiRoot: 'https://api.telegram.org'
