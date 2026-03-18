@@ -84,6 +84,39 @@ class ChatGamesUtilityHandler {
     return String(process.env.YOUTUBE_DATA_API_KEY || process.env.YOUTUBE_API_KEY || '').trim();
   }
 
+  static extractFirstUrl(text) {
+    const m = String(text || '').match(/https?:\/\/[^\s]+/i);
+    return m ? String(m[0]).trim() : '';
+  }
+
+  static classifyMediaUrl(url) {
+    const u = String(url || '').toLowerCase();
+    if (!u) return '';
+    if (u.includes('youtube.com') || u.includes('youtu.be')) return 'youtube';
+    if (u.includes('tiktok.com') || u.includes('vt.tiktok.com')) return 'tiktok';
+    if (u.includes('spotify.com')) return 'spotify';
+    // سناب تيوب غالبًا يشارك روابط يوتيوب/تيك توك؛ لو ظهر رابط مباشر باسمه نحاول.
+    if (u.includes('snaptube')) return 'snaptube';
+    return '';
+  }
+
+  static async resolveSpotifySearchQuery(spotifyUrl) {
+    const url = String(spotifyUrl || '').trim();
+    if (!url) return '';
+    try {
+      const { data } = await axios.get('https://open.spotify.com/oembed', {
+        params: { url },
+        timeout: 10000
+      });
+      const title = this.cleanAudioLabel(data?.title || '').trim();
+      const author = this.cleanAudioLabel(data?.author_name || '').trim();
+      const query = [author, title].filter(Boolean).join(' - ').trim();
+      return query || '';
+    } catch (_error) {
+      return '';
+    }
+  }
+
   static execFileAsync(command, args = [], options = {}) {
     return new Promise((resolve, reject) => {
       execFile(command, args, {
@@ -1777,11 +1810,6 @@ class ChatGamesUtilityHandler {
   }
 
   static async handlePlayCommand(ctx, queryText) {
-    if (!['group', 'supergroup'].includes(ctx.chat?.type)) {
-      await ctx.reply('❌ هذا الأمر للجروب فقط.');
-      return;
-    }
-
     const query = String(queryText || '').trim();
     if (!query) {
       await ctx.reply('❌ الصيغة:\nستارز اسم المقطع');
@@ -1792,9 +1820,29 @@ class ChatGamesUtilityHandler {
       const loadingMsg = await ctx.reply('🎧 جاري التحميل ....');
       try {
         let audio = null;
-        const directList = await this.resolveAudioListWithCache(query).catch(() => []);
-        if (Array.isArray(directList) && directList[0]?.url) {
-          audio = directList[0];
+        const directUrl = this.extractFirstUrl(query);
+        const directType = this.classifyMediaUrl(directUrl);
+
+        if (directUrl && directType) {
+          if (directType === 'spotify') {
+            const spotifyQuery = await this.resolveSpotifySearchQuery(directUrl);
+            if (spotifyQuery) {
+              const listFromSpotify = await this.resolveAudioListWithCache(spotifyQuery).catch(() => []);
+              if (Array.isArray(listFromSpotify) && listFromSpotify[0]?.url) {
+                audio = listFromSpotify[0];
+              }
+            }
+          } else {
+            // youtube / tiktok / snaptube-link
+            audio = await this.resolveAudioWithYtDlp(directUrl).catch(() => null);
+          }
+        }
+
+        if (!audio) {
+          const directList = await this.resolveAudioListWithCache(query).catch(() => []);
+          if (Array.isArray(directList) && directList[0]?.url) {
+            audio = directList[0];
+          }
         }
 
         if (!audio) {
