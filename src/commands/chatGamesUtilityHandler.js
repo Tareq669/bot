@@ -2073,8 +2073,8 @@ class ChatGamesUtilityHandler {
     return this.enqueueAudioChatTask(ctx.chat?.id, async () => {
       const runtime = await this.getStarsRuntimeReadiness().catch(() => null);
       if (!runtime?.ytDlp?.ok) {
-        // لا نوقف الخدمة بشكل كامل: نكمل بمحاولات البحث/الإرسال المتاحة.
-        // هذا يمنع ظهور رسالة "الخدمة غير جاهزة" لكل الطلبات.
+        await ctx.reply('♪ عذرا الخدمة غير جاهزة حاليا ..');
+        return;
       }
 
       const cachedFileId = this.getStarsCachedFileId(query);
