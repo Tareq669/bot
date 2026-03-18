@@ -153,6 +153,7 @@ const httpsAgent = new https.Agent({
 
 // Initialize bot with proper config
 const bot = new Telegraf(process.env.BOT_TOKEN, {
+  handlerTimeout: 300000,
   telegram: {
     agent: httpsAgent,
     apiRoot: 'https://api.telegram.org'
@@ -477,8 +478,14 @@ Promise.all([
 // Error handling for bot
 bot.catch((err, ctx) => {
   // تجاهل أخطاء Timeout المتوقعة
-  if (err.code === 'ETIMEDOUT' || err.code === 'ENETUNREACH') {
-    logger.warn(`⚠️ خطأ اتصال مؤقت: ${err.code}`);
+  const isTimeoutLike =
+    err?.code === 'ETIMEDOUT'
+    || err?.code === 'ENETUNREACH'
+    || err?.name === 'TimeoutError'
+    || String(err?.message || '').toLowerCase().includes('promise timed out');
+
+  if (isTimeoutLike) {
+    logger.warn(`⚠️ خطأ مهلة/اتصال مؤقت: ${err?.code || err?.name || 'TIMEOUT'}`);
     return;
   }
 
