@@ -279,6 +279,111 @@ class ChatGamesUtilityHandler {
       .slice(0, max);
   }
 
+  static isReligiousLikeText(text) {
+    const normalized = this.normalizeSearchText(text);
+    if (!normalized) return false;
+    return this.hasAnyTerm(normalized, this.RELIGIOUS_AUDIO_TERMS);
+  }
+
+  static isLikelyAdText(text) {
+    const normalized = this.normalizeSearchText(text);
+    if (!normalized) return false;
+    const adTerms = [
+      'اعلان', 'إعلان', 'ad', 'commercial', 'promo', 'teaser', 'trailer', 'spot'
+    ];
+    return this.hasAnyTerm(normalized, adTerms);
+  }
+
+  static isStarsCandidateAllowed(query, title, creator = '') {
+    const q = this.normalizeSearchText(query);
+    const tc = `${String(title || '')} ${String(creator || '')}`.trim();
+    const text = this.normalizeSearchText(tc);
+    if (!text) return false;
+
+    const queryIsReligious = this.isReligiousLikeText(q);
+    const itemIsReligious = this.isReligiousLikeText(text);
+
+    // طلب موسيقى عادي: امنع النتائج الدينية/المصاحف.
+    if (!queryIsReligious && itemIsReligious) return false;
+
+    // منع الإعلانات الصريحة من نتائج ستارز.
+    if (this.isLikelyAdText(text)) return false;
+
+    return true;
+  }
+
+  static rankStarsCandidate(query, candidate) {
+    const title = String(candidate?.title || '');
+    const creator = String(candidate?.creator || '');
+    const text = `${title} ${creator}`;
+    const normalizedQuery = this.normalizeSearchText(query);
+    let score = this.scoreAudioCandidate(normalizedQuery, title, creator);
+
+    if (this.hasOrderedTokenMatch(normalizedQuery, text)) score += 22;
+    if (this.isMatchForRequest(normalizedQuery, title, creator)) score += 18;
+    if (this.isArtistOnlyQuery(normalizedQuery)) {
+      const creatorNorm = this.normalizeSearchText(creator);
+      const titleNorm = this.normalizeSearchText(title);
+      if (creatorNorm.includes(normalizedQuery)) score += 20;
+      if (titleNorm.includes(normalizedQuery)) score += 8;
+      if (titleNorm.includes('كوكتيل') || titleNorm.includes('mix')) score += 6;
+    }
+    if (!this.isStarsCandidateAllowed(query, title, creator)) score -= 100;
+    return score;
+  }
+
+  static async resolveStarsAudio(query) {
+    const q = String(query || '').trim();
+    if (!q) return null;
+
+    const artistOnly = this.isArtistOnlyQuery(q);
+    const variantQueries = [q];
+    if (artistOnly) {
+      variantQueries.push(`${q} اغاني`);
+      variantQueries.push(`${q} كوكتيل`);
+      variantQueries.push(`${q} official audio`);
+    }
+
+    const allCandidates = [];
+    const seen = new Set();
+
+    for (const variant of variantQueries) {
+      const apiItems = await this.searchYoutubeCandidatesViaApi(variant, 10).catch(() => []);
+      const ytdlpItems = await this.searchYoutubeCandidatesViaYtDlp(variant, 8).catch(() => []);
+      for (const item of [...apiItems, ...ytdlpItems]) {
+        const key = String(item?.id || `${item?.title}|${item?.creator}`).trim();
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        if (!this.isStarsCandidateAllowed(q, item?.title, item?.creator)) continue;
+        allCandidates.push(item);
+      }
+    }
+
+    const ranked = allCandidates
+      .map((item) => ({ item, score: this.rankStarsCandidate(q, item) }))
+      .sort((a, b) => b.score - a.score)
+      .map((entry) => entry.item);
+
+    const pool = artistOnly ? ranked.slice(0, 6) : ranked.slice(0, 3);
+    const order = this.shuffleArray(pool);
+    for (const item of order) {
+      const audio = await this.resolveAudioFromPickedItem(item, q).catch(() => null);
+      if (audio?.url && this.isStarsCandidateAllowed(q, audio?.title, audio?.creator)) {
+        return audio;
+      }
+    }
+
+    // fallback أخير من محرك الصوت الحالي مع فلترة.
+    const fallbackList = await this.resolveAudioListWithCache(q).catch(() => []);
+    const fallbackFiltered = (Array.isArray(fallbackList) ? fallbackList : [])
+      .filter((a) => this.isStarsCandidateAllowed(q, a?.title, a?.creator))
+      .sort((a, b) => this.rankStarsCandidate(q, b) - this.rankStarsCandidate(q, a));
+    if (!fallbackFiltered.length) return null;
+    return artistOnly
+      ? this.shuffleArray(fallbackFiltered.slice(0, 5))[0]
+      : fallbackFiltered[0];
+  }
+
   static getStarsSelectionKey(ctx) {
     const chatId = Number(ctx?.chat?.id || 0);
     const userId = Number(ctx?.from?.id || 0);
@@ -1791,19 +1896,7 @@ class ChatGamesUtilityHandler {
     return this.enqueueAudioChatTask(ctx.chat?.id, async () => {
       const loadingMsg = await ctx.reply('🎧 جاري التحميل ....');
       try {
-        let audio = null;
-        const directList = await this.resolveAudioListWithCache(query).catch(() => []);
-        if (Array.isArray(directList) && directList[0]?.url) {
-          audio = directList[0];
-        }
-
-        if (!audio) {
-          const picksFromApi = await this.searchYoutubeCandidatesViaApi(query, 8).catch(() => []);
-          for (const pick of picksFromApi) {
-            audio = await this.resolveAudioFromPickedItem(pick, query).catch(() => null);
-            if (audio?.url) break;
-          }
-        }
+        const audio = await this.resolveStarsAudio(query).catch(() => null);
 
         await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
         if (!audio?.url) {
