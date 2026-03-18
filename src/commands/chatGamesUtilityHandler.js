@@ -382,30 +382,6 @@ class ChatGamesUtilityHandler {
     if (!q) return null;
 
     const artistOnly = this.isArtistOnlyQuery(q);
-    const quickTargets = artistOnly
-      ? [
-          `ytsearch1:${q} كوكتيل`,
-          `ytsearch1:${q} اغاني`,
-          `ytsearch1:${q} official audio`,
-          `ytsearch1:${q}`
-        ]
-      : [
-          `ytsearch1:${q}`,
-          `ytsearch1:${q} official audio`
-        ];
-
-    // مسار سريع جدًا قبل الفلترة الثقيلة لتقليل التأخير.
-    for (const target of quickTargets) {
-      const quick = await this.withTimeout(
-        this.resolveAudioWithYtDlp(target).catch(() => null),
-        18000,
-        'STARS_QUICK_TIMEOUT'
-      ).catch(() => null);
-      if (quick?.url && this.isStarsCandidateAllowed(q, quick?.title, quick?.creator)) {
-        return quick;
-      }
-    }
-
     const variantQueries = [q];
     if (artistOnly) {
       variantQueries.push(`${q} اغاني`);
@@ -1986,33 +1962,6 @@ class ChatGamesUtilityHandler {
 
         await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
         if (!audio?.url) {
-          // fallback أخير: تنزيل مباشر من ytsearch ثم إرسال الملف كـ audio.
-          const artistOnly = this.isArtistOnlyQuery(query);
-          const fallbackTargets = artistOnly
-            ? [`ytsearch1:${query} كوكتيل`, `ytsearch1:${query} اغاني`, `ytsearch1:${query}`]
-            : [`ytsearch1:${query}`];
-          for (const target of fallbackTargets) {
-            const downloaded = await this.downloadAudioFileWithYtDlp(target, query).catch(() => null);
-            if (!downloaded?.filePath) continue;
-            try {
-              const updatesButton = Markup.inlineKeyboard([
-                [Markup.button.url('تحديثات جو', this.JOE_UPDATES_CHANNEL_URL)]
-              ]);
-              await ctx.replyWithAudio(
-                { source: downloaded.filePath, filename: downloaded.fileName },
-                {
-                  caption: '♪ تم التح🎧ميل بنجاح ♪',
-                  title: this.cleanAudioLabel(query).slice(0, 120) || 'مقطع صوتي',
-                  performer: undefined,
-                  reply_markup: updatesButton.reply_markup
-                }
-              );
-              fs.unlink(downloaded.filePath, () => {});
-              return;
-            } catch (_sendErr) {
-              fs.unlink(downloaded.filePath, () => {});
-            }
-          }
           await ctx.reply('♪ عذرا غير متوفر ..');
           return;
         }
