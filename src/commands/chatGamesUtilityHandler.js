@@ -536,6 +536,45 @@ class ChatGamesUtilityHandler {
       : fallbackFiltered[0];
   }
 
+  static async findBestStarsCandidate(query) {
+    const q = String(query || '').trim();
+    if (!q) return null;
+    const artistOnly = this.isArtistOnlyQuery(q);
+    const variants = [q];
+    if (artistOnly) {
+      variants.push(`${q} اغاني`);
+      variants.push(`${q} كوكتيل`);
+      variants.push(`${q} official audio`);
+    }
+
+    const collected = [];
+    const seen = new Set();
+    for (const variant of variants) {
+      const fromApi = await this.searchYoutubeCandidatesViaApi(variant, 10).catch(() => []);
+      const fromYt = await this.searchYoutubeCandidatesViaYtDlp(variant, 8).catch(() => []);
+      for (const item of [...fromApi, ...fromYt]) {
+        const key = String(item?.id || `${item?.title}|${item?.creator}`).trim();
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        if (!this.isStarsCandidateAllowed(q, item?.title, item?.creator)) continue;
+        collected.push(item);
+      }
+    }
+
+    if (!collected.length) return null;
+    const ranked = collected
+      .map((item) => ({ item, score: this.rankStarsCandidate(q, item) }))
+      .sort((a, b) => b.score - a.score)
+      .map((x) => x.item);
+
+    // إذا البحث باسم مغني فقط نختار عشوائي من أفضل 5، غير ذلك أول نتيجة.
+    if (artistOnly) {
+      const pool = ranked.slice(0, 5);
+      return this.shuffleArray(pool)[0] || null;
+    }
+    return ranked[0] || null;
+  }
+
   static getStarsSelectionKey(ctx) {
     const chatId = Number(ctx?.chat?.id || 0);
     const userId = Number(ctx?.from?.id || 0);
@@ -2059,11 +2098,6 @@ class ChatGamesUtilityHandler {
   }
 
   static async handlePlayCommand(ctx, queryText) {
-    if (!['group', 'supergroup'].includes(ctx.chat?.type)) {
-      await ctx.reply('❌ هذا الأمر للجروب فقط.');
-      return;
-    }
-
     const query = String(queryText || '').trim();
     if (!query) {
       await ctx.reply('❌ الصيغة:\nستارز اسم المقطع');
@@ -2071,12 +2105,6 @@ class ChatGamesUtilityHandler {
     }
 
     return this.enqueueAudioChatTask(ctx.chat?.id, async () => {
-      const runtime = await this.getStarsRuntimeReadiness().catch(() => null);
-      if (!runtime?.ytDlp?.ok) {
-        // لا نوقف الخدمة بشكل كامل: نكمل بمحاولات البحث/الإرسال المتاحة.
-        // هذا يمنع ظهور رسالة "الخدمة غير جاهزة" لكل الطلبات.
-      }
-
       const cachedFileId = this.getStarsCachedFileId(query);
       if (cachedFileId) {
         const updatesButton = Markup.inlineKeyboard([
@@ -2092,49 +2120,62 @@ class ChatGamesUtilityHandler {
         return;
       }
 
-      const loadingMsg = await ctx.reply('🎧 جاري التحميل ....');
+      const loadingMsg = await ctx.reply('🔍 جاري البحث...');
       try {
-        const audio = await this.resolveStarsAudio(query).catch(() => null);
-
-        await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
-        if (!audio?.url) {
-          // fallback أخير: تنزيل مباشر من ytsearch ثم إرسال الملف كـ audio.
-          const artistOnly = this.isArtistOnlyQuery(query);
-          const fallbackTargets = artistOnly
-            ? [`ytsearch1:${query} كوكتيل`, `ytsearch1:${query} اغاني`, `ytsearch1:${query}`]
-            : [`ytsearch1:${query}`];
-          for (const target of fallbackTargets) {
-            const downloaded = await this.downloadAudioFileWithYtDlp(target, query).catch(() => null);
-            if (!downloaded?.filePath) continue;
-            try {
-              const updatesButton = Markup.inlineKeyboard([
-                [Markup.button.url('تحديثات جو', this.JOE_UPDATES_CHANNEL_URL)]
-              ]);
-              await ctx.replyWithAudio(
-                { source: downloaded.filePath, filename: downloaded.fileName },
-                {
-                  caption: '♪ تم التح🎧ميل بنجاح ♪',
-                  title: this.cleanAudioLabel(query).slice(0, 120) || 'مقطع صوتي',
-                  performer: undefined,
-                  reply_markup: updatesButton.reply_markup
-                }
-              ).then((msg) => {
-                const fileId = String(msg?.audio?.file_id || '').trim();
-                if (fileId) this.setStarsCachedFileId(query, fileId);
-              });
-              fs.unlink(downloaded.filePath, () => {});
-              return;
-            } catch (_sendErr) {
-              fs.unlink(downloaded.filePath, () => {});
-            }
-          }
-          await ctx.reply('♪ عذرا غير متوفر ..');
+        const best = await this.findBestStarsCandidate(query).catch(() => null);
+        if (!best?.id) {
+          await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
+          await ctx.reply('❌ لم يتم العثور على أغاني');
           return;
         }
-        await this.sendHotAudioResult(ctx, audio, false, query);
+
+        await ctx.telegram.editMessageText(
+          ctx.chat.id,
+          loadingMsg.message_id,
+          undefined,
+          '⏳ تجهيز الصوت...'
+        ).catch(() => {});
+
+        const targetUrl = String(best.webpageUrl || `https://www.youtube.com/watch?v=${best.id}`).trim();
+        let downloaded = await this.downloadAudioFileWithYtDlp(
+          targetUrl,
+          best.title || query
+        ).catch(() => null);
+
+        if (!downloaded?.filePath) {
+          downloaded = await this.downloadAudioFileWithYtDlp(
+            `ytsearch1:${query}`,
+            best.title || query
+          ).catch(() => null);
+        }
+
+        await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
+        if (!downloaded?.filePath) {
+          await ctx.reply('❌ لم يتم العثور على أغاني');
+          return;
+        }
+
+        try {
+          const updatesButton = Markup.inlineKeyboard([
+            [Markup.button.url('تحديثات جو', this.JOE_UPDATES_CHANNEL_URL)]
+          ]);
+          const sent = await ctx.replyWithAudio(
+            { source: downloaded.filePath, filename: downloaded.fileName },
+            {
+              caption: '♪ تم التح🎧ميل بنجاح ♪',
+              title: this.cleanAudioLabel(best.title || query).slice(0, 120) || 'مقطع صوتي',
+              performer: this.cleanAudioLabel(best.creator || '').slice(0, 80) || undefined,
+              reply_markup: updatesButton.reply_markup
+            }
+          );
+          const fileId = String(sent?.audio?.file_id || '').trim();
+          if (fileId) this.setStarsCachedFileId(query, fileId);
+        } finally {
+          fs.unlink(downloaded.filePath, () => {});
+        }
       } catch (_error) {
         await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
-        await ctx.reply('♪ عذرا غير متوفر ..');
+        await ctx.reply('❌ لم يتم العثور على أغاني');
       }
     });
   }
