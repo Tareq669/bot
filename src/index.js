@@ -5199,12 +5199,13 @@ async function startBot() {
     const maxRetries = 5;
     const retryDelays = [3000, 5000, 7000, 10000, 15000]; // Increasing delays
 
-    while (retryCount < maxRetries && !botStarted) {
+    while (!botStarted) {
       try {
         // Wait before trying to start (gives previous instance time to shutdown)
         if (retryCount > 0) {
-          const delayMs = retryDelays[retryCount - 1];
-          logger.info(`⏳ محاولة #${retryCount + 1}/${maxRetries} بعد ${delayMs / 1000} ثانية...`);
+          const delayIndex = Math.min(retryCount - 1, retryDelays.length - 1);
+          const delayMs = retryDelays[delayIndex];
+          logger.info(`⏳ محاولة #${retryCount + 1} بعد ${delayMs / 1000} ثانية...`);
           await new Promise((resolve) => setTimeout(resolve, delayMs));
         }
 
@@ -5216,12 +5217,7 @@ async function startBot() {
 
         // Check if it's a 409 error (another instance running)
         if (error.response && error.response.error_code === 409) {
-          logger.warn(`⚠️ محاولة #${retryCount}/${maxRetries} - خطأ 409 (نسخة أخرى تعمل)`);
-
-          if (retryCount >= maxRetries) {
-            logger.error('❌ تم تجاوز عدد المحاولات. سيتم الإيقاف للسماح للسحابة بإعادة التشغيل.');
-            process.exit(1);
-          }
+          logger.warn(`⚠️ محاولة #${retryCount} - خطأ 409 (نسخة أخرى تعمل). سيستمر في إعادة المحاولة تلقائيًا...`);
         } else {
           logger.error(`❌ فشل في محاولة #${retryCount}: ${error.message}`);
           if (retryCount >= maxRetries) {
