@@ -291,8 +291,13 @@ bot.use(async (ctx, next) => {
     const patchReplyMethod = (methodName) => {
       const original = ctx[methodName];
       if (typeof original !== 'function') return;
+      const isReplyTargetMissing = (error) => {
+        const description = String(error?.response?.description || '').toLowerCase();
+        return description.includes('message to be replied not found');
+      };
       ctx[methodName] = (...args) => {
         if (!args.length) return original.apply(ctx, args);
+        const originalArgs = [...args];
         const lastArg = args[args.length - 1];
         const hasOptionsObject = lastArg && typeof lastArg === 'object' && !Array.isArray(lastArg);
         let options = hasOptionsObject ? { ...lastArg } : {};
@@ -311,7 +316,17 @@ bot.use(async (ctx, next) => {
 
         if (hasOptionsObject) args[args.length - 1] = options;
         else args.push(options);
-        return original.apply(ctx, args);
+        return original.apply(ctx, args).catch((error) => {
+          if (!isReplyTargetMissing(error)) throw error;
+          const retryArgs = [...originalArgs];
+          const retryLast = retryArgs[retryArgs.length - 1];
+          const retryHasOptions = retryLast && typeof retryLast === 'object' && !Array.isArray(retryLast);
+          let retryOptions = retryHasOptions ? { ...retryLast } : {};
+          delete retryOptions.reply_to_message_id;
+          if (retryHasOptions) retryArgs[retryArgs.length - 1] = retryOptions;
+          else retryArgs.push(retryOptions);
+          return original.apply(ctx, retryArgs);
+        });
       };
     };
 
