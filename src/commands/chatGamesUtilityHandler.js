@@ -38,6 +38,7 @@ class ChatGamesUtilityHandler {
   static YT_HTML_SEARCH_TIMEOUT_MS = 4500;
   static ARCHIVE_SEARCH_URL = 'https://archive.org/advancedsearch.php';
   static ARCHIVE_METADATA_URL = 'https://archive.org/metadata';
+  static YOUTUBE_SEARCH_API_URL = 'https://www.googleapis.com/youtube/v3/search';
   static YT_PIPED_INSTANCES = [
     'https://piped.video',
     'https://piped.adminforge.de',
@@ -77,6 +78,10 @@ class ChatGamesUtilityHandler {
       .replace(/\s+/g, ' ')
       .trim();
     return (cleaned || 'audio').slice(0, 80);
+  }
+
+  static getYoutubeApiKey() {
+    return String(process.env.YOUTUBE_DATA_API_KEY || process.env.YOUTUBE_API_KEY || '').trim();
   }
 
   static execFileAsync(command, args = [], options = {}) {
@@ -229,6 +234,49 @@ class ChatGamesUtilityHandler {
     return collected
       .sort((a, b) => rankCandidate(b) - rankCandidate(a))
       .slice(0, capped);
+  }
+
+  static async searchYoutubeCandidatesViaApi(query, limit = 5) {
+    const q = String(query || '').trim();
+    const apiKey = this.getYoutubeApiKey();
+    if (!q || !apiKey) return [];
+
+    const max = Math.max(1, Math.min(10, Number(limit || 5)));
+    const { data } = await axios.get(this.YOUTUBE_SEARCH_API_URL, {
+      params: {
+        part: 'snippet',
+        q,
+        type: 'video',
+        maxResults: max,
+        key: apiKey,
+        regionCode: 'SA',
+        relevanceLanguage: 'ar'
+      },
+      timeout: 15000
+    });
+
+    const items = Array.isArray(data?.items) ? data.items : [];
+    const mapped = items.map((item) => {
+      const id = String(item?.id?.videoId || '').trim();
+      const title = this.cleanAudioLabel(item?.snippet?.title || '').trim();
+      const creator = this.cleanAudioLabel(item?.snippet?.channelTitle || '').trim();
+      const webpageUrl = id ? `https://www.youtube.com/watch?v=${id}` : '';
+      return { id, title, creator, webpageUrl };
+    }).filter((x) => x.id && x.title);
+
+    const rankCandidate = (candidate) => {
+      const text = this.normalizeSearchText(`${candidate.title} ${candidate.creator}`);
+      const queryNorm = this.normalizeSearchText(q);
+      let score = this.scoreAudioCandidate(queryNorm, candidate.title, candidate.creator);
+      if (text.includes('كوكتيل') || text.includes('mix') || text.includes('playlist')) score -= 20;
+      if (text.includes('official') || text.includes('lyric')) score += 8;
+      if (this.hasOrderedTokenMatch(queryNorm, `${candidate.creator} ${candidate.title}`)) score += 15;
+      return score;
+    };
+
+    return mapped
+      .sort((a, b) => rankCandidate(b) - rankCandidate(a))
+      .slice(0, max);
   }
 
   static getStarsSelectionKey(ctx) {
@@ -1743,7 +1791,10 @@ class ChatGamesUtilityHandler {
     return this.enqueueAudioChatTask(ctx.chat?.id, async () => {
       const loadingMsg = await ctx.reply('🎧 جاري التحميل ....');
       try {
-        const picks = await this.searchYoutubeCandidatesViaYtDlp(query, 5).catch(() => []);
+        const picksFromApi = await this.searchYoutubeCandidatesViaApi(query, 5).catch(() => []);
+        const picks = picksFromApi.length
+          ? picksFromApi
+          : await this.searchYoutubeCandidatesViaYtDlp(query, 5).catch(() => []);
         await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
         if (!picks.length) {
           await ctx.reply('♪ عذرا غير متوفر ..');
