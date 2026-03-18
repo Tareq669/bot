@@ -220,6 +220,7 @@ bot.use(async (ctx, next) => {
     !ctx.callbackQuery.data.startsWith('group:') &&
     !ctx.callbackQuery.data.startsWith('tops:') &&
     !ctx.callbackQuery.data.startsWith('bank:create:') &&
+    !ctx.callbackQuery.data.startsWith('stars:') &&
     !ctx.callbackQuery.data.startsWith('xo:')
   ) {
     await ctx.answerCbQuery('هذا الزر مخصص للمحادثة الخاصة.', { show_alert: false }).catch(() => {});
@@ -2874,6 +2875,7 @@ bot.hears(/^طقس(?:\s+(.+))?$/i, (ctx) => ChatGamesUtilityHandler.handleWeathe
 bot.hears(/^(?:اذان|أذان)(?:\s+(.+))?$/i, (ctx) => ChatGamesUtilityHandler.handleAdhanText(ctx, ctx.match[1]));
 bot.hears(/^ستارز\s+فيديو(?:\s+(.+))?$/i, (ctx) => ChatGamesUtilityHandler.handlePlayVideoCommand(ctx, ctx.match[1]));
 bot.hears(/^ستارز(?:\s+(.+))?$/i, (ctx) => ChatGamesUtilityHandler.handlePlayCommand(ctx, ctx.match[1]));
+bot.action(/^stars:pick:(\d+)$/i, (ctx) => ChatGamesUtilityHandler.handleStarsPickAction(ctx));
 bot.action('hot:next', (ctx) => ChatGamesUtilityHandler.handleHotNextAction(ctx));
 
 const buildTopMenuKeyboard = () => Markup.inlineKeyboard([

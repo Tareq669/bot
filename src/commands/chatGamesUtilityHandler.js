@@ -9,7 +9,9 @@ const { User } = require('../database/models');
 class ChatGamesUtilityHandler {
   static xoGames = new Map();
   static hotSearchCache = new Map();
+  static starsSelectionCache = new Map();
   static HOT_CACHE_TTL_MS = 10 * 60 * 1000;
+  static STARS_SELECTION_TTL_MS = 5 * 60 * 1000;
   static audioQueryCache = new Map();
   static AUDIO_QUERY_CACHE_TTL_MS = 30 * 60 * 1000;
   static audioSearchInFlight = new Map();
@@ -181,6 +183,90 @@ class ChatGamesUtilityHandler {
       ext: parsed.ext || 'm4a',
       webpageUrl: parsed.webpageUrl || ''
     };
+  }
+
+  static async searchYoutubeCandidatesViaYtDlp(query, limit = 5) {
+    const trimmed = String(query || '').trim();
+    if (!trimmed) return [];
+    const capped = Math.max(1, Math.min(8, Number(limit || 5)));
+    const targets = [`ytsearch${capped}:${trimmed}`];
+    const variants = this.generateSearchVariants(trimmed)
+      .filter((v) => this.normalizeSearchText(v) !== this.normalizeSearchText(trimmed))
+      .slice(0, 2);
+    for (const variant of variants) {
+      targets.push(`ytsearch${Math.max(2, Math.min(4, capped))}:${variant}`);
+    }
+
+    const collected = [];
+    const seen = new Set();
+    const rankCandidate = (candidate) => {
+      const text = this.normalizeSearchText(`${candidate.title} ${candidate.creator}`);
+      const queryNorm = this.normalizeSearchText(trimmed);
+      let score = this.scoreAudioCandidate(queryNorm, candidate.title, candidate.creator);
+      if (text.includes('كوكتيل') || text.includes('mix') || text.includes('playlist')) score -= 20;
+      if (text.includes('official') || text.includes('lyric')) score += 8;
+      if (this.hasOrderedTokenMatch(queryNorm, `${candidate.creator} ${candidate.title}`)) score += 15;
+      return score;
+    };
+    for (const target of targets) {
+      const data = await this.runYtDlpJson(target, ['--flat-playlist']).catch(() => null);
+      const entries = data?._type === 'playlist' && Array.isArray(data.entries) ? data.entries : [];
+      for (const entry of entries) {
+        if (collected.length >= capped) break;
+        const id = String(entry?.id || '').trim();
+        if (!id) continue;
+        if (seen.has(id)) continue;
+        seen.add(id);
+        const title = this.cleanAudioLabel(entry?.title || '').trim();
+        if (!title) continue;
+        const creator = this.cleanAudioLabel(entry?.uploader || entry?.channel || entry?.creator || '').trim();
+        const webpageUrl = String(entry?.webpage_url || `https://www.youtube.com/watch?v=${id}`).trim();
+        collected.push({ id, title, creator, webpageUrl });
+      }
+      if (collected.length >= capped) break;
+    }
+
+    return collected
+      .sort((a, b) => rankCandidate(b) - rankCandidate(a))
+      .slice(0, capped);
+  }
+
+  static getStarsSelectionKey(ctx) {
+    const chatId = Number(ctx?.chat?.id || 0);
+    const userId = Number(ctx?.from?.id || 0);
+    if (!chatId || !userId) return '';
+    return `${chatId}:${userId}`;
+  }
+
+  static setStarsSelectionCache(ctx, query, list = []) {
+    const key = this.getStarsSelectionKey(ctx);
+    if (!key || !Array.isArray(list) || !list.length) return;
+    this.starsSelectionCache.set(key, {
+      query: String(query || ''),
+      list,
+      createdAt: Date.now()
+    });
+  }
+
+  static getStarsSelectionCache(ctx) {
+    const key = this.getStarsSelectionKey(ctx);
+    if (!key) return null;
+    const cached = this.starsSelectionCache.get(key);
+    if (!cached) return null;
+    if ((Date.now() - Number(cached.createdAt || 0)) > this.STARS_SELECTION_TTL_MS) {
+      this.starsSelectionCache.delete(key);
+      return null;
+    }
+    return cached;
+  }
+
+  static buildStarsSelectionKeyboard(items = []) {
+    const rows = [];
+    const max = Math.min(5, items.length);
+    for (let i = 0; i < max; i += 1) {
+      rows.push([Markup.button.callback(`${i + 1}) ${items[i].title.slice(0, 40)}`, `stars:pick:${i}`)]);
+    }
+    return Markup.inlineKeyboard(rows);
   }
 
   static buildYtDlpSearchQueries(query) {
@@ -1657,22 +1743,62 @@ class ChatGamesUtilityHandler {
     return this.enqueueAudioChatTask(ctx.chat?.id, async () => {
       const loadingMsg = await ctx.reply('🎧 جاري التحميل ....');
       try {
-        const audioList = await this.resolveAudioListWithCache(query);
-
-        if (!audioList.length) {
-          await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
+        const picks = await this.searchYoutubeCandidatesViaYtDlp(query, 5).catch(() => []);
+        await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
+        if (!picks.length) {
           await ctx.reply('♪ عذرا غير متوفر ..');
           return;
         }
-
-        this.setHotCache(ctx, query, audioList, 0);
-        await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
-        await this.sendHotAudioResult(ctx, audioList[0], true);
+        this.setStarsSelectionCache(ctx, query, picks);
+        const lines = picks.map((item, idx) => {
+          const channel = item.creator ? ` - ${item.creator}` : '';
+          return `${idx + 1}) ${item.title}${channel}`.slice(0, 130);
+        });
+        await ctx.reply(
+          '🎵 اختر النتيجة المطلوبة من الأزرار:\n\n' + lines.join('\n'),
+          { reply_markup: this.buildStarsSelectionKeyboard(picks).reply_markup }
+        );
       } catch (_error) {
         await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
         await ctx.reply('♪ عذرا غير متوفر ..');
       }
     });
+  }
+
+  static async handleStarsPickAction(ctx) {
+    const chatType = String(ctx.chat?.type || ctx.callbackQuery?.message?.chat?.type || '');
+    if (!['group', 'supergroup'].includes(chatType)) {
+      await ctx.answerCbQuery().catch(() => {});
+      return;
+    }
+
+    const pickIndex = Number(ctx.match?.[1]);
+    const cached = this.getStarsSelectionCache(ctx);
+    if (!cached || !Array.isArray(cached.list) || !cached.list.length) {
+      await ctx.answerCbQuery('ما في نتائج محفوظة، اكتب ستارز من جديد').catch(() => {});
+      return;
+    }
+    if (!Number.isInteger(pickIndex) || pickIndex < 0 || pickIndex >= cached.list.length) {
+      await ctx.answerCbQuery('اختيار غير صالح').catch(() => {});
+      return;
+    }
+
+    const selected = cached.list[pickIndex];
+    await ctx.answerCbQuery('جاري التحميل...').catch(() => {});
+    const loadingMsg = await ctx.reply('🎧 جاري التحميل ....');
+    try {
+      const target = selected?.webpageUrl || `https://www.youtube.com/watch?v=${selected?.id || ''}`;
+      const audio = await this.resolveAudioWithYtDlp(target).catch(() => null);
+      await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
+      if (!audio?.url) {
+        await ctx.reply('♪ عذرا غير متوفر ..');
+        return;
+      }
+      await this.sendHotAudioResult(ctx, audio, false);
+    } catch (_error) {
+      await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
+      await ctx.reply('♪ عذرا غير متوفر ..');
+    }
   }
 
   static async handleHotCommand(ctx, queryText) {
