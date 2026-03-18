@@ -5229,6 +5229,11 @@ async function startBot() {
       }
     }
 
+    // Runtime readiness for stars music command
+    await ChatGamesUtilityHandler.logStarsRuntimeReadiness((msg) => logger.info(msg)).catch((err) => {
+      logger.warn(`⚠️ STARS readiness check error: ${err?.message || err}`);
+    });
+
     // بدء مراقبة صحة الاتصال
     await reconnectManager.startHealthCheck(
       async () => {

@@ -86,6 +86,64 @@ class ChatGamesUtilityHandler {
     return String(process.env.YOUTUBE_DATA_API_KEY || process.env.YOUTUBE_API_KEY || '').trim();
   }
 
+  static async checkBinaryRuntime(command, args = ['--version'], timeout = 8000) {
+    try {
+      const { stdout, stderr } = await this.execFileAsync(command, args, { timeout });
+      const line = String(stdout || stderr || '').split(/\r?\n/).map((x) => x.trim()).find(Boolean) || '';
+      return { ok: true, command, details: line.slice(0, 180) };
+    } catch (error) {
+      return {
+        ok: false,
+        command,
+        details: String(error?.message || '').slice(0, 200)
+      };
+    }
+  }
+
+  static async getStarsRuntimeReadiness(forceRefresh = false) {
+    const now = Date.now();
+    const ttlMs = 2 * 60 * 1000;
+    if (!forceRefresh && this._starsRuntimeReadiness && ((now - this._starsRuntimeReadiness.ts) < ttlMs)) {
+      return this._starsRuntimeReadiness.data;
+    }
+
+    const ytDlpResolved = await this.resolveYtDlpCommand().catch(() => null);
+    const ytDlpCmd = ytDlpResolved?.command || 'yt-dlp';
+    const ytDlpArgs = ytDlpResolved?.baseArgs?.length ? [...ytDlpResolved.baseArgs, '--version'] : ['--version'];
+
+    const [ytStatus, ffmpegStatus] = await Promise.all([
+      this.checkBinaryRuntime(ytDlpCmd, ytDlpArgs, 10000),
+      this.checkBinaryRuntime('ffmpeg', ['-version'], 10000)
+    ]);
+
+    const data = {
+      ok: Boolean(ytStatus.ok),
+      ytDlp: ytStatus,
+      ffmpeg: ffmpegStatus
+    };
+    this._starsRuntimeReadiness = { ts: now, data };
+    return data;
+  }
+
+  static async logStarsRuntimeReadiness(logFn) {
+    const loggerLike = typeof logFn === 'function' ? logFn : () => {};
+    const status = await this.getStarsRuntimeReadiness(true).catch(() => null);
+    if (!status) {
+      loggerLike('⚠️ STARS runtime check failed (unknown error).');
+      return;
+    }
+    if (status.ytDlp?.ok) {
+      loggerLike(`✅ STARS yt-dlp ready: ${status.ytDlp.details || 'ok'}`);
+    } else {
+      loggerLike(`❌ STARS yt-dlp NOT ready: ${status.ytDlp?.details || 'unknown error'}`);
+    }
+    if (status.ffmpeg?.ok) {
+      loggerLike(`✅ STARS ffmpeg ready: ${status.ffmpeg.details || 'ok'}`);
+    } else {
+      loggerLike(`⚠️ STARS ffmpeg not found: ${status.ffmpeg?.details || 'unknown error'}`);
+    }
+  }
+
   static getStarsFileCacheKey(query) {
     return this.normalizeSearchText(String(query || '').trim());
   }
@@ -2013,6 +2071,12 @@ class ChatGamesUtilityHandler {
     }
 
     return this.enqueueAudioChatTask(ctx.chat?.id, async () => {
+      const runtime = await this.getStarsRuntimeReadiness().catch(() => null);
+      if (!runtime?.ytDlp?.ok) {
+        await ctx.reply('♪ عذرا الخدمة غير جاهزة حاليا ..');
+        return;
+      }
+
       const cachedFileId = this.getStarsCachedFileId(query);
       if (cachedFileId) {
         const updatesButton = Markup.inlineKeyboard([
