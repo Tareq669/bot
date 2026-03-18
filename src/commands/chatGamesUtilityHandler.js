@@ -1840,7 +1840,6 @@ class ChatGamesUtilityHandler {
     return this.enqueueAudioChatTask(ctx.chat?.id, async () => {
       const loadingMsg = await ctx.reply('🎧 جاري التحميل ....');
       try {
-        let audio = null;
         const cachedFileId = this.getStarsCachedFileId(query);
         if (cachedFileId) {
           await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
@@ -1856,52 +1855,93 @@ class ChatGamesUtilityHandler {
 
         const directUrl = this.extractFirstUrl(query);
         const directType = this.classifyMediaUrl(directUrl);
+        let targetUrl = '';
+        let titleHint = query;
+        let performerHint = '';
 
-        if (directUrl && directType) {
-          if (directType === 'spotify') {
-            const spotifyQuery = await this.resolveSpotifySearchQuery(directUrl);
-            if (spotifyQuery) {
-              const listFromSpotify = await this.resolveAudioListWithCache(spotifyQuery).catch(() => []);
-              if (Array.isArray(listFromSpotify) && listFromSpotify[0]?.url) {
-                audio = listFromSpotify[0];
-              }
+        // 1) رابط مباشر: يوتيوب / تيك توك / سناب تيوب
+        if (directUrl && directType && directType !== 'spotify') {
+          targetUrl = directUrl;
+        }
+
+        // 2) رابط سبوتيفاي: نحوله لعبارة بحث ثم نجيب أول نتيجة من يوتيوب
+        if (!targetUrl && directUrl && directType === 'spotify') {
+          const spotifyQuery = await this.resolveSpotifySearchQuery(directUrl);
+          if (spotifyQuery) {
+            const top = await this.searchYoutubeCandidatesViaApi(spotifyQuery, 1).catch(() => []);
+            const pick = Array.isArray(top) ? top[0] : null;
+            if (pick?.webpageUrl) {
+              targetUrl = pick.webpageUrl;
+              titleHint = pick.title || spotifyQuery;
+              performerHint = pick.creator || '';
+            } else {
+              targetUrl = `ytsearch1:${spotifyQuery}`;
+              titleHint = spotifyQuery;
             }
+          }
+        }
+
+        // 3) نص عادي: أول نتيجة فقط (مثل بحث يوتيوب مباشر)
+        if (!targetUrl) {
+          const top = await this.searchYoutubeCandidatesViaApi(query, 1).catch(() => []);
+          const pick = Array.isArray(top) ? top[0] : null;
+          if (pick?.webpageUrl) {
+            targetUrl = pick.webpageUrl;
+            titleHint = pick.title || query;
+            performerHint = pick.creator || '';
           } else {
-            // youtube / tiktok / snaptube-link
-            audio = await this.resolveAudioWithYtDlp(directUrl).catch(() => null);
+            const topYt = await this.searchYoutubeCandidatesViaYtDlp(query, 1).catch(() => []);
+            const yPick = Array.isArray(topYt) ? topYt[0] : null;
+            if (yPick?.webpageUrl) {
+              targetUrl = yPick.webpageUrl;
+              titleHint = yPick.title || query;
+              performerHint = yPick.creator || '';
+            }
           }
         }
 
-        if (!audio) {
-          const fastTop = await this.searchYoutubeCandidatesViaApi(query, 1).catch(() => []);
-          if (Array.isArray(fastTop) && fastTop[0]) {
-            audio = await this.resolveAudioFromPickedItem(fastTop[0], query).catch(() => null);
-          }
-        }
-
-        if (!audio) {
-          const directList = await this.resolveAudioListWithCache(query).catch(() => []);
-          if (Array.isArray(directList) && directList[0]?.url) {
-            audio = directList[0];
-          }
-        }
-
-        if (!audio) {
-          const picksFromApi = await this.searchYoutubeCandidatesViaApi(query, 3).catch(() => []);
-          for (const pick of picksFromApi) {
-            audio = await this.resolveAudioFromPickedItem(pick, query).catch(() => null);
-            if (audio?.url) break;
-          }
-        }
-
-        await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
-        if (!audio?.url) {
+        if (!targetUrl) {
+          await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
           await ctx.reply('♪ عذرا غير متوفر ..');
           return;
         }
-        const sent = await this.sendHotAudioResult(ctx, audio, false);
-        const fileId = String(sent?.audio?.file_id || '').trim();
-        if (fileId) this.setStarsCachedFileId(query, fileId);
+
+        await ctx.telegram.editMessageText(
+          ctx.chat.id,
+          loadingMsg.message_id,
+          undefined,
+          '⏳ تجهيز الصوت...'
+        ).catch(() => {});
+
+        let downloaded = await this.downloadAudioFileWithYtDlp(targetUrl, titleHint).catch(() => null);
+        if (!downloaded?.filePath) {
+          downloaded = await this.downloadAudioFileWithYtDlp(`ytsearch1:${query}`, titleHint).catch(() => null);
+        }
+
+        await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
+        if (!downloaded?.filePath) {
+          await ctx.reply('♪ عذرا غير متوفر ..');
+          return;
+        }
+
+        try {
+          const updatesButton = Markup.inlineKeyboard([
+            [Markup.button.url('تحديثات جو', this.JOE_UPDATES_CHANNEL_URL)]
+          ]);
+          const sent = await ctx.replyWithAudio(
+            { source: downloaded.filePath, filename: downloaded.fileName },
+            {
+              caption: '♪ تم التح🎧ميل بنجاح ♪',
+              title: this.cleanAudioLabel(titleHint || query).slice(0, 120) || 'مقطع صوتي',
+              performer: this.cleanAudioLabel(performerHint || '').slice(0, 80) || undefined,
+              reply_markup: updatesButton.reply_markup
+            }
+          );
+          const fileId = String(sent?.audio?.file_id || '').trim();
+          if (fileId) this.setStarsCachedFileId(query, fileId);
+        } finally {
+          fs.unlink(downloaded.filePath, () => {});
+        }
       } catch (_error) {
         await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
         await ctx.reply('♪ عذرا غير متوفر ..');
