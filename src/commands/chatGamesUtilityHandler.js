@@ -287,7 +287,7 @@ class ChatGamesUtilityHandler {
   static async downloadStarsAudioTemp(audio) {
     this.ensureStarsTempDir();
     const baseName = this.sanitizeAudioFileName(audio?.title || 'audio');
-    const uniquePrefix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${baseName}`;
+    const uniquePrefix = `stars-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const outTemplate = path.join(this.STARS_TEMP_DIR, `${uniquePrefix}.%(ext)s`);
     const target = String(audio?.webpageUrl || '').trim();
     if (!target) return null;
@@ -337,7 +337,7 @@ class ChatGamesUtilityHandler {
 
     return {
       path: fullPath,
-      filename: path.basename(fullPath)
+      filename: `${baseName || 'audio'}.${path.extname(fullPath).replace(/^\./, '') || 'm4a'}`
     };
   }
 
@@ -347,7 +347,7 @@ class ChatGamesUtilityHandler {
 
     this.ensureStarsTempDir();
     const baseName = this.sanitizeAudioFileName(query || 'audio');
-    const uniquePrefix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${baseName}`;
+    const uniquePrefix = `stars-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const outTemplate = path.join(this.STARS_TEMP_DIR, `${uniquePrefix}.%(ext)s`);
 
     const executable = await this.resolveYtDlpCommand();
@@ -394,7 +394,7 @@ class ChatGamesUtilityHandler {
 
     return {
       path: fullPath,
-      filename: path.basename(fullPath),
+      filename: `${baseName || 'audio'}.${path.extname(fullPath).replace(/^\./, '') || 'm4a'}`,
       title: this.cleanAudioLabel(query).slice(0, 120) || 'مقطع صوتي'
     };
   }
@@ -1332,7 +1332,7 @@ class ChatGamesUtilityHandler {
 
     try {
       return await ctx.replyWithAudio(
-        { source: tempFile.path, filename: tempFile.filename },
+        { source: fs.createReadStream(tempFile.path), filename: tempFile.filename },
         {
           caption,
           title: safeTitle,
@@ -1357,7 +1357,7 @@ class ChatGamesUtilityHandler {
 
     try {
       return await ctx.replyWithAudio(
-        { source: tempFile.path, filename: tempFile.filename },
+        { source: fs.createReadStream(tempFile.path), filename: tempFile.filename },
         {
           caption: '♪ تم التح🎧ميل بنجاح ♪',
           title: tempFile.title,
