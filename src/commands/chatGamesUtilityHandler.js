@@ -1258,6 +1258,10 @@ class ChatGamesUtilityHandler {
   static async sendStarsAudioResult(ctx, audio) {
     const tempFile = await this.downloadStarsAudioTemp(audio).catch(() => null);
     if (!tempFile?.path || !fs.existsSync(tempFile.path)) {
+      // Fallback: try direct audio URL send when local temp download fails
+      if (audio?.url) {
+        return this.sendHotAudioResult(ctx, audio, false).catch(() => null);
+      }
       return null;
     }
 
@@ -2112,7 +2116,11 @@ class ChatGamesUtilityHandler {
           '⏳ تجهيز الصوت...'
         ).catch(() => {});
 
-        const audio = await this.resolveStarsAudio(query);
+        let audio = await this.resolveStarsAudio(query);
+        if (!audio?.url) {
+          const listFallback = await this.resolveAudioListWithCache(query).catch(() => []);
+          audio = Array.isArray(listFallback) && listFallback.length ? listFallback[0] : null;
+        }
 
         await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
         if (!audio?.url) {
