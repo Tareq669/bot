@@ -31,7 +31,7 @@ class ChatGamesUtilityHandler {
   static FAST_SEARCH_INSTANCES = 1;
   static FAST_SEARCH_FALLBACK_INSTANCES = 2;
   static AUDIO_FAST_TIMEOUT_MS = 2400;
-  static AUDIO_RESOLVE_TIMEOUT_MS = 3600;
+  static AUDIO_RESOLVE_TIMEOUT_MS = 9000;
   static AUDIO_QUERY_MAX_VARIANTS = 4;
   static AUDIO_QUERY_FAST_VARIANTS = 2;
   static FAST_YT_RESULTS_LIMIT = 12;
@@ -44,6 +44,7 @@ class ChatGamesUtilityHandler {
   static YT_DLP_TIMEOUT_MS = 90000;
   static VIDEO_SEARCH_TIMEOUT_MS = 18000;
   static VIDEO_RESOLVE_TIMEOUT_MS = 4000;
+  static YT_DLP_BOT_BLOCK_COOLDOWN_MS = 20 * 60 * 1000;
   static JOE_UPDATES_CHANNEL_URL = 'https://t.me/joam909';
   static STARS_TEMP_DIR = path.join(os.tmpdir(), 'jo-bot-stars');
   static YT_DLP_BIN_DIR = path.join(os.tmpdir(), 'jo-bot-bin');
@@ -63,6 +64,7 @@ class ChatGamesUtilityHandler {
     'اذكار', 'أذكار', 'ذكر', 'duaa', 'dua', 'دعاء', 'دعاء', 'رقية', 'رقيه', 'ادعية',
     'انشودة', 'انشوده', 'nasheed', 'اناشيد', 'الشيخ', 'imam', 'azan', 'adhan', 'اذان', 'أذان'
   ];
+  static ytDlpBotBlockedUntil = 0;
 
   static MUSIC_HINT_TERMS = [
     'اغنية', 'أغنية', 'اغاني', 'أغاني', 'music', 'song', 'mp3', 'كليب', 'حفلة', 'حفله',
@@ -309,7 +311,7 @@ class ChatGamesUtilityHandler {
         return {
           title: 'مقطع صوتي',
           creator: '',
-          url: '',
+          url: directUrl,
           webpageUrl: directUrl,
           source: 'youtube_node_candidate'
         };
@@ -338,7 +340,7 @@ class ChatGamesUtilityHandler {
           nodeFallbackCandidate = {
             title: this.cleanAudioLabel(candidate.title || searchQuery) || 'مقطع صوتي',
             creator: this.cleanAudioLabel(candidate.creator || '').trim(),
-            url: '',
+            url: candidate.webpageUrl,
             webpageUrl: candidate.webpageUrl,
             source: 'youtube_node_candidate'
           };
@@ -353,8 +355,24 @@ class ChatGamesUtilityHandler {
       };
     }
 
+    const pipedByIdCandidates = candidates
+      .filter((c) => c?.id)
+      .map((c) => ({ id: c.id, title: c.title, uploader: c.creator || '' }));
+    const pipedById = await this.resolveAudioCandidatesConcurrently(
+      pipedByIdCandidates,
+      this.shuffleArray(this.YT_PIPED_INSTANCES),
+      1
+    ).catch(() => []);
+    if (Array.isArray(pipedById) && pipedById[0]?.url) {
+      return {
+        ...pipedById[0],
+        title: this.cleanAudioLabel(pipedById[0].title || searchQuery) || 'مقطع صوتي',
+        creator: this.cleanAudioLabel(pipedById[0].creator || '').trim()
+      };
+    }
+
     return this.resolveAudioWithYtDlp(`ytsearch1:${searchQuery}`).then((audio) => {
-      if (!audio?.url) return null;
+      if (!audio?.url) return nodeFallbackCandidate;
       return {
         ...audio,
         title: this.cleanAudioLabel(audio.title || searchQuery) || 'مقطع صوتي',
@@ -390,10 +408,6 @@ class ChatGamesUtilityHandler {
       '2',
       '--fragment-retries',
       '2',
-      '--extractor-args',
-      'youtube:player_client=android_vr;lang=en',
-      '--js-runtimes',
-      'node',
       '-o',
       outTemplate
     ];
@@ -458,10 +472,6 @@ class ChatGamesUtilityHandler {
       '2',
       '--fragment-retries',
       '2',
-      '--extractor-args',
-      'youtube:player_client=android_vr;lang=en',
-      '--js-runtimes',
-      'node',
       '-o',
       outTemplate
     ];
@@ -533,6 +543,16 @@ class ChatGamesUtilityHandler {
     const pythonCandidates = ['python3', 'python', 'python3.12', 'python3.11', 'python3.10'];
     const probeArgs = requireYtDlpModule ? ['-c', 'import yt_dlp'] : ['--version'];
     return this.detectAvailableCommand(pythonCandidates, probeArgs);
+  }
+
+  static isYtDlpBotBlockedError(error) {
+    const text = `${String(error?.message || '')}\n${String(error?.stderr || '')}`;
+    const lower = text.toLowerCase();
+    return lower.includes('sign in to confirm you') && lower.includes('not a bot');
+  }
+
+  static isYtDlpBotBlockedActive() {
+    return Number(this.ytDlpBotBlockedUntil || 0) > Date.now();
   }
 
   static getStandaloneYtDlpAssetName() {
@@ -742,10 +762,6 @@ class ChatGamesUtilityHandler {
       '--skip-download',
       '--no-warnings',
       '--quiet',
-      '--extractor-args',
-      'youtube:player_client=android_vr;lang=en',
-      '--js-runtimes',
-      'node',
       ...extraArgs
     ];
     const { stdout } = await this.execFileAsync(executable.command, args, {
@@ -757,10 +773,18 @@ class ChatGamesUtilityHandler {
   }
 
   static async resolveAudioWithYtDlp(target) {
+    if (this.isYtDlpBotBlockedActive()) return null;
+
     const data = await this.runYtDlpJson(target, [
       '-f',
       'bestaudio[ext=m4a]/bestaudio[acodec^=mp4a]/bestaudio'
-    ]);
+    ]).catch((error) => {
+      if (this.isYtDlpBotBlockedError(error)) {
+        this.ytDlpBotBlockedUntil = Date.now() + this.YT_DLP_BOT_BLOCK_COOLDOWN_MS;
+        logger.warn(`STARS_YTDLP_BOT_BLOCKED cooldown_ms="${this.YT_DLP_BOT_BLOCK_COOLDOWN_MS}"`);
+      }
+      throw error;
+    });
     const parsed = this.parseYtDlpResult(data);
     if (!parsed?.url) return null;
     return {
@@ -1460,7 +1484,7 @@ class ChatGamesUtilityHandler {
     const out = [];
     const seen = new Set();
     const maxCandidates = Math.min(Array.isArray(candidates) ? candidates.length : 0, 10);
-    const orderedInstances = this.shuffleArray(Array.isArray(instances) ? [...instances] : []).slice(0, 2);
+    const orderedInstances = this.shuffleArray(Array.isArray(instances) ? [...instances] : []).slice(0, 4);
     const concurrency = 3;
 
     const tryResolveCandidate = async (candidate) => {
@@ -1577,6 +1601,10 @@ class ChatGamesUtilityHandler {
   }
 
   static async sendStarsAudioResult(ctx, audio) {
+    if (!String(audio?.webpageUrl || '').trim() && audio?.url) {
+      return this.sendHotAudioResult(ctx, audio, false).catch(() => null);
+    }
+
     const tempFile = await this.downloadStarsAudioTemp(audio).catch(() => null);
     if (!tempFile?.path || !fs.existsSync(tempFile.path)) {
       logger.warn(`STARS_TEMP_SEND_FAILED title="${audio?.title || ''}" source="${audio?.source || ''}"`);
@@ -1609,7 +1637,9 @@ class ChatGamesUtilityHandler {
         }
       }
       // Fallback: try direct audio URL send when local temp download fails
-      if (audio?.url) {
+      const maybeDirectAudioUrl = String(audio?.url || '').trim();
+      const isYoutubeWatchUrl = /(?:youtube\.com\/watch\?v=|youtu\.be\/)/i.test(maybeDirectAudioUrl);
+      if (maybeDirectAudioUrl && !isYoutubeWatchUrl) {
         return this.sendHotAudioResult(ctx, audio, false).catch(() => null);
       }
       return null;
@@ -2527,11 +2557,7 @@ class ChatGamesUtilityHandler {
           '⏳ تجهيز الصوت...'
         ).catch(() => {});
 
-        let audio = await this.resolveStarsAudio(query);
-        if (!audio?.url) {
-          const listFallback = await this.resolveAudioListWithCache(query).catch(() => []);
-          audio = Array.isArray(listFallback) && listFallback.length ? listFallback[0] : null;
-        }
+        const audio = await this.resolveStarsAudio(query);
 
         await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
         if (!audio?.url) {
