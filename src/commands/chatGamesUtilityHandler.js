@@ -495,28 +495,68 @@ class ChatGamesUtilityHandler {
     });
   }
 
+  static async detectAvailableCommand(candidates = [], probeArgs = ['--version']) {
+    for (const candidate of candidates) {
+      try {
+        await this.execFileAsync(candidate, probeArgs, { timeout: 12000 });
+        return candidate;
+      } catch (_error) {}
+    }
+    return '';
+  }
+
+  static async resolvePythonCommand(requireYtDlpModule = false) {
+    const pythonCandidates = ['python3', 'python', 'python3.12', 'python3.11', 'python3.10'];
+    const probeArgs = requireYtDlpModule ? ['-c', 'import yt_dlp'] : ['--version'];
+    return this.detectAvailableCommand(pythonCandidates, probeArgs);
+  }
+
   static async resolveYtDlpCommand() {
     if (this.ytDlpCommandPromise) return this.ytDlpCommandPromise;
 
     this.ytDlpCommandPromise = (async () => {
       try {
-        await this.execFileAsync('python', ['-c', 'import yt_dlp'], { timeout: 12000 });
-        return { command: 'python', baseArgs: ['-m', 'yt_dlp'] };
+        const pythonWithYtDlp = await this.resolvePythonCommand(true);
+        if (pythonWithYtDlp) {
+          logger.info(`STARS_YTDLP_RUNNER mode="python-module" command="${pythonWithYtDlp}"`);
+          return { command: pythonWithYtDlp, baseArgs: ['-m', 'yt_dlp'] };
+        }
       } catch (_error) {
-        const binDir = this.YT_DLP_BIN_DIR;
-        const binName = process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp';
-        const binPath = path.join(binDir, binName);
-        if (!fs.existsSync(binPath)) {
-          fs.mkdirSync(binDir, { recursive: true });
-          await YTDlpWrap.downloadFromGithub(binPath);
-        }
-        if (process.platform !== 'win32') {
-          try {
-            fs.chmodSync(binPath, 0o755);
-          } catch (_error) {}
-        }
-        return { command: binPath, baseArgs: [] };
+        // continue to standalone/script fallback below
       }
+
+      const binDir = this.YT_DLP_BIN_DIR;
+      const binName = process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp';
+      const binPath = path.join(binDir, binName);
+      if (!fs.existsSync(binPath)) {
+        fs.mkdirSync(binDir, { recursive: true });
+        await YTDlpWrap.downloadFromGithub(binPath);
+      }
+      if (process.platform !== 'win32') {
+        try {
+          fs.chmodSync(binPath, 0o755);
+        } catch (_error) {}
+      }
+
+      let needsPythonInterpreter = false;
+      if (process.platform !== 'win32') {
+        try {
+          const header = fs.readFileSync(binPath).subarray(0, 128).toString('utf8');
+          needsPythonInterpreter = header.startsWith('#!') && /python/i.test(header);
+        } catch (_error) {}
+      }
+
+      if (needsPythonInterpreter) {
+        const pythonCommand = await this.resolvePythonCommand(false);
+        if (pythonCommand) {
+          logger.info(`STARS_YTDLP_RUNNER mode="python-script" command="${pythonCommand}"`);
+          return { command: pythonCommand, baseArgs: [binPath] };
+        }
+        logger.warn(`STARS_YTDLP_PYTHON_MISSING bin="${binPath}"`);
+      }
+
+      logger.info(`STARS_YTDLP_RUNNER mode="binary" command="${binPath}"`);
+      return { command: binPath, baseArgs: [] };
     })();
 
     return this.ytDlpCommandPromise;
