@@ -341,6 +341,64 @@ class ChatGamesUtilityHandler {
     };
   }
 
+  static async downloadStarsByQueryTemp(queryText) {
+    const query = String(queryText || '').trim();
+    if (!query) return null;
+
+    this.ensureStarsTempDir();
+    const baseName = this.sanitizeAudioFileName(query || 'audio');
+    const uniquePrefix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${baseName}`;
+    const outTemplate = path.join(this.STARS_TEMP_DIR, `${uniquePrefix}.%(ext)s`);
+
+    const executable = await this.resolveYtDlpCommand();
+    const args = [
+      ...executable.baseArgs,
+      `ytsearch1:${query}`,
+      '-f',
+      'bestaudio[ext=m4a]/bestaudio',
+      '--no-playlist',
+      '--no-warnings',
+      '--quiet',
+      '--no-part',
+      '-o',
+      outTemplate
+    ];
+
+    await this.execFileAsync(executable.command, args, {
+      timeout: Math.max(this.YT_DLP_TIMEOUT_MS, 240000)
+    }).catch(() => null);
+
+    const matches = fs.readdirSync(this.STARS_TEMP_DIR, { withFileTypes: true })
+      .filter((entry) => entry.isFile() && entry.name.startsWith(uniquePrefix))
+      .map((entry) => path.join(this.STARS_TEMP_DIR, entry.name));
+    if (!matches.length) return null;
+
+    matches.sort((a, b) => {
+      try {
+        return fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs;
+      } catch (_error) {
+        return 0;
+      }
+    });
+
+    const fullPath = matches[0];
+    try {
+      const stat = fs.statSync(fullPath);
+      if (!stat.size) {
+        fs.unlinkSync(fullPath);
+        return null;
+      }
+    } catch (_error) {
+      return null;
+    }
+
+    return {
+      path: fullPath,
+      filename: path.basename(fullPath),
+      title: this.cleanAudioLabel(query).slice(0, 120) || 'مقطع صوتي'
+    };
+  }
+
   static execFileAsync(command, args = [], options = {}) {
     return new Promise((resolve, reject) => {
       execFile(command, args, {
@@ -1289,6 +1347,31 @@ class ChatGamesUtilityHandler {
     }
   }
 
+  static async sendStarsQueryFallback(ctx, queryText) {
+    const tempFile = await this.downloadStarsByQueryTemp(queryText).catch(() => null);
+    if (!tempFile?.path || !fs.existsSync(tempFile.path)) return null;
+
+    const updatesButton = Markup.inlineKeyboard([
+      [Markup.button.url('تحديثات جو', this.JOE_UPDATES_CHANNEL_URL)]
+    ]);
+
+    try {
+      return await ctx.replyWithAudio(
+        { source: tempFile.path, filename: tempFile.filename },
+        {
+          caption: '♪ تم التح🎧ميل بنجاح ♪',
+          title: tempFile.title,
+          performer: undefined,
+          reply_markup: updatesButton.reply_markup
+        }
+      );
+    } finally {
+      try {
+        fs.unlinkSync(tempFile.path);
+      } catch (_error) {}
+    }
+  }
+
   static cleanAudioLabel(value) {
     let text = String(value || '').trim();
     if (!text) return '';
@@ -2128,7 +2211,10 @@ class ChatGamesUtilityHandler {
           return;
         }
 
-        const sent = await this.sendStarsAudioResult(ctx, audio);
+        let sent = await this.sendStarsAudioResult(ctx, audio);
+        if (!sent) {
+          sent = await this.sendStarsQueryFallback(ctx, query);
+        }
         if (!sent) {
           await ctx.reply('♪ عذرا غير متوفر ..');
           return;
