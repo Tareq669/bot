@@ -1,5 +1,6 @@
 const axios = require('axios');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const { execFile } = require('child_process');
 const Markup = require('telegraf/markup');
@@ -43,7 +44,8 @@ class ChatGamesUtilityHandler {
   static VIDEO_SEARCH_TIMEOUT_MS = 18000;
   static VIDEO_RESOLVE_TIMEOUT_MS = 4000;
   static JOE_UPDATES_CHANNEL_URL = 'https://t.me/joam909';
-  static STARS_TEMP_DIR = path.join(process.cwd(), 'temp', 'stars');
+  static STARS_TEMP_DIR = path.join(os.tmpdir(), 'jo-bot-stars');
+  static YT_DLP_BIN_DIR = path.join(os.tmpdir(), 'jo-bot-bin');
   static STARS_AUDIO_FORMAT = 'worstaudio[ext=m4a]/worstaudio/bestaudio[abr<=64]/bestaudio';
   static YT_HTML_SEARCH_TIMEOUT_MS = 4500;
   static ARCHIVE_SEARCH_URL = 'https://archive.org/advancedsearch.php';
@@ -248,36 +250,49 @@ class ChatGamesUtilityHandler {
   }
 
   static async resolveFirstYoutubeCandidate(queryText) {
+    const candidates = await this.resolveYoutubeCandidateList(queryText, 1);
+    return candidates[0] || null;
+  }
+
+  static async resolveYoutubeCandidateList(queryText, limit = 3) {
     const query = String(queryText || '').trim();
-    if (!query) return null;
+    if (!query) return [];
+    const max = Math.max(1, Math.min(5, Number(limit || 3)));
 
     if (this.getYoutubeApiKey()) {
-      const apiResults = await this.searchYoutubeCandidatesViaApi(query, 1).catch((error) => {
+      const apiResults = await this.searchYoutubeCandidatesViaApi(query, max).catch((error) => {
         logger.warn(`STARS_API_ERROR query="${query}" message="${error?.message || 'unknown'}"`);
         return [];
       });
       if (apiResults[0]?.webpageUrl) {
         logger.info(`STARS_API_RESULT query="${query}" title="${apiResults[0].title}" creator="${apiResults[0].creator || ''}"`);
-        return apiResults[0];
+        return apiResults.slice(0, max);
       }
       logger.warn(`STARS_API_EMPTY query="${query}"`);
     }
 
-    const ytDlpData = await this.runYtDlpJson(`ytsearch1:${query}`, ['--flat-playlist']).catch(() => null);
-    const ytDlpEntry = ytDlpData?._type === 'playlist' && Array.isArray(ytDlpData.entries)
-      ? ytDlpData.entries[0]
-      : null;
-    if (ytDlpEntry?.id) {
-      return {
-        id: String(ytDlpEntry.id || '').trim(),
-        title: this.cleanAudioLabel(ytDlpEntry.title || query).trim() || query,
-        creator: this.cleanAudioLabel(ytDlpEntry.uploader || ytDlpEntry.channel || ytDlpEntry.creator || '').trim(),
-        webpageUrl: String(ytDlpEntry.webpage_url || `https://www.youtube.com/watch?v=${ytDlpEntry.id}`).trim()
-      };
+    const ytDlpData = await this.runYtDlpJson(`ytsearch${max}:${query}`, ['--flat-playlist']).catch(() => null);
+    const ytDlpEntries = ytDlpData?._type === 'playlist' && Array.isArray(ytDlpData.entries)
+      ? ytDlpData.entries
+      : [];
+    const mapped = ytDlpEntries
+      .map((ytDlpEntry) => {
+        const id = String(ytDlpEntry?.id || '').trim();
+        if (!id) return null;
+        return {
+          id,
+          title: this.cleanAudioLabel(ytDlpEntry.title || query).trim() || query,
+          creator: this.cleanAudioLabel(ytDlpEntry.uploader || ytDlpEntry.channel || ytDlpEntry.creator || '').trim(),
+          webpageUrl: String(ytDlpEntry.webpage_url || `https://www.youtube.com/watch?v=${id}`).trim()
+        };
+      })
+      .filter(Boolean);
+    if (mapped.length) {
+      return mapped.slice(0, max);
     }
 
     logger.warn(`STARS_SEARCH_EMPTY query="${query}"`);
-    return null;
+    return [];
   }
 
   static async resolveStarsAudio(queryText) {
@@ -296,18 +311,35 @@ class ChatGamesUtilityHandler {
       if (spotifyQuery) searchQuery = spotifyQuery;
     }
 
-    const candidate = await this.resolveFirstYoutubeCandidate(searchQuery);
+    const candidates = await this.resolveYoutubeCandidateList(searchQuery, 3);
+    if (!candidates.length) return null;
 
-    if (!candidate?.webpageUrl) return null;
+    for (const candidate of candidates) {
+      if (!candidate?.webpageUrl) continue;
+      const audio = await this.resolveAudioWithYtDlp(candidate.webpageUrl).catch((error) => {
+        logger.warn(`STARS_AUDIO_RESOLVE_FAIL query="${searchQuery}" title="${candidate?.title || ''}" message="${error?.message || 'unknown'}"`);
+        return null;
+      });
+      if (!audio?.url) continue;
 
-    const audio = await this.resolveAudioWithYtDlp(candidate.webpageUrl).catch(() => null);
-    if (!audio?.url) return null;
+      return {
+        ...audio,
+        title: this.cleanAudioLabel(audio.title || candidate.title || searchQuery) || 'مقطع صوتي',
+        creator: this.cleanAudioLabel(audio.creator || candidate.creator || '').trim()
+      };
+    }
 
-    return {
-      ...audio,
-      title: this.cleanAudioLabel(audio.title || candidate.title || searchQuery) || 'مقطع صوتي',
-      creator: this.cleanAudioLabel(audio.creator || candidate.creator || '').trim()
-    };
+    return this.resolveAudioWithYtDlp(`ytsearch1:${searchQuery}`).then((audio) => {
+      if (!audio?.url) return null;
+      return {
+        ...audio,
+        title: this.cleanAudioLabel(audio.title || searchQuery) || 'مقطع صوتي',
+        creator: this.cleanAudioLabel(audio.creator || '').trim()
+      };
+    }).catch((error) => {
+      logger.warn(`STARS_AUDIO_FINAL_FALLBACK_FAIL query="${searchQuery}" message="${error?.message || 'unknown'}"`);
+      return null;
+    });
   }
 
   static async downloadStarsAudioTemp(audio) {
@@ -471,7 +503,7 @@ class ChatGamesUtilityHandler {
         await this.execFileAsync('python', ['-c', 'import yt_dlp'], { timeout: 12000 });
         return { command: 'python', baseArgs: ['-m', 'yt_dlp'] };
       } catch (_error) {
-        const binDir = path.join(process.cwd(), 'bin');
+        const binDir = this.YT_DLP_BIN_DIR;
         const binName = process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp';
         const binPath = path.join(binDir, binName);
         if (!fs.existsSync(binPath)) {
@@ -625,19 +657,7 @@ class ChatGamesUtilityHandler {
       return { id, title, creator, webpageUrl };
     }).filter((x) => x.id && x.title);
 
-    const rankCandidate = (candidate) => {
-      const text = this.normalizeSearchText(`${candidate.title} ${candidate.creator}`);
-      const queryNorm = this.normalizeSearchText(q);
-      let score = this.scoreAudioCandidate(queryNorm, candidate.title, candidate.creator);
-      if (text.includes('كوكتيل') || text.includes('mix') || text.includes('playlist')) score -= 20;
-      if (text.includes('official') || text.includes('lyric')) score += 8;
-      if (this.hasOrderedTokenMatch(queryNorm, `${candidate.creator} ${candidate.title}`)) score += 15;
-      return score;
-    };
-
-    return mapped
-      .sort((a, b) => rankCandidate(b) - rankCandidate(a))
-      .slice(0, max);
+    return mapped.slice(0, max);
   }
 
   static getStarsSelectionKey(ctx) {
