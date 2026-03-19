@@ -5,6 +5,7 @@ const path = require('path');
 const { execFile } = require('child_process');
 const Markup = require('telegraf/markup');
 const YTDlpWrap = require('yt-dlp-wrap').default;
+const ytdl = require('@distube/ytdl-core');
 const { User } = require('../database/models');
 const { logger } = require('../utils/helpers');
 
@@ -302,7 +303,18 @@ class ChatGamesUtilityHandler {
     const directUrl = this.extractFirstUrl(raw);
     const directKind = this.classifyMediaUrl(directUrl);
     if (directKind === 'youtube' || directKind === 'tiktok' || directKind === 'snaptube') {
-      return this.resolveAudioWithYtDlp(directUrl).catch(() => null);
+      const directAudio = await this.resolveAudioWithYtDlp(directUrl).catch(() => null);
+      if (directAudio?.url) return directAudio;
+      if (directKind === 'youtube') {
+        return {
+          title: 'مقطع صوتي',
+          creator: '',
+          url: '',
+          webpageUrl: directUrl,
+          source: 'youtube_node_candidate'
+        };
+      }
+      return null;
     }
 
     let searchQuery = raw;
@@ -313,6 +325,7 @@ class ChatGamesUtilityHandler {
 
     const candidates = await this.resolveYoutubeCandidateList(searchQuery, 3);
     if (!candidates.length) return null;
+    let nodeFallbackCandidate = null;
 
     for (const candidate of candidates) {
       if (!candidate?.webpageUrl) continue;
@@ -320,7 +333,18 @@ class ChatGamesUtilityHandler {
         logger.warn(`STARS_AUDIO_RESOLVE_FAIL query="${searchQuery}" title="${candidate?.title || ''}" message="${error?.message || 'unknown'}"`);
         return null;
       });
-      if (!audio?.url) continue;
+      if (!audio?.url) {
+        if (!nodeFallbackCandidate) {
+          nodeFallbackCandidate = {
+            title: this.cleanAudioLabel(candidate.title || searchQuery) || 'مقطع صوتي',
+            creator: this.cleanAudioLabel(candidate.creator || '').trim(),
+            url: '',
+            webpageUrl: candidate.webpageUrl,
+            source: 'youtube_node_candidate'
+          };
+        }
+        continue;
+      }
 
       return {
         ...audio,
@@ -338,7 +362,7 @@ class ChatGamesUtilityHandler {
       };
     }).catch((error) => {
       logger.warn(`STARS_AUDIO_FINAL_FALLBACK_FAIL query="${searchQuery}" message="${error?.message || 'unknown'}"`);
-      return null;
+      return nodeFallbackCandidate;
     });
   }
 
@@ -511,6 +535,43 @@ class ChatGamesUtilityHandler {
     return this.detectAvailableCommand(pythonCandidates, probeArgs);
   }
 
+  static getStandaloneYtDlpAssetName() {
+    if (process.platform === 'win32') return 'yt-dlp.exe';
+    if (process.platform === 'linux') {
+      if (process.arch === 'arm64') return 'yt-dlp_linux_aarch64';
+      if (process.arch === 'arm') return 'yt-dlp_linux_armv7l';
+      return 'yt-dlp_linux';
+    }
+    if (process.platform === 'darwin') return 'yt-dlp_macos';
+    return '';
+  }
+
+  static async downloadStandaloneYtDlp(binPath) {
+    const assetName = this.getStandaloneYtDlpAssetName();
+    if (!assetName) {
+      await YTDlpWrap.downloadFromGithub(binPath);
+      return;
+    }
+
+    const url = `https://github.com/yt-dlp/yt-dlp/releases/latest/download/${assetName}`;
+    logger.info(`STARS_YTDLP_DOWNLOAD asset="${assetName}"`);
+    await new Promise((resolve, reject) => {
+      const writer = fs.createWriteStream(binPath);
+      axios({
+        method: 'get',
+        url,
+        responseType: 'stream',
+        timeout: 60000,
+        maxRedirects: 5
+      }).then((response) => {
+        response.data.on('error', reject);
+        writer.on('error', reject);
+        writer.on('finish', resolve);
+        response.data.pipe(writer);
+      }).catch(reject);
+    });
+  }
+
   static async resolveYtDlpCommand() {
     if (this.ytDlpCommandPromise) return this.ytDlpCommandPromise;
 
@@ -528,9 +589,18 @@ class ChatGamesUtilityHandler {
       const binDir = this.YT_DLP_BIN_DIR;
       const binName = process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp';
       const binPath = path.join(binDir, binName);
-      if (!fs.existsSync(binPath)) {
-        fs.mkdirSync(binDir, { recursive: true });
-        await YTDlpWrap.downloadFromGithub(binPath);
+      fs.mkdirSync(binDir, { recursive: true });
+      let shouldDownloadStandalone = !fs.existsSync(binPath);
+      if (!shouldDownloadStandalone && process.platform !== 'win32') {
+        try {
+          const header = fs.readFileSync(binPath).subarray(0, 128).toString('utf8');
+          shouldDownloadStandalone = header.startsWith('#!') && /python/i.test(header);
+        } catch (_error) {
+          shouldDownloadStandalone = true;
+        }
+      }
+      if (shouldDownloadStandalone) {
+        await this.downloadStandaloneYtDlp(binPath);
       }
       if (process.platform !== 'win32') {
         try {
@@ -579,6 +649,86 @@ class ChatGamesUtilityHandler {
       webpageUrl: pageUrl,
       ext: String(requested?.ext || entry.ext || '').trim(),
       id: String(entry.id || '').trim()
+    };
+  }
+
+  static pickNodeAudioFormat(formats = []) {
+    const audioOnly = ytdl.filterFormats(formats, 'audioonly')
+      .filter((format) => format && format.url && format.hasAudio && !format.hasVideo);
+    if (!audioOnly.length) return null;
+
+    const scoreFormat = (format) => {
+      const container = String(format.container || '').toLowerCase();
+      const bitrate = Number(format.audioBitrate || format.bitrate || 0);
+      let score = 0;
+      if (container === 'm4a' || container === 'mp4') score += 30;
+      if (bitrate > 0 && bitrate <= 96) score += 20;
+      if (bitrate > 96 && bitrate <= 160) score += 10;
+      if (String(format.codecs || '').includes('mp4a')) score += 10;
+      return score;
+    };
+
+    return audioOnly
+      .slice()
+      .sort((a, b) => {
+        const diff = scoreFormat(b) - scoreFormat(a);
+        if (diff !== 0) return diff;
+        return Number(a.audioBitrate || a.bitrate || 0) - Number(b.audioBitrate || b.bitrate || 0);
+      })[0];
+  }
+
+  static async downloadYoutubeAudioTempViaNode(targetUrl, preferredTitle = 'audio') {
+    const url = String(targetUrl || '').trim();
+    if (!url) return null;
+
+    this.ensureStarsTempDir();
+    const info = await ytdl.getInfo(url);
+    const format = this.pickNodeAudioFormat(info?.formats || []);
+    if (!format?.itag) return null;
+
+    const baseName = this.sanitizeAudioFileName(preferredTitle || info?.videoDetails?.title || 'audio');
+    const uniquePrefix = `stars-node-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const ext = String(format.container || 'm4a').replace(/[^a-z0-9]/gi, '') || 'm4a';
+    const fullPath = path.join(this.STARS_TEMP_DIR, `${uniquePrefix}.${ext}`);
+
+    await new Promise((resolve, reject) => {
+      const writeStream = fs.createWriteStream(fullPath);
+      const readStream = ytdl.downloadFromInfo(info, {
+        quality: format.itag,
+        filter: 'audioonly',
+        highWaterMark: 1 << 24
+      });
+
+      const cleanup = (error) => {
+        try { writeStream.destroy(); } catch (_error) {}
+        try { readStream.destroy(); } catch (_error) {}
+        try {
+          if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
+        } catch (_error) {}
+        reject(error);
+      };
+
+      readStream.on('error', cleanup);
+      writeStream.on('error', cleanup);
+      writeStream.on('finish', resolve);
+      readStream.pipe(writeStream);
+    });
+
+    try {
+      const stat = fs.statSync(fullPath);
+      if (!stat.size) {
+        fs.unlinkSync(fullPath);
+        return null;
+      }
+    } catch (_error) {
+      return null;
+    }
+
+    return {
+      path: fullPath,
+      filename: `${baseName || 'audio'}.${ext}`,
+      title: this.cleanAudioLabel(preferredTitle || info?.videoDetails?.title || '').slice(0, 120) || 'مقطع صوتي',
+      creator: this.cleanAudioLabel(info?.videoDetails?.author?.name || '').slice(0, 80) || ''
     };
   }
 
@@ -1430,6 +1580,34 @@ class ChatGamesUtilityHandler {
     const tempFile = await this.downloadStarsAudioTemp(audio).catch(() => null);
     if (!tempFile?.path || !fs.existsSync(tempFile.path)) {
       logger.warn(`STARS_TEMP_SEND_FAILED title="${audio?.title || ''}" source="${audio?.source || ''}"`);
+      if (audio?.webpageUrl && String(audio.webpageUrl).includes('youtube.com')) {
+        const nodeTempFile = await this.downloadYoutubeAudioTempViaNode(audio.webpageUrl, audio.title).catch((error) => {
+          logger.warn(`STARS_NODE_TEMP_FAILED title="${audio?.title || ''}" message="${error?.message || 'unknown'}"`);
+          return null;
+        });
+        if (nodeTempFile?.path && fs.existsSync(nodeTempFile.path)) {
+          const updatesButton = Markup.inlineKeyboard([
+            [Markup.button.url('تحديثات جو', this.JOE_UPDATES_CHANNEL_URL)]
+          ]);
+
+          try {
+            return await ctx.replyWithAudio(
+              { source: fs.createReadStream(nodeTempFile.path), filename: nodeTempFile.filename },
+              {
+                caption: '♪ تم التح🎧ميل بنجاح ♪',
+                title: this.cleanAudioLabel(nodeTempFile.title || audio?.title || 'مقطع صوتي').slice(0, 120) || 'مقطع صوتي',
+                performer: this.cleanAudioLabel(nodeTempFile.creator || audio?.creator || '').slice(0, 80) || undefined,
+                ...this.getStarsReplyOptions(ctx),
+                reply_markup: updatesButton.reply_markup
+              }
+            );
+          } finally {
+            try {
+              fs.unlinkSync(nodeTempFile.path);
+            } catch (_error) {}
+          }
+        }
+      }
       // Fallback: try direct audio URL send when local temp download fails
       if (audio?.url) {
         return this.sendHotAudioResult(ctx, audio, false).catch(() => null);
@@ -1466,6 +1644,36 @@ class ChatGamesUtilityHandler {
     const tempFile = await this.downloadStarsByQueryTemp(queryText).catch(() => null);
     if (!tempFile?.path || !fs.existsSync(tempFile.path)) {
       logger.warn(`STARS_QUERY_FALLBACK_FAILED query="${queryText}"`);
+      const candidates = await this.resolveYoutubeCandidateList(queryText, 1).catch(() => []);
+      const candidate = Array.isArray(candidates) && candidates.length ? candidates[0] : null;
+      if (candidate?.webpageUrl) {
+        const nodeTempFile = await this.downloadYoutubeAudioTempViaNode(candidate.webpageUrl, candidate.title || queryText).catch((error) => {
+          logger.warn(`STARS_QUERY_NODE_FALLBACK_FAILED query="${queryText}" message="${error?.message || 'unknown'}"`);
+          return null;
+        });
+        if (nodeTempFile?.path && fs.existsSync(nodeTempFile.path)) {
+          const updatesButton = Markup.inlineKeyboard([
+            [Markup.button.url('تحديثات جو', this.JOE_UPDATES_CHANNEL_URL)]
+          ]);
+
+          try {
+            return await ctx.replyWithAudio(
+              { source: fs.createReadStream(nodeTempFile.path), filename: nodeTempFile.filename },
+              {
+                caption: '♪ تم التح🎧ميل بنجاح ♪',
+                title: nodeTempFile.title,
+                performer: this.cleanAudioLabel(nodeTempFile.creator || '').slice(0, 80) || undefined,
+                ...this.getStarsReplyOptions(ctx),
+                reply_markup: updatesButton.reply_markup
+              }
+            );
+          } finally {
+            try {
+              fs.unlinkSync(nodeTempFile.path);
+            } catch (_error) {}
+          }
+        }
+      }
       return null;
     }
 
