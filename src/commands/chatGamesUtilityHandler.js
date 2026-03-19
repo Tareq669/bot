@@ -44,6 +44,7 @@ class ChatGamesUtilityHandler {
   static VIDEO_RESOLVE_TIMEOUT_MS = 4000;
   static JOE_UPDATES_CHANNEL_URL = 'https://t.me/joam909';
   static STARS_TEMP_DIR = path.join(process.cwd(), 'temp', 'stars');
+  static STARS_AUDIO_FORMAT = 'worstaudio[ext=m4a]/worstaudio/bestaudio[abr<=64]/bestaudio';
   static YT_HTML_SEARCH_TIMEOUT_MS = 4500;
   static ARCHIVE_SEARCH_URL = 'https://archive.org/advancedsearch.php';
   static ARCHIVE_METADATA_URL = 'https://archive.org/metadata';
@@ -322,7 +323,7 @@ class ChatGamesUtilityHandler {
       ...executable.baseArgs,
       target,
       '-f',
-      'bestaudio[ext=m4a]/bestaudio[acodec^=mp4a]/bestaudio',
+      this.STARS_AUDIO_FORMAT,
       '--no-playlist',
       '--no-warnings',
       '--quiet',
@@ -390,7 +391,7 @@ class ChatGamesUtilityHandler {
       ...executable.baseArgs,
       `ytsearch1:${query}`,
       '-f',
-      'bestaudio[ext=m4a]/bestaudio[acodec^=mp4a]/bestaudio',
+      this.STARS_AUDIO_FORMAT,
       '--no-playlist',
       '--no-warnings',
       '--quiet',
