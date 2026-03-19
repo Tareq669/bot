@@ -138,9 +138,16 @@ if (missingEnvVars.length > 0) {
 }
 
 process.env.BOT_TOKEN = normalizeEnvValue(process.env.BOT_TOKEN);
+if (typeof process.env.YOUTUBE_DATA_API_KEY === 'string') {
+  process.env.YOUTUBE_DATA_API_KEY = normalizeEnvValue(process.env.YOUTUBE_DATA_API_KEY);
+}
+if (typeof process.env.YOUTUBE_API_KEY === 'string') {
+  process.env.YOUTUBE_API_KEY = normalizeEnvValue(process.env.YOUTUBE_API_KEY);
+}
 if (isMissingRequiredEnv(process.env.GEMINI_API_KEY)) {
   logger.warn('⚠️ GEMINI_API_KEY غير موجود: دردشة جو وتوليد الصور عبر Gemini لن يعملا حتى تضيف المفتاح.');
 }
+logger.info(`🎵 STARS_ENV: youtube_api=${process.env.YOUTUBE_DATA_API_KEY || process.env.YOUTUBE_API_KEY ? 'configured' : 'missing'}`);
 
 const imageHandler = require('./handlers/imageHandler');
 

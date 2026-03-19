@@ -5,6 +5,7 @@ const { execFile } = require('child_process');
 const Markup = require('telegraf/markup');
 const YTDlpWrap = require('yt-dlp-wrap').default;
 const { User } = require('../database/models');
+const { logger } = require('../utils/helpers');
 
 class ChatGamesUtilityHandler {
   static xoGames = new Map();
@@ -250,8 +251,15 @@ class ChatGamesUtilityHandler {
     if (!query) return null;
 
     if (this.getYoutubeApiKey()) {
-      const apiResults = await this.searchYoutubeCandidatesViaApi(query, 1).catch(() => []);
-      if (apiResults[0]?.webpageUrl) return apiResults[0];
+      const apiResults = await this.searchYoutubeCandidatesViaApi(query, 1).catch((error) => {
+        logger.warn(`STARS_API_ERROR query="${query}" message="${error?.message || 'unknown'}"`);
+        return [];
+      });
+      if (apiResults[0]?.webpageUrl) {
+        logger.info(`STARS_API_RESULT query="${query}" title="${apiResults[0].title}" creator="${apiResults[0].creator || ''}"`);
+        return apiResults[0];
+      }
+      logger.warn(`STARS_API_EMPTY query="${query}"`);
     }
 
     const ytDlpData = await this.runYtDlpJson(`ytsearch1:${query}`, ['--flat-playlist']).catch(() => null);
@@ -267,6 +275,7 @@ class ChatGamesUtilityHandler {
       };
     }
 
+    logger.warn(`STARS_SEARCH_EMPTY query="${query}"`);
     return null;
   }
 
@@ -1359,6 +1368,7 @@ class ChatGamesUtilityHandler {
   static async sendStarsAudioResult(ctx, audio) {
     const tempFile = await this.downloadStarsAudioTemp(audio).catch(() => null);
     if (!tempFile?.path || !fs.existsSync(tempFile.path)) {
+      logger.warn(`STARS_TEMP_SEND_FAILED title="${audio?.title || ''}" source="${audio?.source || ''}"`);
       // Fallback: try direct audio URL send when local temp download fails
       if (audio?.url) {
         return this.sendHotAudioResult(ctx, audio, false).catch(() => null);
@@ -1393,7 +1403,10 @@ class ChatGamesUtilityHandler {
 
   static async sendStarsQueryFallback(ctx, queryText) {
     const tempFile = await this.downloadStarsByQueryTemp(queryText).catch(() => null);
-    if (!tempFile?.path || !fs.existsSync(tempFile.path)) return null;
+    if (!tempFile?.path || !fs.existsSync(tempFile.path)) {
+      logger.warn(`STARS_QUERY_FALLBACK_FAILED query="${queryText}"`);
+      return null;
+    }
 
     const updatesButton = Markup.inlineKeyboard([
       [Markup.button.url('تحديثات جو', this.JOE_UPDATES_CHANNEL_URL)]
@@ -2253,6 +2266,7 @@ class ChatGamesUtilityHandler {
 
         await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
         if (!audio?.url) {
+          logger.warn(`STARS_FAIL query="${query}" stage="resolve"`);
           await ctx.reply('♪ عذرا غير متوفر ..', this.getStarsReplyOptions(ctx));
           return;
         }
@@ -2262,6 +2276,7 @@ class ChatGamesUtilityHandler {
           sent = await this.sendStarsQueryFallback(ctx, query);
         }
         if (!sent) {
+          logger.warn(`STARS_FAIL query="${query}" stage="send"`);
           await ctx.reply('♪ عذرا غير متوفر ..', this.getStarsReplyOptions(ctx));
           return;
         }
