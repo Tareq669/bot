@@ -245,6 +245,31 @@ class ChatGamesUtilityHandler {
     }
   }
 
+  static async resolveFirstYoutubeCandidate(queryText) {
+    const query = String(queryText || '').trim();
+    if (!query) return null;
+
+    const ytDlpData = await this.runYtDlpJson(`ytsearch1:${query}`, ['--flat-playlist']).catch(() => null);
+    const ytDlpEntry = ytDlpData?._type === 'playlist' && Array.isArray(ytDlpData.entries)
+      ? ytDlpData.entries[0]
+      : null;
+    if (ytDlpEntry?.id) {
+      return {
+        id: String(ytDlpEntry.id || '').trim(),
+        title: this.cleanAudioLabel(ytDlpEntry.title || query).trim() || query,
+        creator: this.cleanAudioLabel(ytDlpEntry.uploader || ytDlpEntry.channel || ytDlpEntry.creator || '').trim(),
+        webpageUrl: String(ytDlpEntry.webpage_url || `https://www.youtube.com/watch?v=${ytDlpEntry.id}`).trim()
+      };
+    }
+
+    if (this.getYoutubeApiKey()) {
+      const apiResults = await this.searchYoutubeCandidatesViaApi(query, 1).catch(() => []);
+      if (apiResults[0]?.webpageUrl) return apiResults[0];
+    }
+
+    return null;
+  }
+
   static async resolveStarsAudio(queryText) {
     const raw = String(queryText || '').trim();
     if (!raw) return null;
@@ -261,12 +286,7 @@ class ChatGamesUtilityHandler {
       if (spotifyQuery) searchQuery = spotifyQuery;
     }
 
-    let candidate = null;
-    if (this.getYoutubeApiKey()) {
-      const apiResults = await this.searchYoutubeCandidatesViaApi(searchQuery, 1).catch(() => []);
-      candidate = apiResults[0] || null;
-    }
-
+    let candidate = await this.resolveFirstYoutubeCandidate(searchQuery);
     if (!candidate) {
       const ytDlpResults = await this.searchYoutubeCandidatesViaYtDlp(searchQuery, 1).catch(() => []);
       candidate = ytDlpResults[0] || null;
