@@ -1315,6 +1315,12 @@ class ChatGamesUtilityHandler {
     return cached;
   }
 
+  static getStarsReplyOptions(ctx) {
+    const messageId = Number(ctx?.message?.message_id || 0);
+    if (!messageId) return {};
+    return { reply_to_message_id: messageId };
+  }
+
   static async sendHotAudioResult(ctx, audio, canNext = true) {
     const caption = '♪ تم التح🎧ميل بنجاح ♪';
     const safeTitle = this.cleanAudioLabel(audio?.title || 'مقطع صوتي').slice(0, 120);
@@ -1328,6 +1334,7 @@ class ChatGamesUtilityHandler {
         caption,
         title: safeTitle,
         performer: safePerformer,
+        ...this.getStarsReplyOptions(ctx),
         reply_markup: updatesButton.reply_markup
       }
     );
@@ -1357,6 +1364,7 @@ class ChatGamesUtilityHandler {
           caption,
           title: safeTitle,
           performer: safePerformer,
+          ...this.getStarsReplyOptions(ctx),
           reply_markup: updatesButton.reply_markup
         }
       );
@@ -1382,6 +1390,7 @@ class ChatGamesUtilityHandler {
           caption: '♪ تم التح🎧ميل بنجاح ♪',
           title: tempFile.title,
           performer: undefined,
+          ...this.getStarsReplyOptions(ctx),
           reply_markup: updatesButton.reply_markup
         }
       );
@@ -2192,12 +2201,12 @@ class ChatGamesUtilityHandler {
   static async handlePlayCommand(ctx, queryText) {
     const query = String(queryText || '').trim();
     if (!query) {
-      await ctx.reply('❌ الصيغة:\nستارز اسم المقطع');
+      await ctx.reply('❌ الصيغة:\nستارز اسم المقطع', this.getStarsReplyOptions(ctx));
       return;
     }
 
     return this.enqueueAudioChatTask(ctx.chat?.id, async () => {
-      const loadingMsg = await ctx.reply('🎧 جاري التحميل ....');
+      const loadingMsg = await ctx.reply('🎧 جاري التحميل ....', this.getStarsReplyOptions(ctx));
       try {
         const cachedFileId = this.getStarsCachedFileId(query);
         if (cachedFileId) {
@@ -2207,6 +2216,7 @@ class ChatGamesUtilityHandler {
           ]);
           await ctx.replyWithAudio(cachedFileId, {
             caption: '♪ تم التح🎧ميل بنجاح ♪',
+            ...this.getStarsReplyOptions(ctx),
             reply_markup: updatesButton.reply_markup
           }).catch(() => {});
           return;
@@ -2227,7 +2237,7 @@ class ChatGamesUtilityHandler {
 
         await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
         if (!audio?.url) {
-          await ctx.reply('♪ عذرا غير متوفر ..');
+          await ctx.reply('♪ عذرا غير متوفر ..', this.getStarsReplyOptions(ctx));
           return;
         }
 
@@ -2236,14 +2246,14 @@ class ChatGamesUtilityHandler {
           sent = await this.sendStarsQueryFallback(ctx, query);
         }
         if (!sent) {
-          await ctx.reply('♪ عذرا غير متوفر ..');
+          await ctx.reply('♪ عذرا غير متوفر ..', this.getStarsReplyOptions(ctx));
           return;
         }
         const fileId = String(sent?.audio?.file_id || '').trim();
         if (fileId) this.setStarsCachedFileId(query, fileId);
       } catch (_error) {
         await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
-        await ctx.reply('♪ عذرا غير متوفر ..');
+        await ctx.reply('♪ عذرا غير متوفر ..', this.getStarsReplyOptions(ctx));
       }
     });
   }
