@@ -270,6 +270,14 @@ class ChatGamesUtilityHandler {
     return null;
   }
 
+  static shouldUseRankedStarsCandidate(queryText) {
+    const normalized = this.normalizeSearchText(queryText);
+    const tokens = this.queryTokens(normalized);
+    if (!normalized || !tokens.length) return false;
+    if (this.isArtistOnlyQuery(normalized)) return true;
+    return tokens.length <= 2;
+  }
+
   static async resolveStarsAudio(queryText) {
     const raw = String(queryText || '').trim();
     if (!raw) return null;
@@ -286,10 +294,20 @@ class ChatGamesUtilityHandler {
       if (spotifyQuery) searchQuery = spotifyQuery;
     }
 
-    let candidate = await this.resolveFirstYoutubeCandidate(searchQuery);
-    if (!candidate) {
-      const ytDlpResults = await this.searchYoutubeCandidatesViaYtDlp(searchQuery, 1).catch(() => []);
+    let candidate = null;
+    if (this.shouldUseRankedStarsCandidate(searchQuery)) {
+      const ytDlpResults = await this.searchYoutubeCandidatesViaYtDlp(searchQuery, 5).catch(() => []);
       candidate = ytDlpResults[0] || null;
+      if (!candidate && this.getYoutubeApiKey()) {
+        const apiResults = await this.searchYoutubeCandidatesViaApi(searchQuery, 5).catch(() => []);
+        candidate = apiResults[0] || null;
+      }
+    } else {
+      candidate = await this.resolveFirstYoutubeCandidate(searchQuery);
+    }
+
+    if (!candidate) {
+      candidate = await this.resolveFirstYoutubeCandidate(searchQuery);
     }
 
     if (!candidate?.webpageUrl) return null;
@@ -317,11 +335,21 @@ class ChatGamesUtilityHandler {
       ...executable.baseArgs,
       target,
       '-f',
-      'bestaudio[ext=m4a]/bestaudio',
+      'bestaudio[ext=m4a]/bestaudio[acodec^=mp4a]/bestaudio',
       '--no-playlist',
       '--no-warnings',
       '--quiet',
       '--no-part',
+      '--socket-timeout',
+      '20',
+      '--retries',
+      '2',
+      '--fragment-retries',
+      '2',
+      '--extractor-args',
+      'youtube:player_client=android_vr;lang=en',
+      '--js-runtimes',
+      'node',
       '-o',
       outTemplate
     ];
@@ -375,11 +403,21 @@ class ChatGamesUtilityHandler {
       ...executable.baseArgs,
       `ytsearch1:${query}`,
       '-f',
-      'bestaudio[ext=m4a]/bestaudio',
+      'bestaudio[ext=m4a]/bestaudio[acodec^=mp4a]/bestaudio',
       '--no-playlist',
       '--no-warnings',
       '--quiet',
       '--no-part',
+      '--socket-timeout',
+      '20',
+      '--retries',
+      '2',
+      '--fragment-retries',
+      '2',
+      '--extractor-args',
+      'youtube:player_client=android_vr;lang=en',
+      '--js-runtimes',
+      'node',
       '-o',
       outTemplate
     ];
