@@ -44,6 +44,7 @@ class ChatGamesUtilityHandler {
   static YT_DLP_TIMEOUT_MS = 90000;
   static YT_DLP_ATTEMPT_TIMEOUT_MS = 6000;
   static YT_DLP_PROXY_ATTEMPT_TIMEOUT_MS = 5000;
+  static YT_DLP_PROXY_PROBE_TIMEOUT_MS = 3500;
   static YT_DLP_MAX_PROXY_ROUTES = 2;
   static STARS_TEMP_DOWNLOAD_TIMEOUT_MS = 30000;
   static VIDEO_SEARCH_TIMEOUT_MS = 18000;
@@ -699,53 +700,20 @@ class ChatGamesUtilityHandler {
     });
   }
 
-  static parseAxiosProxyConfig(proxy = '') {
-    try {
-      const normalized = this.normalizeYtDlpProxy(proxy);
-      if (!normalized) return null;
-      const url = new URL(normalized);
-      const protocol = String(url.protocol || '').replace(':', '');
-      if (!['http', 'https'].includes(protocol)) return null;
-      const port = Number(url.port || (protocol === 'https' ? 443 : 80));
-      if (!Number.isFinite(port) || port <= 0) return null;
-      const authUser = decodeURIComponent(url.username || '');
-      const authPass = decodeURIComponent(url.password || '');
-      const auth = authUser || authPass ? { username: authUser, password: authPass } : undefined;
-      return {
-        protocol,
-        host: url.hostname,
-        port,
-        auth
-      };
-    } catch (_error) {
-      return null;
-    }
-  }
-
   static async probeYtDlpProxy(proxy = '') {
     const key = this.normalizeYtDlpProxy(proxy);
     if (!key) return false;
     const health = this.getYtDlpProxyHealth(key);
     if (health === 'good') return true;
     if (health === 'bad') return false;
-
-    const axiosProxy = this.parseAxiosProxyConfig(key);
-    if (!axiosProxy) {
-      this.markYtDlpProxyUnhealthy(key);
-      return false;
-    }
-
     try {
-      const { status, data } = await axios.get('https://www.youtube.com/oembed', {
-        params: {
-          url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-          format: 'json'
-        },
-        timeout: 2200,
-        proxy: axiosProxy,
-        validateStatus: () => true
-      });
-      if (status === 200 && (data?.title || data?.author_name)) {
+      const probeData = await this.runYtDlpJson(
+        'https://www.youtube.com/watch?v=BaW_jenozKc',
+        ['-f', 'bestaudio[ext=m4a]/bestaudio[acodec^=mp4a]/bestaudio'],
+        { proxy: key, timeoutMs: this.YT_DLP_PROXY_PROBE_TIMEOUT_MS }
+      );
+      const parsed = this.parseYtDlpResult(probeData);
+      if (parsed?.url) {
         this.markYtDlpProxyHealthy(key);
         return true;
       }
@@ -860,7 +828,9 @@ class ChatGamesUtilityHandler {
     }
 
     if (!prepared.length) {
-      return randomized.slice(0, maxCandidates);
+      const allowUncheckedValue = String(process.env.YTDLP_ALLOW_UNCHECKED_PROXIES || '').trim().toLowerCase();
+      const allowUnchecked = ['1', 'true', 'yes', 'on'].includes(allowUncheckedValue);
+      return allowUnchecked ? randomized.slice(0, maxCandidates) : [];
     }
 
     return prepared.slice(0, maxCandidates);
@@ -1143,14 +1113,16 @@ class ChatGamesUtilityHandler {
       if (!proxy) continue;
       if (!routes.includes(proxy)) routes.push(proxy);
     }
-    if (!routes.length || String(process.env.YTDLP_TRY_DIRECT_FALLBACK || 'true').trim().toLowerCase() !== 'false') {
+    const tryDirectValue = String(process.env.YTDLP_TRY_DIRECT_FALLBACK || '').trim().toLowerCase();
+    const tryDirectWithProxies = ['1', 'true', 'yes', 'on'].includes(tryDirectValue);
+    if (!routes.length || tryDirectWithProxies) {
       routes.push('');
     }
 
     let blockedByBotAny = false;
     for (const proxy of routes) {
       let blockedByThisRoute = false;
-      const routeStrategies = proxy ? [baseFormatArgs] : strategies;
+      const routeStrategies = proxy ? [baseFormatArgs] : (limitedProxyCandidates.length ? [baseFormatArgs] : strategies);
       for (let i = 0; i < routeStrategies.length; i += 1) {
         const args = routeStrategies[i];
         const timeoutMs = proxy ? this.YT_DLP_PROXY_ATTEMPT_TIMEOUT_MS : this.YT_DLP_ATTEMPT_TIMEOUT_MS;
