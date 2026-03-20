@@ -65,6 +65,7 @@ class ChatGamesUtilityHandler {
     'انشودة', 'انشوده', 'nasheed', 'اناشيد', 'الشيخ', 'imam', 'azan', 'adhan', 'اذان', 'أذان'
   ];
   static ytDlpBotBlockedUntil = 0;
+  static ytDlpCookiesFile = '';
 
   static MUSIC_HINT_TERMS = [
     'اغنية', 'أغنية', 'اغاني', 'أغاني', 'music', 'song', 'mp3', 'كليب', 'حفلة', 'حفله',
@@ -393,6 +394,7 @@ class ChatGamesUtilityHandler {
     if (!target) return null;
 
     const executable = await this.resolveYtDlpCommand();
+    const cookiesArgs = await this.resolveYtDlpCookiesArgs();
     const args = [
       ...executable.baseArgs,
       target,
@@ -408,6 +410,7 @@ class ChatGamesUtilityHandler {
       '2',
       '--fragment-retries',
       '2',
+      ...cookiesArgs,
       '-o',
       outTemplate
     ];
@@ -457,6 +460,7 @@ class ChatGamesUtilityHandler {
     const outTemplate = path.join(this.STARS_TEMP_DIR, `${uniquePrefix}.%(ext)s`);
 
     const executable = await this.resolveYtDlpCommand();
+    const cookiesArgs = await this.resolveYtDlpCookiesArgs();
     const args = [
       ...executable.baseArgs,
       `ytsearch1:${query}`,
@@ -472,6 +476,7 @@ class ChatGamesUtilityHandler {
       '2',
       '--fragment-retries',
       '2',
+      ...cookiesArgs,
       '-o',
       outTemplate
     ];
@@ -553,6 +558,37 @@ class ChatGamesUtilityHandler {
 
   static isYtDlpBotBlockedActive() {
     return Number(this.ytDlpBotBlockedUntil || 0) > Date.now();
+  }
+
+  static async resolveYtDlpCookiesArgs() {
+    const configuredPath = String(process.env.YTDLP_COOKIES_FILE || process.env.YTDLP_COOKIES_PATH || '').trim();
+    if (configuredPath && fs.existsSync(configuredPath)) {
+      return ['--cookies', configuredPath];
+    }
+
+    const rawCookies = String(process.env.YTDLP_COOKIES || '').trim();
+    const base64Cookies = String(process.env.YTDLP_COOKIES_B64 || '').trim();
+    let cookiesText = rawCookies;
+    if (!cookiesText && base64Cookies) {
+      try {
+        cookiesText = Buffer.from(base64Cookies, 'base64').toString('utf8').trim();
+      } catch (_error) {
+        cookiesText = '';
+      }
+    }
+    if (!cookiesText) return [];
+
+    if (!this.ytDlpCookiesFile) {
+      const cookiesDir = path.join(os.tmpdir(), 'jo-bot-stars');
+      fs.mkdirSync(cookiesDir, { recursive: true });
+      this.ytDlpCookiesFile = path.join(cookiesDir, 'yt-cookies.txt');
+    }
+    try {
+      fs.writeFileSync(this.ytDlpCookiesFile, cookiesText, 'utf8');
+      return ['--cookies', this.ytDlpCookiesFile];
+    } catch (_error) {
+      return [];
+    }
   }
 
   static getStandaloneYtDlpAssetName() {
@@ -754,6 +790,7 @@ class ChatGamesUtilityHandler {
 
   static async runYtDlpJson(target, extraArgs = []) {
     const executable = await this.resolveYtDlpCommand();
+    const cookiesArgs = await this.resolveYtDlpCookiesArgs();
     const args = [
       ...executable.baseArgs,
       target,
@@ -762,6 +799,7 @@ class ChatGamesUtilityHandler {
       '--skip-download',
       '--no-warnings',
       '--quiet',
+      ...cookiesArgs,
       ...extraArgs
     ];
     const { stdout } = await this.execFileAsync(executable.command, args, {
@@ -2557,7 +2595,29 @@ class ChatGamesUtilityHandler {
           '⏳ تجهيز الصوت...'
         ).catch(() => {});
 
-        const audio = await this.resolveStarsAudio(query);
+        let audio = await this.resolveStarsAudio(query);
+        const needsStrictFallback = !audio?.url || String(audio?.source || '') === 'youtube_node_candidate';
+        if (needsStrictFallback) {
+          const listFallback = await this.resolveAudioListWithCache(query).catch(() => []);
+          if (Array.isArray(listFallback) && listFallback.length) {
+            const normalizedQuery = this.normalizeSearchText(query);
+            const strictPick = listFallback.find((item) => {
+              const title = String(item?.title || '').trim();
+              const creator = String(item?.creator || '').trim();
+              const text = `${title} ${creator}`.trim();
+              if (!text) return false;
+              if (!this.isAcceptableQueryMatch(normalizedQuery, text)) return false;
+              const itemNorm = this.normalizeSearchText(text);
+              const queryIsReligious = this.hasAnyTerm(normalizedQuery, this.RELIGIOUS_AUDIO_TERMS);
+              const itemIsReligious = this.hasAnyTerm(itemNorm, this.RELIGIOUS_AUDIO_TERMS);
+              if (!queryIsReligious && itemIsReligious) return false;
+              return true;
+            });
+            if (strictPick?.url) {
+              audio = strictPick;
+            }
+          }
+        }
 
         await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
         if (!audio?.url) {
