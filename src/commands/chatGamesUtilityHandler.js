@@ -812,27 +812,42 @@ class ChatGamesUtilityHandler {
 
   static async resolveAudioWithYtDlp(target) {
     if (this.isYtDlpBotBlockedActive()) return null;
+    const baseFormatArgs = ['-f', 'bestaudio[ext=m4a]/bestaudio[acodec^=mp4a]/bestaudio'];
+    const strategies = [
+      baseFormatArgs,
+      [...baseFormatArgs, '--extractor-args', 'youtube:player_client=tv_embedded,ios,android;lang=en'],
+      [...baseFormatArgs, '--extractor-args', 'youtube:player_client=ios,android;lang=en']
+    ];
 
-    const data = await this.runYtDlpJson(target, [
-      '-f',
-      'bestaudio[ext=m4a]/bestaudio[acodec^=mp4a]/bestaudio'
-    ]).catch((error) => {
-      if (this.isYtDlpBotBlockedError(error)) {
-        this.ytDlpBotBlockedUntil = Date.now() + this.YT_DLP_BOT_BLOCK_COOLDOWN_MS;
-        logger.warn(`STARS_YTDLP_BOT_BLOCKED cooldown_ms="${this.YT_DLP_BOT_BLOCK_COOLDOWN_MS}"`);
+    let blockedByBot = false;
+    for (let i = 0; i < strategies.length; i += 1) {
+      const args = strategies[i];
+      try {
+        const data = await this.runYtDlpJson(target, args);
+        const parsed = this.parseYtDlpResult(data);
+        if (!parsed?.url) continue;
+        return {
+          title: parsed.title || 'مقطع صوتي',
+          creator: parsed.creator || '',
+          url: parsed.url,
+          source: 'youtube_ytdlp',
+          ext: parsed.ext || 'm4a',
+          webpageUrl: parsed.webpageUrl || ''
+        };
+      } catch (error) {
+        if (this.isYtDlpBotBlockedError(error)) {
+          blockedByBot = true;
+          logger.warn(`STARS_YTDLP_RETRY_CLIENT strategy="${i + 1}/${strategies.length}"`);
+          continue;
+        }
       }
-      throw error;
-    });
-    const parsed = this.parseYtDlpResult(data);
-    if (!parsed?.url) return null;
-    return {
-      title: parsed.title || 'مقطع صوتي',
-      creator: parsed.creator || '',
-      url: parsed.url,
-      source: 'youtube_ytdlp',
-      ext: parsed.ext || 'm4a',
-      webpageUrl: parsed.webpageUrl || ''
-    };
+    }
+
+    if (blockedByBot) {
+      this.ytDlpBotBlockedUntil = Date.now() + this.YT_DLP_BOT_BLOCK_COOLDOWN_MS;
+      logger.warn(`STARS_YTDLP_BOT_BLOCKED cooldown_ms="${this.YT_DLP_BOT_BLOCK_COOLDOWN_MS}"`);
+    }
+    return null;
   }
 
   static async searchYoutubeCandidatesViaYtDlp(query, limit = 5) {
