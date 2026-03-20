@@ -563,6 +563,24 @@ class ChatGamesUtilityHandler {
     return lower.includes('sign in to confirm you') && lower.includes('not a bot');
   }
 
+  static isYtDlpRateLimitedError(error) {
+    const text = `${String(error?.message || '')}\n${String(error?.stderr || '')}`;
+    const lower = text.toLowerCase();
+    return (
+      lower.includes('status code: 429') ||
+      lower.includes('http error 429') ||
+      lower.includes('too many requests') ||
+      lower.includes('rate limit')
+    );
+  }
+
+  static markYtDlpBlockedCooldown(reason = '') {
+    const until = Date.now() + this.YT_DLP_BOT_BLOCK_COOLDOWN_MS;
+    this.ytDlpBotBlockedUntil = Math.max(Number(this.ytDlpBotBlockedUntil || 0), until);
+    const suffix = reason ? ` reason="${reason}"` : '';
+    logger.warn(`STARS_YTDLP_BOT_BLOCKED cooldown_ms="${this.YT_DLP_BOT_BLOCK_COOLDOWN_MS}"${suffix}`);
+  }
+
   static isYtDlpBotBlockedActive() {
     return Number(this.ytDlpBotBlockedUntil || 0) > Date.now();
   }
@@ -757,7 +775,15 @@ class ChatGamesUtilityHandler {
     if (!url) return null;
 
     this.ensureStarsTempDir();
-    const info = await ytdl.getInfo(url);
+    let info;
+    try {
+      info = await ytdl.getInfo(url);
+    } catch (error) {
+      if (this.isYtDlpBotBlockedError(error) || this.isYtDlpRateLimitedError(error)) {
+        this.markYtDlpBlockedCooldown('node_get_info');
+      }
+      throw error;
+    }
     const format = this.pickNodeAudioFormat(info?.formats || []);
     if (!format?.itag) return null;
 
@@ -766,28 +792,35 @@ class ChatGamesUtilityHandler {
     const ext = String(format.container || 'm4a').replace(/[^a-z0-9]/gi, '') || 'm4a';
     const fullPath = path.join(this.STARS_TEMP_DIR, `${uniquePrefix}.${ext}`);
 
-    await new Promise((resolve, reject) => {
-      const writeStream = fs.createWriteStream(fullPath);
-      const readStream = ytdl.downloadFromInfo(info, {
-        quality: format.itag,
-        filter: 'audioonly',
-        highWaterMark: 1 << 24
+    try {
+      await new Promise((resolve, reject) => {
+        const writeStream = fs.createWriteStream(fullPath);
+        const readStream = ytdl.downloadFromInfo(info, {
+          quality: format.itag,
+          filter: 'audioonly',
+          highWaterMark: 1 << 24
+        });
+
+        const cleanup = (error) => {
+          try { writeStream.destroy(); } catch (_error) {}
+          try { readStream.destroy(); } catch (_error) {}
+          try {
+            if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
+          } catch (_error) {}
+          reject(error);
+        };
+
+        readStream.on('error', cleanup);
+        writeStream.on('error', cleanup);
+        writeStream.on('finish', resolve);
+        readStream.pipe(writeStream);
       });
-
-      const cleanup = (error) => {
-        try { writeStream.destroy(); } catch (_error) {}
-        try { readStream.destroy(); } catch (_error) {}
-        try {
-          if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
-        } catch (_error) {}
-        reject(error);
-      };
-
-      readStream.on('error', cleanup);
-      writeStream.on('error', cleanup);
-      writeStream.on('finish', resolve);
-      readStream.pipe(writeStream);
-    });
+    } catch (error) {
+      if (this.isYtDlpBotBlockedError(error) || this.isYtDlpRateLimitedError(error)) {
+        this.markYtDlpBlockedCooldown('node_download');
+      }
+      throw error;
+    }
 
     try {
       const stat = fs.statSync(fullPath);
@@ -857,7 +890,7 @@ class ChatGamesUtilityHandler {
           webpageUrl: parsed.webpageUrl || ''
         };
       } catch (error) {
-        if (this.isYtDlpBotBlockedError(error)) {
+        if (this.isYtDlpBotBlockedError(error) || this.isYtDlpRateLimitedError(error)) {
           blockedByBot = true;
           logger.warn(`STARS_YTDLP_RETRY_CLIENT strategy="${i + 1}/${strategies.length}"`);
           continue;
@@ -866,8 +899,7 @@ class ChatGamesUtilityHandler {
     }
 
     if (blockedByBot) {
-      this.ytDlpBotBlockedUntil = Date.now() + this.YT_DLP_BOT_BLOCK_COOLDOWN_MS;
-      logger.warn(`STARS_YTDLP_BOT_BLOCKED cooldown_ms="${this.YT_DLP_BOT_BLOCK_COOLDOWN_MS}"`);
+      this.markYtDlpBlockedCooldown('yt_dlp_resolve');
     }
     return null;
   }
@@ -1680,6 +1712,13 @@ class ChatGamesUtilityHandler {
       return this.sendHotAudioResult(ctx, audio, false).catch(() => null);
     }
 
+    const source = String(audio?.source || '').trim();
+    const isYoutubeNodeCandidate = source === 'youtube_node_candidate';
+    if (isYoutubeNodeCandidate && this.isYtDlpBotBlockedActive()) {
+      logger.warn(`STARS_SEND_SKIPPED reason="bot_blocked" source="${source}"`);
+      return null;
+    }
+
     const tempFile = await this.downloadStarsAudioTemp(audio).catch(() => null);
     if (!tempFile?.path || !fs.existsSync(tempFile.path)) {
       logger.warn(`STARS_TEMP_SEND_FAILED title="${audio?.title || ''}" source="${audio?.source || ''}"`);
@@ -1746,6 +1785,10 @@ class ChatGamesUtilityHandler {
   }
 
   static async sendStarsQueryFallback(ctx, queryText) {
+    if (this.isYtDlpBotBlockedActive()) {
+      logger.warn(`STARS_QUERY_FALLBACK_SKIPPED query="${queryText}" reason="bot_blocked"`);
+      return null;
+    }
     const tempFile = await this.downloadStarsByQueryTemp(queryText).catch(() => null);
     if (!tempFile?.path || !fs.existsSync(tempFile.path)) {
       logger.warn(`STARS_QUERY_FALLBACK_FAILED query="${queryText}"`);
@@ -2664,7 +2707,7 @@ class ChatGamesUtilityHandler {
         }
 
         let sent = await this.sendStarsAudioResult(ctx, audio);
-        if (!sent) {
+        if (!sent && !this.isYtDlpBotBlockedActive()) {
           sent = await this.sendStarsQueryFallback(ctx, query);
         }
         if (!sent) {
