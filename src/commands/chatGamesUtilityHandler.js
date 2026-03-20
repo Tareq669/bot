@@ -45,6 +45,7 @@ class ChatGamesUtilityHandler {
   static VIDEO_SEARCH_TIMEOUT_MS = 18000;
   static VIDEO_RESOLVE_TIMEOUT_MS = 4000;
   static YT_DLP_BOT_BLOCK_COOLDOWN_MS = 20 * 60 * 1000;
+  static STARS_COMMAND_TIMEOUT_MS = 45 * 1000;
   static YT_DLP_PROXY_COOLDOWN_MS = 10 * 60 * 1000;
   static YT_DLP_PROXY_FETCH_TTL_MS = 10 * 60 * 1000;
   static JOE_UPDATES_CHANNEL_URL = 'https://t.me/joam909';
@@ -2786,72 +2787,86 @@ class ChatGamesUtilityHandler {
 
     return this.enqueueAudioChatTask(ctx.chat?.id, async () => {
       const loadingMsg = await ctx.reply('🎧 جاري التحميل ....', this.getStarsReplyOptions(ctx));
+      let loadingCleared = false;
+      const clearLoading = async () => {
+        if (loadingCleared) return;
+        loadingCleared = true;
+        await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
+      };
+
       try {
-        const cachedFileId = this.getStarsCachedFileId(query);
-        if (cachedFileId) {
-          await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
-          const updatesButton = Markup.inlineKeyboard([
-            [Markup.button.url('تحديثات جو', this.JOE_UPDATES_CHANNEL_URL)]
-          ]);
-          await ctx.replyWithAudio(cachedFileId, {
-            caption: '♪ تم التح🎧ميل بنجاح ♪',
-            ...this.getStarsReplyOptions(ctx),
-            reply_markup: updatesButton.reply_markup
-          }).catch(() => {});
-          return;
-        }
+        const runTask = async () => {
+          const cachedFileId = this.getStarsCachedFileId(query);
+          if (cachedFileId) {
+            await clearLoading();
+            const updatesButton = Markup.inlineKeyboard([
+              [Markup.button.url('تحديثات جو', this.JOE_UPDATES_CHANNEL_URL)]
+            ]);
+            await ctx.replyWithAudio(cachedFileId, {
+              caption: '♪ تم التح🎧ميل بنجاح ♪',
+              ...this.getStarsReplyOptions(ctx),
+              reply_markup: updatesButton.reply_markup
+            }).catch(() => {});
+            return;
+          }
 
-        await ctx.telegram.editMessageText(
-          ctx.chat.id,
-          loadingMsg.message_id,
-          undefined,
-          '⏳ تجهيز الصوت...'
-        ).catch(() => {});
+          await ctx.telegram.editMessageText(
+            ctx.chat.id,
+            loadingMsg.message_id,
+            undefined,
+            '⏳ تجهيز الصوت...'
+          ).catch(() => {});
 
-        let audio = await this.resolveStarsAudio(query);
-        const needsStrictFallback = !audio?.url || String(audio?.source || '') === 'youtube_node_candidate';
-        if (needsStrictFallback) {
-          const listFallback = await this.resolveAudioListWithCache(query).catch(() => []);
-          if (Array.isArray(listFallback) && listFallback.length) {
-            const normalizedQuery = this.normalizeSearchText(query);
-            const strictPick = listFallback.find((item) => {
-              const title = String(item?.title || '').trim();
-              const creator = String(item?.creator || '').trim();
-              const text = `${title} ${creator}`.trim();
-              if (!text) return false;
-              if (!this.isAcceptableQueryMatch(normalizedQuery, text)) return false;
-              const itemNorm = this.normalizeSearchText(text);
-              const queryIsReligious = this.hasAnyTerm(normalizedQuery, this.RELIGIOUS_AUDIO_TERMS);
-              const itemIsReligious = this.hasAnyTerm(itemNorm, this.RELIGIOUS_AUDIO_TERMS);
-              if (!queryIsReligious && itemIsReligious) return false;
-              return true;
-            });
-            if (strictPick?.url) {
-              audio = strictPick;
+          let audio = await this.resolveStarsAudio(query);
+          const needsStrictFallback = !audio?.url || String(audio?.source || '') === 'youtube_node_candidate';
+          if (needsStrictFallback) {
+            const listFallback = await this.resolveAudioListWithCache(query).catch(() => []);
+            if (Array.isArray(listFallback) && listFallback.length) {
+              const normalizedQuery = this.normalizeSearchText(query);
+              const strictPick = listFallback.find((item) => {
+                const title = String(item?.title || '').trim();
+                const creator = String(item?.creator || '').trim();
+                const text = `${title} ${creator}`.trim();
+                if (!text) return false;
+                if (!this.isAcceptableQueryMatch(normalizedQuery, text)) return false;
+                const itemNorm = this.normalizeSearchText(text);
+                const queryIsReligious = this.hasAnyTerm(normalizedQuery, this.RELIGIOUS_AUDIO_TERMS);
+                const itemIsReligious = this.hasAnyTerm(itemNorm, this.RELIGIOUS_AUDIO_TERMS);
+                if (!queryIsReligious && itemIsReligious) return false;
+                return true;
+              });
+              if (strictPick?.url) {
+                audio = strictPick;
+              }
             }
           }
-        }
 
-        await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
-        if (!audio?.url) {
-          logger.warn(`STARS_FAIL query="${query}" stage="resolve"`);
-          await ctx.reply('♪ عذرا غير متوفر ..', this.getStarsReplyOptions(ctx));
-          return;
-        }
+          await clearLoading();
+          if (!audio?.url) {
+            logger.warn(`STARS_FAIL query="${query}" stage="resolve"`);
+            await ctx.reply('♪ عذرا غير متوفر ..', this.getStarsReplyOptions(ctx));
+            return;
+          }
 
-        let sent = await this.sendStarsAudioResult(ctx, audio);
-        if (!sent && !this.isYtDlpBotBlockedActive()) {
-          sent = await this.sendStarsQueryFallback(ctx, query);
+          let sent = await this.sendStarsAudioResult(ctx, audio);
+          if (!sent && !this.isYtDlpBotBlockedActive()) {
+            sent = await this.sendStarsQueryFallback(ctx, query);
+          }
+          if (!sent) {
+            logger.warn(`STARS_FAIL query="${query}" stage="send"`);
+            await ctx.reply('♪ عذرا غير متوفر ..', this.getStarsReplyOptions(ctx));
+            return;
+          }
+          const fileId = String(sent?.audio?.file_id || '').trim();
+          if (fileId) this.setStarsCachedFileId(query, fileId);
+        };
+
+        await this.withTimeout(runTask(), this.STARS_COMMAND_TIMEOUT_MS, 'STARS_COMMAND_TIMEOUT');
+      } catch (error) {
+        await clearLoading();
+        if (String(error?.message || '') === 'STARS_COMMAND_TIMEOUT') {
+          logger.warn(`STARS_TIMEOUT query="${query}" timeout_ms="${this.STARS_COMMAND_TIMEOUT_MS}"`);
         }
-        if (!sent) {
-          logger.warn(`STARS_FAIL query="${query}" stage="send"`);
-          await ctx.reply('♪ عذرا غير متوفر ..', this.getStarsReplyOptions(ctx));
-          return;
-        }
-        const fileId = String(sent?.audio?.file_id || '').trim();
-        if (fileId) this.setStarsCachedFileId(query, fileId);
-      } catch (_error) {
-        await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
         await ctx.reply('♪ عذرا غير متوفر ..', this.getStarsReplyOptions(ctx));
       }
     });
@@ -2878,16 +2893,29 @@ class ChatGamesUtilityHandler {
     const selected = cached.list[pickIndex];
     await ctx.answerCbQuery('جاري التحميل...').catch(() => {});
     const loadingMsg = await ctx.reply('🎧 جاري التحميل ....');
-    try {
-      const audio = await this.resolveAudioFromPickedItem(selected, cached.query).catch(() => null);
+    let loadingCleared = false;
+    const clearLoading = async () => {
+      if (loadingCleared) return;
+      loadingCleared = true;
       await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
+    };
+    try {
+      const audio = await this.withTimeout(
+        this.resolveAudioFromPickedItem(selected, cached.query).catch(() => null),
+        this.STARS_COMMAND_TIMEOUT_MS,
+        'STARS_PICK_TIMEOUT'
+      );
+      await clearLoading();
       if (!audio?.url) {
         await ctx.reply('♪ عذرا غير متوفر ..');
         return;
       }
       await this.sendHotAudioResult(ctx, audio, false);
-    } catch (_error) {
-      await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
+    } catch (error) {
+      await clearLoading();
+      if (String(error?.message || '') === 'STARS_PICK_TIMEOUT') {
+        logger.warn(`STARS_PICK_TIMEOUT query="${cached.query || ''}" timeout_ms="${this.STARS_COMMAND_TIMEOUT_MS}"`);
+      }
       await ctx.reply('♪ عذرا غير متوفر ..');
     }
   }
