@@ -42,6 +42,10 @@ class ChatGamesUtilityHandler {
   static AUDIO_STRICT_MATCH_RATIO = 0.35;
   static AUDIO_STRICT_SCORE_THRESHOLD = 0.4;
   static YT_DLP_TIMEOUT_MS = 90000;
+  static YT_DLP_ATTEMPT_TIMEOUT_MS = 6000;
+  static YT_DLP_PROXY_ATTEMPT_TIMEOUT_MS = 5000;
+  static YT_DLP_MAX_PROXY_ROUTES = 2;
+  static STARS_TEMP_DOWNLOAD_TIMEOUT_MS = 30000;
   static VIDEO_SEARCH_TIMEOUT_MS = 18000;
   static VIDEO_RESOLVE_TIMEOUT_MS = 4000;
   static YT_DLP_BOT_BLOCK_COOLDOWN_MS = 20 * 60 * 1000;
@@ -426,7 +430,7 @@ class ChatGamesUtilityHandler {
     ];
 
     await this.execFileAsync(executable.command, args, {
-      timeout: Math.max(this.YT_DLP_TIMEOUT_MS, 240000)
+      timeout: Math.max(this.STARS_TEMP_DOWNLOAD_TIMEOUT_MS, 15000)
     }).catch(() => null);
 
     const matches = fs.readdirSync(this.STARS_TEMP_DIR, { withFileTypes: true })
@@ -495,7 +499,7 @@ class ChatGamesUtilityHandler {
     ];
 
     await this.execFileAsync(executable.command, args, {
-      timeout: Math.max(this.YT_DLP_TIMEOUT_MS, 240000)
+      timeout: Math.max(this.STARS_TEMP_DOWNLOAD_TIMEOUT_MS, 15000)
     }).catch(() => null);
 
     const matches = fs.readdirSync(this.STARS_TEMP_DIR, { withFileTypes: true })
@@ -577,6 +581,17 @@ class ChatGamesUtilityHandler {
       lower.includes('http error 429') ||
       lower.includes('too many requests') ||
       lower.includes('rate limit')
+    );
+  }
+
+  static isYtDlpTimeoutError(error) {
+    const text = `${String(error?.message || '')}\n${String(error?.stderr || '')}`;
+    const lower = text.toLowerCase();
+    return (
+      lower.includes('timed out') ||
+      lower.includes('etimedout') ||
+      lower.includes('timeout') ||
+      lower.includes('killed')
     );
   }
 
@@ -957,6 +972,7 @@ class ChatGamesUtilityHandler {
     const executable = await this.resolveYtDlpCommand();
     const cookiesArgs = await this.resolveYtDlpCookiesArgs();
     const proxyArgs = this.resolveYtDlpProxyArgs(options?.proxy || '');
+    const timeoutMs = Math.max(2000, Number(options?.timeoutMs || this.YT_DLP_ATTEMPT_TIMEOUT_MS));
     this.logYtDlpRuntimeConfig(cookiesArgs, proxyArgs);
     const args = [
       ...executable.baseArgs,
@@ -966,12 +982,16 @@ class ChatGamesUtilityHandler {
       '--skip-download',
       '--no-warnings',
       '--quiet',
+      '--socket-timeout',
+      '8',
+      '--retries',
+      '0',
       ...cookiesArgs,
       ...proxyArgs,
       ...extraArgs
     ];
     const { stdout } = await this.execFileAsync(executable.command, args, {
-      timeout: this.YT_DLP_TIMEOUT_MS
+      timeout: timeoutMs
     });
     const text = String(stdout || '').trim();
     if (!text) return null;
@@ -988,15 +1008,24 @@ class ChatGamesUtilityHandler {
     ];
 
     const proxyCandidates = await this.getYtDlpProxyCandidates();
-    const routes = proxyCandidates.length ? proxyCandidates : [''];
+    const maxProxyRoutesEnv = Number(process.env.YTDLP_PROXY_MAX_ROUTES || this.YT_DLP_MAX_PROXY_ROUTES);
+    const maxProxyRoutes = Math.max(0, Math.min(5, Number.isFinite(maxProxyRoutesEnv) ? maxProxyRoutesEnv : this.YT_DLP_MAX_PROXY_ROUTES));
+    const limitedProxyCandidates = proxyCandidates.slice(0, maxProxyRoutes);
+    const routes = [''];
+    for (const proxy of limitedProxyCandidates) {
+      if (!proxy) continue;
+      if (!routes.includes(proxy)) routes.push(proxy);
+    }
 
     let blockedByBotAny = false;
     for (const proxy of routes) {
       let blockedByThisRoute = false;
-      for (let i = 0; i < strategies.length; i += 1) {
-        const args = strategies[i];
+      const routeStrategies = proxy ? [baseFormatArgs] : strategies;
+      for (let i = 0; i < routeStrategies.length; i += 1) {
+        const args = routeStrategies[i];
+        const timeoutMs = proxy ? this.YT_DLP_PROXY_ATTEMPT_TIMEOUT_MS : this.YT_DLP_ATTEMPT_TIMEOUT_MS;
         try {
-          const data = await this.runYtDlpJson(target, args, { proxy });
+          const data = await this.runYtDlpJson(target, args, { proxy, timeoutMs });
           const parsed = this.parseYtDlpResult(data);
           if (!parsed?.url) continue;
           if (proxy) this.ytDlpLastWorkingProxy = proxy;
@@ -1010,11 +1039,11 @@ class ChatGamesUtilityHandler {
             proxy
           };
         } catch (error) {
-          if (this.isYtDlpBotBlockedError(error) || this.isYtDlpRateLimitedError(error)) {
+          if (this.isYtDlpBotBlockedError(error) || this.isYtDlpRateLimitedError(error) || this.isYtDlpTimeoutError(error)) {
             blockedByBotAny = true;
             blockedByThisRoute = true;
             logger.warn(
-              `STARS_YTDLP_RETRY_CLIENT strategy="${i + 1}/${strategies.length}" proxy="${proxy || 'direct'}"`
+              `STARS_YTDLP_RETRY_CLIENT strategy="${i + 1}/${routeStrategies.length}" proxy="${proxy || 'direct'}"`
             );
             continue;
           }
@@ -1026,8 +1055,9 @@ class ChatGamesUtilityHandler {
       }
     }
 
-    if (blockedByBotAny && !proxyCandidates.length) {
-      this.markYtDlpBlockedCooldown('yt_dlp_resolve');
+    if (blockedByBotAny) {
+      const cooldownMs = proxyCandidates.length ? Math.min(this.YT_DLP_BOT_BLOCK_COOLDOWN_MS, 2 * 60 * 1000) : this.YT_DLP_BOT_BLOCK_COOLDOWN_MS;
+      this.markYtDlpBlockedCooldown('yt_dlp_resolve', cooldownMs);
     }
     return null;
   }
