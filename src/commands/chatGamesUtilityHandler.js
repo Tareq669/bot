@@ -77,6 +77,7 @@ class ChatGamesUtilityHandler {
   static ytDlpLastWorkingProxy = '';
   static ytDlpProxyBlockedUntil = new Map();
   static ytDlpFetchedProxyPool = { fetchedAt: 0, items: [] };
+  static ytDlpProxyHealthCache = new Map();
 
   static MUSIC_HINT_TERMS = [
     'اغنية', 'أغنية', 'اغاني', 'أغاني', 'music', 'song', 'mp3', 'كليب', 'حفلة', 'حفله',
@@ -666,10 +667,101 @@ class ChatGamesUtilityHandler {
     return true;
   }
 
+  static getYtDlpProxyHealth(proxy = '') {
+    const key = this.normalizeYtDlpProxy(proxy);
+    if (!key) return 'unknown';
+    const row = this.ytDlpProxyHealthCache.get(key);
+    if (!row) return 'unknown';
+    const now = Date.now();
+    const goodUntil = Number(row.goodUntil || 0);
+    const badUntil = Number(row.badUntil || 0);
+    if (goodUntil > now) return 'good';
+    if (badUntil > now) return 'bad';
+    this.ytDlpProxyHealthCache.delete(key);
+    return 'unknown';
+  }
+
+  static markYtDlpProxyHealthy(proxy = '') {
+    const key = this.normalizeYtDlpProxy(proxy);
+    if (!key) return;
+    this.ytDlpProxyHealthCache.set(key, {
+      goodUntil: Date.now() + (30 * 60 * 1000),
+      badUntil: 0
+    });
+  }
+
+  static markYtDlpProxyUnhealthy(proxy = '') {
+    const key = this.normalizeYtDlpProxy(proxy);
+    if (!key) return;
+    this.ytDlpProxyHealthCache.set(key, {
+      goodUntil: 0,
+      badUntil: Date.now() + this.YT_DLP_PROXY_COOLDOWN_MS
+    });
+  }
+
+  static parseAxiosProxyConfig(proxy = '') {
+    try {
+      const normalized = this.normalizeYtDlpProxy(proxy);
+      if (!normalized) return null;
+      const url = new URL(normalized);
+      const protocol = String(url.protocol || '').replace(':', '');
+      if (!['http', 'https'].includes(protocol)) return null;
+      const port = Number(url.port || (protocol === 'https' ? 443 : 80));
+      if (!Number.isFinite(port) || port <= 0) return null;
+      const authUser = decodeURIComponent(url.username || '');
+      const authPass = decodeURIComponent(url.password || '');
+      const auth = authUser || authPass ? { username: authUser, password: authPass } : undefined;
+      return {
+        protocol,
+        host: url.hostname,
+        port,
+        auth
+      };
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  static async probeYtDlpProxy(proxy = '') {
+    const key = this.normalizeYtDlpProxy(proxy);
+    if (!key) return false;
+    const health = this.getYtDlpProxyHealth(key);
+    if (health === 'good') return true;
+    if (health === 'bad') return false;
+
+    const axiosProxy = this.parseAxiosProxyConfig(key);
+    if (!axiosProxy) {
+      this.markYtDlpProxyUnhealthy(key);
+      return false;
+    }
+
+    try {
+      const { status, data } = await axios.get('https://www.youtube.com/oembed', {
+        params: {
+          url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+          format: 'json'
+        },
+        timeout: 2200,
+        proxy: axiosProxy,
+        validateStatus: () => true
+      });
+      if (status === 200 && (data?.title || data?.author_name)) {
+        this.markYtDlpProxyHealthy(key);
+        return true;
+      }
+      this.markYtDlpProxyUnhealthy(key);
+      return false;
+    } catch (_error) {
+      this.markYtDlpProxyUnhealthy(key);
+      return false;
+    }
+  }
+
   static markYtDlpProxyBlocked(proxy = '', reason = '') {
     const key = this.normalizeYtDlpProxy(proxy);
     if (!key) return;
     this.ytDlpProxyBlockedUntil.set(key, Date.now() + this.YT_DLP_PROXY_COOLDOWN_MS);
+    this.markYtDlpProxyUnhealthy(key);
     const suffix = reason ? ` reason="${reason}"` : '';
     logger.warn(`STARS_PROXY_BLOCKED proxy="${key}" cooldown_ms="${this.YT_DLP_PROXY_COOLDOWN_MS}"${suffix}`);
   }
@@ -736,7 +828,42 @@ class ChatGamesUtilityHandler {
       }
     }
 
-    return unique.slice(0, 10);
+    const randomized = this.shuffleArray(unique);
+    if (this.ytDlpLastWorkingProxy) {
+      const preferred = this.normalizeYtDlpProxy(this.ytDlpLastWorkingProxy);
+      const idx = randomized.indexOf(preferred);
+      if (idx > 0) {
+        randomized.splice(idx, 1);
+        randomized.unshift(preferred);
+      }
+    }
+
+    const maxCandidates = Math.max(1, Math.min(10, Number(process.env.YTDLP_PROXY_POOL_MAX_CANDIDATES || 6)));
+    const precheckLimit = Math.max(0, Math.min(8, Number(process.env.YTDLP_PROXY_PRECHECK_LIMIT || 4)));
+
+    const knownGood = [];
+    const unknown = [];
+    for (const proxy of randomized) {
+      const health = this.getYtDlpProxyHealth(proxy);
+      if (health === 'good') knownGood.push(proxy);
+      else if (health === 'unknown') unknown.push(proxy);
+      if (knownGood.length >= maxCandidates) break;
+    }
+
+    const prepared = [...knownGood];
+    const toProbe = unknown.slice(0, Math.max(0, precheckLimit));
+    for (const proxy of toProbe) {
+      if (prepared.length >= maxCandidates) break;
+      // eslint-disable-next-line no-await-in-loop
+      const ok = await this.probeYtDlpProxy(proxy);
+      if (ok) prepared.push(proxy);
+    }
+
+    if (!prepared.length) {
+      return randomized.slice(0, maxCandidates);
+    }
+
+    return prepared.slice(0, maxCandidates);
   }
 
   static resolveYtDlpProxyArgs(proxyOverride = '') {
@@ -1011,10 +1138,13 @@ class ChatGamesUtilityHandler {
     const maxProxyRoutesEnv = Number(process.env.YTDLP_PROXY_MAX_ROUTES || this.YT_DLP_MAX_PROXY_ROUTES);
     const maxProxyRoutes = Math.max(0, Math.min(5, Number.isFinite(maxProxyRoutesEnv) ? maxProxyRoutesEnv : this.YT_DLP_MAX_PROXY_ROUTES));
     const limitedProxyCandidates = proxyCandidates.slice(0, maxProxyRoutes);
-    const routes = [''];
+    const routes = [];
     for (const proxy of limitedProxyCandidates) {
       if (!proxy) continue;
       if (!routes.includes(proxy)) routes.push(proxy);
+    }
+    if (!routes.length || String(process.env.YTDLP_TRY_DIRECT_FALLBACK || 'true').trim().toLowerCase() !== 'false') {
+      routes.push('');
     }
 
     let blockedByBotAny = false;
@@ -1028,7 +1158,10 @@ class ChatGamesUtilityHandler {
           const data = await this.runYtDlpJson(target, args, { proxy, timeoutMs });
           const parsed = this.parseYtDlpResult(data);
           if (!parsed?.url) continue;
-          if (proxy) this.ytDlpLastWorkingProxy = proxy;
+          if (proxy) {
+            this.ytDlpLastWorkingProxy = proxy;
+            this.markYtDlpProxyHealthy(proxy);
+          }
           return {
             title: parsed.title || 'مقطع صوتي',
             creator: parsed.creator || '',
