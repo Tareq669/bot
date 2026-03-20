@@ -667,7 +667,8 @@ class ChatGamesUtilityHandler {
   }
 
   static async fetchAutoYtDlpProxyPool() {
-    const enabled = String(process.env.YTDLP_PROXY_AUTO_FETCH || '').trim().toLowerCase() === 'true';
+    const enabledValue = String(process.env.YTDLP_PROXY_AUTO_FETCH || 'true').trim().toLowerCase();
+    const enabled = !['0', 'false', 'off', 'no'].includes(enabledValue);
     if (!enabled) return [];
 
     const now = Date.now();
