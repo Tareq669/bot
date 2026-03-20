@@ -66,6 +66,7 @@ class ChatGamesUtilityHandler {
   ];
   static ytDlpBotBlockedUntil = 0;
   static ytDlpCookiesFile = '';
+  static ytDlpRuntimeConfigLogged = false;
 
   static MUSIC_HINT_TERMS = [
     'اغنية', 'أغنية', 'اغاني', 'أغاني', 'music', 'song', 'mp3', 'كليب', 'حفلة', 'حفله',
@@ -395,6 +396,8 @@ class ChatGamesUtilityHandler {
 
     const executable = await this.resolveYtDlpCommand();
     const cookiesArgs = await this.resolveYtDlpCookiesArgs();
+    const proxyArgs = this.resolveYtDlpProxyArgs();
+    this.logYtDlpRuntimeConfig(cookiesArgs, proxyArgs);
     const args = [
       ...executable.baseArgs,
       target,
@@ -411,6 +414,7 @@ class ChatGamesUtilityHandler {
       '--fragment-retries',
       '2',
       ...cookiesArgs,
+      ...proxyArgs,
       '-o',
       outTemplate
     ];
@@ -461,6 +465,8 @@ class ChatGamesUtilityHandler {
 
     const executable = await this.resolveYtDlpCommand();
     const cookiesArgs = await this.resolveYtDlpCookiesArgs();
+    const proxyArgs = this.resolveYtDlpProxyArgs();
+    this.logYtDlpRuntimeConfig(cookiesArgs, proxyArgs);
     const args = [
       ...executable.baseArgs,
       `ytsearch1:${query}`,
@@ -477,6 +483,7 @@ class ChatGamesUtilityHandler {
       '--fragment-retries',
       '2',
       ...cookiesArgs,
+      ...proxyArgs,
       '-o',
       outTemplate
     ];
@@ -589,6 +596,18 @@ class ChatGamesUtilityHandler {
     } catch (_error) {
       return [];
     }
+  }
+
+  static resolveYtDlpProxyArgs() {
+    const proxy = String(process.env.YTDLP_PROXY || process.env.YT_DLP_PROXY || '').trim();
+    if (!proxy) return [];
+    return ['--proxy', proxy];
+  }
+
+  static logYtDlpRuntimeConfig(cookiesArgs = [], proxyArgs = []) {
+    if (this.ytDlpRuntimeConfigLogged) return;
+    this.ytDlpRuntimeConfigLogged = true;
+    logger.info(`STARS_YTDLP_RUNTIME cookies=${cookiesArgs.length ? 'on' : 'off'} proxy=${proxyArgs.length ? 'on' : 'off'}`);
   }
 
   static getStandaloneYtDlpAssetName() {
@@ -791,6 +810,8 @@ class ChatGamesUtilityHandler {
   static async runYtDlpJson(target, extraArgs = []) {
     const executable = await this.resolveYtDlpCommand();
     const cookiesArgs = await this.resolveYtDlpCookiesArgs();
+    const proxyArgs = this.resolveYtDlpProxyArgs();
+    this.logYtDlpRuntimeConfig(cookiesArgs, proxyArgs);
     const args = [
       ...executable.baseArgs,
       target,
@@ -800,6 +821,7 @@ class ChatGamesUtilityHandler {
       '--no-warnings',
       '--quiet',
       ...cookiesArgs,
+      ...proxyArgs,
       ...extraArgs
     ];
     const { stdout } = await this.execFileAsync(executable.command, args, {
