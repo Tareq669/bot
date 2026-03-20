@@ -45,6 +45,8 @@ class ChatGamesUtilityHandler {
   static VIDEO_SEARCH_TIMEOUT_MS = 18000;
   static VIDEO_RESOLVE_TIMEOUT_MS = 4000;
   static YT_DLP_BOT_BLOCK_COOLDOWN_MS = 20 * 60 * 1000;
+  static YT_DLP_PROXY_COOLDOWN_MS = 10 * 60 * 1000;
+  static YT_DLP_PROXY_FETCH_TTL_MS = 10 * 60 * 1000;
   static JOE_UPDATES_CHANNEL_URL = 'https://t.me/joam909';
   static STARS_TEMP_DIR = path.join(os.tmpdir(), 'jo-bot-stars');
   static YT_DLP_BIN_DIR = path.join(os.tmpdir(), 'jo-bot-bin');
@@ -67,6 +69,9 @@ class ChatGamesUtilityHandler {
   static ytDlpBotBlockedUntil = 0;
   static ytDlpCookiesFile = '';
   static ytDlpRuntimeConfigLogged = false;
+  static ytDlpLastWorkingProxy = '';
+  static ytDlpProxyBlockedUntil = new Map();
+  static ytDlpFetchedProxyPool = { fetchedAt: 0, items: [] };
 
   static MUSIC_HINT_TERMS = [
     'اغنية', 'أغنية', 'اغاني', 'أغاني', 'music', 'song', 'mp3', 'كليب', 'حفلة', 'حفله',
@@ -396,7 +401,7 @@ class ChatGamesUtilityHandler {
 
     const executable = await this.resolveYtDlpCommand();
     const cookiesArgs = await this.resolveYtDlpCookiesArgs();
-    const proxyArgs = this.resolveYtDlpProxyArgs();
+    const proxyArgs = this.resolveYtDlpProxyArgs(audio?.proxy || this.ytDlpLastWorkingProxy || '');
     this.logYtDlpRuntimeConfig(cookiesArgs, proxyArgs);
     const args = [
       ...executable.baseArgs,
@@ -465,7 +470,7 @@ class ChatGamesUtilityHandler {
 
     const executable = await this.resolveYtDlpCommand();
     const cookiesArgs = await this.resolveYtDlpCookiesArgs();
-    const proxyArgs = this.resolveYtDlpProxyArgs();
+    const proxyArgs = this.resolveYtDlpProxyArgs(this.ytDlpLastWorkingProxy || '');
     this.logYtDlpRuntimeConfig(cookiesArgs, proxyArgs);
     const args = [
       ...executable.baseArgs,
@@ -574,11 +579,14 @@ class ChatGamesUtilityHandler {
     );
   }
 
-  static markYtDlpBlockedCooldown(reason = '') {
-    const until = Date.now() + this.YT_DLP_BOT_BLOCK_COOLDOWN_MS;
+  static markYtDlpBlockedCooldown(reason = '', customCooldownMs = 0) {
+    const cooldownMs = Number(customCooldownMs) > 0
+      ? Number(customCooldownMs)
+      : this.YT_DLP_BOT_BLOCK_COOLDOWN_MS;
+    const until = Date.now() + cooldownMs;
     this.ytDlpBotBlockedUntil = Math.max(Number(this.ytDlpBotBlockedUntil || 0), until);
     const suffix = reason ? ` reason="${reason}"` : '';
-    logger.warn(`STARS_YTDLP_BOT_BLOCKED cooldown_ms="${this.YT_DLP_BOT_BLOCK_COOLDOWN_MS}"${suffix}`);
+    logger.warn(`STARS_YTDLP_BOT_BLOCKED cooldown_ms="${cooldownMs}"${suffix}`);
   }
 
   static isYtDlpBotBlockedActive() {
@@ -616,8 +624,111 @@ class ChatGamesUtilityHandler {
     }
   }
 
-  static resolveYtDlpProxyArgs() {
-    const proxy = String(process.env.YTDLP_PROXY || process.env.YT_DLP_PROXY || '').trim();
+  static normalizeYtDlpProxy(proxyValue = '') {
+    const raw = String(proxyValue || '').trim();
+    if (!raw) return '';
+    if (/^https?:\/\//i.test(raw) || /^socks5h?:\/\//i.test(raw)) return raw;
+    return `http://${raw}`;
+  }
+
+  static parseProxyPoolText(rawText = '') {
+    return String(rawText || '')
+      .split(/[\r\n,;]+/)
+      .map((row) => this.normalizeYtDlpProxy(row))
+      .filter(Boolean);
+  }
+
+  static isYtDlpProxyCooling(proxy = '') {
+    const key = this.normalizeYtDlpProxy(proxy);
+    if (!key) return false;
+    const until = Number(this.ytDlpProxyBlockedUntil.get(key) || 0);
+    if (!until) return false;
+    if (until <= Date.now()) {
+      this.ytDlpProxyBlockedUntil.delete(key);
+      return false;
+    }
+    return true;
+  }
+
+  static markYtDlpProxyBlocked(proxy = '', reason = '') {
+    const key = this.normalizeYtDlpProxy(proxy);
+    if (!key) return;
+    this.ytDlpProxyBlockedUntil.set(key, Date.now() + this.YT_DLP_PROXY_COOLDOWN_MS);
+    const suffix = reason ? ` reason="${reason}"` : '';
+    logger.warn(`STARS_PROXY_BLOCKED proxy="${key}" cooldown_ms="${this.YT_DLP_PROXY_COOLDOWN_MS}"${suffix}`);
+  }
+
+  static getStaticYtDlpProxyPool() {
+    const single = this.normalizeYtDlpProxy(process.env.YTDLP_PROXY || process.env.YT_DLP_PROXY || '');
+    const poolRaw = String(process.env.YTDLP_PROXY_POOL || process.env.YT_DLP_PROXY_POOL || '').trim();
+    const pool = this.parseProxyPoolText(poolRaw);
+    const all = [single, ...pool].filter(Boolean);
+    return Array.from(new Set(all));
+  }
+
+  static async fetchAutoYtDlpProxyPool() {
+    const enabled = String(process.env.YTDLP_PROXY_AUTO_FETCH || '').trim().toLowerCase() === 'true';
+    if (!enabled) return [];
+
+    const now = Date.now();
+    if ((now - Number(this.ytDlpFetchedProxyPool.fetchedAt || 0)) < this.YT_DLP_PROXY_FETCH_TTL_MS) {
+      return Array.isArray(this.ytDlpFetchedProxyPool.items) ? this.ytDlpFetchedProxyPool.items : [];
+    }
+
+    const sourceUrl = String(
+      process.env.YTDLP_PROXY_SOURCE_URL ||
+      process.env.YT_DLP_PROXY_SOURCE_URL ||
+      'https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/http.txt'
+    ).trim();
+
+    try {
+      const { data } = await axios.get(sourceUrl, { timeout: 12000 });
+      const parsed = this.parseProxyPoolText(data).slice(0, 80);
+      const unique = Array.from(new Set(parsed));
+      this.ytDlpFetchedProxyPool = { fetchedAt: now, items: unique };
+      logger.info(`STARS_PROXY_POOL_FETCHED count="${unique.length}" source="${sourceUrl}"`);
+      return unique;
+    } catch (_error) {
+      this.ytDlpFetchedProxyPool = { fetchedAt: now, items: [] };
+      return [];
+    }
+  }
+
+  static async getYtDlpProxyCandidates() {
+    const staticPool = this.getStaticYtDlpProxyPool();
+    const autoPool = staticPool.length ? [] : await this.fetchAutoYtDlpProxyPool();
+    const merged = [...staticPool, ...autoPool].filter(Boolean);
+
+    const unique = [];
+    const seen = new Set();
+    for (const proxy of merged) {
+      const normalized = this.normalizeYtDlpProxy(proxy);
+      if (!normalized) continue;
+      if (seen.has(normalized)) continue;
+      if (this.isYtDlpProxyCooling(normalized)) continue;
+      seen.add(normalized);
+      unique.push(normalized);
+    }
+
+    if (this.ytDlpLastWorkingProxy) {
+      const preferred = this.normalizeYtDlpProxy(this.ytDlpLastWorkingProxy);
+      const idx = unique.indexOf(preferred);
+      if (idx > 0) {
+        unique.splice(idx, 1);
+        unique.unshift(preferred);
+      }
+    }
+
+    return unique.slice(0, 10);
+  }
+
+  static resolveYtDlpProxyArgs(proxyOverride = '') {
+    const proxy = this.normalizeYtDlpProxy(
+      proxyOverride ||
+      process.env.YTDLP_PROXY ||
+      process.env.YT_DLP_PROXY ||
+      ''
+    );
     if (!proxy) return [];
     return ['--proxy', proxy];
   }
@@ -840,10 +951,10 @@ class ChatGamesUtilityHandler {
     };
   }
 
-  static async runYtDlpJson(target, extraArgs = []) {
+  static async runYtDlpJson(target, extraArgs = [], options = {}) {
     const executable = await this.resolveYtDlpCommand();
     const cookiesArgs = await this.resolveYtDlpCookiesArgs();
-    const proxyArgs = this.resolveYtDlpProxyArgs();
+    const proxyArgs = this.resolveYtDlpProxyArgs(options?.proxy || '');
     this.logYtDlpRuntimeConfig(cookiesArgs, proxyArgs);
     const args = [
       ...executable.baseArgs,
@@ -874,31 +985,46 @@ class ChatGamesUtilityHandler {
       [...baseFormatArgs, '--extractor-args', 'youtube:player_client=ios,android;lang=en']
     ];
 
-    let blockedByBot = false;
-    for (let i = 0; i < strategies.length; i += 1) {
-      const args = strategies[i];
-      try {
-        const data = await this.runYtDlpJson(target, args);
-        const parsed = this.parseYtDlpResult(data);
-        if (!parsed?.url) continue;
-        return {
-          title: parsed.title || 'مقطع صوتي',
-          creator: parsed.creator || '',
-          url: parsed.url,
-          source: 'youtube_ytdlp',
-          ext: parsed.ext || 'm4a',
-          webpageUrl: parsed.webpageUrl || ''
-        };
-      } catch (error) {
-        if (this.isYtDlpBotBlockedError(error) || this.isYtDlpRateLimitedError(error)) {
-          blockedByBot = true;
-          logger.warn(`STARS_YTDLP_RETRY_CLIENT strategy="${i + 1}/${strategies.length}"`);
-          continue;
+    const proxyCandidates = await this.getYtDlpProxyCandidates();
+    const routes = proxyCandidates.length ? proxyCandidates : [''];
+
+    let blockedByBotAny = false;
+    for (const proxy of routes) {
+      let blockedByThisRoute = false;
+      for (let i = 0; i < strategies.length; i += 1) {
+        const args = strategies[i];
+        try {
+          const data = await this.runYtDlpJson(target, args, { proxy });
+          const parsed = this.parseYtDlpResult(data);
+          if (!parsed?.url) continue;
+          if (proxy) this.ytDlpLastWorkingProxy = proxy;
+          return {
+            title: parsed.title || 'مقطع صوتي',
+            creator: parsed.creator || '',
+            url: parsed.url,
+            source: 'youtube_ytdlp',
+            ext: parsed.ext || 'm4a',
+            webpageUrl: parsed.webpageUrl || '',
+            proxy
+          };
+        } catch (error) {
+          if (this.isYtDlpBotBlockedError(error) || this.isYtDlpRateLimitedError(error)) {
+            blockedByBotAny = true;
+            blockedByThisRoute = true;
+            logger.warn(
+              `STARS_YTDLP_RETRY_CLIENT strategy="${i + 1}/${strategies.length}" proxy="${proxy || 'direct'}"`
+            );
+            continue;
+          }
         }
+      }
+
+      if (blockedByThisRoute && proxy) {
+        this.markYtDlpProxyBlocked(proxy, 'yt_dlp_resolve');
       }
     }
 
-    if (blockedByBot) {
+    if (blockedByBotAny && !proxyCandidates.length) {
       this.markYtDlpBlockedCooldown('yt_dlp_resolve');
     }
     return null;
@@ -1708,11 +1834,19 @@ class ChatGamesUtilityHandler {
   }
 
   static async sendStarsAudioResult(ctx, audio) {
+    const maybeDirectAudioUrl = String(audio?.url || '').trim();
+    const isYoutubeWatchUrl = /(?:youtube\.com\/watch\?v=|youtu\.be\/)/i.test(maybeDirectAudioUrl);
+    const source = String(audio?.source || '').trim();
+
+    if (source === 'youtube_ytdlp' && maybeDirectAudioUrl && !isYoutubeWatchUrl) {
+      const directSent = await this.sendHotAudioResult(ctx, audio, false).catch(() => null);
+      if (directSent) return directSent;
+    }
+
     if (!String(audio?.webpageUrl || '').trim() && audio?.url) {
       return this.sendHotAudioResult(ctx, audio, false).catch(() => null);
     }
 
-    const source = String(audio?.source || '').trim();
     const isYoutubeNodeCandidate = source === 'youtube_node_candidate';
     if (isYoutubeNodeCandidate && this.isYtDlpBotBlockedActive()) {
       logger.warn(`STARS_SEND_SKIPPED reason="bot_blocked" source="${source}"`);
@@ -1751,8 +1885,6 @@ class ChatGamesUtilityHandler {
         }
       }
       // Fallback: try direct audio URL send when local temp download fails
-      const maybeDirectAudioUrl = String(audio?.url || '').trim();
-      const isYoutubeWatchUrl = /(?:youtube\.com\/watch\?v=|youtu\.be\/)/i.test(maybeDirectAudioUrl);
       if (maybeDirectAudioUrl && !isYoutubeWatchUrl) {
         return this.sendHotAudioResult(ctx, audio, false).catch(() => null);
       }
