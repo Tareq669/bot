@@ -170,14 +170,21 @@ class ChatGamesUtilityHandler {
     await this.sleep(2000);
 
     const executable = await this.resolveYtDlpCommand();
+    const cookiesArgs = await this.resolveYtDlpCookiesArgs();
+    const browserCookiesArgs = this.resolveYtDlpBrowserCookiesArgs();
     const targetDir = kind === 'video' ? this.STARS_VIDEOS_DIR : this.STARS_SONGS_DIR;
     const outTemplate = path.join(targetDir, '%(title).50s.%(ext)s');
     const runtimeArgs = this.getYtDlpJsRuntimeArgs();
+    this.logYtDlpRuntimeConfig([...cookiesArgs, ...browserCookiesArgs], []);
     const ffmpegReady = kind === 'audio' ? await this.hasFfmpegTools() : false;
     const args = kind === 'video'
       ? [
         ...executable.baseArgs,
         ...runtimeArgs,
+        ...cookiesArgs,
+        ...browserCookiesArgs,
+        '--extractor-args',
+        'youtube:player_client=tv_embedded,ios,android;lang=en',
         '-f',
         'mp4',
         '--no-playlist',
@@ -190,6 +197,10 @@ class ChatGamesUtilityHandler {
       : [
         ...executable.baseArgs,
         ...runtimeArgs,
+        ...cookiesArgs,
+        ...browserCookiesArgs,
+        '--extractor-args',
+        'youtube:player_client=tv_embedded,ios,android;lang=en',
         ...(ffmpegReady
           ? ['-x', '--audio-format', 'mp3', '--audio-quality', '0']
           : ['-f', 'bestaudio[ext=m4a]/bestaudio']),
@@ -221,7 +232,13 @@ class ChatGamesUtilityHandler {
           resolve();
           return;
         }
-        reject(new Error(stderr || `yt-dlp exited with code ${code}`));
+        const msg = String(stderr || `yt-dlp exited with code ${code}`);
+        if (msg.toLowerCase().includes('sign in to confirm you')) {
+          logger.warn(
+            `STARS_YTDLP_NEEDS_COOKIES query="${query}" cookies="${cookiesArgs.length ? 'on' : 'off'}" browser_cookies="${browserCookiesArgs.length ? 'on' : 'off'}"`
+          );
+        }
+        reject(new Error(msg));
       });
     });
 
@@ -259,6 +276,13 @@ class ChatGamesUtilityHandler {
     const nodePath = String(process.execPath || '').trim();
     if (nodePath) return ['--js-runtimes', `node:${nodePath}`];
     return ['--js-runtimes', 'node'];
+  }
+
+  static resolveYtDlpBrowserCookiesArgs() {
+    const raw = String(process.env.YTDLP_COOKIES_FROM_BROWSER || process.env.YT_DLP_COOKIES_FROM_BROWSER || '').trim();
+    if (!raw) return [];
+    // Expected: chrome or chrome:Default or firefox:default-release etc.
+    return ['--cookies-from-browser', raw];
   }
 
   static async hasFfmpegTools() {
@@ -570,8 +594,9 @@ class ChatGamesUtilityHandler {
 
     const executable = await this.resolveYtDlpCommand();
     const cookiesArgs = await this.resolveYtDlpCookiesArgs();
+    const browserCookiesArgs = this.resolveYtDlpBrowserCookiesArgs();
     const proxyArgs = this.resolveYtDlpProxyArgs(audio?.proxy || this.ytDlpLastWorkingProxy || '');
-    this.logYtDlpRuntimeConfig(cookiesArgs, proxyArgs);
+    this.logYtDlpRuntimeConfig([...cookiesArgs, ...browserCookiesArgs], proxyArgs);
     const args = [
       ...executable.baseArgs,
       target,
@@ -588,6 +613,7 @@ class ChatGamesUtilityHandler {
       '--fragment-retries',
       '2',
       ...cookiesArgs,
+      ...browserCookiesArgs,
       ...proxyArgs,
       '-o',
       outTemplate
@@ -639,8 +665,9 @@ class ChatGamesUtilityHandler {
 
     const executable = await this.resolveYtDlpCommand();
     const cookiesArgs = await this.resolveYtDlpCookiesArgs();
+    const browserCookiesArgs = this.resolveYtDlpBrowserCookiesArgs();
     const proxyArgs = this.resolveYtDlpProxyArgs(this.ytDlpLastWorkingProxy || '');
-    this.logYtDlpRuntimeConfig(cookiesArgs, proxyArgs);
+    this.logYtDlpRuntimeConfig([...cookiesArgs, ...browserCookiesArgs], proxyArgs);
     const args = [
       ...executable.baseArgs,
       `ytsearch1:${query}`,
@@ -657,6 +684,7 @@ class ChatGamesUtilityHandler {
       '--fragment-retries',
       '2',
       ...cookiesArgs,
+      ...browserCookiesArgs,
       ...proxyArgs,
       '-o',
       outTemplate
@@ -1230,9 +1258,10 @@ class ChatGamesUtilityHandler {
   static async runYtDlpJson(target, extraArgs = [], options = {}) {
     const executable = await this.resolveYtDlpCommand();
     const cookiesArgs = await this.resolveYtDlpCookiesArgs();
+    const browserCookiesArgs = this.resolveYtDlpBrowserCookiesArgs();
     const proxyArgs = this.resolveYtDlpProxyArgs(options?.proxy || '');
     const timeoutMs = Math.max(2000, Number(options?.timeoutMs || this.YT_DLP_ATTEMPT_TIMEOUT_MS));
-    this.logYtDlpRuntimeConfig(cookiesArgs, proxyArgs);
+    this.logYtDlpRuntimeConfig([...cookiesArgs, ...browserCookiesArgs], proxyArgs);
     const args = [
       ...executable.baseArgs,
       target,
@@ -1247,6 +1276,7 @@ class ChatGamesUtilityHandler {
       '0',
       ...this.getYtDlpJsRuntimeArgs(),
       ...cookiesArgs,
+      ...browserCookiesArgs,
       ...proxyArgs,
       ...extraArgs
     ];
