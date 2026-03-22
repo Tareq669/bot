@@ -743,7 +743,7 @@ class ChatGamesUtilityHandler {
   }
 
   static async fetchAutoYtDlpProxyPool() {
-    const enabledValue = String(process.env.YTDLP_PROXY_AUTO_FETCH || 'true').trim().toLowerCase();
+    const enabledValue = String(process.env.YTDLP_PROXY_AUTO_FETCH || 'false').trim().toLowerCase();
     const enabled = !['0', 'false', 'off', 'no'].includes(enabledValue);
     if (!enabled) return [];
 
@@ -1113,8 +1113,8 @@ class ChatGamesUtilityHandler {
       if (!proxy) continue;
       if (!routes.includes(proxy)) routes.push(proxy);
     }
-    const tryDirectValue = String(process.env.YTDLP_TRY_DIRECT_FALLBACK || '').trim().toLowerCase();
-    const tryDirectWithProxies = ['1', 'true', 'yes', 'on'].includes(tryDirectValue);
+    const tryDirectValue = String(process.env.YTDLP_TRY_DIRECT_FALLBACK || 'true').trim().toLowerCase();
+    const tryDirectWithProxies = !['0', 'false', 'off', 'no'].includes(tryDirectValue);
     if (!routes.length || tryDirectWithProxies) {
       routes.push('');
     }
@@ -2922,6 +2922,7 @@ class ChatGamesUtilityHandler {
 
     return this.enqueueAudioChatTask(ctx.chat?.id, async () => {
       const loadingMsg = await ctx.reply('🎧 جاري التحميل ....', this.getStarsReplyOptions(ctx));
+      let commandTimedOut = false;
       let loadingCleared = false;
       const clearLoading = async () => {
         if (loadingCleared) return;
@@ -2931,12 +2932,16 @@ class ChatGamesUtilityHandler {
 
       try {
         const runTask = async () => {
+          if (commandTimedOut) return;
           const cachedFileId = this.getStarsCachedFileId(query);
           if (cachedFileId) {
+            if (commandTimedOut) return;
             await clearLoading();
+            if (commandTimedOut) return;
             const updatesButton = Markup.inlineKeyboard([
               [Markup.button.url('تحديثات جو', this.JOE_UPDATES_CHANNEL_URL)]
             ]);
+            if (commandTimedOut) return;
             await ctx.replyWithAudio(cachedFileId, {
               caption: '♪ تم التح🎧ميل بنجاح ♪',
               ...this.getStarsReplyOptions(ctx),
@@ -2953,9 +2958,11 @@ class ChatGamesUtilityHandler {
           ).catch(() => {});
 
           let audio = await this.resolveStarsAudio(query);
+          if (commandTimedOut) return;
           const needsStrictFallback = !audio?.url || String(audio?.source || '') === 'youtube_node_candidate';
           if (needsStrictFallback) {
             const listFallback = await this.resolveAudioListWithCache(query).catch(() => []);
+            if (commandTimedOut) return;
             if (Array.isArray(listFallback) && listFallback.length) {
               const normalizedQuery = this.normalizeSearchText(query);
               const strictPick = listFallback.find((item) => {
@@ -2977,18 +2984,24 @@ class ChatGamesUtilityHandler {
           }
 
           await clearLoading();
+          if (commandTimedOut) return;
           if (!audio?.url) {
             logger.warn(`STARS_FAIL query="${query}" stage="resolve"`);
+            if (commandTimedOut) return;
             await ctx.reply('♪ عذرا غير متوفر ..', this.getStarsReplyOptions(ctx));
             return;
           }
 
+          if (commandTimedOut) return;
           let sent = await this.sendStarsAudioResult(ctx, audio);
+          if (commandTimedOut) return;
           if (!sent && !this.isYtDlpBotBlockedActive()) {
             sent = await this.sendStarsQueryFallback(ctx, query);
           }
+          if (commandTimedOut) return;
           if (!sent) {
             logger.warn(`STARS_FAIL query="${query}" stage="send"`);
+            if (commandTimedOut) return;
             await ctx.reply('♪ عذرا غير متوفر ..', this.getStarsReplyOptions(ctx));
             return;
           }
@@ -2998,6 +3011,9 @@ class ChatGamesUtilityHandler {
 
         await this.withTimeout(runTask(), this.STARS_COMMAND_TIMEOUT_MS, 'STARS_COMMAND_TIMEOUT');
       } catch (error) {
+        if (String(error?.message || '') === 'STARS_COMMAND_TIMEOUT') {
+          commandTimedOut = true;
+        }
         await clearLoading();
         if (String(error?.message || '') === 'STARS_COMMAND_TIMEOUT') {
           logger.warn(`STARS_TIMEOUT query="${query}" timeout_ms="${this.STARS_COMMAND_TIMEOUT_MS}"`);
@@ -3028,6 +3044,7 @@ class ChatGamesUtilityHandler {
     const selected = cached.list[pickIndex];
     await ctx.answerCbQuery('جاري التحميل...').catch(() => {});
     const loadingMsg = await ctx.reply('🎧 جاري التحميل ....');
+    let commandTimedOut = false;
     let loadingCleared = false;
     const clearLoading = async () => {
       if (loadingCleared) return;
@@ -3040,13 +3057,20 @@ class ChatGamesUtilityHandler {
         this.STARS_COMMAND_TIMEOUT_MS,
         'STARS_PICK_TIMEOUT'
       );
+      if (commandTimedOut) return;
       await clearLoading();
+      if (commandTimedOut) return;
       if (!audio?.url) {
+        if (commandTimedOut) return;
         await ctx.reply('♪ عذرا غير متوفر ..');
         return;
       }
+      if (commandTimedOut) return;
       await this.sendHotAudioResult(ctx, audio, false);
     } catch (error) {
+      if (String(error?.message || '') === 'STARS_PICK_TIMEOUT') {
+        commandTimedOut = true;
+      }
       await clearLoading();
       if (String(error?.message || '') === 'STARS_PICK_TIMEOUT') {
         logger.warn(`STARS_PICK_TIMEOUT query="${cached.query || ''}" timeout_ms="${this.STARS_COMMAND_TIMEOUT_MS}"`);
@@ -3467,4 +3491,3 @@ class ChatGamesUtilityHandler {
 }
 
 module.exports = ChatGamesUtilityHandler;
-
