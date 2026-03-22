@@ -1174,13 +1174,26 @@ class BankGameHandler {
     const rows = Array.isArray(group?.gameSystem?.scores) ? [...group.gameSystem.scores] : [];
     if (!rows.length) return ctx.reply('ℹ️ لا توجد بيانات تفاعل بعد.');
 
+    const resolveRowUserId = (row) => {
+      const raw = row?.userId ?? row?.id ?? row?.user?.id ?? 0;
+      const id = Number(raw);
+      return Number.isInteger(id) && id > 0 ? id : 0;
+    };
+
     const withInteraction = rows.map((row) => {
       // التفاعل الحقيقي داخل القروب: نفضل الأسبوعي ثم الرسائل ثم اليومي.
       const weekly = Math.max(0, Number(row?.activityWeeklyCount || 0));
       const messages = Math.max(0, Number(row?.messagesCount || 0));
       const daily = Math.max(0, Number(row?.activityDailyCount || 0));
       const interaction = weekly > 0 ? weekly : (messages > 0 ? messages : daily);
-      return { ...row, _interaction: interaction };
+      const rowName = String(
+        row?.username
+        || row?.name
+        || row?.first_name
+        || row?.displayName
+        || ''
+      ).trim();
+      return { ...row, _interaction: interaction, _uid: resolveRowUserId(row), _rowName: rowName };
     }).filter((row) => Number(row._interaction || 0) > 0);
 
     if (!withInteraction.length) return ctx.reply('ℹ️ لا توجد بيانات تفاعل بعد.');
@@ -1189,7 +1202,7 @@ class BankGameHandler {
     const top = withInteraction.slice(0, 20);
 
     const userIds = top
-      .map((r) => Number(r?.userId || 0))
+      .map((r) => Number(r?._uid || 0))
       .filter((id) => Number.isInteger(id) && id > 0);
     const dbUsers = userIds.length
       ? await User.find({ userId: { $in: userIds } }).select('userId firstName').lean().catch(() => [])
@@ -1203,7 +1216,7 @@ class BankGameHandler {
 
     const tgNameMap = new Map();
     await Promise.all(top.map(async (r) => {
-      const uid = Number(r?.userId || 0);
+      const uid = Number(r?._uid || 0);
       if (!uid) return;
       try {
         const member = await ctx.telegram.getChatMember(ctx.chat.id, uid);
@@ -1216,9 +1229,9 @@ class BankGameHandler {
     let text = '• توب لأكثر 20 متفاعلين في القروب \n\n';
     top.forEach((r, i) => {
       const points = Math.max(0, Math.floor(Number(r?._interaction || 0)));
-      const uid = Number(r?.userId || 0);
-      const fallback = `عضو ${uid || '0'}`;
-      const name = String(tgNameMap.get(uid) || dbNameMap.get(uid) || fallback).trim() || fallback;
+      const uid = Number(r?._uid || 0);
+      const fallback = String(r?._rowName || '').trim() || `عضو`;
+      const name = String(tgNameMap.get(uid) || dbNameMap.get(uid) || r?._rowName || fallback).trim() || fallback;
       const prefix = i === 0 ? `${i + 1})🥇` : i === 1 ? `${i + 1})🥈` : i === 2 ? `${i + 1})🥉` : `${i + 1})`;
       text += `${prefix} ${points} l ${name}\n`;
     });
