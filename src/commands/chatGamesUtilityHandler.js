@@ -49,7 +49,7 @@ class ChatGamesUtilityHandler {
   static STARS_TEMP_DOWNLOAD_TIMEOUT_MS = 30000;
   static VIDEO_SEARCH_TIMEOUT_MS = 18000;
   static VIDEO_RESOLVE_TIMEOUT_MS = 4000;
-  static YT_DLP_BOT_BLOCK_COOLDOWN_MS = 20 * 60 * 1000;
+  static YT_DLP_BOT_BLOCK_COOLDOWN_MS = 3 * 60 * 1000;
   static STARS_COMMAND_TIMEOUT_MS = 45 * 1000;
   static YT_DLP_PROXY_COOLDOWN_MS = 10 * 60 * 1000;
   static YT_DLP_PROXY_FETCH_TTL_MS = 10 * 60 * 1000;
@@ -1986,7 +1986,35 @@ class ChatGamesUtilityHandler {
 
     const isYoutubeNodeCandidate = source === 'youtube_node_candidate';
     if (isYoutubeNodeCandidate && this.isYtDlpBotBlockedActive()) {
-      logger.warn(`STARS_SEND_SKIPPED reason="bot_blocked" source="${source}"`);
+      logger.warn(`STARS_SEND_SKIPPED reason="yt_dlp_blocked_use_node_fallback" source="${source}"`);
+      if (audio?.webpageUrl && String(audio.webpageUrl).includes('youtube.com')) {
+        const nodeTempFile = await this.downloadYoutubeAudioTempViaNode(audio.webpageUrl, audio.title).catch((error) => {
+          logger.warn(`STARS_NODE_TEMP_FAILED title="${audio?.title || ''}" message="${error?.message || 'unknown'}"`);
+          return null;
+        });
+        if (nodeTempFile?.path && fs.existsSync(nodeTempFile.path)) {
+          const updatesButton = Markup.inlineKeyboard([
+            [Markup.button.url('تحديثات جو', this.JOE_UPDATES_CHANNEL_URL)]
+          ]);
+
+          try {
+            return await ctx.replyWithAudio(
+              { source: fs.createReadStream(nodeTempFile.path), filename: nodeTempFile.filename },
+              {
+                caption: '♪ تم التح🎧ميل بنجاح ♪',
+                title: this.cleanAudioLabel(nodeTempFile.title || audio?.title || 'مقطع صوتي').slice(0, 120) || 'مقطع صوتي',
+                performer: this.cleanAudioLabel(nodeTempFile.creator || audio?.creator || '').slice(0, 80) || undefined,
+                ...this.getStarsReplyOptions(ctx),
+                reply_markup: updatesButton.reply_markup
+              }
+            );
+          } finally {
+            try {
+              fs.unlinkSync(nodeTempFile.path);
+            } catch (_error) {}
+          }
+        }
+      }
       return null;
     }
 
@@ -2054,11 +2082,11 @@ class ChatGamesUtilityHandler {
   }
 
   static async sendStarsQueryFallback(ctx, queryText) {
-    if (this.isYtDlpBotBlockedActive()) {
-      logger.warn(`STARS_QUERY_FALLBACK_SKIPPED query="${queryText}" reason="bot_blocked"`);
-      return null;
+    const ytDlpBlocked = this.isYtDlpBotBlockedActive();
+    if (ytDlpBlocked) {
+      logger.warn(`STARS_QUERY_FALLBACK_SKIPPED query="${queryText}" reason="bot_blocked_try_node"`);
     }
-    const tempFile = await this.downloadStarsByQueryTemp(queryText).catch(() => null);
+    const tempFile = ytDlpBlocked ? null : await this.downloadStarsByQueryTemp(queryText).catch(() => null);
     if (!tempFile?.path || !fs.existsSync(tempFile.path)) {
       logger.warn(`STARS_QUERY_FALLBACK_FAILED query="${queryText}"`);
       const candidates = await this.resolveYoutubeCandidateList(queryText, 1).catch(() => []);
