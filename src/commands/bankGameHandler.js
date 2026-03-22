@@ -1174,12 +1174,23 @@ class BankGameHandler {
     const rows = Array.isArray(group?.gameSystem?.scores) ? [...group.gameSystem.scores] : [];
     if (!rows.length) return ctx.reply('ℹ️ لا توجد بيانات تفاعل بعد.');
     rows.sort((a, b) => Number(b.points || 0) - Number(a.points || 0));
-    const top = rows.slice(0, 10);
-    let text = '🔥 توب أكثر 10 متفاعلين بالقروب\n\n';
+    const top = rows.slice(0, 20);
+    let text = '• توب لأكثر 20 متفاعلين في القروب \n\n';
     top.forEach((r, i) => {
-      text += `${i + 1}. ${r.username || r.userId} — ${this.fmt(r.points || 0)}\n`;
+      const points = Math.max(0, Math.floor(Number(r?.points || 0)));
+      const name = String(r?.username || `user_${r?.userId || '0'}`).trim() || `user_${r?.userId || '0'}`;
+      const prefix = i === 0 ? `${i + 1})🥇` : i === 1 ? `${i + 1})🥈` : i === 2 ? `${i + 1})🥉` : `${i + 1})`;
+      text += `${prefix} ${points} l ${name}\n`;
     });
-    return ctx.reply(text);
+
+    return ctx.reply(
+      text.trim(),
+      {
+        reply_markup: Markup.inlineKeyboard([
+          [Markup.button.callback('اخفاء التوب', 'tops:hide')]
+        ]).reply_markup
+      }
+    );
   }
 
   static async handleTopThieves(ctx) {

@@ -3003,6 +3003,7 @@ bot.hears(/^تعطيل\s*البطوله$/i, (ctx) => TournamentChallengeHandler.
 bot.hears(/^توب\s*القروبات$/i, (ctx) => BankGameHandler.handleTopGroups(ctx));
 bot.hears(/^توب\s*الالعاب$/i, (ctx) => BankGameHandler.handleTopGames(ctx));
 bot.hears(/^(?:توب\s*المتفاعلين|الاكثر\s*تفاعلا|الأكثر\s*تفاعلا)$/i, (ctx) => BankGameHandler.handleTopActiveInGroup(ctx));
+bot.hears(/^(?:\/)?المتفاعلين$/i, (ctx) => BankGameHandler.handleTopActiveInGroup(ctx));
 bot.hears(/^توب\s*الحراميه$/i, (ctx) => BankGameHandler.handleTopThieves(ctx));
 bot.hears(/^توب\s*الفلوس$/i, (ctx) => BankGameHandler.handleTopMoney(ctx));
 bot.hears(/^توب\s*المطلقات$/i, (ctx) => BankGameHandler.handleTopDivorcedWomen(ctx));
@@ -5570,4 +5571,3 @@ app.listen(PORT, () => {
 startBot();
 
 module.exports = bot;
-
