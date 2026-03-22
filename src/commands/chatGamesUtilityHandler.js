@@ -22,6 +22,7 @@ class ChatGamesUtilityHandler {
   static STARS_SONGS_DIR = path.join(process.cwd(), 'songs');
   static STARS_VIDEOS_DIR = path.join(process.cwd(), 'videos');
   static starsQueryFileCache = new Map();
+  static ytDlpFfmpegReady = null;
   static MUSIC_DIR = path.join(process.cwd(), 'music');
   static MUSIC_INDEX_FILE = path.join(process.cwd(), 'music', 'music_index.json');
   static MUSIC_INDEX_RESCAN_MS = 2 * 60 * 1000;
@@ -171,9 +172,12 @@ class ChatGamesUtilityHandler {
     const executable = await this.resolveYtDlpCommand();
     const targetDir = kind === 'video' ? this.STARS_VIDEOS_DIR : this.STARS_SONGS_DIR;
     const outTemplate = path.join(targetDir, '%(title).50s.%(ext)s');
+    const runtimeArgs = this.getYtDlpJsRuntimeArgs();
+    const ffmpegReady = kind === 'audio' ? await this.hasFfmpegTools() : false;
     const args = kind === 'video'
       ? [
         ...executable.baseArgs,
+        ...runtimeArgs,
         '-f',
         'mp4',
         '--no-playlist',
@@ -185,11 +189,10 @@ class ChatGamesUtilityHandler {
       ]
       : [
         ...executable.baseArgs,
-        '-x',
-        '--audio-format',
-        'mp3',
-        '--audio-quality',
-        '0',
+        ...runtimeArgs,
+        ...(ffmpegReady
+          ? ['-x', '--audio-format', 'mp3', '--audio-quality', '0']
+          : ['-f', 'bestaudio[ext=m4a]/bestaudio']),
         '--no-playlist',
         '--max-filesize',
         '10M',
@@ -248,6 +251,32 @@ class ChatGamesUtilityHandler {
       if (key) this.starsQueryFileCache.set(key, selectedPath);
     }
     return selectedPath;
+  }
+
+  static getYtDlpJsRuntimeArgs() {
+    const configured = String(process.env.YTDLP_JS_RUNTIMES || '').trim();
+    if (configured) return ['--js-runtimes', configured];
+    const nodePath = String(process.execPath || '').trim();
+    if (nodePath) return ['--js-runtimes', `node:${nodePath}`];
+    return ['--js-runtimes', 'node'];
+  }
+
+  static async hasFfmpegTools() {
+    if (this.ytDlpFfmpegReady !== null) return this.ytDlpFfmpegReady;
+    const check = async (cmd) => {
+      try {
+        await this.execFileAsync(cmd, ['-version'], { timeout: 4000 });
+        return true;
+      } catch (_error) {
+        return false;
+      }
+    };
+    const [ffmpegOk, ffprobeOk] = await Promise.all([check('ffmpeg'), check('ffprobe')]);
+    this.ytDlpFfmpegReady = Boolean(ffmpegOk && ffprobeOk);
+    if (!this.ytDlpFfmpegReady) {
+      logger.warn('STARS_FFMPEG_MISSING using="direct-audio-fallback"');
+    }
+    return this.ytDlpFfmpegReady;
   }
 
   static buildMusicKeywords(title) {
@@ -1216,6 +1245,7 @@ class ChatGamesUtilityHandler {
       '8',
       '--retries',
       '0',
+      ...this.getYtDlpJsRuntimeArgs(),
       ...cookiesArgs,
       ...proxyArgs,
       ...extraArgs
