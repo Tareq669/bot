@@ -2,7 +2,7 @@ const axios = require('axios');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { execFile } = require('child_process');
+const { execFile, spawn } = require('child_process');
 const Markup = require('telegraf/markup');
 const YTDlpWrap = require('yt-dlp-wrap').default;
 const ytdl = require('@distube/ytdl-core');
@@ -19,6 +19,9 @@ class ChatGamesUtilityHandler {
   static starsFileIdCache = new Map();
   static AUDIO_QUERY_CACHE_TTL_MS = 30 * 60 * 1000;
   static STARS_FILEID_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+  static STARS_SONGS_DIR = path.join(process.cwd(), 'songs');
+  static STARS_VIDEOS_DIR = path.join(process.cwd(), 'videos');
+  static starsQueryFileCache = new Map();
   static MUSIC_DIR = path.join(process.cwd(), 'music');
   static MUSIC_INDEX_FILE = path.join(process.cwd(), 'music', 'music_index.json');
   static MUSIC_INDEX_RESCAN_MS = 2 * 60 * 1000;
@@ -115,6 +118,136 @@ class ChatGamesUtilityHandler {
 
   static ensureStarsTempDir() {
     fs.mkdirSync(this.STARS_TEMP_DIR, { recursive: true });
+  }
+
+  static ensureStarsMediaDirs() {
+    fs.mkdirSync(this.STARS_SONGS_DIR, { recursive: true });
+    fs.mkdirSync(this.STARS_VIDEOS_DIR, { recursive: true });
+  }
+
+  static sleep(ms = 0) {
+    return new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(ms || 0))));
+  }
+
+  static normalizeStarsCacheKey(value) {
+    return this.normalizeSearchText(String(value || ''));
+  }
+
+  static findCachedStarsAudio(queryText) {
+    this.ensureStarsMediaDirs();
+    const key = this.normalizeStarsCacheKey(queryText);
+    if (!key) return '';
+
+    const cachedPath = String(this.starsQueryFileCache.get(key) || '');
+    if (cachedPath && fs.existsSync(cachedPath)) return cachedPath;
+
+    const files = fs.readdirSync(this.STARS_SONGS_DIR, { withFileTypes: true })
+      .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith('.mp3'))
+      .map((entry) => entry.name);
+
+    const match = files.find((name) => this.normalizeStarsCacheKey(path.basename(name, '.mp3')).includes(key))
+      || files.find((name) => key.includes(this.normalizeStarsCacheKey(path.basename(name, '.mp3'))));
+    if (!match) return '';
+
+    const fullPath = path.join(this.STARS_SONGS_DIR, match);
+    this.starsQueryFileCache.set(key, fullPath);
+    return fullPath;
+  }
+
+  static async runYtDlpDownload(queryText, kind = 'audio') {
+    this.ensureStarsMediaDirs();
+    const query = String(queryText || '').trim();
+    if (!query) return '';
+
+    const beforeFiles = new Set(
+      fs.readdirSync(kind === 'video' ? this.STARS_VIDEOS_DIR : this.STARS_SONGS_DIR, { withFileTypes: true })
+        .filter((entry) => entry.isFile())
+        .map((entry) => entry.name)
+    );
+
+    // Delay بسيط لتحسين تجربة البوت وعدم الضغط على التنفيذ المتزامن.
+    await this.sleep(2000);
+
+    const executable = await this.resolveYtDlpCommand();
+    const targetDir = kind === 'video' ? this.STARS_VIDEOS_DIR : this.STARS_SONGS_DIR;
+    const outTemplate = path.join(targetDir, '%(title).50s.%(ext)s');
+    const args = kind === 'video'
+      ? [
+        ...executable.baseArgs,
+        '-f',
+        'mp4',
+        '--no-playlist',
+        '--retries',
+        '1',
+        '-o',
+        outTemplate,
+        `ytsearch1:${query}`
+      ]
+      : [
+        ...executable.baseArgs,
+        '-x',
+        '--audio-format',
+        'mp3',
+        '--audio-quality',
+        '0',
+        '--no-playlist',
+        '--max-filesize',
+        '10M',
+        '--retries',
+        '1',
+        '-o',
+        outTemplate,
+        `ytsearch1:${query}`
+      ];
+
+    await new Promise((resolve, reject) => {
+      const child = spawn(executable.command, args, {
+        windowsHide: true,
+        stdio: ['ignore', 'pipe', 'pipe']
+      });
+
+      let stderr = '';
+      child.stderr.on('data', (chunk) => {
+        stderr += String(chunk || '');
+      });
+      child.on('error', (error) => {
+        reject(error);
+      });
+      child.on('close', (code) => {
+        if (code === 0) {
+          resolve();
+          return;
+        }
+        reject(new Error(stderr || `yt-dlp exited with code ${code}`));
+      });
+    });
+
+    const afterEntries = fs.readdirSync(targetDir, { withFileTypes: true })
+      .filter((entry) => entry.isFile());
+    const newFiles = afterEntries
+      .filter((entry) => !beforeFiles.has(entry.name))
+      .map((entry) => path.join(targetDir, entry.name));
+
+    let selectedPath = '';
+    const candidates = newFiles.length ? newFiles : afterEntries.map((entry) => path.join(targetDir, entry.name));
+    if (candidates.length) {
+      selectedPath = candidates
+        .slice()
+        .sort((a, b) => {
+          try {
+            return fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs;
+          } catch (_error) {
+            return 0;
+          }
+        })[0];
+    }
+
+    if (!selectedPath || !fs.existsSync(selectedPath)) return '';
+    if (kind === 'audio') {
+      const key = this.normalizeStarsCacheKey(query);
+      if (key) this.starsQueryFileCache.set(key, selectedPath);
+    }
+    return selectedPath;
   }
 
   static buildMusicKeywords(title) {
@@ -2949,8 +3082,7 @@ class ChatGamesUtilityHandler {
     }
 
     return this.enqueueAudioChatTask(ctx.chat?.id, async () => {
-      const loadingMsg = await ctx.reply('🎧 جاري التحميل ....', this.getStarsReplyOptions(ctx));
-      let commandTimedOut = false;
+      const loadingMsg = await ctx.reply('🎧 جاري التحميل...', this.getStarsReplyOptions(ctx));
       let loadingCleared = false;
       const clearLoading = async () => {
         if (loadingCleared) return;
@@ -2959,93 +3091,33 @@ class ChatGamesUtilityHandler {
       };
 
       try {
-        const runTask = async () => {
-          if (commandTimedOut) return;
-          const cachedFileId = this.getStarsCachedFileId(query);
-          if (cachedFileId) {
-            if (commandTimedOut) return;
-            await clearLoading();
-            if (commandTimedOut) return;
-            const updatesButton = Markup.inlineKeyboard([
-              [Markup.button.url('تحديثات جو', this.JOE_UPDATES_CHANNEL_URL)]
-            ]);
-            if (commandTimedOut) return;
-            await ctx.replyWithAudio(cachedFileId, {
-              caption: '♪ تم التح🎧ميل بنجاح ♪',
-              ...this.getStarsReplyOptions(ctx),
-              reply_markup: updatesButton.reply_markup
-            }).catch(() => {});
-            return;
-          }
-
-          await ctx.telegram.editMessageText(
-            ctx.chat.id,
-            loadingMsg.message_id,
-            undefined,
-            '⏳ تجهيز الصوت...'
-          ).catch(() => {});
-
-          let audio = await this.resolveStarsAudio(query);
-          if (commandTimedOut) return;
-          const needsStrictFallback = !audio?.url || String(audio?.source || '') === 'youtube_node_candidate';
-          if (needsStrictFallback) {
-            const listFallback = await this.resolveAudioListWithCache(query).catch(() => []);
-            if (commandTimedOut) return;
-            if (Array.isArray(listFallback) && listFallback.length) {
-              const normalizedQuery = this.normalizeSearchText(query);
-              const strictPick = listFallback.find((item) => {
-                const title = String(item?.title || '').trim();
-                const creator = String(item?.creator || '').trim();
-                const text = `${title} ${creator}`.trim();
-                if (!text) return false;
-                if (!this.isAcceptableQueryMatch(normalizedQuery, text)) return false;
-                const itemNorm = this.normalizeSearchText(text);
-                const queryIsReligious = this.hasAnyTerm(normalizedQuery, this.RELIGIOUS_AUDIO_TERMS);
-                const itemIsReligious = this.hasAnyTerm(itemNorm, this.RELIGIOUS_AUDIO_TERMS);
-                if (!queryIsReligious && itemIsReligious) return false;
-                return true;
-              });
-              if (strictPick?.url) {
-                audio = strictPick;
-              }
-            }
-          }
-
-          await clearLoading();
-          if (commandTimedOut) return;
-          if (!audio?.url) {
-            logger.warn(`STARS_FAIL query="${query}" stage="resolve"`);
-            if (commandTimedOut) return;
-            await ctx.reply('♪ عذرا غير متوفر ..', this.getStarsReplyOptions(ctx));
-            return;
-          }
-
-          if (commandTimedOut) return;
-          let sent = await this.sendStarsAudioResult(ctx, audio);
-          if (commandTimedOut) return;
-          if (!sent && !this.isYtDlpBotBlockedActive()) {
-            sent = await this.sendStarsQueryFallback(ctx, query);
-          }
-          if (commandTimedOut) return;
-          if (!sent) {
-            logger.warn(`STARS_FAIL query="${query}" stage="send"`);
-            if (commandTimedOut) return;
-            await ctx.reply('♪ عذرا غير متوفر ..', this.getStarsReplyOptions(ctx));
-            return;
-          }
-          const fileId = String(sent?.audio?.file_id || '').trim();
-          if (fileId) this.setStarsCachedFileId(query, fileId);
-        };
-
-        await this.withTimeout(runTask(), this.STARS_COMMAND_TIMEOUT_MS, 'STARS_COMMAND_TIMEOUT');
-      } catch (error) {
-        if (String(error?.message || '') === 'STARS_COMMAND_TIMEOUT') {
-          commandTimedOut = true;
+        let audioPath = this.findCachedStarsAudio(query);
+        if (!audioPath) {
+          audioPath = await this.runYtDlpDownload(query, 'audio').catch((error) => {
+            logger.warn(`STARS_YTDLP_DOWNLOAD_FAILED query="${query}" message="${error?.message || 'unknown'}"`);
+            return '';
+          });
         }
+
         await clearLoading();
-        if (String(error?.message || '') === 'STARS_COMMAND_TIMEOUT') {
-          logger.warn(`STARS_TIMEOUT query="${query}" timeout_ms="${this.STARS_COMMAND_TIMEOUT_MS}"`);
+        if (!audioPath || !fs.existsSync(audioPath)) {
+          await ctx.reply('♪ عذرا غير متوفر ..', this.getStarsReplyOptions(ctx));
+          return;
         }
+
+        const updatesButton = Markup.inlineKeyboard([
+          [Markup.button.url('تحديثات جو', this.JOE_UPDATES_CHANNEL_URL)]
+        ]);
+        await ctx.replyWithAudio(
+          { source: fs.createReadStream(audioPath), filename: path.basename(audioPath) },
+          {
+            ...this.getStarsReplyOptions(ctx),
+            reply_markup: updatesButton.reply_markup
+          }
+        );
+      } catch (error) {
+        await clearLoading();
+        logger.warn(`STARS_FAIL query="${query}" stage="direct_ytdlp" message="${error?.message || 'unknown'}"`);
         await ctx.reply('♪ عذرا غير متوفر ..', this.getStarsReplyOptions(ctx));
       }
     });
