@@ -1173,12 +1173,52 @@ class BankGameHandler {
     const group = await Group.findOne({ groupId: String(ctx.chat.id) });
     const rows = Array.isArray(group?.gameSystem?.scores) ? [...group.gameSystem.scores] : [];
     if (!rows.length) return ctx.reply('ℹ️ لا توجد بيانات تفاعل بعد.');
-    rows.sort((a, b) => Number(b.points || 0) - Number(a.points || 0));
-    const top = rows.slice(0, 20);
+
+    const withInteraction = rows.map((row) => {
+      // التفاعل الحقيقي داخل القروب: نفضل الأسبوعي ثم الرسائل ثم اليومي.
+      const weekly = Math.max(0, Number(row?.activityWeeklyCount || 0));
+      const messages = Math.max(0, Number(row?.messagesCount || 0));
+      const daily = Math.max(0, Number(row?.activityDailyCount || 0));
+      const interaction = weekly > 0 ? weekly : (messages > 0 ? messages : daily);
+      return { ...row, _interaction: interaction };
+    }).filter((row) => Number(row._interaction || 0) > 0);
+
+    if (!withInteraction.length) return ctx.reply('ℹ️ لا توجد بيانات تفاعل بعد.');
+
+    withInteraction.sort((a, b) => Number(b._interaction || 0) - Number(a._interaction || 0));
+    const top = withInteraction.slice(0, 20);
+
+    const userIds = top
+      .map((r) => Number(r?.userId || 0))
+      .filter((id) => Number.isInteger(id) && id > 0);
+    const dbUsers = userIds.length
+      ? await User.find({ userId: { $in: userIds } }).select('userId firstName username').lean().catch(() => [])
+      : [];
+    const dbNameMap = new Map(
+      (Array.isArray(dbUsers) ? dbUsers : []).map((u) => [
+        Number(u.userId),
+        String(u.firstName || u.username || '').trim()
+      ])
+    );
+
+    const tgNameMap = new Map();
+    await Promise.all(top.map(async (r) => {
+      const uid = Number(r?.userId || 0);
+      if (!uid) return;
+      try {
+        const member = await ctx.telegram.getChatMember(ctx.chat.id, uid);
+        const full = [member?.user?.first_name, member?.user?.last_name].filter(Boolean).join(' ').trim();
+        const fromTg = full || String(member?.user?.username || '').trim();
+        if (fromTg) tgNameMap.set(uid, fromTg);
+      } catch (_error) {}
+    }));
+
     let text = '• توب لأكثر 20 متفاعلين في القروب \n\n';
     top.forEach((r, i) => {
-      const points = Math.max(0, Math.floor(Number(r?.points || 0)));
-      const name = String(r?.username || `user_${r?.userId || '0'}`).trim() || `user_${r?.userId || '0'}`;
+      const points = Math.max(0, Math.floor(Number(r?._interaction || 0)));
+      const uid = Number(r?.userId || 0);
+      const fallback = String(r?.username || `user_${uid || '0'}`).trim() || `user_${uid || '0'}`;
+      const name = String(tgNameMap.get(uid) || dbNameMap.get(uid) || fallback).trim() || fallback;
       const prefix = i === 0 ? `${i + 1})🥇` : i === 1 ? `${i + 1})🥈` : i === 2 ? `${i + 1})🥉` : `${i + 1})`;
       text += `${prefix} ${points} l ${name}\n`;
     });
