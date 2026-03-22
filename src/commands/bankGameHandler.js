@@ -1192,12 +1192,12 @@ class BankGameHandler {
       .map((r) => Number(r?.userId || 0))
       .filter((id) => Number.isInteger(id) && id > 0);
     const dbUsers = userIds.length
-      ? await User.find({ userId: { $in: userIds } }).select('userId firstName username').lean().catch(() => [])
+      ? await User.find({ userId: { $in: userIds } }).select('userId firstName').lean().catch(() => [])
       : [];
     const dbNameMap = new Map(
       (Array.isArray(dbUsers) ? dbUsers : []).map((u) => [
         Number(u.userId),
-        String(u.firstName || u.username || '').trim()
+        String(u.firstName || '').trim()
       ])
     );
 
@@ -1208,7 +1208,7 @@ class BankGameHandler {
       try {
         const member = await ctx.telegram.getChatMember(ctx.chat.id, uid);
         const full = [member?.user?.first_name, member?.user?.last_name].filter(Boolean).join(' ').trim();
-        const fromTg = full || String(member?.user?.username || '').trim();
+        const fromTg = full || String(member?.user?.first_name || '').trim();
         if (fromTg) tgNameMap.set(uid, fromTg);
       } catch (_error) {}
     }));
@@ -1217,7 +1217,7 @@ class BankGameHandler {
     top.forEach((r, i) => {
       const points = Math.max(0, Math.floor(Number(r?._interaction || 0)));
       const uid = Number(r?.userId || 0);
-      const fallback = String(r?.username || `user_${uid || '0'}`).trim() || `user_${uid || '0'}`;
+      const fallback = `عضو ${uid || '0'}`;
       const name = String(tgNameMap.get(uid) || dbNameMap.get(uid) || fallback).trim() || fallback;
       const prefix = i === 0 ? `${i + 1})🥇` : i === 1 ? `${i + 1})🥈` : i === 2 ? `${i + 1})🥉` : `${i + 1})`;
       text += `${prefix} ${points} l ${name}\n`;
