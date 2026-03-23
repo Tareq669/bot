@@ -1202,19 +1202,56 @@ class BankGameHandler {
     };
 
     const withInteraction = rows.map((row) => {
-      // التفاعل الحقيقي داخل القروب: نفضل الأسبوعي ثم الرسائل ثم اليومي.
+      // معيار الترتيب: رسائل القروب الفعلية أولاً، ثم الأسبوعي/اليومي كاحتياط.
+      const messagesPrimary = Math.max(
+        0,
+        Number(row?.messagesCount || 0),
+        Number(row?.messageCount || 0)
+      );
       const weekly = Math.max(0, Number(row?.activityWeeklyCount || 0));
-      const messages = Math.max(0, Number(row?.messagesCount || 0));
       const daily = Math.max(0, Number(row?.activityDailyCount || 0));
-      const interaction = weekly > 0 ? weekly : (messages > 0 ? messages : daily);
+      const interaction = messagesPrimary > 0 ? messagesPrimary : (weekly > 0 ? weekly : daily);
       const rowName = resolveRowName(row);
-      return { ...row, _interaction: interaction, _uid: resolveRowUserId(row), _rowName: rowName };
+      return {
+        ...row,
+        _interaction: interaction,
+        _messages: messagesPrimary,
+        _weekly: weekly,
+        _daily: daily,
+        _uid: resolveRowUserId(row),
+        _rowName: rowName
+      };
     }).filter((row) => Number(row._interaction || 0) > 0 && (Number(row._uid || 0) > 0 || String(row._rowName || '').trim()));
 
     if (!withInteraction.length) return ctx.reply('ℹ️ لا توجد بيانات تفاعل بعد.');
 
-    withInteraction.sort((a, b) => Number(b._interaction || 0) - Number(a._interaction || 0));
-    const top = withInteraction.slice(0, 20);
+    // دمج الصفوف المكررة لنفس العضو لتفادي نتائج غير دقيقة.
+    const mergedByMember = new Map();
+    withInteraction.forEach((row) => {
+      const uid = Number(row?._uid || 0);
+      const fallbackName = String(row?._rowName || '').trim();
+      const key = uid > 0 ? `uid:${uid}` : `name:${fallbackName.toLowerCase()}`;
+      const prev = mergedByMember.get(key);
+      if (!prev) {
+        mergedByMember.set(key, { ...row });
+        return;
+      }
+      prev._interaction = Math.max(Number(prev._interaction || 0), Number(row._interaction || 0));
+      prev._messages = Math.max(Number(prev._messages || 0), Number(row._messages || 0));
+      prev._weekly = Math.max(Number(prev._weekly || 0), Number(row._weekly || 0));
+      prev._daily = Math.max(Number(prev._daily || 0), Number(row._daily || 0));
+      if (!String(prev._rowName || '').trim() && fallbackName) prev._rowName = fallbackName;
+      if (!Number(prev._uid || 0) && uid > 0) prev._uid = uid;
+    });
+
+    const mergedRows = [...mergedByMember.values()];
+    mergedRows.sort((a, b) =>
+      (Number(b._interaction || 0) - Number(a._interaction || 0))
+      || (Number(b._messages || 0) - Number(a._messages || 0))
+      || (Number(b._weekly || 0) - Number(a._weekly || 0))
+      || (Number(b._daily || 0) - Number(a._daily || 0))
+    );
+    const top = mergedRows.slice(0, 20);
 
     const userIds = top
       .map((r) => Number(r?._uid || 0))
