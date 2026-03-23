@@ -1175,9 +1175,30 @@ class BankGameHandler {
     if (!rows.length) return ctx.reply('ℹ️ لا توجد بيانات تفاعل بعد.');
 
     const resolveRowUserId = (row) => {
-      const raw = row?.userId ?? row?.id ?? row?.user?.id ?? 0;
+      const raw = row?.userId ?? row?.id ?? row?.user?.id ?? row?.memberId ?? row?.uid ?? 0;
       const id = Number(raw);
       return Number.isInteger(id) && id > 0 ? id : 0;
+    };
+
+    const resolveRowName = (row) => {
+      const candidates = [
+        row?.username,
+        row?.name,
+        row?.first_name,
+        row?.firstName,
+        row?.displayName,
+        row?.user?.first_name,
+        row?.user?.firstName,
+        row?.user?.name,
+        row?.user?.username
+      ];
+      for (const candidate of candidates) {
+        const value = String(candidate || '').trim();
+        if (!value) continue;
+        if (value.toLowerCase() === 'undefined' || value.toLowerCase() === 'null') continue;
+        return value;
+      }
+      return '';
     };
 
     const withInteraction = rows.map((row) => {
@@ -1186,15 +1207,9 @@ class BankGameHandler {
       const messages = Math.max(0, Number(row?.messagesCount || 0));
       const daily = Math.max(0, Number(row?.activityDailyCount || 0));
       const interaction = weekly > 0 ? weekly : (messages > 0 ? messages : daily);
-      const rowName = String(
-        row?.username
-        || row?.name
-        || row?.first_name
-        || row?.displayName
-        || ''
-      ).trim();
+      const rowName = resolveRowName(row);
       return { ...row, _interaction: interaction, _uid: resolveRowUserId(row), _rowName: rowName };
-    }).filter((row) => Number(row._interaction || 0) > 0);
+    }).filter((row) => Number(row._interaction || 0) > 0 && (Number(row._uid || 0) > 0 || String(row._rowName || '').trim()));
 
     if (!withInteraction.length) return ctx.reply('ℹ️ لا توجد بيانات تفاعل بعد.');
 
@@ -1226,15 +1241,21 @@ class BankGameHandler {
       } catch (_error) {}
     }));
 
-    let text = '• توب لأكثر 20 متفاعلين في القروب \n\n';
-    top.forEach((r, i) => {
+    const lines = [];
+    top.forEach((r) => {
       const points = Math.max(0, Math.floor(Number(r?._interaction || 0)));
       const uid = Number(r?._uid || 0);
       const fallback = String(r?._rowName || '').trim() || `عضو`;
       const name = String(tgNameMap.get(uid) || dbNameMap.get(uid) || r?._rowName || fallback).trim() || fallback;
-      const prefix = i === 0 ? `${i + 1})🥇` : i === 1 ? `${i + 1})🥈` : i === 2 ? `${i + 1})🥉` : `${i + 1})`;
-      text += `${prefix} ${points} l ${name}\n`;
+      if (!name || name === 'عضو') return;
+      const rank = lines.length + 1;
+      const prefix = rank === 1 ? `${rank})🥇` : rank === 2 ? `${rank})🥈` : rank === 3 ? `${rank})🥉` : `${rank})`;
+      lines.push(`${prefix} ${points} l ${name}`);
     });
+
+    // لو كل الصفوف كانت غير صالحة بالأسماء، نرجع رسالة واضحة بدل "عضو 0".
+    if (!lines.length) return ctx.reply('ℹ️ لا توجد بيانات أسماء كافية في سجلات التفاعل حالياً.');
+    const text = `• توب لأكثر 20 متفاعلين في القروب \n\n${lines.slice(0, 20).join('\n')}`;
 
     return ctx.reply(
       text.trim(),
