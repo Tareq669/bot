@@ -2934,8 +2934,20 @@ bot.action(/^tops:(rulers|arena|invaders|thieves|money|divorced_men|divorced_wom
   const action = String(ctx.match?.[1] || '').toLowerCase();
 
   if (action === 'hide') {
-    await ctx.editMessageReplyMarkup({ inline_keyboard: [] }).catch(() => {});
-    await ctx.reply('• تم اخفاء الاوامر بنجاح');
+    const chatId = ctx.chat?.id;
+    const messageId = ctx.callbackQuery?.message?.message_id;
+    let hidden = false;
+
+    if (chatId && messageId) {
+      await ctx.telegram.deleteMessage(chatId, messageId).then(() => {
+        hidden = true;
+      }).catch(() => {});
+    }
+
+    if (!hidden) {
+      await ctx.editMessageReplyMarkup({ inline_keyboard: [] }).catch(() => {});
+      await ctx.reply('• تم اخفاء التوب بنجاح');
+    }
     return;
   }
 
