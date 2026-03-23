@@ -177,45 +177,8 @@ class ChatGamesUtilityHandler {
     const runtimeArgs = this.getYtDlpJsRuntimeArgs();
     this.logYtDlpRuntimeConfig([...cookiesArgs, ...browserCookiesArgs], []);
     const ffmpegReady = kind === 'audio' ? await this.hasFfmpegTools() : false;
-    const args = kind === 'video'
-      ? [
-        ...executable.baseArgs,
-        ...runtimeArgs,
-        ...cookiesArgs,
-        ...browserCookiesArgs,
-        '--extractor-args',
-        'youtube:player_client=tv_embedded,ios,android;lang=en',
-        '-f',
-        'mp4',
-        '--no-playlist',
-        '--retries',
-        '1',
-        '-o',
-        outTemplate,
-        `ytsearch1:${query}`
-      ]
-      : [
-        ...executable.baseArgs,
-        ...runtimeArgs,
-        ...cookiesArgs,
-        ...browserCookiesArgs,
-        '--extractor-args',
-        'youtube:player_client=tv_embedded,ios,android;lang=en',
-        ...(ffmpegReady
-          ? ['-x', '--audio-format', 'mp3', '--audio-quality', '0']
-          : ['-f', 'bestaudio[ext=m4a]/bestaudio']),
-        '--no-playlist',
-        '--max-filesize',
-        '10M',
-        '--retries',
-        '1',
-        '-o',
-        outTemplate,
-        `ytsearch1:${query}`
-      ];
-
-    await new Promise((resolve, reject) => {
-      const child = spawn(executable.command, args, {
+    const runDownloadAttempt = (attemptArgs = [], authLabel = 'on') => new Promise((resolve, reject) => {
+      const child = spawn(executable.command, attemptArgs, {
         windowsHide: true,
         stdio: ['ignore', 'pipe', 'pipe']
       });
@@ -233,14 +196,79 @@ class ChatGamesUtilityHandler {
           return;
         }
         const msg = String(stderr || `yt-dlp exited with code ${code}`);
-        if (msg.toLowerCase().includes('sign in to confirm you')) {
+        const lower = msg.toLowerCase();
+        if (lower.includes('sign in to confirm you')) {
           logger.warn(
-            `STARS_YTDLP_NEEDS_COOKIES query="${query}" cookies="${cookiesArgs.length ? 'on' : 'off'}" browser_cookies="${browserCookiesArgs.length ? 'on' : 'off'}"`
+            `STARS_YTDLP_NEEDS_COOKIES query="${query}" cookies="${authLabel}"`
           );
         }
         reject(new Error(msg));
       });
     });
+
+    const buildArgs = ({ useAuth = true, relaxedFormat = false } = {}) => {
+      const authArgs = useAuth ? [...cookiesArgs, ...browserCookiesArgs] : [];
+      const audioFormatArgs = ffmpegReady
+        ? ['-x', '--audio-format', 'mp3', '--audio-quality', '0']
+        : (relaxedFormat ? ['-f', 'bestaudio/best'] : ['-f', 'bestaudio[ext=m4a]/bestaudio']);
+      const videoFormatArgs = relaxedFormat ? ['-f', 'mp4/best'] : ['-f', 'mp4'];
+      return kind === 'video'
+        ? [
+          ...executable.baseArgs,
+          ...runtimeArgs,
+          ...authArgs,
+          ...videoFormatArgs,
+          '--no-playlist',
+          '--retries',
+          '1',
+          '-o',
+          outTemplate,
+          `ytsearch1:${query}`
+        ]
+        : [
+          ...executable.baseArgs,
+          ...runtimeArgs,
+          ...authArgs,
+          ...audioFormatArgs,
+          '--no-playlist',
+          '--max-filesize',
+          '10M',
+          '--retries',
+          '1',
+          '-o',
+          outTemplate,
+          `ytsearch1:${query}`
+        ];
+    };
+
+    let lastError = null;
+    const attempts = [
+      { useAuth: true, relaxedFormat: false, label: 'on' },
+      { useAuth: true, relaxedFormat: true, label: 'on-relaxed' },
+      { useAuth: false, relaxedFormat: true, label: 'off-relaxed' }
+    ];
+
+    for (const attempt of attempts) {
+      const args = buildArgs(attempt);
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        await runDownloadAttempt(args, attempt.label);
+        lastError = null;
+        break;
+      } catch (error) {
+        lastError = error;
+        const msg = String(error?.message || '').toLowerCase();
+        const cookiesInvalid = msg.includes('cookies are no longer valid');
+        const formatUnavailable = msg.includes('requested format is not available') || msg.includes('po token');
+        if (cookiesInvalid && attempt.useAuth) {
+          logger.warn(`STARS_YTDLP_COOKIES_EXPIRED query="${query}"`);
+        } else if (formatUnavailable && !attempt.relaxedFormat) {
+          logger.warn(`STARS_YTDLP_FORMAT_RETRY query="${query}"`);
+        }
+      }
+    }
+
+    if (lastError) throw lastError;
 
     const afterEntries = fs.readdirSync(targetDir, { withFileTypes: true })
       .filter((entry) => entry.isFile());
