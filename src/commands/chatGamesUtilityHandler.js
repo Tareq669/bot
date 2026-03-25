@@ -61,6 +61,7 @@ class ChatGamesUtilityHandler {
   static STARS_TEMP_DIR = path.join(os.tmpdir(), 'jo-bot-stars');
   static YT_DLP_BIN_DIR = path.join(os.tmpdir(), 'jo-bot-bin');
   static STARS_AUDIO_FORMAT = 'worstaudio[ext=m4a]/worstaudio/bestaudio[abr<=64]/bestaudio';
+  static STARS_MAX_UPLOAD_MB = Math.max(1, Number(process.env.STARS_MAX_UPLOAD_MB || 9));
   static YT_HTML_SEARCH_TIMEOUT_MS = 4500;
   static ARCHIVE_SEARCH_URL = 'https://archive.org/advancedsearch.php';
   static ARCHIVE_METADATA_URL = 'https://archive.org/metadata';
@@ -171,8 +172,23 @@ class ChatGamesUtilityHandler {
     if (!match) return '';
 
     const fullPath = path.join(this.STARS_SONGS_DIR, match);
+    if (!this.isStarsFileWithinUploadLimit(fullPath)) return '';
     this.starsQueryFileCache.set(key, fullPath);
     return fullPath;
+  }
+
+  static getStarsMaxUploadBytes() {
+    return Math.floor(this.STARS_MAX_UPLOAD_MB * 1024 * 1024);
+  }
+
+  static isStarsFileWithinUploadLimit(filePath = '') {
+    try {
+      const stat = fs.statSync(String(filePath || ''));
+      if (!stat.isFile()) return false;
+      return Number(stat.size || 0) <= this.getStarsMaxUploadBytes();
+    } catch (_error) {
+      return false;
+    }
   }
 
   static async runYtDlpDownload(queryText, kind = 'audio') {
@@ -232,7 +248,7 @@ class ChatGamesUtilityHandler {
       const searchTarget = String(target || '').trim() || `ytsearch1:${query}`;
       const audioFormatArgs = ffmpegReady
         ? ['-x', '--audio-format', 'mp3', '--audio-quality', '0']
-        : (relaxedFormat ? ['-f', 'bestaudio/best'] : ['-f', 'bestaudio[ext=m4a]/bestaudio']);
+        : (relaxedFormat ? ['-f', 'worstaudio/bestaudio'] : ['-f', 'worstaudio[ext=m4a]/worstaudio/bestaudio[abr<=64]/bestaudio']);
       const videoFormatArgs = relaxedFormat ? ['-f', 'mp4/best'] : ['-f', 'mp4'];
       return kind === 'video'
         ? [
@@ -373,6 +389,12 @@ class ChatGamesUtilityHandler {
     }
 
     if (!selectedPath || !fs.existsSync(selectedPath)) return '';
+    if (!this.isStarsFileWithinUploadLimit(selectedPath)) {
+      logger.warn(
+        `STARS_FILE_TOO_LARGE path="${path.basename(selectedPath)}" max_mb="${this.STARS_MAX_UPLOAD_MB}"`
+      );
+      return '';
+    }
     if (kind === 'audio') {
       const key = this.normalizeStarsCacheKey(query);
       if (key) this.starsQueryFileCache.set(key, selectedPath);
@@ -3272,7 +3294,7 @@ class ChatGamesUtilityHandler {
         }
 
         await clearLoading();
-        if (!audioPath || !fs.existsSync(audioPath)) {
+        if (!audioPath || !fs.existsSync(audioPath) || !this.isStarsFileWithinUploadLimit(audioPath)) {
           await ctx.reply('♪ عذرا غير متوفر ..', this.getStarsReplyOptions(ctx));
           return;
         }
