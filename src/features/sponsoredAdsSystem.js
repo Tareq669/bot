@@ -23,11 +23,9 @@ class SponsoredAdsSystem {
   }
 
   static shouldShowAd(ctx) {
-    const isPrivate = ctx.chat?.type === 'private';
-    const text = String(ctx.message?.text || '').trim();
-    if (!isPrivate || !text) return false;
-    if (text.startsWith('/')) return false;
-    return true;
+    // Disable automatic ad injection in private chats to avoid unexpected
+    // promotional messages being sent to users.
+    return false;
   }
 
   static runtimeForUser(userId) {
