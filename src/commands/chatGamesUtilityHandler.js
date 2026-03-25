@@ -83,6 +83,10 @@ class ChatGamesUtilityHandler {
   static ytDlpProxyBlockedUntil = new Map();
   static ytDlpFetchedProxyPool = { fetchedAt: 0, items: [] };
   static ytDlpProxyHealthCache = new Map();
+  static ytDlpCookiesInvalidUntil = 0;
+  static ytDlpGlobalQueue = Promise.resolve();
+  static YT_DLP_GLOBAL_MIN_GAP_MS = 1200;
+  static ytDlpLastRunAt = 0;
 
   static MUSIC_HINT_TERMS = [
     'اغنية', 'أغنية', 'اغاني', 'أغاني', 'music', 'song', 'mp3', 'كليب', 'حفلة', 'حفله',
@@ -128,6 +132,22 @@ class ChatGamesUtilityHandler {
 
   static sleep(ms = 0) {
     return new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(ms || 0))));
+  }
+
+  static enqueueYtDlpTask(taskFn) {
+    const current = this.ytDlpGlobalQueue || Promise.resolve();
+    const next = current
+      .catch(() => {})
+      .then(async () => {
+        const now = Date.now();
+        const waitMs = Math.max(0, Number(this.YT_DLP_GLOBAL_MIN_GAP_MS || 0) - (now - Number(this.ytDlpLastRunAt || 0)));
+        if (waitMs > 0) await this.sleep(waitMs);
+        const out = await taskFn();
+        this.ytDlpLastRunAt = Date.now();
+        return out;
+      });
+    this.ytDlpGlobalQueue = next;
+    return next;
   }
 
   static normalizeStarsCacheKey(value) {
@@ -206,8 +226,10 @@ class ChatGamesUtilityHandler {
       });
     });
 
-    const buildArgs = ({ useAuth = true, relaxedFormat = false } = {}) => {
+    const buildArgs = ({ useAuth = true, relaxedFormat = false, target = '', proxy = '' } = {}) => {
       const authArgs = useAuth ? [...cookiesArgs, ...browserCookiesArgs] : [];
+      const proxyArgs = this.resolveYtDlpProxyArgs(proxy);
+      const searchTarget = String(target || '').trim() || `ytsearch1:${query}`;
       const audioFormatArgs = ffmpegReady
         ? ['-x', '--audio-format', 'mp3', '--audio-quality', '0']
         : (relaxedFormat ? ['-f', 'bestaudio/best'] : ['-f', 'bestaudio[ext=m4a]/bestaudio']);
@@ -217,18 +239,20 @@ class ChatGamesUtilityHandler {
           ...executable.baseArgs,
           ...runtimeArgs,
           ...authArgs,
+          ...proxyArgs,
           ...videoFormatArgs,
           '--no-playlist',
           '--retries',
           '1',
           '-o',
           outTemplate,
-          `ytsearch1:${query}`
+          searchTarget
         ]
         : [
           ...executable.baseArgs,
           ...runtimeArgs,
           ...authArgs,
+          ...proxyArgs,
           ...audioFormatArgs,
           '--no-playlist',
           '--max-filesize',
@@ -237,36 +261,94 @@ class ChatGamesUtilityHandler {
           '1',
           '-o',
           outTemplate,
-          `ytsearch1:${query}`
+          searchTarget
         ];
     };
 
     let lastError = null;
-    const attempts = [
-      { useAuth: true, relaxedFormat: false, label: 'on' },
-      { useAuth: true, relaxedFormat: true, label: 'on-relaxed' },
-      { useAuth: false, relaxedFormat: true, label: 'off-relaxed' }
-    ];
+    const cookiesTemporarilyDisabled = Number(this.ytDlpCookiesInvalidUntil || 0) > Date.now();
+    const attempts = cookiesTemporarilyDisabled
+      ? [
+        { useAuth: false, relaxedFormat: true, label: 'off-relaxed' }
+      ]
+      : [
+        { useAuth: true, relaxedFormat: false, label: 'on' },
+        { useAuth: true, relaxedFormat: true, label: 'on-relaxed' },
+        { useAuth: false, relaxedFormat: true, label: 'off-relaxed' }
+      ];
 
-    for (const attempt of attempts) {
-      const args = buildArgs(attempt);
-      try {
-        // eslint-disable-next-line no-await-in-loop
-        await runDownloadAttempt(args, attempt.label);
-        lastError = null;
-        break;
-      } catch (error) {
-        lastError = error;
-        const msg = String(error?.message || '').toLowerCase();
-        const cookiesInvalid = msg.includes('cookies are no longer valid');
-        const formatUnavailable = msg.includes('requested format is not available') || msg.includes('po token');
-        if (cookiesInvalid && attempt.useAuth) {
-          logger.warn(`STARS_YTDLP_COOKIES_EXPIRED query="${query}"`);
-        } else if (formatUnavailable && !attempt.relaxedFormat) {
-          logger.warn(`STARS_YTDLP_FORMAT_RETRY query="${query}"`);
+    await this.enqueueYtDlpTask(async () => {
+      const searchTargets = [`ytsearch1:${query}`, `ytsearch3:${query}`, `ytsearch5:${query}`];
+      for (let targetIndex = 0; targetIndex < searchTargets.length; targetIndex += 1) {
+        const target = searchTargets[targetIndex];
+        let targetError = null;
+
+        for (const attempt of attempts) {
+          const args = buildArgs({ ...attempt, target });
+          try {
+            // eslint-disable-next-line no-await-in-loop
+            await runDownloadAttempt(args, `${attempt.label}|q${targetIndex + 1}`);
+            targetError = null;
+            break;
+          } catch (error) {
+            targetError = error;
+            const msg = String(error?.message || '').toLowerCase();
+            const cookiesInvalid = msg.includes('cookies are no longer valid');
+            const formatUnavailable = msg.includes('requested format is not available') || msg.includes('po token');
+            if (cookiesInvalid && attempt.useAuth) {
+              this.ytDlpCookiesInvalidUntil = Date.now() + (30 * 60 * 1000);
+              logger.warn(`STARS_YTDLP_COOKIES_EXPIRED query="${query}"`);
+            } else if (formatUnavailable && !attempt.relaxedFormat) {
+              logger.warn(`STARS_YTDLP_FORMAT_RETRY query="${query}"`);
+            }
+          }
+        }
+
+        if (!targetError) {
+          lastError = null;
+          break;
+        }
+
+        lastError = targetError;
+        const targetErrorText = String(targetError?.message || '').toLowerCase();
+        const shouldTryNextSearch =
+          targetErrorText.includes('sign in to confirm you')
+          || targetErrorText.includes('requested format is not available')
+          || targetErrorText.includes('video unavailable')
+          || targetErrorText.includes('private video')
+          || targetErrorText.includes('cookies are no longer valid');
+
+        if (!shouldTryNextSearch || targetIndex >= searchTargets.length - 1) {
+          break;
+        }
+
+        logger.warn(`STARS_YTDLP_SEARCH_FALLBACK query="${query}" strategy="${targetIndex + 1}->${targetIndex + 2}"`);
+      }
+
+      if (lastError && (this.isYtDlpBotBlockedError(lastError) || this.isYtDlpRateLimitedError(lastError))) {
+        const proxyCandidates = await this.getYtDlpProxyCandidates().catch(() => []);
+        const maxProxyRoutes = Math.max(1, Math.min(3, Number(this.YT_DLP_MAX_PROXY_ROUTES || 2)));
+        const proxyPool = proxyCandidates.slice(0, maxProxyRoutes);
+        for (let i = 0; i < proxyPool.length; i += 1) {
+          const proxy = proxyPool[i];
+          try {
+            // eslint-disable-next-line no-await-in-loop
+            await runDownloadAttempt(
+              buildArgs({ useAuth: false, relaxedFormat: true, target: `ytsearch3:${query}`, proxy }),
+              `proxy-${i + 1}`
+            );
+            this.ytDlpLastWorkingProxy = proxy;
+            this.markYtDlpProxyHealthy(proxy);
+            lastError = null;
+            logger.info(`STARS_YTDLP_PROXY_RECOVERY query="${query}" strategy="${i + 1}/${proxyPool.length}"`);
+            break;
+          } catch (proxyError) {
+            lastError = proxyError;
+            this.markYtDlpProxyBlocked(proxy, 'download_failed');
+          }
         }
       }
-    }
+    });
 
     if (lastError) throw lastError;
 
@@ -830,6 +912,8 @@ class ChatGamesUtilityHandler {
   }
 
   static async resolveYtDlpCookiesArgs() {
+    if (Number(this.ytDlpCookiesInvalidUntil || 0) > Date.now()) return [];
+
     const configuredPath = String(process.env.YTDLP_COOKIES_FILE || process.env.YTDLP_COOKIES_PATH || '').trim();
     if (configuredPath && fs.existsSync(configuredPath)) {
       return ['--cookies', configuredPath];
