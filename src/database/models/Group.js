@@ -32,6 +32,14 @@ const groupSchema = new mongoose.Schema({
       type: Number,
       default: 90
     },
+    complaintsEnabled: {
+      type: Boolean,
+      default: false
+    },
+    complaintsTargetChatId: {
+      type: String,
+      default: ''
+    },
     blockDuplicateSuggestions: {
       type: Boolean,
       default: true
