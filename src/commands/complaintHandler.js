@@ -150,8 +150,8 @@ class ComplaintHandler {
       : '';
     const sourceGroupTitle = String(ctx.chat?.title || 'Unknown Group').trim();
     const now = new Date();
-    const timeText = now.toLocaleTimeString('en-US', { hour12: true });
-    const dateText = now.toLocaleDateString('en-US');
+    const timeText = now.toLocaleTimeString('en-US', { hour12: true, timeZone: 'Asia/Gaza' });
+    const dateText = now.toLocaleDateString('en-US', { timeZone: 'Asia/Gaza' });
     const title = String(options.title || '📩 شكوى جديدة');
     const successMessage = String(options.successMessage || '✅ تم إرسال رسالتك للإدارة.');
     const messageLabel = String(options.messageLabel || '• الرسالة');
