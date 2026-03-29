@@ -3288,6 +3288,7 @@ bot.hears(/^(?:\/)?(?:همسه|همسة|whisper)(?:\s+.+)?$/i, (ctx) => WhisperH
 bot.hears(/^(?:\/)?(?:ضبط_الشكاوى|تعيين\s*قروب\s*الشكاوى|setcomplaints)(?:@\w+)?\s+-?\d+$/i, (ctx) => ComplaintHandler.handleSetTargetGroup(ctx));
 bot.hears(/^(?:\/)?(?:تعطيل_الشكاوى|disablecomplaints)$/i, (ctx) => ComplaintHandler.handleDisableComplaints(ctx));
 bot.hears(/^(?:\/)?شكوى(?:@\w+)?(?:\s+.+)?$/i, (ctx) => ComplaintHandler.handleComplaintSubmit(ctx));
+bot.hears(/^(?:\/)?(?:مشكلة|issue)(?:@\w+)?(?:\s+.+)?$/i, (ctx) => ComplaintHandler.handleProblemSubmit(ctx));
 bot.hears(/^(?:\/)?(?:خلل|عطل|bugreport)(?:@\w+)?(?:\s+.+)?$/i, (ctx) => ComplaintHandler.handleBugSubmit(ctx));
 bot.hears(/^(?:\/)?(?:منح_فلوس|اعطاء_فلوس|إعطاء_فلوس|ggrantmoney)(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleOwnerGrantMoneyCommand(ctx));
 bot.hears(/^(?:\/)?(?:سحب_فلوس|خصم_فلوس|gtakemoney)(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleOwnerTakeMoneyCommand(ctx));

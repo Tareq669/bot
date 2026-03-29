@@ -106,12 +106,30 @@ class ComplaintHandler {
 
     const messageText = String(match[1] || '').trim();
     if (!messageText) {
-      return ctx.reply('❌ اكتب البلاغ بهذا الشكل:\nخلل نص المشكلة');
+      return ctx.reply('❌ اكتب البلاغ بهذا الشكل:\nخلل نص الخلل');
     }
     return this.submitToComplaintsTarget(ctx, {
       title: '🛠️ بلاغ خلل جديد',
       successMessage: '✅ تم إرسال بلاغ الخلل للإدارة.',
-      messageLabel: '• وصف الخلل',
+      messageLabel: '• نص الخلل',
+      messageText
+    });
+  }
+
+  static async handleProblemSubmit(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const text = String(ctx.message?.text || '').trim();
+    const match = /^(?:\/)?(?:مشكلة|issue)(?:@\w+)?(?:\s+(.+))?$/i.exec(text);
+    if (!match) return;
+
+    const messageText = String(match[1] || '').trim();
+    if (!messageText) {
+      return ctx.reply('❌ اكتب البلاغ بهذا الشكل:\nمشكلة نص المشكلة');
+    }
+    return this.submitToComplaintsTarget(ctx, {
+      title: '⚠️ مشكلة جديدة',
+      successMessage: '✅ تم إرسال المشكلة للإدارة.',
+      messageLabel: '• نص المشكلة',
       messageText
     });
   }
@@ -131,7 +149,9 @@ class ComplaintHandler {
       ? ([repliedUser.first_name, repliedUser.last_name].filter(Boolean).join(' ').trim() || repliedUser.username || String(repliedUser.id || ''))
       : '';
     const sourceGroupTitle = String(ctx.chat?.title || 'Unknown Group').trim();
-    const createdAt = new Date().toLocaleString('en-GB', { hour12: false });
+    const now = new Date();
+    const timeText = now.toLocaleTimeString('en-US', { hour12: true });
+    const dateText = now.toLocaleDateString('en-US');
     const title = String(options.title || '📩 شكوى جديدة');
     const successMessage = String(options.successMessage || '✅ تم إرسال رسالتك للإدارة.');
     const messageLabel = String(options.messageLabel || '• الرسالة');
@@ -150,7 +170,8 @@ class ComplaintHandler {
       lines.push(`• المشتكى عليه: ${repliedName}`);
       lines.push(`• معرف المشتكى عليه: ${repliedUser.id}`);
     }
-    lines.push(`• الوقت: ${createdAt}`);
+    lines.push(`• الوقت: ${timeText}`);
+    lines.push(`• التاريخ: ${dateText}`);
     lines.push('');
     lines.push(`${messageLabel}:\n${messageText}`);
 
