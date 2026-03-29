@@ -42,6 +42,7 @@ const EconomyHandler = require('./commands/economyHandler');
 const ContentHandler = require('./commands/contentHandler');
 const ProfileHandler = require('./commands/profileHandler');
 const ChatGamesUtilityHandler = require('./commands/chatGamesUtilityHandler');
+const SongRelayHandler = require('./commands/songRelayHandler');
 const SponsoredAdsSystem = require('./features/sponsoredAdsSystem');
 const { logger } = require('./utils/helpers');
 const ReconnectManager = require('./utils/reconnect');
@@ -686,6 +687,7 @@ bot.command('referral', (ctx) => CommandHandler.handleReferral(ctx));
 bot.command('events', (ctx) => CommandHandler.handleEvents(ctx));
 bot.command('library', (ctx) => CommandHandler.handleLibrary(ctx));
 bot.command('teams', (ctx) => CommandHandler.handleTeams(ctx));
+bot.command('song', (ctx) => SongRelayHandler.handleSongCommand(ctx));
 
 // --- QUICK MENU COMMANDS ---
 bot.command('khatma', (ctx) => MenuHandler.handleKhatmaMenu(ctx));

@@ -6,6 +6,8 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
+    "media:api": "node src/services/mediaApiServer.js",
+    "media:worker": "node src/services/mediaDownloadWorker.js",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
@@ -41,7 +43,9 @@
     "p-retry": "^7.1.1",
     "socks-proxy-agent": "^8.0.5",
     "telegraf": "^4.14.0",
-    "yt-dlp-wrap": "^2.3.12"
+    "yt-dlp-exec": "^1.0.2",
+    "yt-dlp-wrap": "^2.3.12",
+    "sqlite3": "^5.1.7"
   },
   "devDependencies": {
     "@types/jest": "^29.5.11",
