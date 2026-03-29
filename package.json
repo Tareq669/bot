@@ -43,7 +43,6 @@
     "p-retry": "^7.1.1",
     "socks-proxy-agent": "^8.0.5",
     "telegraf": "^4.14.0",
-    "yt-dlp-exec": "^1.0.2",
     "yt-dlp-wrap": "^2.3.12",
     "sqlite3": "^5.1.7"
   },

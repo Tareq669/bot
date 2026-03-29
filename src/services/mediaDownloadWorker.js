@@ -1,7 +1,8 @@
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const express = require('express');
-const ytdlp = require('yt-dlp-exec');
+const YTDlpWrap = require('yt-dlp-wrap').default;
 const { logger } = require('../utils/helpers');
 
 const app = express();
@@ -11,8 +12,11 @@ const HOST = String(process.env.MEDIA_WORKER_HOST || '0.0.0.0').trim();
 const TOKEN = String(process.env.MEDIA_WORKER_TOKEN || '').trim();
 const BASE_PUBLIC_URL = String(process.env.MEDIA_WORKER_PUBLIC_BASE_URL || '').trim().replace(/\/+$/, '');
 const MEDIA_DIR = path.resolve(process.env.MEDIA_STORAGE_DIR || path.join(process.cwd(), 'storage', 'downloads'));
+const YTDLP_BIN_DIR = path.join(os.tmpdir(), 'jo-media-worker-bin');
+const YTDLP_BIN_PATH = path.join(YTDLP_BIN_DIR, process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp');
 
 const activeDownloads = new Map();
+let ytDlpReadyPromise = null;
 
 function ensureStorageDir() {
   fs.mkdirSync(MEDIA_DIR, { recursive: true });
@@ -22,6 +26,19 @@ function isAuthorized(req) {
   if (!TOKEN) return true;
   const token = String(req.headers['x-worker-token'] || req.query.token || '').trim();
   return token && token === TOKEN;
+}
+
+async function ensureYtDlpBinary() {
+  if (ytDlpReadyPromise) return ytDlpReadyPromise;
+  ytDlpReadyPromise = (async () => {
+    fs.mkdirSync(YTDLP_BIN_DIR, { recursive: true });
+    if (!fs.existsSync(YTDLP_BIN_PATH)) {
+      await YTDlpWrap.downloadFromGithub(YTDLP_BIN_PATH);
+      if (process.platform !== 'win32') fs.chmodSync(YTDLP_BIN_PATH, 0o755);
+    }
+    return YTDLP_BIN_PATH;
+  })();
+  return ytDlpReadyPromise;
 }
 
 function getVideoId(input = '') {
@@ -75,16 +92,19 @@ async function downloadAudio(videoUrl) {
   }
 
   const task = (async () => {
+    const ytDlpBin = await ensureYtDlpBinary();
+    const ytDlp = new YTDlpWrap(ytDlpBin);
     const outTemplate = path.join(MEDIA_DIR, `${videoId}.%(ext)s`);
-    await ytdlp(videoUrl, {
-      noWarnings: true,
-      noCheckCertificates: true,
-      preferFreeFormats: true,
-      extractAudio: true,
-      audioFormat: 'mp3',
-      audioQuality: '0',
-      output: outTemplate
-    });
+    await ytDlp.execPromise([
+      videoUrl,
+      '--no-warnings',
+      '--no-check-certificates',
+      '--prefer-free-formats',
+      '-x',
+      '--audio-format', 'mp3',
+      '--audio-quality', '0',
+      '-o', outTemplate
+    ]);
 
     const after = firstExistingFile(videoId);
     if (!after) {
