@@ -5,6 +5,8 @@ const Config = require('../database/models/Config');
 const GROUP_TYPES = new Set(['group', 'supergroup']);
 
 class GroupAdminHandler {
+  static LEGACY_WELCOME_TEMPLATE = '👋 أهلًا {name} في {group}\n🆔 {id}\nنتمنى لك وقتًا ممتعًا معنا.';
+  static DEFAULT_WELCOME_TEMPLATE = '• أهلاً بك عزيزي ← {name}\n• في مجموعة ← {group}\n• تاريخ إنضمامك ← {join_date}\n• وقت دخولك ← {join_time}\nسعيد بانضمامك اتمنى لك أجمل الأوقات و السعادة Enjoy 🤍💫';
   static DEFAULT_BAD_WORDS = ['سب', 'شتيمة', 'كلمة_ممنوعة'];
   static DEFAULT_EXPLICIT_WORDS = ['porn', 'xxx', 'sex', 'xvideos', 'xnxx', 'redtube', 'onlyfans', 'nsfw', 'اباحي', 'اباحية', 'سكس', 'جنس صريح', 'نيك'];
   static GLOBAL_WORD_LISTS_CACHE = { bad: [], explicit: [], loadedAt: 0 };
@@ -923,7 +925,9 @@ class GroupAdminHandler {
     if (typeof group.settings.notifyAdminLeave !== 'boolean') group.settings.notifyAdminLeave = false;
     if (typeof group.settings.welcomeEnabled !== 'boolean') group.settings.welcomeEnabled = false;
     if (typeof group.settings.welcomeTemplate !== 'string' || !group.settings.welcomeTemplate.trim()) {
-      group.settings.welcomeTemplate = '👋 أهلًا {name} في {group}\n🆔 {id}\nنتمنى لك وقتًا ممتعًا معنا.';
+      group.settings.welcomeTemplate = this.DEFAULT_WELCOME_TEMPLATE;
+    } else if (String(group.settings.welcomeTemplate).trim() === this.LEGACY_WELCOME_TEMPLATE) {
+      group.settings.welcomeTemplate = this.DEFAULT_WELCOME_TEMPLATE;
     }
     if (!Number.isInteger(group.settings.suggestionCooldownSeconds)) group.settings.suggestionCooldownSeconds = 90;
     group.settings.suggestionCooldownSeconds = Math.max(10, Math.min(3600, Number(group.settings.suggestionCooldownSeconds) || 90));
@@ -3261,16 +3265,29 @@ class GroupAdminHandler {
   }
 
   static renderWelcomeTemplate(template, user, chat) {
-    const safeTemplate = String(template || '').trim() || '👋 أهلًا {name} في {group}\n🆔 {id}';
+    const safeTemplate = String(template || '').trim() || this.DEFAULT_WELCOME_TEMPLATE;
     const name = user?.first_name || user?.username || String(user?.id || 'عضو');
     const username = user?.username ? `@${user.username}` : '';
     const groupName = chat?.title || 'المجموعة';
     const userId = String(user?.id || '');
+    const now = new Date();
+    const joinDate = new Intl.DateTimeFormat('en-US', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    }).format(now);
+    const joinTime = new Intl.DateTimeFormat('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    }).format(now);
     return safeTemplate
       .replace(/\{name\}/g, name)
       .replace(/\{username\}/g, username)
       .replace(/\{group\}/g, groupName)
       .replace(/\{id\}/g, userId)
+      .replace(/\{join_date\}/g, joinDate)
+      .replace(/\{join_time\}/g, joinTime)
       .slice(0, 4000);
   }
 
@@ -3316,7 +3333,7 @@ class GroupAdminHandler {
       group.settings.welcomeTemplate = template.slice(0, 2000);
       await this.addModerationLog(group, 'welcome_template', ctx.from.id, null, 'updated');
       await group.save();
-      await ctx.reply('✅ تم تحديث رسالة الترحيب.\nالمتغيرات المتاحة: {name} {username} {group} {id}');
+      await ctx.reply('✅ تم تحديث رسالة الترحيب.\nالمتغيرات المتاحة: {name} {username} {group} {id} {join_date} {join_time}');
       return true;
     }
 
@@ -3335,11 +3352,11 @@ class GroupAdminHandler {
         '👋 إعدادات الترحيب\n\n' +
           '• تفعيل الترحيب\n' +
           '• تعطيل الترحيب\n' +
-          '• رسالة الترحيب أهلًا {name} في {group}\n' +
+          '• رسالة الترحيب • أهلاً بك عزيزي ← {name}\n• في مجموعة ← {group}\n• تاريخ إنضمامك ← {join_date}\n• وقت دخولك ← {join_time}\n' +
           '• عرض الترحيب\n\n' +
           '• /gwelcome on\n' +
           '• /gwelcome off\n' +
-          '• /gwelcome set أهلًا {name} في {group}\n' +
+          '• /gwelcome set • أهلاً بك عزيزي ← {name}\n• في مجموعة ← {group}\n• تاريخ إنضمامك ← {join_date}\n• وقت دخولك ← {join_time}\n' +
           '• /gwelcome show'
       );
       return true;

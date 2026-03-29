@@ -26,7 +26,7 @@ const groupSchema = new mongoose.Schema({
     },
     welcomeTemplate: {
       type: String,
-      default: '👋 أهلًا {name} في {group}\n🆔 {id}\nنتمنى لك وقتًا ممتعًا معنا.'
+      default: '• أهلاً بك عزيزي ← {name}\n• في مجموعة ← {group}\n• تاريخ إنضمامك ← {join_date}\n• وقت دخولك ← {join_time}\nسعيد بانضمامك اتمنى لك أجمل الأوقات و السعادة Enjoy 🤍💫'
     },
     suggestionCooldownSeconds: {
       type: Number,
