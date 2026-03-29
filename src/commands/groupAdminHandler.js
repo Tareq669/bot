@@ -406,21 +406,32 @@ class GroupAdminHandler {
     return `<a href="tg://user?id=${id}">${safeLabel}</a>`;
   }
 
-  static async collectOwnerRecipients(ctx, group, chatId) {
-    const owners = new Set();
-    if (Number.isInteger(group?.settings?.primaryOwnerId)) owners.add(Number(group.settings.primaryOwnerId));
-    this.getRoleIds(group, 'basicOwnerIds').forEach((id) => owners.add(id));
-    this.getRoleIds(group, 'ownerIds').forEach((id) => owners.add(id));
+  static async collectLeaveNotificationRecipients(ctx, group, chatId, excludedUserId = null) {
+    const recipients = new Set();
+    if (Number.isInteger(group?.settings?.primaryOwnerId)) recipients.add(Number(group.settings.primaryOwnerId));
+    this.getRoleIds(group, 'basicOwnerIds').forEach((id) => recipients.add(id));
+    this.getRoleIds(group, 'ownerIds').forEach((id) => recipients.add(id));
+    this.getRoleIds(group, 'managerIds').forEach((id) => recipients.add(id));
+    this.getRoleIds(group, 'adminIds').forEach((id) => recipients.add(id));
 
     try {
       const admins = await ctx.telegram.getChatAdministrators(chatId);
-      const creator = admins.find((m) => m.status === 'creator');
-      if (creator?.user?.id) owners.add(Number(creator.user.id));
+      admins.forEach((member) => {
+        const userId = Number(member?.user?.id || 0);
+        if (!userId || member?.user?.is_bot) return;
+        if (!['creator', 'administrator'].includes(String(member?.status || ''))) return;
+        recipients.add(userId);
+      });
     } catch (_error) {
       // ignore
     }
 
-    return owners;
+    const botId = Number(ctx.botInfo?.id || 0);
+    if (botId > 0) recipients.delete(botId);
+    const excludedId = Number(excludedUserId || 0);
+    if (excludedId > 0) recipients.delete(excludedId);
+
+    return recipients;
   }
 
   static async collectPrimaryOwnerRecipients(ctx, group, chatId) {
@@ -4407,7 +4418,7 @@ class GroupAdminHandler {
       if (!leftNow || user.id === ctx.botInfo?.id) return;
 
       const wasAdmin = ['administrator', 'creator'].includes(oldStatus);
-      const owners = await this.collectOwnerRecipients(ctx, group, chat.id);
+      const recipients = await this.collectLeaveNotificationRecipients(ctx, group, chat.id, user.id);
       const who = this.mentionUser(user.id, user.first_name || user.username || String(user.id));
 
       if (wasAdmin && group.settings.notifyAdminLeave) {
@@ -4419,7 +4430,7 @@ class GroupAdminHandler {
 
         await this.addModerationLog(group, 'admin_left_group', user.id, null, `status ${oldStatus} -> ${newStatus}`);
         await group.save();
-        await Promise.all([...owners].map((ownerId) => ctx.telegram.sendMessage(ownerId, adminNote, {
+        await Promise.all([...recipients].map((ownerId) => ctx.telegram.sendMessage(ownerId, adminNote, {
           parse_mode: 'HTML'
         }).catch(() => null)));
         return;
@@ -4433,7 +4444,7 @@ class GroupAdminHandler {
           `• بقروبك ↤︎ ${this.escapeHtml(chat.title || 'Unknown')}\n-`;
         await this.addModerationLog(group, 'member_left_group', user.id, null, `status ${oldStatus} -> ${newStatus}`);
         await group.save();
-        await Promise.all([...owners].map((ownerId) => ctx.telegram.sendMessage(ownerId, memberNote, {
+        await Promise.all([...recipients].map((ownerId) => ctx.telegram.sendMessage(ownerId, memberNote, {
           parse_mode: 'HTML'
         }).catch(() => null)));
       }
