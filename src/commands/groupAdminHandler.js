@@ -619,8 +619,6 @@ class GroupAdminHandler {
     }
 
     const group = await this.ensureGroupRecord(ctx);
-    const rawText = String(ctx.message?.text || '').trim();
-    const note = rawText.replace(/^\/?(?:all@|all|gall)(?:\s|$)/i, '').trim();
     const members = (await this.collectMentionableMembers(group, ctx.botInfo?.id))
       .filter((member) => Number(member.id) !== Number(ctx.from?.id || 0));
 
@@ -639,18 +637,15 @@ class GroupAdminHandler {
         } catch (_error) {
           // ignore and keep fallback label
         }
-        if (!label || label.startsWith('@')) label = `عضو ${member.id}`;
+        if (!label || label.startsWith('@')) label = 'عضو';
         return { id: member.id, label };
       })
     );
 
     for (let index = 0; index < resolvedMembers.length; index += 8) {
       const chunk = resolvedMembers.slice(index, index + 8);
-      const mentions = chunk.map((member) => this.mentionUser(member.id, member.label)).join(' | ');
-      const prefix = index === 0
-        ? `📢 ${note || 'نداء لجميع الأعضاء'}\n\n`
-        : '📢 متابعة النداء\n\n';
-      await ctx.reply(prefix + mentions, {
+      const mentions = chunk.map((member) => this.mentionUser(member.id, member.label)).join(' ~ ');
+      await ctx.reply(mentions, {
         parse_mode: 'HTML',
         disable_web_page_preview: true,
         reply_to_message_id: index === 0 ? ctx.message?.message_id : undefined
