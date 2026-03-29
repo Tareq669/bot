@@ -29,9 +29,19 @@ class ComplaintHandler {
   }
 
   static normalizeTargetChatId(raw = '') {
-    const value = String(raw || '').trim();
+    const value = String(raw || '')
+      .replace(/[٠-٩]/g, (digit) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)))
+      .trim();
     if (!value) return '';
     return /^-?\d+$/.test(value) ? value : '';
+  }
+
+  static extractSetComplaintsTarget(text = '') {
+    const trimmed = String(text || '').trim();
+    const match = /^(?:\/)?(?:ضبط_الشكاوى|تعيين\s*قروب\s*الشكاوى|setcomplaints)(?:@\w+)?\s+(.+)$/i.exec(trimmed);
+    if (!match) return '';
+    const firstArg = String(match[1] || '').trim().split(/\s+/)[0] || '';
+    return this.normalizeTargetChatId(firstArg);
   }
 
   static async handleSetTargetGroup(ctx) {
@@ -42,14 +52,9 @@ class ComplaintHandler {
     }
 
     const text = String(ctx.message?.text || '').trim();
-    const match = /^(?:\/)?(?:ضبط_الشكاوى|تعيين\s*قروب\s*الشكاوى|setcomplaints)\s+(-?\d+)$/i.exec(text);
-    if (!match) {
-      return ctx.reply('❌ الصيغة:\nضبط_الشكاوى -1001234567890');
-    }
-
-    const targetChatId = this.normalizeTargetChatId(match[1]);
+    const targetChatId = this.extractSetComplaintsTarget(text);
     if (!targetChatId) {
-      return ctx.reply('❌ معرف قروب الشكاوى غير صالح.');
+      return ctx.reply('❌ الصيغة:\nضبط_الشكاوى -1001234567890');
     }
 
     const group = await this.ensureGroupRecord(ctx);
@@ -80,7 +85,7 @@ class ComplaintHandler {
   static async handleComplaintSubmit(ctx) {
     if (!this.isGroupChat(ctx)) return;
     const text = String(ctx.message?.text || '').trim();
-    const match = /^(?:\/)?شكوى(?:\s+(.+))?$/i.exec(text);
+    const match = /^(?:\/)?شكوى(?:@\w+)?(?:\s+(.+))?$/i.exec(text);
     if (!match) return;
 
     const complaintText = String(match[1] || '').trim();
