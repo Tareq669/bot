@@ -88,11 +88,37 @@ class ComplaintHandler {
     const match = /^(?:\/)?شكوى(?:@\w+)?(?:\s+(.+))?$/i.exec(text);
     if (!match) return;
 
-    const complaintText = String(match[1] || '').trim();
-    if (!complaintText) {
+    const messageText = String(match[1] || '').trim();
+    if (!messageText) {
       return ctx.reply('❌ اكتب الشكوى بهذا الشكل:\nشكوى نص الشكوى');
     }
+    return this.submitToComplaintsTarget(ctx, {
+      title: '📩 شكوى جديدة',
+      successMessage: '✅ تم إرسال شكواك للإدارة.',
+      messageLabel: '• نص الشكوى',
+      messageText
+    });
+  }
 
+  static async handleBugSubmit(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const text = String(ctx.message?.text || '').trim();
+    const match = /^(?:\/)?(?:خلل|عطل|bugreport)(?:@\w+)?(?:\s+(.+))?$/i.exec(text);
+    if (!match) return;
+
+    const messageText = String(match[1] || '').trim();
+    if (!messageText) {
+      return ctx.reply('❌ اكتب البلاغ بهذا الشكل:\nخلل نص المشكلة');
+    }
+    return this.submitToComplaintsTarget(ctx, {
+      title: '🛠️ بلاغ خلل جديد',
+      successMessage: '✅ تم إرسال بلاغ الخلل للإدارة.',
+      messageLabel: '• وصف الخلل',
+      messageText
+    });
+  }
+
+  static async submitToComplaintsTarget(ctx, options = {}) {
     const group = await this.ensureGroupRecord(ctx);
     const enabled = Boolean(group?.settings?.complaintsEnabled);
     const targetChatId = this.normalizeTargetChatId(group?.settings?.complaintsTargetChatId || '');
@@ -108,9 +134,14 @@ class ComplaintHandler {
       : '';
     const sourceGroupTitle = String(ctx.chat?.title || 'Unknown Group').trim();
     const createdAt = new Date().toLocaleString('en-GB', { hour12: false });
+    const title = String(options.title || '📩 شكوى جديدة');
+    const successMessage = String(options.successMessage || '✅ تم إرسال رسالتك للإدارة.');
+    const messageLabel = String(options.messageLabel || '• الرسالة');
+    const messageText = String(options.messageText || '').trim();
+    const sendErrorMessage = String(options.sendErrorMessage || '❌ تعذر إرسال الرسالة. تأكد أن البوت موجود في قروب الشكاوى ويمتلك صلاحية الإرسال.');
 
     const lines = [
-      '📩 شكوى جديدة',
+      title,
       '',
       `• القروب: ${sourceGroupTitle}`,
       `• معرف القروب: ${ctx.chat?.id || ''}`,
@@ -123,13 +154,13 @@ class ComplaintHandler {
     }
     lines.push(`• الوقت: ${createdAt}`);
     lines.push('');
-    lines.push(`• نص الشكوى:\n${complaintText}`);
+    lines.push(`${messageLabel}:\n${messageText}`);
 
     try {
       await ctx.telegram.sendMessage(targetChatId, lines.join('\n'));
-      return ctx.reply('✅ تم إرسال شكواك للإدارة.');
+      return ctx.reply(successMessage);
     } catch (_error) {
-      return ctx.reply('❌ تعذر إرسال الشكوى. تأكد أن البوت موجود في قروب الشكاوى ويمتلك صلاحية الإرسال.');
+      return ctx.reply(sendErrorMessage);
     }
   }
 }
