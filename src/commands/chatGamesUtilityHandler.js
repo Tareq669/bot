@@ -3619,14 +3619,26 @@ class ChatGamesUtilityHandler {
   static formatAdhanMessage(locationLabel, adhanData) {
     const t = adhanData?.timings || {};
     const dateLine = adhanData?.date ? `\u{1F4C5} ${adhanData.date}\n\n` : '\n';
+    const to12 = (value) => {
+      const raw = String(value || '').trim();
+      if (!raw) return '-';
+      const match = raw.match(/(\d{1,2}):(\d{2})/);
+      if (!match) return raw;
+      const hours24 = Number(match[1]);
+      const minutes = match[2];
+      if (!Number.isFinite(hours24) || hours24 < 0 || hours24 > 23) return raw;
+      const period = hours24 >= 12 ? '\u0645' : '\u0635';
+      const hours12 = hours24 % 12 || 12;
+      return `${hours12}:${minutes} ${period}`;
+    };
     return (
       `\u{1F54C} \u0645\u0648\u0627\u0642\u064A\u062A \u0627\u0644\u0623\u0630\u0627\u0646 \u0641\u064A ${locationLabel}\n` +
       dateLine +
-      `\u0627\u0644\u0641\u062C\u0631: ${t.Fajr || '-'}\n` +
-      `\u0627\u0644\u0638\u0647\u0631: ${t.Dhuhr || '-'}\n` +
-      `\u0627\u0644\u0639\u0635\u0631: ${t.Asr || '-'}\n` +
-      `\u0627\u0644\u0645\u063A\u0631\u0628: ${t.Maghrib || '-'}\n` +
-      `\u0627\u0644\u0639\u0634\u0627\u0621: ${t.Isha || '-'}`
+      `\u0627\u0644\u0641\u062C\u0631: ${to12(t.Fajr)}\n` +
+      `\u0627\u0644\u0638\u0647\u0631: ${to12(t.Dhuhr)}\n` +
+      `\u0627\u0644\u0639\u0635\u0631: ${to12(t.Asr)}\n` +
+      `\u0627\u0644\u0645\u063A\u0631\u0628: ${to12(t.Maghrib)}\n` +
+      `\u0627\u0644\u0639\u0634\u0627\u0621: ${to12(t.Isha)}`
     );
   }
 
