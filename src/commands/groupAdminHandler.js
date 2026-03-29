@@ -157,6 +157,41 @@ class GroupAdminHandler {
     return { ok: true, botMember };
   }
 
+  static async restrictChatMemberWithFallback(ctx, targetUserId, permissions = {}, untilDate = null) {
+    const uid = Number(targetUserId || 0);
+    if (!uid) throw new Error('INVALID_TARGET_USER');
+
+    const normalizedUntil = Number(untilDate || 0);
+    const withUntil = (payload) => (
+      normalizedUntil > 0 ? { ...payload, until_date: normalizedUntil } : { ...payload }
+    );
+
+    const fullPayload = withUntil(permissions || {});
+    const fallbackMute = withUntil({ can_send_messages: false });
+    const fallbackUnmute = withUntil({
+      can_send_messages: true,
+      can_send_polls: true,
+      can_invite_users: true
+    });
+
+    const isUnmute = Boolean(permissions?.can_send_messages);
+    const attempts = isUnmute
+      ? [fullPayload, fallbackUnmute]
+      : [fullPayload, fallbackMute];
+
+    let lastError = null;
+    for (const payload of attempts) {
+      try {
+        await ctx.telegram.restrictChatMember(ctx.chat.id, uid, payload);
+        return true;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    throw lastError || new Error('RESTRICT_FAILED');
+  }
+
   static getRepliedUserId(ctx) {
     return ctx.message?.reply_to_message?.from?.id || null;
   }
@@ -1801,7 +1836,7 @@ class GroupAdminHandler {
     if (warning.count >= policy.muteAt) {
       const untilDate = Math.floor(Date.now() / 1000) + policy.muteMinutes * 60;
       try {
-        await ctx.telegram.restrictChatMember(ctx.chat.id, targetUserId, {
+        await this.restrictChatMemberWithFallback(ctx, targetUserId, {
           can_send_messages: false,
           can_send_audios: false,
           can_send_documents: false,
@@ -1816,8 +1851,7 @@ class GroupAdminHandler {
           can_invite_users: false,
           can_pin_messages: false,
           can_manage_topics: false,
-          until_date: untilDate
-        });
+        }, untilDate);
         await this.addModerationLog(
           group,
           'auto_mute_after_warnings',
@@ -3993,7 +4027,7 @@ class GroupAdminHandler {
     const untilDate = Math.floor(Date.now() / 1000) + minutes * 60;
 
     try {
-      await ctx.telegram.restrictChatMember(ctx.chat.id, targetUserId, {
+      await this.restrictChatMemberWithFallback(ctx, targetUserId, {
         can_send_messages: false,
         can_send_audios: false,
         can_send_documents: false,
@@ -4007,9 +4041,8 @@ class GroupAdminHandler {
         can_change_info: false,
         can_invite_users: false,
         can_pin_messages: false,
-        can_manage_topics: false,
-        until_date: untilDate
-      });
+        can_manage_topics: false
+      }, untilDate);
       await this.addModerationLog(group, 'mute', ctx.from.id, targetUserId, reason);
       await group.save();
       const targetName = this.getUserDisplayName({ first_name: target?.firstName, last_name: '', username: target?.username });
@@ -4037,7 +4070,7 @@ class GroupAdminHandler {
     if (!targetUserId) return ctx.reply('❌ استخدم إلغاء الكتم بالرد أو @user أو ID.');
 
     try {
-      await ctx.telegram.restrictChatMember(ctx.chat.id, targetUserId, {
+      await this.restrictChatMemberWithFallback(ctx, targetUserId, {
         can_send_messages: true,
         can_send_audios: true,
         can_send_documents: true,
