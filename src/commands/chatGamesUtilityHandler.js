@@ -62,6 +62,7 @@ class ChatGamesUtilityHandler {
   static YT_DLP_BIN_DIR = path.join(os.tmpdir(), 'jo-bot-bin');
   static STARS_AUDIO_FORMAT = 'worstaudio[ext=m4a]/worstaudio/bestaudio[abr<=64]/bestaudio';
   static STARS_MAX_UPLOAD_MB = Math.max(1, Number(process.env.STARS_MAX_UPLOAD_MB || 9));
+  static STARS_DIRECT_URL_SEND = String(process.env.STARS_DIRECT_URL_SEND || 'false').trim().toLowerCase();
   static YT_HTML_SEARCH_TIMEOUT_MS = 4500;
   static ARCHIVE_SEARCH_URL = 'https://archive.org/advancedsearch.php';
   static ARCHIVE_METADATA_URL = 'https://archive.org/metadata';
@@ -2278,7 +2279,12 @@ class ChatGamesUtilityHandler {
     return { reply_to_message_id: messageId };
   }
 
-  static async sendHotAudioResult(ctx, audio, canNext = true) {
+  static isDirectUrlSendEnabled() {
+    const value = String(this.STARS_DIRECT_URL_SEND || '').trim().toLowerCase();
+    return ['1', 'true', 'yes', 'on'].includes(value);
+  }
+
+  static async sendAudioByDirectUrl(ctx, audio) {
     const caption = '♪ تم التح🎧ميل بنجاح ♪';
     const safeTitle = this.cleanAudioLabel(audio?.title || 'مقطع صوتي').slice(0, 120);
     const safePerformer = this.cleanAudioLabel(audio?.creator || '').slice(0, 80) || undefined;
@@ -2297,18 +2303,30 @@ class ChatGamesUtilityHandler {
     );
   }
 
+  static async sendHotAudioResult(ctx, audio, canNext = true) {
+    if (this.isDirectUrlSendEnabled()) {
+      return this.sendAudioByDirectUrl(ctx, audio);
+    }
+    const sent = await this.sendStarsAudioResult(ctx, audio).catch(() => null);
+    if (sent) return sent;
+    if (canNext) {
+      await ctx.reply('♪ عذرا غير متوفر ..');
+    }
+    return null;
+  }
+
   static async sendStarsAudioResult(ctx, audio) {
     const maybeDirectAudioUrl = String(audio?.url || '').trim();
     const isYoutubeWatchUrl = /(?:youtube\.com\/watch\?v=|youtu\.be\/)/i.test(maybeDirectAudioUrl);
     const source = String(audio?.source || '').trim();
 
-    if (source === 'youtube_ytdlp' && maybeDirectAudioUrl && !isYoutubeWatchUrl) {
-      const directSent = await this.sendHotAudioResult(ctx, audio, false).catch(() => null);
+    if (this.isDirectUrlSendEnabled() && source === 'youtube_ytdlp' && maybeDirectAudioUrl && !isYoutubeWatchUrl) {
+      const directSent = await this.sendAudioByDirectUrl(ctx, audio).catch(() => null);
       if (directSent) return directSent;
     }
 
-    if (!String(audio?.webpageUrl || '').trim() && audio?.url) {
-      return this.sendHotAudioResult(ctx, audio, false).catch(() => null);
+    if (this.isDirectUrlSendEnabled() && !String(audio?.webpageUrl || '').trim() && audio?.url) {
+      return this.sendAudioByDirectUrl(ctx, audio).catch(() => null);
     }
 
     const isYoutubeNodeCandidate = source === 'youtube_node_candidate';
@@ -2377,8 +2395,8 @@ class ChatGamesUtilityHandler {
         }
       }
       // Fallback: try direct audio URL send when local temp download fails
-      if (maybeDirectAudioUrl && !isYoutubeWatchUrl) {
-        return this.sendHotAudioResult(ctx, audio, false).catch(() => null);
+      if (this.isDirectUrlSendEnabled() && maybeDirectAudioUrl && !isYoutubeWatchUrl) {
+        return this.sendAudioByDirectUrl(ctx, audio).catch(() => null);
       }
       return null;
     }
@@ -3360,7 +3378,10 @@ class ChatGamesUtilityHandler {
         return;
       }
       if (commandTimedOut) return;
-      await this.sendHotAudioResult(ctx, audio, false);
+      const sent = await this.sendStarsAudioResult(ctx, audio).catch(() => null);
+      if (!sent) {
+        await ctx.reply('♪ عذرا غير متوفر ..');
+      }
     } catch (error) {
       if (String(error?.message || '') === 'STARS_PICK_TIMEOUT') {
         commandTimedOut = true;
@@ -3446,7 +3467,10 @@ class ChatGamesUtilityHandler {
     this.setHotCache(ctx, cached.query, list, nextIndex);
 
     await ctx.answerCbQuery().catch(() => {});
-    await this.sendHotAudioResult(ctx, list[nextIndex], true);
+    const sent = await this.sendHotAudioResult(ctx, list[nextIndex], false).catch(() => null);
+    if (!sent) {
+      await ctx.reply('♪ عذرا غير متوفر ..');
+    }
   }
 
   static async handleDotCommand(ctx, queryText) {
