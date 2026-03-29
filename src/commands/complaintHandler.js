@@ -14,8 +14,6 @@ class ComplaintHandler {
       {
         $setOnInsert: {
           groupId,
-          groupTitle: ctx.chat.title || 'Unknown Group',
-          groupType: ctx.chat.type || 'group',
           createdAt: new Date()
         },
         $set: {
