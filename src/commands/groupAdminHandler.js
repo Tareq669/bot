@@ -602,7 +602,7 @@ class GroupAdminHandler {
     return this.escapeHtml(fullName || user?.first_name || 'غير معروف');
   }
 
-  static async collectMentionableMembers(group, botId = null) {
+  static async collectMentionableMembers(ctx, group, botId = null) {
     const people = new Map();
     const addPerson = (userId, label = '') => {
       const id = Number(userId || 0);
@@ -632,6 +632,18 @@ class GroupAdminHandler {
       addPerson(row?.targetId);
     });
 
+    // Fallback: include current Telegram admins even if local DB is still empty/new.
+    try {
+      const admins = await ctx.telegram.getChatAdministrators(ctx.chat.id);
+      admins.forEach((member) => {
+        const userId = Number(member?.user?.id || 0);
+        const name = String(member?.user?.first_name || member?.user?.username || '').trim();
+        addPerson(userId, name);
+      });
+    } catch (_error) {
+      // ignore: keep local-known members only
+    }
+
     const members = [...people.entries()].map(([id, label]) => ({ id, label: String(label || `عضو ${id}`) }));
     const ids = members.map((row) => Number(row.id)).filter((id) => Number.isInteger(id) && id > 0);
 
@@ -658,7 +670,7 @@ class GroupAdminHandler {
     }
 
     const group = await this.ensureGroupRecord(ctx);
-    const members = (await this.collectMentionableMembers(group, ctx.botInfo?.id))
+    const members = (await this.collectMentionableMembers(ctx, group, ctx.botInfo?.id))
       .filter((member) => Number(member.id) !== Number(ctx.from?.id || 0));
 
     if (!members.length) {
