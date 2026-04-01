@@ -1832,6 +1832,7 @@ bot.action(/^group:levels:(bronze|silver|gold|platinum|diamond)$/i, (ctx) => Gro
 bot.action(/^group:(?!whisper:).+$/, (ctx) => GroupAdminHandler.handleGroupCallback(ctx));
 bot.on('poll_answer', (ctx) => GroupGamesHandler.handlePollAnswer(ctx));
 bot.on('chat_member', (ctx) => GroupAdminHandler.handleChatMemberUpdate(ctx));
+bot.on('message', (ctx) => GroupAdminHandler.handleGroupServiceMembershipUpdate(ctx));
 bot.on('photo', async (ctx) => {
   try {
     if (GroupAdminHandler.isGroupChat(ctx)) {

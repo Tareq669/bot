@@ -11,6 +11,8 @@ class GroupAdminHandler {
   static DEFAULT_EXPLICIT_WORDS = ['porn', 'xxx', 'sex', 'xvideos', 'xnxx', 'redtube', 'onlyfans', 'nsfw', 'اباحي', 'اباحية', 'سكس', 'جنس صريح', 'نيك'];
   static GLOBAL_WORD_LISTS_CACHE = { bad: [], explicit: [], loadedAt: 0 };
   static GLOBAL_WORD_LISTS_TTL_MS = 60 * 1000;
+  static membershipEventCache = new Map();
+  static MEMBERSHIP_EVENT_TTL_MS = 15 * 1000;
 
   static async saveGroupQuietly(group) {
     try {
@@ -4438,6 +4440,51 @@ class GroupAdminHandler {
       const user = update?.new_chat_member?.user || update?.old_chat_member?.user;
       if (!user?.id) return;
 
+      await this.handleMembershipTransition(ctx, {
+        chat,
+        user,
+        oldStatus,
+        newStatus,
+        source: 'chat_member'
+      });
+    } catch (_error) {
+      // ignore chat_member failures
+    }
+  }
+
+  static shouldSkipMembershipEvent(chatId, userId, oldStatus, newStatus, source = 'unknown') {
+    const key = `${chatId}:${userId}:${oldStatus || 'unknown'}:${newStatus || 'unknown'}`;
+    const now = Date.now();
+
+    for (const [cacheKey, cacheTime] of this.membershipEventCache.entries()) {
+      if (now - cacheTime > this.MEMBERSHIP_EVENT_TTL_MS) {
+        this.membershipEventCache.delete(cacheKey);
+      }
+    }
+
+    if (this.membershipEventCache.has(key)) {
+      return true;
+    }
+
+    this.membershipEventCache.set(key, now);
+    if (source === 'service_message') {
+      this.membershipEventCache.set(`${chatId}:${userId}:member:left`, now);
+      this.membershipEventCache.set(`${chatId}:${userId}:left:member`, now);
+    }
+    return false;
+  }
+
+  static async handleMembershipTransition(ctx, payload = {}) {
+    const chat = payload.chat || ctx.chat;
+    const user = payload.user || {};
+    const oldStatus = String(payload.oldStatus || '').trim();
+    const newStatus = String(payload.newStatus || '').trim();
+    if (!GROUP_TYPES.has(chat?.type)) return;
+    if (!Number(user?.id)) return;
+
+    const shouldSkip = this.shouldSkipMembershipEvent(chat.id, user.id, oldStatus, newStatus, payload.source);
+    if (shouldSkip) return;
+
       const group = await Group.findOneAndUpdate(
         { groupId: String(chat.id) },
         {
@@ -4462,7 +4509,8 @@ class GroupAdminHandler {
       const leftNow = ['left', 'kicked'].includes(newStatus);
       if (!leftNow || user.id === ctx.botInfo?.id) return;
 
-      const wasAdmin = ['administrator', 'creator'].includes(oldStatus);
+      const internalRole = this.getInternalRoleLabel(group, user.id);
+      const wasAdmin = ['administrator', 'creator'].includes(oldStatus) || ['مالك اساسي', 'مالك', 'مدير', 'أدمن'].includes(String(internalRole || ''));
       const recipients = await this.collectLeaveNotificationRecipients(ctx, group, chat.id, user.id);
       const who = this.mentionUser(user.id, user.first_name || user.username || String(user.id));
 
@@ -4493,8 +4541,37 @@ class GroupAdminHandler {
           parse_mode: 'HTML'
         }).catch(() => null)));
       }
+  }
+
+  static async handleGroupServiceMembershipUpdate(ctx) {
+    try {
+      if (!this.isGroupChat(ctx)) return;
+      const message = ctx.message || {};
+
+      if (Array.isArray(message.new_chat_members) && message.new_chat_members.length > 0) {
+        for (const member of message.new_chat_members) {
+          if (!member?.id) continue;
+          await this.handleMembershipTransition(ctx, {
+            chat: ctx.chat,
+            user: member,
+            oldStatus: 'left',
+            newStatus: 'member',
+            source: 'service_message'
+          });
+        }
+      }
+
+      if (message.left_chat_member?.id) {
+        await this.handleMembershipTransition(ctx, {
+          chat: ctx.chat,
+          user: message.left_chat_member,
+          oldStatus: 'member',
+          newStatus: 'left',
+          source: 'service_message'
+        });
+      }
     } catch (_error) {
-      // ignore chat_member failures
+      // ignore service message failures
     }
   }
 
