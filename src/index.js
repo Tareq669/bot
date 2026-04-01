@@ -499,11 +499,24 @@ bot.catch((err, ctx) => {
     return;
   }
 
+  const telegramDescription = String(err?.description || err?.response?.description || '').toLowerCase();
+  const isNoRightsError =
+    telegramDescription.includes('not enough rights')
+    || telegramDescription.includes('have no rights')
+    || telegramDescription.includes('chat not found')
+    || telegramDescription.includes('forbidden: bot was blocked by the user')
+    || telegramDescription.includes('forbidden: bot was kicked from the supergroup');
+
   logger.error('❌ خطأ في البوت:', err);
   healthMonitor.logError();
 
   // حاول الرد على المستخدم
   try {
+    if (isNoRightsError) {
+      logger.warn('⚠️ تم تجاهل خطأ صلاحيات/وصول عند محاولة الرد داخل الشات.');
+      return;
+    }
+
     if (ctx && ctx.reply && err.code !== 409) {
       ctx.reply('❌ حدث خطأ غير متوقع، جاري محاولة الإصلاح...').catch((e) => {
         logger.error('فشل الرد على الخطأ:', e.message);
@@ -5223,12 +5236,19 @@ async function startBot() {
     // Connect to database
     logger.info('📦 جاري الاتصال بـ MongoDB...');
     const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/arab-bot';
+    let dbConnected = false;
 
     // محاولة الاتصال بـ MongoDB مع إعادة محاولة
-    await reconnectManager.connect(async () => {
-      await Database.connect(mongoUri);
-      logger.info('✅ تم الاتصال بـ MongoDB بنجاح!');
-    });
+    while (!dbConnected) {
+      dbConnected = await reconnectManager.connect(async () => {
+        await Database.connect(mongoUri);
+        logger.info('✅ تم الاتصال بـ MongoDB بنجاح!');
+      });
+
+      if (!dbConnected && reconnectManager.retryCount >= reconnectManager.maxRetries) {
+        throw new Error(`MongoDB connection failed after ${reconnectManager.maxRetries} retries`);
+      }
+    }
 
     // Start bot with intelligent retry logic
     logger.info('🚀 جاري بدء البوت...');

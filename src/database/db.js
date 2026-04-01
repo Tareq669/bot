@@ -5,14 +5,23 @@ const { logger } = require('../utils/helpers');
 class Database {
   static async connect(mongoUri) {
     try {
+      const normalizedUri = String(mongoUri || '').trim().replace(/^["']|["']$/g, '');
+      const isRailway = Boolean(
+        process.env.RAILWAY_ENVIRONMENT
+        || process.env.RAILWAY_PROJECT_ID
+        || process.env.RAILWAY_SERVICE_ID
+      );
+
       // محاولة الاتصال بـ MongoDB
-      await mongoose.connect(mongoUri, {
+      await mongoose.connect(normalizedUri, {
         useNewUrlParser: true,
         useUnifiedTopology: true,
-        serverSelectionTimeoutMS: 5000,
+        // 5s كانت قصيرة على بيئات السحابة وتسبب timeouts كاذبة
+        serverSelectionTimeoutMS: Number(process.env.MONGO_SERVER_SELECTION_TIMEOUT_MS || 30000),
         socketTimeoutMS: 45000,
         retryWrites: true,
-        connectTimeoutMS: 10000
+        connectTimeoutMS: Number(process.env.MONGO_CONNECT_TIMEOUT_MS || 15000),
+        family: isRailway ? 4 : undefined
       });
 
       logger.info('✅ تم الاتصال بقاعدة البيانات بنجاح');
