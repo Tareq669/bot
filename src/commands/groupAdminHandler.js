@@ -4560,7 +4560,15 @@ class GroupAdminHandler {
       if (!this.isGroupChat(ctx)) return;
       const message = ctx.message || {};
 
-      if (Array.isArray(message.new_chat_members) && message.new_chat_members.length > 0) {
+      // Only handle if this is a membership service message
+      const hasNewMembers = Array.isArray(message.new_chat_members) && message.new_chat_members.length > 0;
+      const hasLeftMember = message.left_chat_member?.id;
+
+      if (!hasNewMembers && !hasLeftMember) {
+        return; // Let other handlers process this message
+      }
+
+      if (hasNewMembers) {
         for (const member of message.new_chat_members) {
           if (!member?.id) continue;
           await this.handleMembershipTransition(ctx, {
@@ -4573,7 +4581,7 @@ class GroupAdminHandler {
         }
       }
 
-      if (message.left_chat_member?.id) {
+      if (hasLeftMember) {
         await this.handleMembershipTransition(ctx, {
           chat: ctx.chat,
           user: message.left_chat_member,
