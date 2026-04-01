@@ -4925,12 +4925,22 @@ class GroupGamesHandler {
   static async handleBuyCommand(ctx) {
     if (!this.isGroupChat(ctx)) return;
     const args = this.parseCommandArgs(ctx);
+    const qtyArg = [...args].reverse().find((x) => /^\d+$/.test(String(x))) || '1';
+    const qty = Math.max(1, Math.min(50, parseInt(this.normalizeArabicDigits(qtyArg), 10) || 1));
+    const loungeInput = args.filter((x) => !/^\d+$/.test(String(x))).join(' ').trim();
+    const loungeKey = this.normalizeLoungeToken(loungeInput || String(args[0] || ''));
+
     const key = String(args[0] || '').toLowerCase();
     const normalizedInput = this.normalizeText(args.join(' '));
     const item = GROUP_STORE.find((x) => x.key === key)
       || GROUP_STORE.find((x) => this.normalizeText(x.title) === normalizedInput)
       || GROUP_STORE.find((x) => normalizedInput.length > 2 && this.normalizeText(x.title).includes(normalizedInput));
-    if (!item) return ctx.reply('• عذرا هذا غير متوفر .');
+    if (!item) {
+      if (loungeKey && LOUNGE_PRODUCTS[loungeKey]) {
+        return this.buyLoungeProduct(ctx, loungeKey, qty);
+      }
+      return ctx.reply('• عذرا هذا غير متوفر .');
+    }
 
     const group = await this.ensureGroupRecord(ctx);
     const row = this.getOrCreateScoreRow(group, ctx.from);
@@ -5113,10 +5123,14 @@ class GroupGamesHandler {
     if (!this.isGroupChat(ctx)) return false;
     const parsed = this.parseLoungeBuy(ctx.message?.text || '');
     if (!parsed) return false;
+    return this.buyLoungeProduct(ctx, parsed.productKey, parsed.qty);
+  }
 
-    const product = LOUNGE_PRODUCTS[parsed.productKey];
+  static async buyLoungeProduct(ctx, productKey, qty = 1) {
+    const product = LOUNGE_PRODUCTS[productKey];
     if (!product) return false;
 
+    const safeQty = Math.max(1, Math.min(50, Number(qty || 1)));
     const group = await this.ensureGroupRecord(ctx);
     const market = this.ensureCafeMarket(group);
     const row = this.getOrCreateScoreRow(group, ctx.from);
@@ -5126,23 +5140,23 @@ class GroupGamesHandler {
     row.cafeProfile = this.resetCafeDailyAndWeekly(row.cafeProfile || {});
 
     const inStock = Number(market.stocks?.[product.key] || 0);
-    if (product.market && inStock < parsed.qty) {
-      return ctx.reply(`❌ المخزون الحالي ما بكفي.\n• المتاح: ${inStock}\n• المطلوب: ${parsed.qty}`);
+    if (product.market && inStock < safeQty) {
+      return ctx.reply(`❌ المخزون الحالي ما بكفي.\n• المتاح: ${inStock}\n• المطلوب: ${safeQty}`);
     }
     const unitPrice = this.getCafePrice(product, market);
-    const total = Number(unitPrice || 0) * parsed.qty;
+    const total = Number(unitPrice || 0) * safeQty;
     if (Number(row.points || 0) < total) {
       return ctx.reply(`❌ فلوسك غير كافية.\n• المطلوب: ${this.formatCurrency(total)}\n• فلوسك: ${this.formatCurrency(row.points || 0)}`);
     }
 
     row.points = Number(row.points || 0) - total;
-    row.loungeInventory[product.key] = Number(row.loungeInventory[product.key] || 0) + parsed.qty;
+    row.loungeInventory[product.key] = Number(row.loungeInventory[product.key] || 0) + safeQty;
     if (product.market) {
-      market.stocks[product.key] = Math.max(0, Number(market.stocks[product.key] || 0) - parsed.qty);
-      market.sold[product.key] = Number(market.sold[product.key] || 0) + parsed.qty;
+      market.stocks[product.key] = Math.max(0, Number(market.stocks[product.key] || 0) - safeQty);
+      market.sold[product.key] = Number(market.sold[product.key] || 0) + safeQty;
     }
     if (product.key === 'lighter') {
-      const fuelAdd = parsed.qty * Number(product.ignitionsPerUnit || 25);
+      const fuelAdd = safeQty * Number(product.ignitionsPerUnit || 25);
       row.loungeInventory.lighterFuel = Number(row.loungeInventory.lighterFuel || 0) + fuelAdd;
     }
     row.updatedAt = new Date();
@@ -5153,10 +5167,11 @@ class GroupGamesHandler {
       ? `\n• توليعات القداحة المتاحة: ${row.loungeInventory.lighterFuel}`
       : '';
     return ctx.reply(
-      `✅ تم شراء ${parsed.qty} ${product.name}\n` +
+      `✅ تم شراء ${safeQty} ${product.name}\n` +
       `• سعر القطعة: ${this.formatCurrency(unitPrice)}\n` +
       `• التكلفة: ${this.formatCurrency(total)}\n` +
-      `• الرصيد الآن: ${this.formatCurrency(row.points || 0)}${extra}`
+      `• الرصيد الآن: ${this.formatCurrency(row.points || 0)}${extra}\n` +
+      '• يعرض هذا العنصر تلقائياً في "ممتلكاتي"'
     );
   }
 
@@ -7952,6 +7967,12 @@ class GroupGamesHandler {
     if (ctx.callbackQuery) await ctx.answerCbQuery().catch(() => {});
     if (act === 'noop') return;
     if (act === 'hide') {
+      const chatId = ctx.chat?.id || ctx.callbackQuery?.message?.chat?.id;
+      const messageId = ctx.callbackQuery?.message?.message_id;
+      if (chatId && messageId) {
+        const deleted = await ctx.telegram.deleteMessage(chatId, messageId).then(() => true).catch(() => false);
+        if (deleted) return;
+      }
       await ctx.editMessageReplyMarkup({ inline_keyboard: [] }).catch(() => {});
       await ctx.reply('• تم اخفاء الاوامر بنجاح');
     }
@@ -8159,7 +8180,6 @@ class GroupGamesHandler {
 }
 
 module.exports = GroupGamesHandler;
-
 
 
 
