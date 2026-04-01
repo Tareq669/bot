@@ -66,8 +66,35 @@ class JoeChatHandler {
     let out = String(text || '').trim();
     out = out.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
     out = out.replace(/^\s*```[\s\S]*?```/g, '').trim();
+    if (this.isLikelyPromoOutput(out)) {
+      return 'خلّينا نكمّل بدون روابط دعائية. اكتب سؤالك بشكل مباشر وأنا معك.';
+    }
     if (!out) out = 'وضح سؤالك أكثر شوي.';
     return out.slice(0, 2000);
+  }
+
+  static isLikelyPromoOutput(text) {
+    const raw = String(text || '');
+    if (!raw) return false;
+    const lower = raw.toLowerCase();
+    const hasTelegramLink = /https?:\/\/t\.me\/[a-z0-9_]+/i.test(raw);
+    const promoSignals = [
+      'join the bot',
+      'start now',
+      'think you’re the funniest',
+      "think you're the funniest",
+      'best memes',
+      'battle',
+      'conquer',
+      'memefightsbot'
+    ];
+    const promoScore = promoSignals.reduce((sum, signal) => sum + (lower.includes(signal) ? 1 : 0), 0);
+    return hasTelegramLink && promoScore >= 2;
+  }
+
+  static isFreeFallbackAllowed() {
+    const raw = String(process.env.JOE_ALLOW_FREE_FALLBACK || 'false').trim().toLowerCase();
+    return ['1', 'true', 'yes', 'on'].includes(raw);
   }
 
   static pushHistory(session, role, content) {
@@ -158,7 +185,8 @@ class JoeChatHandler {
   }
 
   static async generate(session, userText, firstName, userLang) {
-    const freeFirst = ['1', 'true', 'yes', 'on'].includes(String(process.env.JOE_USE_FREE_FIRST || 'false').toLowerCase());
+    const freeAllowed = this.isFreeFallbackAllowed();
+    const freeFirst = freeAllowed && ['1', 'true', 'yes', 'on'].includes(String(process.env.JOE_USE_FREE_FIRST || 'false').toLowerCase());
 
     if (freeFirst) {
       try { return await this.callFreeFallback(session, userText, firstName, userLang); } catch (_) {}
@@ -168,7 +196,9 @@ class JoeChatHandler {
 
     try { return await this.callGeminiWithModel(session, userText, firstName, userLang, this.getModelName()); } catch (_) {}
     try { return await this.callGeminiWithModel(session, userText, firstName, userLang, this.getFallbackModelName()); } catch (_) {}
-    try { return await this.callFreeFallback(session, userText, firstName, userLang); } catch (_) {}
+    if (freeAllowed) {
+      try { return await this.callFreeFallback(session, userText, firstName, userLang); } catch (_) {}
+    }
     return this.getLocalFallback(userText);
   }
 
