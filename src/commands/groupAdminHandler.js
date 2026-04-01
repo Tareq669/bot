@@ -4459,8 +4459,8 @@ class GroupAdminHandler {
         newStatus,
         source: 'chat_member'
       });
-    } catch (_error) {
-      // ignore chat_member failures
+    } catch (error) {
+      console.error('Error in handleChatMemberUpdate:', error.message);
     }
   }
 
@@ -4487,28 +4487,36 @@ class GroupAdminHandler {
   }
 
   static async handleMembershipTransition(ctx, payload = {}) {
-    const chat = payload.chat || ctx.chat;
-    const user = payload.user || {};
-    const oldStatus = String(payload.oldStatus || '').trim();
-    const newStatus = String(payload.newStatus || '').trim();
-    if (!GROUP_TYPES.has(chat?.type)) return;
-    if (!Number(user?.id)) return;
+    try {
+      const chat = payload.chat || ctx.chat;
+      const user = payload.user || {};
+      const oldStatus = String(payload.oldStatus || '').trim();
+      const newStatus = String(payload.newStatus || '').trim();
+      if (!GROUP_TYPES.has(chat?.type)) return;
+      if (!Number(user?.id)) return;
 
-    const shouldSkip = this.shouldSkipMembershipEvent(chat.id, user.id, oldStatus, newStatus, payload.source);
-    if (shouldSkip) return;
+      const shouldSkip = this.shouldSkipMembershipEvent(chat.id, user.id, oldStatus, newStatus, payload.source);
+      if (shouldSkip) return;
 
-      const group = await Group.findOneAndUpdate(
-        { groupId: String(chat.id) },
-        {
-          $set: {
-            groupTitle: chat.title || 'Unknown Group',
-            groupType: chat.type || 'group',
-            updatedAt: new Date()
+      let group;
+      try {
+        group = await Group.findOneAndUpdate(
+          { groupId: String(chat.id) },
+          {
+            $set: {
+              groupTitle: chat.title || 'Unknown Group',
+              groupType: chat.type || 'group',
+              updatedAt: new Date()
+            },
+            $setOnInsert: { createdAt: new Date() }
           },
-          $setOnInsert: { createdAt: new Date() }
-        },
-        { upsert: true, new: true }
-      );
+          { upsert: true, new: true }
+        );
+      } catch (dbError) {
+        console.error('Database error in handleMembershipTransition:', dbError.message);
+        return;
+      }
+
       if (!group) return;
       this.normalizeGroupState(group);
 
@@ -4553,6 +4561,9 @@ class GroupAdminHandler {
           parse_mode: 'HTML'
         }).catch(() => null)));
       }
+    } catch (error) {
+      console.error('Error in handleMembershipTransition:', error.message);
+    }
   }
 
   static async handleGroupServiceMembershipUpdate(ctx) {
@@ -4590,8 +4601,8 @@ class GroupAdminHandler {
           source: 'service_message'
         });
       }
-    } catch (_error) {
-      // ignore service message failures
+    } catch (error) {
+      console.error('Error in handleGroupServiceMembershipUpdate:', error.message);
     }
   }
 
