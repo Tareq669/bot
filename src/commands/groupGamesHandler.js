@@ -6658,7 +6658,7 @@ class GroupGamesHandler {
     if (!this.isGroupChat(ctx)) return;
     const group = await this.ensureGroupRecord(ctx);
     const row = this.getOrCreateScoreRow(group, ctx.from);
-    await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
+    const userDoc = await this.ensureGlobalProfileAndSyncRow(row, ctx.from);
 
     const inventory = this.normalizeGiftInventoryList(row.giftInventory);
     row.giftInventory = inventory;
@@ -6781,22 +6781,42 @@ class GroupGamesHandler {
       .map((x) => ({ label: x.label, count: Number(row.loungeInventory[x.key] || 0) }))
       .filter((x) => Number(x.count || 0) > 0);
 
-    const giftsItems = [...mainItems, ...dynamicExtraItems];
-    const giftsText = giftsItems.length
-      ? giftsItems.map((x) => `( ${x.label} ~ ${x.count} )`).join('\n')
-      : '( لا يوجد هدايا )';
+    const bankAssetLabelMap = {
+      car: 'سيارة',
+      diamond: 'ماسة',
+      house: 'بيت',
+      palace: 'قصر',
+      villa: 'فيلا',
+      rose: 'وردة'
+    };
+    const bankAssets = (userDoc?.bankProfile && typeof userDoc.bankProfile === 'object' && userDoc.bankProfile.assets)
+      ? userDoc.bankProfile.assets
+      : {};
+    const bankItems = Object.entries(bankAssetLabelMap)
+      .map(([key, label]) => ({ key, label, count: Number(bankAssets?.[key] || 0) }))
+      .filter((x) => Number(x.count || 0) > 0);
 
-    const loungeText = loungeItems.length
-      ? loungeItems.map((x) => `( ${x.label} ~ ${x.count} )`).join('\n')
-      : '( لا يوجد عناصر كافيتيريا/لاونج )';
+    const combinedMap = new Map();
+    const appendItem = (item) => {
+      const label = String(item?.label || '').trim();
+      const count = Number(item?.count || 0);
+      if (!label || count <= 0) return;
+      combinedMap.set(label, (combinedMap.get(label) || 0) + count);
+    };
+
+    [...mainItems, ...dynamicExtraItems, ...loungeItems, ...bankItems].forEach(appendItem);
+    const finalItems = [...combinedMap.entries()]
+      .map(([label, count]) => ({ label, count }))
+      .filter((x) => Number(x.count || 0) > 0);
+
+    const rowsText = finalItems.length
+      ? finalItems.map((x) => `( ${x.label} ~ ${x.count} )`).join('\n')
+      : '( لا يوجد ممتلكات )';
 
     await group.save();
     return ctx.reply(
-      '• اهلا بك في قائمة ممتلكاتك .\n\n' +
-      '• الهدايا:\n' +
-      `${giftsText}\n\n` +
-      '• الكافيتيريا واللاونج:\n' +
-      `${loungeText}`
+      '• اهلا بك في قائمة ممتلكاتك .\n' +
+      `${rowsText}`
     );
   }
 
@@ -8188,6 +8208,5 @@ class GroupGamesHandler {
 }
 
 module.exports = GroupGamesHandler;
-
 
 
