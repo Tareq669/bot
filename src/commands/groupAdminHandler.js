@@ -604,32 +604,47 @@ class GroupAdminHandler {
 
   static async collectMentionableMembers(ctx, group, botId = null) {
     const people = new Map();
-    const addPerson = (userId, label = '') => {
+    const addPerson = (userId, options = {}) => {
       const id = Number(userId || 0);
       if (!id || id === Number(botId || 0)) return;
-      if (!people.has(id)) {
-        people.set(id, label ? String(label) : `عضو ${id}`);
-        return;
-      }
-      const current = String(people.get(id) || '');
-      if ((!current || /^عضو \d+$/.test(current)) && label) {
-        people.set(id, String(label));
-      }
+      const nextLabel = String(options.label || '').trim();
+      const nextPriority = Number(options.priority || 0);
+      const nextActivity = Number(options.activity || 0);
+      const existing = people.get(id) || { id, label: `عضو ${id}`, priority: 0, activity: 0 };
+      const existingLabel = String(existing.label || '').trim();
+      const preferNewLabel = nextLabel && (!existingLabel || /^عضو \d+$/.test(existingLabel));
+      people.set(id, {
+        id,
+        label: preferNewLabel ? nextLabel : existingLabel || `عضو ${id}`,
+        priority: Math.max(Number(existing.priority || 0), nextPriority),
+        activity: Math.max(Number(existing.activity || 0), nextActivity)
+      });
     };
 
-    this.getRoleIds(group, 'basicOwnerIds').forEach((id) => addPerson(id));
-    this.getRoleIds(group, 'ownerIds').forEach((id) => addPerson(id));
-    this.getRoleIds(group, 'managerIds').forEach((id) => addPerson(id));
-    this.getRoleIds(group, 'adminIds').forEach((id) => addPerson(id));
-    this.getRoleIds(group, 'premiumMemberIds').forEach((id) => addPerson(id));
+    this.getRoleIds(group, 'basicOwnerIds').forEach((id) => addPerson(id, { priority: 100 }));
+    this.getRoleIds(group, 'ownerIds').forEach((id) => addPerson(id, { priority: 90 }));
+    this.getRoleIds(group, 'managerIds').forEach((id) => addPerson(id, { priority: 80 }));
+    this.getRoleIds(group, 'adminIds').forEach((id) => addPerson(id, { priority: 70 }));
+    this.getRoleIds(group, 'premiumMemberIds').forEach((id) => addPerson(id, { priority: 60 }));
 
-    (Array.isArray(group?.admins) ? group.admins : []).forEach((row) => addPerson(row?.userId));
-    (Array.isArray(group?.gameSystem?.scores) ? group.gameSystem.scores : []).forEach((row) => addPerson(row?.userId));
-    (Array.isArray(group?.warnings) ? group.warnings : []).forEach((row) => addPerson(row?.userId));
-    (Array.isArray(group?.bannedUsers) ? group.bannedUsers : []).forEach((row) => addPerson(row?.userId));
+    (Array.isArray(group?.admins) ? group.admins : []).forEach((row) => addPerson(row?.userId, { priority: 65 }));
+    (Array.isArray(group?.gameSystem?.scores) ? group.gameSystem.scores : []).forEach((row) => {
+      const messagesCount = Number(row?.messagesCount || row?.messageCount || 0);
+      const weeklyActivity = Number(row?.activityWeeklyCount || 0);
+      const weeklyPoints = Number(row?.weeklyPoints || 0);
+      const monthlyPoints = Number(row?.monthlyPoints || 0);
+      const activityScore = (messagesCount * 3) + (weeklyActivity * 5) + weeklyPoints + Math.floor(monthlyPoints / 4);
+      addPerson(row?.userId, {
+        label: row?.username || '',
+        priority: 40,
+        activity: activityScore
+      });
+    });
+    (Array.isArray(group?.warnings) ? group.warnings : []).forEach((row) => addPerson(row?.userId, { priority: 10 }));
+    (Array.isArray(group?.bannedUsers) ? group.bannedUsers : []).forEach((row) => addPerson(row?.userId, { priority: 5 }));
     (Array.isArray(group?.moderationLogs) ? group.moderationLogs : []).forEach((row) => {
-      addPerson(row?.actorId);
-      addPerson(row?.targetId);
+      addPerson(row?.actorId, { priority: 8 });
+      addPerson(row?.targetId, { priority: 8 });
     });
 
     // Fallback: include current Telegram admins even if local DB is still empty/new.
@@ -638,13 +653,20 @@ class GroupAdminHandler {
       admins.forEach((member) => {
         const userId = Number(member?.user?.id || 0);
         const name = String(member?.user?.first_name || member?.user?.username || '').trim();
-        addPerson(userId, name);
+        const status = String(member?.status || '').toLowerCase();
+        const priority = status === 'creator' ? 110 : 75;
+        addPerson(userId, { label: name, priority });
       });
     } catch (_error) {
       // ignore: keep local-known members only
     }
 
-    const members = [...people.entries()].map(([id, label]) => ({ id, label: String(label || `عضو ${id}`) }));
+    const members = [...people.values()].map((row) => ({
+      id: Number(row.id),
+      label: String(row.label || `عضو ${row.id}`),
+      priority: Number(row.priority || 0),
+      activity: Number(row.activity || 0)
+    }));
     const ids = members.map((row) => Number(row.id)).filter((id) => Number.isInteger(id) && id > 0);
 
     if (!ids.length) return members;
@@ -654,11 +676,16 @@ class GroupAdminHandler {
       .lean();
     const nameMap = new Map(profiles.map((profile) => [Number(profile.userId), String(profile.firstName || '').trim()]));
 
-    return members.map((member) => {
+    const enriched = members.map((member) => {
       const preferred = String(nameMap.get(Number(member.id)) || '').trim();
       if (preferred) return { ...member, label: preferred };
       return { ...member, label: `عضو ${member.id}` };
     });
+
+    return enriched.sort((a, b) =>
+      Number(b.priority || 0) - Number(a.priority || 0)
+      || Number(b.activity || 0) - Number(a.activity || 0)
+      || Number(a.id || 0) - Number(b.id || 0));
   }
 
   static async handleAllMentionCommand(ctx) {
