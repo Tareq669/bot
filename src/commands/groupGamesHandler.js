@@ -6601,7 +6601,8 @@ class GroupGamesHandler {
       `• الهدية: ${gift.name}\n` +
       `• العدد: ${qty}\n` +
       `• التكلفة: ${this.formatCurrency(totalPrice)}\n` +
-      `• فلوسك الآن: ${this.formatCurrency(row.points || 0)}`,
+      `• فلوسك الآن: ${this.formatCurrency(row.points || 0)}\n` +
+      '• تمت إضافة الهدية إلى ممتلكاتك',
       { parse_mode: 'HTML', reply_to_message_id: ctx.message?.message_id }
     );
   }
@@ -6780,15 +6781,22 @@ class GroupGamesHandler {
       .map((x) => ({ label: x.label, count: Number(row.loungeInventory[x.key] || 0) }))
       .filter((x) => Number(x.count || 0) > 0);
 
-    const ownedItems = [...mainItems, ...dynamicExtraItems, ...loungeItems];
-    const rowsText = ownedItems.length
-      ? ownedItems.map((x) => `( ${x.label} ~ ${x.count} )`).join('\n')
-      : '( لا يوجد ممتلكات )';
+    const giftsItems = [...mainItems, ...dynamicExtraItems];
+    const giftsText = giftsItems.length
+      ? giftsItems.map((x) => `( ${x.label} ~ ${x.count} )`).join('\n')
+      : '( لا يوجد هدايا )';
+
+    const loungeText = loungeItems.length
+      ? loungeItems.map((x) => `( ${x.label} ~ ${x.count} )`).join('\n')
+      : '( لا يوجد عناصر كافيتيريا/لاونج )';
 
     await group.save();
     return ctx.reply(
-      '• اهلا بك في قائمة ممتلكاتك .\n' +
-      `${rowsText}`
+      '• اهلا بك في قائمة ممتلكاتك .\n\n' +
+      '• الهدايا:\n' +
+      `${giftsText}\n\n` +
+      '• الكافيتيريا واللاونج:\n' +
+      `${loungeText}`
     );
   }
 
@@ -8180,7 +8188,6 @@ class GroupGamesHandler {
 }
 
 module.exports = GroupGamesHandler;
-
 
 
 
