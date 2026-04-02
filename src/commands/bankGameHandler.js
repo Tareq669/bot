@@ -47,6 +47,28 @@ class BankGameHandler {
     });
   }
 
+  static formatEnglishDateInGaza(ts) {
+    const date = new Date(Number(ts || 0));
+    if (!Number.isFinite(date.getTime())) return 'N/A';
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      timeZone: 'Asia/Gaza'
+    });
+  }
+
+  static formatEnglishTimeInGaza(ts) {
+    const date = new Date(Number(ts || 0));
+    if (!Number.isFinite(date.getTime())) return 'N/A';
+    return date.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: 'Asia/Gaza'
+    });
+  }
+
   static generateCardNumber(cardType = 'visa') {
     const digits = String(Date.now()).slice(-10) + String(Math.floor(100000 + Math.random() * 900000));
     const body = digits.slice(0, 15);
@@ -746,7 +768,7 @@ class BankGameHandler {
         targetDoc.bankProfile = tp;
         await Promise.all([meDoc.save(), targetDoc.save()]);
         await this.syncBankBalanceToGameWallet(ctx?.chat?.id, targetDoc, target, tp.balance);
-        return ctx.reply(`🚨 انمسكت! خسرّت غرامة ${this.fmt(fine)}\n• رصيدك: ${this.fmt(p.balance)}`);
+        return ctx.reply('• حرامي فاشل');
       }
 
       const stealAmount = Math.max(1000, Math.floor(tp.balance * (0.01 + Math.random() * 0.07)));
@@ -758,7 +780,17 @@ class BankGameHandler {
       targetDoc.bankProfile = tp;
       await Promise.all([meDoc.save(), targetDoc.save()]);
       await this.syncBankBalanceToGameWallet(ctx?.chat?.id, targetDoc, target, tp.balance);
-      return ctx.reply(`🕶️ زرف ناجح: +${this.fmt(amount)}\n• رصيدك: ${this.fmt(p.balance)}`);
+      const targetName = String(target.first_name || target.username || target.id).replace(/[<&>]/g, '');
+      const englishDate = this.formatEnglishDateInGaza(now);
+      const englishTime = this.formatEnglishTimeInGaza(now);
+      return ctx.reply(
+        '• حافظ عل فلوسك ي حلو \n' +
+        `• الشخص هذا » ${targetName}\n` +
+        `• زرفك ↤︎ ${this.fmt(amount)}\n` +
+        `• التاريخ ↤︎ ${englishDate}\n` +
+        `• الساعة ↤︎ ${englishTime}\n` +
+        '-'
+      );
     });
   }
 
