@@ -2612,18 +2612,29 @@ class GroupAdminHandler {
     if (!canUse) return ctx.reply('• عذراً الامر يخص ↤︎ 〖  المالك 〗 فقط .');
     const group = await this.ensureGroupRecord(ctx);
     const text = String(ctx.message?.text || '').trim();
-    if (/^(تفعيل مغادره المشرفين|\/gadminleave\s+on)$/i.test(text)) {
+    if (/^(تفعيل مغادره المشرفين|تفعيل مغادرة المشرفين|\/gadminleave(?:@\w+)?\s+on)$/i.test(text)) {
       group.settings.notifyAdminLeave = true;
       await this.addModerationLog(group, 'toggle_admin_leave_notify', ctx.from.id, null, 'on');
       await group.save();
       return ctx.reply('✅ تم تفعيل إشعار مغادرة المشرفين.');
     }
-    if (/^(تعطيل مغادره المشرفين|\/gadminleave\s+off)$/i.test(text)) {
+    if (/^(تعطيل مغادره المشرفين|تعطيل مغادرة المشرفين|\/gadminleave(?:@\w+)?\s+off)$/i.test(text)) {
       group.settings.notifyAdminLeave = false;
       await this.addModerationLog(group, 'toggle_admin_leave_notify', ctx.from.id, null, 'off');
       await group.save();
       return ctx.reply('✅ تم تعطيل إشعار مغادرة المشرفين.');
     }
+
+    return ctx.reply(
+      `ℹ️ إعداد إشعار مغادرة المشرفين\n\n` +
+      `• الحالة الحالية: ${group.settings.notifyAdminLeave ? '✅ مفعل' : '❌ معطل'}\n\n` +
+      `للتفعيل:\n` +
+      `• /gadminleave on\n` +
+      `• تفعيل مغادرة المشرفين\n\n` +
+      `للتعطيل:\n` +
+      `• /gadminleave off\n` +
+      `• تعطيل مغادرة المشرفين`
+    );
   }
 
   static buildFaqHelpText(group) {
@@ -4902,7 +4913,7 @@ class GroupAdminHandler {
       await this.handleOnlineToggle(ctx);
       return true;
     }
-    if (/^(تفعيل مغادره المشرفين|تعطيل مغادره المشرفين|\/gadminleave\b)/i.test(rawText)) {
+    if (/^(تفعيل مغادره المشرفين|تعطيل مغادره المشرفين|تفعيل مغادرة المشرفين|تعطيل مغادرة المشرفين|\/gadminleave\b)/i.test(rawText)) {
       await this.handleAdminLeaveToggle(ctx);
       return true;
     }
