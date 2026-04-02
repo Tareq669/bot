@@ -4346,7 +4346,14 @@ class GroupAdminHandler {
       return this.handleToggleSetting(ctx, key);
     }
 
-    if (data === 'group:subscribe:verify') {
+    if (data === 'group:subscribe:verify' || data.startsWith('group:subscribe:verify:')) {
+      const parts = data.split(':');
+      const targetUserId = Number(parts[3] || 0);
+      const actorUserId = Number(ctx.from?.id || 0);
+      if (targetUserId > 0 && actorUserId !== targetUserId) {
+        return ctx.answerCbQuery('❌ هذا الزر ليس مخصصًا لك', { show_alert: true }).catch(() => {});
+      }
+
       const group = await this.ensureGroupRecord(ctx);
       const channel = this.getRequiredSubscriptionChannel(group);
       if (!group.settings?.requireNewsSubscription || !channel) {
@@ -4697,17 +4704,21 @@ class GroupAdminHandler {
     );
   }
 
-  static forcedSubscriptionKeyboard(channel) {
+  static forcedSubscriptionKeyboard(channel, userId = null) {
+    const safeUserId = Number(userId || 0);
+    const verifyCallback = safeUserId > 0
+      ? `group:subscribe:verify:${safeUserId}`
+      : 'group:subscribe:verify';
     return Markup.inlineKeyboard([
       [Markup.button.url(channel?.title || 'اشترك الآن', channel?.url || 'https://t.me')],
-      [Markup.button.callback('✅ تحقق من الاشتراك', 'group:subscribe:verify')]
+      [Markup.button.callback('✅ تحقق من الاشتراك', verifyCallback)]
     ]);
   }
 
   static async sendForcedSubscriptionPrompt(ctx, group) {
     const channel = this.getRequiredSubscriptionChannel(group);
     const text = this.getForcedSubscriptionNotice(ctx.from, group);
-    const keyboard = this.forcedSubscriptionKeyboard(channel).reply_markup;
+    const keyboard = this.forcedSubscriptionKeyboard(channel, ctx.from?.id).reply_markup;
     const chatId = ctx.chat?.id;
     if (!chatId) return;
 
