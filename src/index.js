@@ -205,7 +205,7 @@ const GROUP_ONLY_COMMANDS = new Set([
   'gadminstats', 'gprint', 'greasons', 'gbasic', 'gexceptions', 'granks', 'gdetect', 'gonline', 'gadminleave',
   'gtemplate_member', 'gtemplate_admin', 'gideal_member', 'gideal_admin', 'gshow_ideal_member', 'gshow_ideal_admin', 'gwelcome', 'gsuggest',
   'gfaq', 'gsuggestmenu', 'gsuggeststats', 'gsuggesttop', 'gquiz', 'gmath', 'gword', 'gdaily', 'gmcq', 'gvote', 'gquizset', 'gleader', 'gweekly', 'ggame', 'ggames',
-  'g', 'gteam', 'gteams', 'gtour', 'gwho', 'griddle', 'gtype', 'chance', 'gduel', 'gstore', 'gbuy', 'ggifts', 'ggift', 'gassets', 'gwealth', 'gprofile', 'ginvest', 'gluck', 'gluckstats', 'gmonth', 'gmonthly', 'gbonus', 'glevels', 'glounge',
+  'g', 'gteam', 'gteams', 'gtour', 'gwho', 'griddle', 'gtype', 'gtable', 'chance', 'gduel', 'gstore', 'gbuy', 'ggifts', 'ggift', 'gassets', 'gwealth', 'gprofile', 'ginvest', 'gluck', 'gluckstats', 'gmonth', 'gmonthly', 'gbonus', 'glevels', 'glounge',
   'gcafework', 'gcafereq', 'gcafedeliver', 'gmood', 'gtopcafe', 'gtophookah', 'gtopsmoke', 'ghookahsession',
   'gcastle', 'gmycastle', 'gresstore', 'gbuyres', 'gmyres', 'gupcastle', 'gbarracks', 'gbuyarmy', 'guparmy', 'gtreasure', 'gshield', 'gmyshield', 'gwar', 'garena', 'gfighters', 'grulers', 'gally', 'gallyreq',
   'gconfess', 'gconfessend',
@@ -432,6 +432,7 @@ Promise.all([
       { command: 'gwho', description: 'لعبة مين أنا' },
       { command: 'griddle', description: 'ألغاز ذكية' },
       { command: 'gtype', description: 'سرعة الكتابة' },
+      { command: 'gtable', description: 'لعبة الجدول' },
       { command: 'chance', description: 'روليت الأوامر' },
       { command: 'gduel', description: 'تحدي عضوين' },
       { command: 'gstore', description: 'متجر الجروب' },
@@ -602,6 +603,7 @@ bot.command('gword', (ctx) => GroupGamesHandler.handleWordCommand(ctx));
 bot.command('gwho', (ctx) => GroupGamesHandler.handleWhoAmICommand(ctx));
 bot.command('griddle', (ctx) => GroupGamesHandler.handleRiddleCommand(ctx));
 bot.command('gtype', (ctx) => GroupGamesHandler.handleTypingCommand(ctx));
+bot.command('gtable', (ctx) => GroupGamesHandler.handleTableCodeCommand(ctx));
 bot.command('chance', (ctx) => GroupGamesHandler.handleChanceCommand(ctx));
 bot.command('gduel', (ctx) => GroupGamesHandler.handleDuelCommand(ctx));
 bot.command('gdaily', (ctx) => GroupGamesHandler.handleDailyCommand(ctx));
@@ -1821,13 +1823,13 @@ bot.action(/^group:vote:([a-z0-9]+):(\d+)$/i, (ctx) => GroupGamesHandler.handleV
 bot.action(/^group:duel:(accept|decline):([a-z0-9]+)$/i, (ctx) => GroupGamesHandler.handleDuelAction(ctx, ctx.match[1], ctx.match[2]));
 bot.action(/^group:hazar:answer:([a-z0-9]+)$/i, (ctx) => GroupGamesHandler.handleHazarAnswerAction(ctx, ctx.match[1]));
 bot.action(/^group:confess:(end):([a-z0-9]+)$/i, (ctx) => GroupGamesHandler.handleConfessionAction(ctx, ctx.match[1].toLowerCase(), ctx.match[2]));
-bot.action(/^group:games:(gquiz|gmath|gword|gwho|griddle|gtype|gduel|gcups|greligious|gscience|ghistory|gfiqh|ggeography|gphysics|gcalculations|gdetective|gcrime|ghazar|gruler|gstory|gchair|gstore|ggroupgames|gxo|gchance|gdaily|gmcq|gvote|gleader|gweekly|gmonth|glevels|glounge|gconfess|gconfess_end)$/i, (ctx) => GroupGamesHandler.handleGamesMenuAction(ctx, ctx.match[1].toLowerCase()));
+bot.action(/^group:games:(gquiz|gmath|gword|gwho|griddle|gtype|gtable|gduel|gcups|greligious|gscience|ghistory|gfiqh|ggeography|gphysics|gcalculations|gdetective|gcrime|ghazar|gruler|gstory|gchair|gstore|ggroupgames|gxo|gchance|gdaily|gmcq|gvote|gleader|gweekly|gmonth|glevels|glounge|gconfess|gconfess_end)$/i, (ctx) => GroupGamesHandler.handleGamesMenuAction(ctx, ctx.match[1].toLowerCase()));
 bot.action(/^group:games:page:(\d+)$/i, (ctx) => GroupGamesHandler.handleGamesMenuPageAction(ctx, Number(ctx.match[1] || 0)));
 bot.action(/^group:games:(noop|hide)$/i, (ctx) => GroupGamesHandler.handleGamesMenuMetaAction(ctx, ctx.match[1]));
 bot.action(/^group:cups:pick:([a-z0-9]+):([1-3])$/i, (ctx) => GroupGamesHandler.handleCupsPickAction(ctx, ctx.match[1], Number(ctx.match[2])));
 bot.action(/^group:help:page:(\d+)$/i, (ctx) => GroupGamesHandler.handleGamesHelpPageAction(ctx, Number(ctx.match[1] || 0)));
 bot.action(/^group:help:noop$/i, (ctx) => ctx.answerCbQuery().catch(() => {}));
-bot.action(/^group:quick:(quiz|who|riddle|typing|duel|chance|profile|leader|levels|store|gifts|assets|lounge|supplies|help)$/i, (ctx) => GroupGamesHandler.handleQuickAction(ctx, ctx.match[1]));
+bot.action(/^group:quick:(quiz|who|riddle|typing|table|duel|chance|profile|leader|levels|store|gifts|assets|lounge|supplies|help)$/i, (ctx) => GroupGamesHandler.handleQuickAction(ctx, ctx.match[1]));
 bot.action(/^group:levels:(bronze|silver|gold|platinum|diamond)$/i, (ctx) => GroupGamesHandler.handleLevelsAction(ctx, ctx.match[1]));
 bot.action(/^group:(?!whisper:).+$/, (ctx) => GroupAdminHandler.handleGroupCallback(ctx));
 bot.on('poll_answer', (ctx) => GroupGamesHandler.handlePollAnswer(ctx));
@@ -3060,6 +3062,7 @@ bot.hears(/^مين\s*انا$/i, (ctx) => GroupGamesHandler.handleWhoAmICommand(c
 bot.hears(/^(?:الغاز|ألغاز|لغز)$/i, (ctx) => GroupGamesHandler.handleClassicRiddleCommand(ctx));
 bot.hears(/^(?:لغزي)$/i, (ctx) => GroupGamesHandler.handleRiddleCommand(ctx));
 bot.hears(/^سرعة\s*الكتابة$/i, (ctx) => GroupGamesHandler.handleTypingCommand(ctx));
+bot.hears(/^جدول$/i, (ctx) => GroupGamesHandler.handleTableCodeCommand(ctx));
 bot.hears(/^روليت$/i, (ctx) => GroupGamesHandler.handleChanceCommand(ctx));
 bot.hears(/^(?:اكواب|الاكواب|الثلاث\s*اكواب|لعبة\s*الاكواب)$/i, (ctx) => GroupGamesHandler.handleCupsCommand(ctx));
 bot.hears(/^كرسي\s*الاعتراف$/i, (ctx) => GroupGamesHandler.handleConfessionStart(ctx));
@@ -3248,6 +3251,7 @@ bot.hears(/^(?:\/)?(?:مين_انا|مينانا)$/i, (ctx) => GroupGamesHandler
 bot.hears(/^(?:\/)?(?:الغاز|الغاز_ذكية|لغز)$/i, (ctx) => GroupGamesHandler.handleClassicRiddleCommand(ctx));
 bot.hears(/^(?:\/)?(?:لغزي)$/i, (ctx) => GroupGamesHandler.handleRiddleCommand(ctx));
 bot.hears(/^(?:\/)?(?:سرعة_الكتابة|سرعة)$/i, (ctx) => GroupGamesHandler.handleTypingCommand(ctx));
+bot.hears(/^(?:\/)?(?:جدول|gtable)$/i, (ctx) => GroupGamesHandler.handleTableCodeCommand(ctx));
 bot.hears(/^(?:\/)?(?:روليت|chance_ar)$/i, (ctx) => GroupGamesHandler.handleChanceCommand(ctx));
 bot.hears(/^(?:\/)?(?:كرسي_الاعتراف|gconfess)$/i, (ctx) => GroupGamesHandler.handleConfessionStart(ctx));
 bot.hears(/^(?:\/)?(?:انهاء_كرسي_الاعتراف|gconfessend)$/i, (ctx) => GroupGamesHandler.handleConfessionEnd(ctx));

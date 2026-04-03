@@ -783,12 +783,14 @@ class BankGameHandler {
       targetDoc.bankProfile = tp;
       await Promise.all([meDoc.save(), targetDoc.save()]);
       await this.syncBankBalanceToGameWallet(ctx?.chat?.id, targetDoc, target, tp.balance);
+      const thiefName = String(ctx.from?.first_name || ctx.from?.username || ctx.from?.id || '').replace(/[<&>]/g, '');
       const targetName = String(target.first_name || target.username || target.id).replace(/[<&>]/g, '');
       const englishDate = this.formatEnglishDateInGaza(now);
       const englishTime = this.formatEnglishTimeInGaza(now);
       return ctx.reply(
         '• حافظ عل فلوسك ي حلو \n' +
-        `• الشخص هذا » ${targetName}\n` +
+        `• السارق » ${thiefName}\n` +
+        `• المزروف منه » ${targetName}\n` +
         `• زرفك ↤︎ ${this.fmt(amount)}\n` +
         `• التاريخ ↤︎ ${englishDate}\n` +
         `• الساعة ↤︎ ${englishTime}\n` +

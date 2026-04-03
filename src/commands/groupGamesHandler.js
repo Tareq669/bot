@@ -126,6 +126,67 @@ const QUICK_QUESTIONS = [
   { question: 'في أي قارة تقع مصر؟', answers: ['أفريقيا', 'افريقيا'], reward: 8 }
 ];
 
+const TABLE_GAME_IMAGE_PATH = '/home/tareqamir/التنزيلات/photo_2026-04-03_22-53-59.jpg';
+const TABLE_GAME_REWARD = 100;
+const TABLE_CODE_ITEMS = [
+  { name: 'كتاب', code: 'B518' },
+  { name: 'قلم', code: 'P198' },
+  { name: 'كرسي', code: 'C796' },
+  { name: 'نافذة', code: 'W740' },
+  { name: 'باب', code: 'D324' },
+  { name: 'كوب', code: 'C204' },
+  { name: 'طبق', code: 'P516' },
+  { name: 'ساعة', code: 'C309' },
+  { name: 'هاتف', code: 'H418' },
+  { name: 'مصباح', code: 'L964' },
+  { name: 'مفتاح', code: 'K827' },
+  { name: 'حقيبة', code: 'B380' },
+  { name: 'وسادة', code: 'P958' },
+  { name: 'مرآة', code: 'M144' },
+  { name: 'شاشة', code: 'S182' },
+  { name: 'دفتر', code: 'N581' },
+  { name: 'مقعد', code: 'S230' },
+  { name: 'مزهرية', code: 'V473' },
+  { name: 'مكنسة', code: 'B344' },
+  { name: 'شمعة', code: 'C197' },
+  { name: 'قفل', code: 'L447' },
+  { name: 'سلة', code: 'B954' },
+  { name: 'رف', code: 'S864' },
+  { name: 'منبه', code: 'A792' },
+  { name: 'إبريق', code: 'J917' },
+  { name: 'صندوق', code: 'B551' },
+  { name: 'مقص', code: 'S274' },
+  { name: 'عدسة', code: 'L943' },
+  { name: 'لوحة', code: 'B767' },
+  { name: 'درع', code: 'S820' },
+  { name: 'فرشاة', code: 'B629' },
+  { name: 'مطرقة', code: 'H373' },
+  { name: 'خوذة', code: 'H420' },
+  { name: 'سجادة', code: 'R750' },
+  { name: 'طاولة', code: 'T976' },
+  { name: 'ستارة', code: 'C901' },
+  { name: 'سبورة', code: 'B728' },
+  { name: 'مذياع', code: 'R202' },
+  { name: 'كاميرا', code: 'C950' },
+  { name: 'حاسوب', code: 'C419' },
+  { name: 'سماعة', code: 'H965' },
+  { name: 'شاحن', code: 'C915' },
+  { name: 'بطارية', code: 'B316' },
+  { name: 'مسطرة', code: 'R217' },
+  { name: 'ممحاة', code: 'E503' },
+  { name: 'مسمار', code: 'N687' },
+  { name: 'مطفأة', code: 'E520' },
+  { name: 'صنبور', code: 'T709' },
+  { name: 'موقد', code: 'S762' },
+  { name: 'مغسلة', code: 'S980' },
+  { name: 'ثلاجة', code: 'F323' },
+  { name: 'فرن', code: 'O664' },
+  { name: 'مجهر', code: 'M236' },
+  { name: 'بوصلة', code: 'C124' },
+  { name: 'مقالة', code: 'P571' },
+  { name: 'مروحة', code: 'F764' }
+];
+
 const MCQ_QUESTIONS = [
   { question: 'ما أكبر كوكب؟', options: ['المريخ', 'المشتري', 'زحل', 'الزهرة'], answerIndex: 1, reward: 1, category: 'culture' },
   { question: 'عاصمة اليابان؟', options: ['سيؤول', 'طوكيو', 'بكين', 'بانكوك'], answerIndex: 1, reward: 1, category: 'culture' },
@@ -1455,6 +1516,11 @@ class GroupGamesHandler {
     return `${value.toLocaleString('en-US')} دولار 💸`;
   }
 
+  static formatEnglishSeconds(seconds) {
+    const value = Math.max(1, Math.floor(Number(seconds) || 1));
+    return `${value.toLocaleString('en-US')} ${value === 1 ? 'second' : 'seconds'}`;
+  }
+
   static normalizeGenderValue(value) {
     const normalized = this.normalizeText(String(value || ''));
     if (['ولد', 'ذكر', 'شاب', 'رجل', 'boy', 'male'].includes(normalized)) return GENDER_VALUES.boy;
@@ -2052,6 +2118,9 @@ class GroupGamesHandler {
         Markup.button.callback('⚡ سرعة', 'group:quick:typing')
       ],
       [
+        Markup.button.callback('🗂️ جدول', 'group:quick:table')
+      ],
+      [
         Markup.button.callback('⚔️ تحدي', 'group:quick:duel'),
         Markup.button.callback('🎲 روليت', 'group:quick:chance')
       ],
@@ -2100,6 +2169,7 @@ class GroupGamesHandler {
     if (action === 'who') return this.handleWhoAmICommand(ctx);
     if (action === 'riddle') return this.handleRiddleCommand(ctx);
     if (action === 'typing') return this.handleTypingCommand(ctx);
+    if (action === 'table') return this.handleTableCodeCommand(ctx);
     if (action === 'duel') return ctx.reply('⚔️ للتحدي: اكتب\n/gduel @username\nأو: تحدي @username');
     if (action === 'chance') return this.handleChanceCommand(ctx);
     if (action === 'profile') return this.handleGroupProfileCommand(ctx);
@@ -3548,20 +3618,36 @@ class GroupGamesHandler {
     this.clearRound(groupId);
 
     const deadline = Date.now() + roundPayload.timeoutSec * 1000;
+    const reward = Math.max(1, Math.floor(Number(roundPayload.reward || 1)));
+    const answers = Array.isArray(roundPayload.answers)
+      ? roundPayload.answers.map((a) => String(a || '').trim()).filter(Boolean)
+      : [];
+    if (!answers.length) return;
     this.activeRounds.set(groupId, {
       ...roundPayload,
-      reward: 1,
-      answersNorm: roundPayload.answers.map((a) => this.normalizeText(String(a))),
+      reward,
+      answers,
+      answersNorm: answers.map((a) => this.normalizeText(String(a))),
       deadline,
       allowedUserIds: Array.isArray(roundPayload.allowedUserIds) ? roundPayload.allowedUserIds.map((x) => Number(x)) : null,
       onWin: typeof roundPayload.onWin === 'function' ? roundPayload.onWin : null
     });
 
-    const sent = await this.bot.telegram.sendMessage(
-      Number(chatId),
-      `${roundPayload.prompt}\n\n⏱️ المدة: ${roundPayload.timeoutSec} ثانية\n💰 الجائزة: ${this.formatCurrency(1)}`,
-      { parse_mode: 'HTML' }
-    );
+    const roundText = `${roundPayload.prompt}\n\n⏱️ المدة: ${roundPayload.timeoutSec} ثانية\n💰 الجائزة: ${this.formatCurrency(reward)}`;
+    let sent = null;
+    if (roundPayload.imagePath && fs.existsSync(roundPayload.imagePath)) {
+      sent = await this.bot.telegram.sendPhoto(
+        Number(chatId),
+        { source: fs.createReadStream(roundPayload.imagePath) },
+        { caption: roundText, parse_mode: 'HTML' }
+      );
+    } else {
+      sent = await this.bot.telegram.sendMessage(
+        Number(chatId),
+        roundText,
+        { parse_mode: 'HTML' }
+      );
+    }
 
     const timeout = setTimeout(async () => {
       const active = this.activeRounds.get(groupId);
@@ -3635,6 +3721,18 @@ class GroupGamesHandler {
       answers: [word],
       reward: 1,
       timeoutSec: 10
+    };
+  }
+
+  static buildTableCodeRound() {
+    const item = this.pickNonRepeating(TABLE_CODE_ITEMS, 'tablecode:global');
+    return {
+      type: 'table_code',
+      prompt: `• اسرع واحد يكتب رمز ↤︎ ( ${item.name} )`,
+      answers: [item.code],
+      reward: TABLE_GAME_REWARD,
+      timeoutSec: 30,
+      imagePath: TABLE_GAME_IMAGE_PATH
     };
   }
 
@@ -3885,7 +3983,7 @@ class GroupGamesHandler {
     const luckKey = `${String(ctx.chat.id)}:${Number(ctx.from?.id || 0)}`;
     if (this.pendingLuckInputs.has(luckKey)) {
       const normalized = this.normalizeArabicDigits(String(text || '').trim());
-      const isKnownCommandLike = /^(شراء|بيع|اهداء|إهداء|ارسال|إرسال|متجر|هدايا|ممتلكاتي|حظ|كرسي|انهاء|إنهاء|سؤال|لاونج|كافيتيريا|قائمة|مزاجي|طلب|سلم|ولع|هف|انضم|نفس|اشرب|اكل|كل|كول|البس|حاكم|جلاد|متهم|حكم|ابدأ|محقق|تحديد|جنسي|جنسه|اضف|أضف|حذف|عدد|كلمات|ردود|سوالفكم|فحص|رتبتي|my|تفاعلي|رسائلي|الالعاب|الألعاب|كتم|تقييد|حظر|الغاء|إلغاء|فك|رفع|تنزيل|المنشئين|المالكين|المدراء|الادمنية|الأدمنية|المميزين|تفعيل|تعطيل|الحماية|اعدادات|إعدادات|برنت|تفاعل)\b/i.test(normalized);
+      const isKnownCommandLike = /^(شراء|بيع|اهداء|إهداء|ارسال|إرسال|متجر|هدايا|ممتلكاتي|حظ|كرسي|انهاء|إنهاء|سؤال|لاونج|كافيتيريا|قائمة|مزاجي|طلب|سلم|ولع|هف|انضم|نفس|اشرب|اكل|كل|كول|البس|حاكم|جلاد|متهم|حكم|ابدأ|محقق|تحديد|جنسي|جنسه|اضف|أضف|حذف|عدد|كلمات|ردود|سوالفكم|فحص|رتبتي|my|تفاعلي|رسائلي|الالعاب|الألعاب|جدول|كتم|تقييد|حظر|الغاء|إلغاء|فك|رفع|تنزيل|المنشئين|المالكين|المدراء|الادمنية|الأدمنية|المميزين|تفعيل|تعطيل|الحماية|اعدادات|إعدادات|برنت|تفاعل)\b/i.test(normalized);
       if (isKnownCommandLike) {
         // Do not let pending luck block normal group commands.
         this.pendingLuckInputs.delete(luckKey);
@@ -4019,6 +4117,24 @@ class GroupGamesHandler {
       await ctx.reply(
         `• اجابة صحيحة √ أنت عبقري 😍\n• الفائز  ~» ${winnerSimple}\n• فلوسك ~» ${this.formatCurrency(scoreMeta.finalReward)}`,
         { parse_mode: 'HTML', reply_to_message_id: ctx.message?.message_id }
+      );
+      return true;
+    }
+
+    if (round.type === 'table_code') {
+      const askedAt = Number(round.askedAt || 0);
+      const seconds = askedAt ? Math.max(1, Math.round((Date.now() - askedAt) / 1000)) : 1;
+      const winnerNameSimple = ctx.from.first_name || ctx.from.username || String(ctx.from.id);
+      const winnerSimple = this.mentionUser(ctx.from.id, winnerNameSimple);
+      const winnerRow = (group.gameSystem.scores || []).find((s) => Number(s.userId) === Number(ctx.from.id));
+      const winnerBalance = this.formatCurrency(Number(winnerRow?.points || 0));
+      await ctx.reply(
+        `↢ حلوة منك ماتوقعتك ذكي 🦦 ↤︎ ${winnerSimple}\n` +
+        `↢ ربحت ↢ ${this.formatCurrency(Number(round.reward || TABLE_GAME_REWARD))}\n` +
+        `↢ عدد الثواني ↤︎ ${this.formatEnglishSeconds(seconds)}\n` +
+        `↢ فلوسك ↤︎ (${winnerBalance})\n` +
+        '-',
+        { parse_mode: 'HTML' }
       );
       return true;
     }
@@ -4228,6 +4344,13 @@ class GroupGamesHandler {
     const status = await this.canStartRound(ctx);
     if (!status.ok) return;
     await this.startRoundInternal(ctx.chat.id, this.buildTypingRound(), false);
+  }
+
+  static async handleTableCodeCommand(ctx) {
+    if (!this.isGroupChat(ctx)) return;
+    const status = await this.canStartRound(ctx);
+    if (!status.ok) return;
+    await this.startRoundInternal(ctx.chat.id, this.buildTableCodeRound(), false);
   }
 
   static async handleDailyCommand(ctx) {
@@ -7827,6 +7950,7 @@ class GroupGamesHandler {
     if (action === 'gwho') return this.handleWhoAmICommand(ctx);
     if (action === 'griddle') return this.handleRiddleCommand(ctx);
     if (action === 'gtype') return this.handleTypingCommand(ctx);
+    if (action === 'gtable') return this.handleTableCodeCommand(ctx);
     if (action === 'gduel') return this.handleDuelCommand(ctx);
     if (action === 'gcups') return this.handleCupsCommand(ctx);
     if (action === 'greligious') return this.handleReligiousMcqCommand(ctx);
@@ -7868,6 +7992,7 @@ class GroupGamesHandler {
         { label: '❓ سؤال سريع / كويز', action: 'gquiz' },
         { label: '🧠 ألغاز', action: 'griddle' },
         { label: '⚡ سرعة الكتابة', action: 'gtype' },
+        { label: '🗂️ جدول', action: 'gtable' },
         { label: '🕵️ مين أنا', action: 'gwho' },
         { label: '🧮 حساب ذهني', action: 'gmath' }
       ],
@@ -7936,21 +8061,22 @@ class GroupGamesHandler {
       ],
       [
         Markup.button.callback('⚡ سرعة الكتابة', 'group:games:gtype'),
-        Markup.button.callback('🕵️ مين أنا', 'group:games:gwho')
+        Markup.button.callback('🗂️ جدول', 'group:games:gtable')
       ],
       [
-        Markup.button.callback('🧮 حساب ذهني', 'group:games:gmath'),
-        Markup.button.callback('🔤 ترتيب كلمة', 'group:games:gword')
+        Markup.button.callback('🕵️ مين أنا', 'group:games:gwho'),
+        Markup.button.callback('🧮 حساب ذهني', 'group:games:gmath')
       ],
       [
-        Markup.button.callback('⚔️ تحدي', 'group:games:gduel'),
-        Markup.button.callback('🎲 روليت', 'group:games:gchance')
+        Markup.button.callback('🔤 ترتيب كلمة', 'group:games:gword'),
+        Markup.button.callback('⚔️ تحدي', 'group:games:gduel')
       ],
       [
-        Markup.button.callback('🥤 الأكواب', 'group:games:gcups'),
-        Markup.button.callback('🗳️ تصويت', 'group:games:gvote')
+        Markup.button.callback('🎲 روليت', 'group:games:gchance'),
+        Markup.button.callback('🥤 الأكواب', 'group:games:gcups')
       ],
       [
+        Markup.button.callback('🗳️ تصويت', 'group:games:gvote'),
         Markup.button.callback('🏆 المتصدرين', 'group:games:gleader')
       ]
     ]);
@@ -8033,6 +8159,7 @@ class GroupGamesHandler {
           '• مين انا | /gwho',
           '• ألغاز | /griddle',
           '• سرعة الكتابة | /gtype',
+          '• جدول | /gtable',
           '• المحقق',
           '• تحدي | /gduel',
           '• روليت | /chance',
@@ -8208,5 +8335,3 @@ class GroupGamesHandler {
 }
 
 module.exports = GroupGamesHandler;
-
-
