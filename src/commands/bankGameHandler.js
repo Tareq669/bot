@@ -768,7 +768,10 @@ class BankGameHandler {
         targetDoc.bankProfile = tp;
         await Promise.all([meDoc.save(), targetDoc.save()]);
         await this.syncBankBalanceToGameWallet(ctx?.chat?.id, targetDoc, target, tp.balance);
-        return ctx.reply('• حرامي فاشل');
+        return ctx.reply(
+          '• حرامي فاشل\n' +
+          `• تم خصم مبلغ منك ↤︎ ${this.fmt(fine)}`
+        );
       }
 
       const stealAmount = Math.max(1000, Math.floor(tp.balance * (0.01 + Math.random() * 0.07)));
