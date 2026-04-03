@@ -3633,7 +3633,9 @@ class GroupGamesHandler {
       onWin: typeof roundPayload.onWin === 'function' ? roundPayload.onWin : null
     });
 
-    const roundText = `${roundPayload.prompt}\n\n⏱️ المدة: ${roundPayload.timeoutSec} ثانية\n💰 الجائزة: ${this.formatCurrency(reward)}`;
+    const roundText = roundPayload.type === 'table_code'
+      ? `${roundPayload.prompt}`
+      : `${roundPayload.prompt}\n\n⏱️ المدة: ${roundPayload.timeoutSec} ثانية\n💰 الجائزة: ${this.formatCurrency(reward)}`;
     let sent = null;
     if (roundPayload.imagePath && fs.existsSync(roundPayload.imagePath)) {
       sent = await this.bot.telegram.sendPhoto(
