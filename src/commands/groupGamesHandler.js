@@ -1518,7 +1518,7 @@ class GroupGamesHandler {
 
   static formatEnglishSeconds(seconds) {
     const value = Math.max(1, Math.floor(Number(seconds) || 1));
-    return `${value.toLocaleString('en-US')} ${value === 1 ? 'second' : 'seconds'}`;
+    return `${value.toLocaleString('en-US')}`;
   }
 
   static normalizeGenderValue(value) {
@@ -3630,6 +3630,7 @@ class GroupGamesHandler {
       reward,
       answers,
       answersNorm: answers.map((a) => this.normalizeText(String(a))),
+      askedAt: Number(roundPayload.askedAt || Date.now()),
       deadline,
       allowedUserIds: Array.isArray(roundPayload.allowedUserIds) ? roundPayload.allowedUserIds.map((x) => Number(x)) : null,
       onWin: typeof roundPayload.onWin === 'function' ? roundPayload.onWin : null
