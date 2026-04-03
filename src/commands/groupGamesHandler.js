@@ -126,7 +126,7 @@ const QUICK_QUESTIONS = [
   { question: 'في أي قارة تقع مصر؟', answers: ['أفريقيا', 'افريقيا'], reward: 8 }
 ];
 
-const TABLE_GAME_IMAGE_PATH = '/home/tareqamir/التنزيلات/photo_2026-04-03_22-53-59.jpg';
+const TABLE_GAME_IMAGE_PATH = path.join(__dirname, '..', 'content', 'images', 'table_game.jpg');
 const TABLE_GAME_REWARD = 100;
 const TABLE_CODE_ITEMS = [
   { name: 'كتاب', code: 'B518' },
@@ -3617,7 +3617,9 @@ class GroupGamesHandler {
     const groupId = String(chatId);
     this.clearRound(groupId);
 
-    const deadline = Date.now() + roundPayload.timeoutSec * 1000;
+    const timeoutSec = Number(roundPayload.timeoutSec || 0);
+    const hasTimeout = !roundPayload.noTimeout && Number.isFinite(timeoutSec) && timeoutSec > 0;
+    const deadline = hasTimeout ? (Date.now() + timeoutSec * 1000) : Number.MAX_SAFE_INTEGER;
     const reward = Math.max(1, Math.floor(Number(roundPayload.reward || 1)));
     const answers = Array.isArray(roundPayload.answers)
       ? roundPayload.answers.map((a) => String(a || '').trim()).filter(Boolean)
@@ -3635,7 +3637,7 @@ class GroupGamesHandler {
 
     const roundText = roundPayload.type === 'table_code'
       ? `${roundPayload.prompt}`
-      : `${roundPayload.prompt}\n\n⏱️ المدة: ${roundPayload.timeoutSec} ثانية\n💰 الجائزة: ${this.formatCurrency(reward)}`;
+      : `${roundPayload.prompt}\n\n⏱️ المدة: ${timeoutSec} ثانية\n💰 الجائزة: ${this.formatCurrency(reward)}`;
     let sent = null;
     if (roundPayload.imagePath && fs.existsSync(roundPayload.imagePath)) {
       sent = await this.bot.telegram.sendPhoto(
@@ -3651,18 +3653,20 @@ class GroupGamesHandler {
       );
     }
 
-    const timeout = setTimeout(async () => {
-      const active = this.activeRounds.get(groupId);
-      if (!active) return;
-      this.clearRound(groupId);
-      await this.bot.telegram.sendMessage(
-        Number(chatId),
-        `⌛ انتهى الوقت.\n✅ الإجابة الصحيحة: <b>${active.answers[0]}</b>${isAuto ? '\n\nسؤال تلقائي جديد لاحقًا.' : ''}`,
-        { parse_mode: 'HTML', reply_to_message_id: sent.message_id }
-      ).catch(() => {});
-    }, roundPayload.timeoutSec * 1000);
+    if (hasTimeout) {
+      const timeout = setTimeout(async () => {
+        const active = this.activeRounds.get(groupId);
+        if (!active) return;
+        this.clearRound(groupId);
+        await this.bot.telegram.sendMessage(
+          Number(chatId),
+          `⌛ انتهى الوقت.\n✅ الإجابة الصحيحة: <b>${active.answers[0]}</b>${isAuto ? '\n\nسؤال تلقائي جديد لاحقًا.' : ''}`,
+          { parse_mode: 'HTML', reply_to_message_id: sent.message_id }
+        ).catch(() => {});
+      }, timeoutSec * 1000);
 
-    this.roundTimers.set(groupId, timeout);
+      this.roundTimers.set(groupId, timeout);
+    }
   }
   static buildDailyRound() {
     const daily = this.pickRandom(DAILY_CHALLENGES);
@@ -3733,7 +3737,7 @@ class GroupGamesHandler {
       prompt: `• اسرع واحد يكتب رمز ↤︎ ( ${item.name} )`,
       answers: [item.code],
       reward: TABLE_GAME_REWARD,
-      timeoutSec: 30,
+      noTimeout: true,
       imagePath: TABLE_GAME_IMAGE_PATH
     };
   }
