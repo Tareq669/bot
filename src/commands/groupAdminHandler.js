@@ -694,7 +694,7 @@ class GroupAdminHandler {
 
   static async handleAllMentionCommand(ctx) {
     if (!this.isGroupChat(ctx)) return;
-    const isAdmin = await this.isAdminOrHigher(ctx);
+    const isAdmin = await this.isGroupAdmin(ctx);
     if (!isAdmin) {
       await ctx.reply('❌ هذا الأمر للمشرفين فقط.');
       return;
