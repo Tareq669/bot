@@ -4905,7 +4905,7 @@ class GroupAdminHandler {
       await this.handleInspectCommand(ctx);
       return true;
     }
-    if (/^(all@|\/gall\b)(?:\s+.+)?$/i.test(rawText)) {
+    if (/^(@all|\/gall\b)(?:\s+.+)?$/i.test(rawText)) {
       await this.handleAllMentionCommand(ctx);
       return true;
     }

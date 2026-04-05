@@ -279,7 +279,7 @@ bot.use(async (ctx, next) => {
     text &&
     (
       text.startsWith('/') ||
-      /^(الاوامر|مساعدة|ساعدني|الالعاب|الألعاب|العاب الجروب|حاكم|جلاد|متهم|حكم|ابدأ|انضم|محقق|الرتب|رتبتي|فحص|رفع|تنزيل|كتم|الغاء|إلغاء|فك|حظر|تقييد|تفعيل|تعطيل|اعدادات|إعدادات|شراء|بيع|اهداء|إهداء|متجر|هدايا|ممتلكاتي|حسابي|راتب|بخشيش|العجلة|حظ|استثمار|سعر الاسهم|ديني|علمي|تاريخي|فقهي|جغرافي|فيزياء|فيزيائي|حسابات|حسابي|حساباتي|لاونج|كافيتيريا|اشرب|اكل|كول|البس|همسه|همسة|all@)(?:\b|\s|$)/i.test(text)
+      /^(الاوامر|مساعدة|ساعدني|الالعاب|الألعاب|العاب الجروب|حاكم|جلاد|متهم|حكم|ابدأ|انضم|محقق|الرتب|رتبتي|فحص|رفع|تنزيل|كتم|الغاء|إلغاء|فك|حظر|تقييد|تفعيل|تعطيل|اعدادات|إعدادات|شراء|بيع|اهداء|إهداء|متجر|هدايا|ممتلكاتي|حسابي|راتب|بخشيش|العجلة|حظ|استثمار|سعر الاسهم|ديني|علمي|تاريخي|فقهي|جغرافي|فيزياء|فيزيائي|حسابات|حسابي|حساباتي|لاونج|كافيتيريا|اشرب|اكل|كول|البس|همسه|همسة|@all)(?:\b|\s|$)/i.test(text)
     )
   );
 
@@ -3208,7 +3208,7 @@ bot.hears(/^(?:اسبوعي|سباق\s*الأسبوع|سباق\s*الاسبوع)
 bot.hears(/^(?:\/)?(?:انشاء_حساب_بنكي|حساب_بنكي|gbank)$/i, (ctx) => BankGameHandler.handleCreateAccount(ctx));
 bot.hears(/^(?:\/)?(?:رتبتي|gmyrank)$/i, (ctx) => GroupAdminHandler.handleMyRankCommand(ctx));
 bot.hears(/^(?:\/)?(?:فحص|ginspect)(?:\s+.+)?$/i, (ctx) => GroupAdminHandler.handleInspectCommand(ctx));
-bot.hears(/^(?:\/)?(?:all@|gall)(?:\s+.+)?$/i, (ctx) => GroupAdminHandler.handleAllMentionCommand(ctx));
+bot.hears(/^(?:\/)?(?:@all|gall)(?:\s+.+)?$/i, (ctx) => GroupAdminHandler.handleAllMentionCommand(ctx));
 bot.hears(/^(?:\/)?(?:راتب|gsalary)$/i, (ctx) => BankGameHandler.handleSalary(ctx));
 bot.hears(/^(?:\/)?(?:حسابي|gaccount)$/i, (ctx) => BankGameHandler.handleAccountInfo(ctx));
 bot.hears(/^(?:\/)?(?:بخشيش|gtip)$/i, (ctx) => BankGameHandler.handleTip(ctx));
