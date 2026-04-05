@@ -452,6 +452,10 @@ class GroupAdminHandler {
     this.getRoleIds(group, 'ownerIds').forEach((id) => recipients.add(id));
     this.getRoleIds(group, 'managerIds').forEach((id) => recipients.add(id));
     this.getRoleIds(group, 'adminIds').forEach((id) => recipients.add(id));
+    (Array.isArray(group?.admins) ? group.admins : []).forEach((row) => {
+      const userId = Number(row?.userId || 0);
+      if (userId > 0) recipients.add(userId);
+    });
 
     try {
       const admins = await ctx.telegram.getChatAdministrators(chatId);
@@ -705,20 +709,26 @@ class GroupAdminHandler {
       return;
     }
 
-    const resolvedMembers = await Promise.all(
+    const resolvedMembersRaw = await Promise.all(
       members.map(async (member) => {
         let label = String(member.label || '').trim();
         try {
           const chatMember = await ctx.telegram.getChatMember(ctx.chat.id, Number(member.id));
+          const status = String(chatMember?.status || '').toLowerCase();
+          const allowedStatuses = new Set(['creator', 'administrator', 'member', 'restricted']);
+          if (!allowedStatuses.has(status)) return null;
+          if (chatMember?.user?.is_bot || chatMember?.user?.is_fake || chatMember?.user?.is_scam) return null;
           const firstName = String(chatMember?.user?.first_name || '').trim();
           if (firstName) label = firstName;
         } catch (_error) {
-          // ignore and keep fallback label
+          // If Telegram can't confirm membership, skip to avoid mentioning stale/ghost accounts.
+          return null;
         }
         if (!label || label.startsWith('@')) label = 'عضو';
         return { id: member.id, label };
       })
     );
+    const resolvedMembers = resolvedMembersRaw.filter(Boolean);
 
     for (let index = 0; index < resolvedMembers.length; index += 8) {
       const chunk = resolvedMembers.slice(index, index + 8);
@@ -4895,7 +4905,7 @@ class GroupAdminHandler {
       await this.handleInspectCommand(ctx);
       return true;
     }
-    if (/^(all@?|\/gall\b)(?:\s+.+)?$/i.test(rawText)) {
+    if (/^(all@|\/gall\b)(?:\s+.+)?$/i.test(rawText)) {
       await this.handleAllMentionCommand(ctx);
       return true;
     }
