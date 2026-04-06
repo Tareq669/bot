@@ -386,6 +386,22 @@ class GroupAdminHandler {
     return this.getRoleIds(group, 'adminIds').includes(targetUserId);
   }
 
+  static async canUseInspectCommand(ctx, userId = null) {
+    if (!this.isGroupChat(ctx)) return false;
+    const targetUserId = Number(userId || ctx.from?.id);
+    if (!targetUserId) return false;
+
+    const member = await this.getChatMemberSafe(ctx, targetUserId);
+    if (['creator', 'administrator'].includes(String(member?.status || ''))) return true;
+
+    const group = await this.ensureGroupRecord(ctx);
+    if (Number(group?.settings?.primaryOwnerId || 0) === targetUserId) return true;
+    if (this.getRoleIds(group, 'basicOwnerIds').includes(targetUserId)) return true;
+    if (this.getRoleIds(group, 'ownerIds').includes(targetUserId)) return true;
+    if (this.getRoleIds(group, 'adminIds').includes(targetUserId)) return true;
+    return false;
+  }
+
   static async isPremiumMember(ctx, userId = null) {
     const targetUserId = Number(userId || ctx.from?.id);
     if (!targetUserId) return false;
@@ -464,6 +480,16 @@ class GroupAdminHandler {
         if (!userId || member?.user?.is_bot) return;
         if (!['creator', 'administrator'].includes(String(member?.status || ''))) return;
         recipients.add(userId);
+      });
+    } catch (_error) {
+      // ignore
+    }
+
+    try {
+      const primaryOwners = await this.collectPrimaryOwnerRecipients(ctx, group, chatId);
+      primaryOwners.forEach((id) => {
+        const userId = Number(id || 0);
+        if (userId > 0) recipients.add(userId);
       });
     } catch (_error) {
       // ignore
@@ -604,6 +630,17 @@ class GroupAdminHandler {
   static getUserDisplayName(user) {
     const fullName = [user?.first_name, user?.last_name].filter(Boolean).join(' ').trim();
     return this.escapeHtml(fullName || user?.first_name || 'غير معروف');
+  }
+
+  static buildCreatorModerationBlockMessage(ctx, actionText) {
+    const requesterName = this.getUserDisplayName({
+      first_name: ctx.from?.first_name,
+      last_name: ctx.from?.last_name
+    });
+    return (
+      `• عذرا عزيزي ← ${requesterName}\n` +
+      `• لا يمكن ${actionText} المنشئ`
+    );
   }
 
   static async collectMentionableMembers(ctx, group, botId = null) {
@@ -902,8 +939,8 @@ class GroupAdminHandler {
 
   static async handleInspectCommand(ctx) {
     if (!this.isGroupChat(ctx)) return;
-    const isAdmin = await this.isAdminOrHigher(ctx);
-    if (!isAdmin) return ctx.reply('❌ هذا الأمر للمشرفين فقط.');
+    const canUse = await this.canUseInspectCommand(ctx);
+    if (!canUse) return ctx.reply('❌ هذا الأمر متاح للمنشئ والمالك والمشرف فقط.');
 
     const resolved = await this.resolveModerationTarget(ctx);
     const target = resolved?.target?.id
@@ -4075,7 +4112,11 @@ class GroupAdminHandler {
     const targetUserId = Number(target?.id || 0);
     if (!targetUserId) return ctx.reply('❌ استخدم الكتم بالرد أو @user أو ID.');
 
-    const targetIsAdmin = await this.isGroupAdmin(ctx, targetUserId);
+    const targetMember = await this.getChatMemberSafe(ctx, targetUserId);
+    if (targetMember?.status === 'creator') {
+      return ctx.reply(this.buildCreatorModerationBlockMessage(ctx, 'كتم'));
+    }
+    const targetIsAdmin = ['administrator', 'creator'].includes(String(targetMember?.status || ''));
     if (targetIsAdmin) return ctx.reply('• عذراً الامر يخص ↤︎ 〖  الادمن 〗 فقط .');
 
     const minutes = Math.max(1, parseInt(args[0] || '10', 10) || 10);
@@ -4175,7 +4216,11 @@ class GroupAdminHandler {
     const targetUserId = Number(target?.id || 0);
     if (!targetUserId) return ctx.reply('❌ استخدم التقييد بالرد أو @user أو ID.');
 
-    const targetIsAdmin = await this.isGroupAdmin(ctx, targetUserId);
+    const targetMember = await this.getChatMemberSafe(ctx, targetUserId);
+    if (targetMember?.status === 'creator') {
+      return ctx.reply(this.buildCreatorModerationBlockMessage(ctx, 'تقييد'));
+    }
+    const targetIsAdmin = ['administrator', 'creator'].includes(String(targetMember?.status || ''));
     if (targetIsAdmin) return ctx.reply('• عذراً الامر يخص ↤︎ 〖  الادمن 〗 فقط .');
 
     const minutes = Math.max(1, parseInt(args[0] || '10', 10) || 10);
@@ -4270,7 +4315,11 @@ class GroupAdminHandler {
     const targetUserId = Number(target?.id || 0);
     if (!targetUserId) return ctx.reply('❌ استخدم الحظر بالرد أو @user أو ID.');
 
-    const targetIsAdmin = await this.isGroupAdmin(ctx, targetUserId);
+    const targetMember = await this.getChatMemberSafe(ctx, targetUserId);
+    if (targetMember?.status === 'creator') {
+      return ctx.reply(this.buildCreatorModerationBlockMessage(ctx, 'حظر'));
+    }
+    const targetIsAdmin = ['administrator', 'creator'].includes(String(targetMember?.status || ''));
     if (targetIsAdmin) return ctx.reply('❌ لا يمكن حظر مشرف.');
 
     const group = await this.ensureGroupRecord(ctx);
