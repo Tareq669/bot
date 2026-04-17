@@ -1,4 +1,8 @@
-﻿const Markup = require('telegraf/markup');
+﻿const fs = require('fs/promises');
+const os = require('os');
+const path = require('path');
+const { execFile } = require('child_process');
+const Markup = require('telegraf/markup');
 const { User, Group } = require('../database/models');
 
 const GROUP_TYPES = new Set(['group', 'supergroup']);
@@ -15,6 +19,25 @@ const ASSETS = {
 class BankGameHandler {
   static WIFE_SLOT_LABELS = ['الاولى', 'الثانية', 'الثالثة', 'الرابعة'];
   static OWNER_ONLY_ID = 1584983530;
+  static WHEEL_SEGMENTS = [
+    { type: 'cash', value: 100, label: '100$' },
+    { type: 'cash', value: 50, label: '50$' },
+    { type: 'cash', value: 200, label: '200$' },
+    { type: 'cash', value: 300, label: '300$' },
+    { type: 'cash', value: 10, label: '10$' },
+    { type: 'cash', value: 1000000, label: '1,000,000$' },
+    { type: 'cash', value: 5000, label: '5,000$' },
+    { type: 'cash', value: 500, label: '500$' },
+    { type: 'cash', value: 150, label: '150$' },
+    { type: 'cash', value: 20, label: '20$' },
+    { type: 'cash', value: 1000, label: '1,000$' },
+    { type: 'cash', value: 2000, label: '2,000$' },
+    { type: 'cash', value: 10000, label: '10,000$' },
+    { type: 'loss', value: 0, label: 'خاسر' },
+    { type: 'loss', value: 0, label: 'خاسر' },
+    { type: 'loss', value: 0, label: 'خاسر' }
+  ];
+  static WHEEL_COLORS = ['#8a2be2', '#1495ff', '#16c784', '#f3c943', '#ef476f', '#ff8a00'];
 
   static isGroupChat(ctx) {
     return GROUP_TYPES.has(ctx?.chat?.type);
@@ -22,6 +45,20 @@ class BankGameHandler {
 
   static now() {
     return Date.now();
+  }
+
+  static execFileAsync(command, args = [], options = {}) {
+    return new Promise((resolve, reject) => {
+      execFile(command, args, options, (error, stdout, stderr) => {
+        if (error) {
+          error.stdout = stdout;
+          error.stderr = stderr;
+          reject(error);
+          return;
+        }
+        resolve({ stdout, stderr });
+      });
+    });
   }
 
   static getDateKey(date = new Date()) {
@@ -35,6 +72,160 @@ class BankGameHandler {
   static fmt(n) {
     const x = Number.isFinite(Number(n)) ? Number(n) : 0;
     return `${Math.floor(x).toLocaleString('en-US')} دولار 💸`;
+  }
+
+  static escapeXml(value) {
+    return String(value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
+  }
+
+  static shuffleItems(items = []) {
+    const cloned = [...items];
+    for (let i = cloned.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [cloned[i], cloned[j]] = [cloned[j], cloned[i]];
+    }
+    return cloned;
+  }
+
+  static polarToCartesian(cx, cy, radius, angleDeg) {
+    const radians = ((angleDeg - 90) * Math.PI) / 180;
+    return {
+      x: cx + (radius * Math.cos(radians)),
+      y: cy + (radius * Math.sin(radians))
+    };
+  }
+
+  static createWheelSlicePath(cx, cy, innerRadius, outerRadius, startAngle, endAngle) {
+    const outerStart = this.polarToCartesian(cx, cy, outerRadius, startAngle);
+    const outerEnd = this.polarToCartesian(cx, cy, outerRadius, endAngle);
+    const innerEnd = this.polarToCartesian(cx, cy, innerRadius, endAngle);
+    const innerStart = this.polarToCartesian(cx, cy, innerRadius, startAngle);
+    const largeArcFlag = endAngle - startAngle <= 180 ? 0 : 1;
+
+    return [
+      `M ${outerStart.x.toFixed(2)} ${outerStart.y.toFixed(2)}`,
+      `A ${outerRadius} ${outerRadius} 0 ${largeArcFlag} 1 ${outerEnd.x.toFixed(2)} ${outerEnd.y.toFixed(2)}`,
+      `L ${innerEnd.x.toFixed(2)} ${innerEnd.y.toFixed(2)}`,
+      `A ${innerRadius} ${innerRadius} 0 ${largeArcFlag} 0 ${innerStart.x.toFixed(2)} ${innerStart.y.toFixed(2)}`,
+      'Z'
+    ].join(' ');
+  }
+
+  static getWheelSpinConfig() {
+    const segments = this.shuffleItems(this.WHEEL_SEGMENTS).map((segment, index) => ({
+      ...segment,
+      color: this.WHEEL_COLORS[index % this.WHEEL_COLORS.length]
+    }));
+    const winningIndex = Math.floor(Math.random() * segments.length);
+    return { segments, winningIndex, winningSegment: segments[winningIndex] };
+  }
+
+  static buildWheelSvg(segments, winningIndex) {
+    const cx = 540;
+    const cy = 600;
+    const outerRadius = 340;
+    const innerRadius = 118;
+    const angleStep = 360 / segments.length;
+
+    const sliceMarkup = segments.map((segment, index) => {
+      const startAngle = -90 + (index * angleStep);
+      const endAngle = startAngle + angleStep;
+      const midAngle = startAngle + (angleStep / 2);
+      const pathData = this.createWheelSlicePath(cx, cy, innerRadius, outerRadius, startAngle, endAngle);
+      const textRadius = 225;
+      const textPoint = this.polarToCartesian(cx, cy, textRadius, midAngle);
+      const highlight = index === winningIndex;
+      const label = this.escapeXml(segment.label);
+      const textSize = segment.label.length > 8 ? 30 : 36;
+
+      return `
+        <g>
+          <path d="${pathData}" fill="${segment.color}" stroke="${highlight ? '#fff2aa' : '#ffd76c'}" stroke-width="${highlight ? 10 : 6}" filter="url(#sliceShadow)"/>
+          <path d="${pathData}" fill="${highlight ? 'url(#winnerGlow)' : 'none'}" opacity="${highlight ? '0.72' : '0'}"/>
+          <g transform="translate(${textPoint.x.toFixed(2)} ${textPoint.y.toFixed(2)}) rotate(${midAngle + 90})">
+            <text x="0" y="0" text-anchor="middle" dominant-baseline="middle" font-size="${textSize}" font-weight="700" font-family="DejaVu Sans, Arial" fill="#ffffff" stroke="rgba(0,0,0,0.35)" stroke-width="1.5">${label}</text>
+          </g>
+        </g>
+      `;
+    }).join('\n');
+
+    const winningLabel = this.escapeXml(segments[winningIndex]?.label || '');
+
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1280" viewBox="0 0 1080 1280">
+  <defs>
+    <radialGradient id="pageBg" cx="50%" cy="35%" r="80%">
+      <stop offset="0%" stop-color="#fff8e7"/>
+      <stop offset="100%" stop-color="#f4e0a3"/>
+    </radialGradient>
+    <radialGradient id="goldRing" cx="35%" cy="35%" r="80%">
+      <stop offset="0%" stop-color="#fff8ce"/>
+      <stop offset="45%" stop-color="#ffd86b"/>
+      <stop offset="100%" stop-color="#c98610"/>
+    </radialGradient>
+    <radialGradient id="buttonFill" cx="30%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#ffd9ff"/>
+      <stop offset="45%" stop-color="#6c39ff"/>
+      <stop offset="100%" stop-color="#2a0a7d"/>
+    </radialGradient>
+    <linearGradient id="winnerGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#ffe36a" stop-opacity="0.15"/>
+    </linearGradient>
+    <filter id="sliceShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#7d4b00" flood-opacity="0.28"/>
+    </filter>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#7a4d00" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <rect width="1080" height="1280" fill="url(#pageBg)"/>
+  <ellipse cx="540" cy="1120" rx="290" ry="52" fill="rgba(139, 96, 0, 0.18)"/>
+
+  <g filter="url(#softShadow)">
+    <circle cx="${cx}" cy="${cy}" r="372" fill="url(#goldRing)"/>
+    <circle cx="${cx}" cy="${cy}" r="352" fill="#fff8dc" opacity="0.55"/>
+    <circle cx="${cx}" cy="${cy}" r="342" fill="#f0b628"/>
+    ${sliceMarkup}
+    <circle cx="${cx}" cy="${cy}" r="128" fill="url(#goldRing)"/>
+    <circle cx="${cx}" cy="${cy}" r="100" fill="url(#buttonFill)" stroke="#ffe97a" stroke-width="10"/>
+    <text x="${cx}" y="${cy + 8}" text-anchor="middle" font-size="58" font-family="DejaVu Sans, Arial" font-weight="800" fill="#fff8ff">SPIN</text>
+    <circle cx="${cx}" cy="${cy}" r="22" fill="#ffe780" opacity="0.9"/>
+  </g>
+
+  <g filter="url(#softShadow)">
+    <path d="M540 162 L592 244 L540 224 L488 244 Z" fill="url(#goldRing)" stroke="#fff4bf" stroke-width="8"/>
+    <circle cx="540" cy="144" r="24" fill="url(#goldRing)" stroke="#fff4bf" stroke-width="8"/>
+  </g>
+
+  <text x="540" y="1040" text-anchor="middle" font-size="46" font-family="DejaVu Sans, Arial" font-weight="800" fill="#7c4400">عجلة الجوائز ثلاثية الأبعاد</text>
+  <text x="540" y="1100" text-anchor="middle" font-size="34" font-family="DejaVu Sans, Arial" font-weight="700" fill="#8f5a00">النتيجة الحالية: ${winningLabel}</text>
+</svg>`;
+  }
+
+  static async renderWheelImage(segments, winningIndex) {
+    const svg = this.buildWheelSvg(segments, winningIndex);
+    const tempBase = path.join(os.tmpdir(), `wheel-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`);
+    const svgPath = `${tempBase}.svg`;
+    const pngPath = `${tempBase}.png`;
+
+    await fs.writeFile(svgPath, svg, 'utf8');
+
+    try {
+      await this.execFileAsync('convert', [svgPath, '-quality', '100', pngPath], { timeout: 15000 });
+      return await fs.readFile(pngPath);
+    } finally {
+      await Promise.all([
+        fs.unlink(svgPath).catch(() => {}),
+        fs.unlink(pngPath).catch(() => {})
+      ]);
+    }
   }
 
   static formatEnglishDate(ts) {
@@ -871,39 +1062,31 @@ class BankGameHandler {
       p.balance -= cost;
       p.wheelLastAt = this.now();
       p.wheelPlaysToday = Number(p.wheelPlaysToday || 0) + 1;
-      const r = Math.random();
-      let line = '';
-      if (r < 0.05) {
-        // Very rare high-value physical reward.
-        p.assets.car = Number(p.assets.car || 0) + 1;
-        await this.adjustGroupGiftInventory(ctx.chat.id, ctx.from, 'car', 1);
-        line = '🔥 حظ قوي جدًا: ربحت سيارة';
-      } else if (r < 0.1) {
-        // Rare high-value physical reward.
-        p.assets.diamond = Number(p.assets.diamond || 0) + 1;
-        await this.adjustGroupGiftInventory(ctx.chat.id, ctx.from, 'diamond', 1);
-        line = '💎 حظ قوي: ربحت ماسة';
-      } else if (r < 0.2) {
-        // Rare temporary multiplier reward.
-        p.boost2xUntil = this.now() + (3 * 60 * 1000);
-        line = '⚡ حظ قوي: ربحت x2 لمدة 3 دقائق';
-      } else if (r < 0.65) {
-        // Low luck cash outcome.
-        const cash = Math.floor(300 + Math.random() * 900); // 300 - 1199
-        p.balance += cash;
-        line = `🍀 حظ قليل: ربحت ${this.fmt(cash)}`;
-      } else if (r < 0.92) {
-        // Good luck cash outcome.
-        const cash = Math.floor(1200 + Math.random() * 3800); // 1200 - 4999
-        p.balance += cash;
-        line = `✅ حظ جيد: ربحت ${this.fmt(cash)}`;
-      } else {
-        // Strong luck cash outcome (rare).
-        const cash = Math.floor(5000 + Math.random() * 10000); // 5000 - 14999
-        p.balance += cash;
-        line = `🚀 حظ قوي: ربحت ${this.fmt(cash)}`;
+      const { segments, winningIndex, winningSegment } = this.getWheelSpinConfig();
+
+      let outcomeLine = '❌ وقفت على: خاسر';
+      if (winningSegment.type === 'cash') {
+        p.balance += Number(winningSegment.value || 0);
+        outcomeLine = `💰 وقفت على: ${this.fmt(winningSegment.value)}`;
       }
-      return ctx.reply(`🎡 نتيجة العجلة:\n${line}\n• رصيدك: ${this.fmt(p.balance)}`);
+
+      const caption =
+        '🎡 عجلة الجوائز\n' +
+        `• سعر اللعب: ${this.fmt(cost)}\n` +
+        `• ${outcomeLine}\n` +
+        `• رصيدك الآن: ${this.fmt(p.balance)}\n` +
+        `• محاولات اليوم: ${p.wheelPlaysToday}/3`;
+
+      try {
+        await ctx.sendChatAction('upload_photo');
+        const wheelBuffer = await this.renderWheelImage(segments, winningIndex);
+        return ctx.replyWithPhoto(
+          { source: wheelBuffer, filename: 'wheel-result.png' },
+          { caption }
+        );
+      } catch (_error) {
+        return ctx.reply(caption);
+      }
     });
   }
 
