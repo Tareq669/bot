@@ -154,8 +154,18 @@ const CARD_RARITY = {
   legendary: { label: '\u0623\u0633\u0637\u0648\u0631\u064a', bonus: 5 }
 };
 
+const GEM_ICONS = ['\ud83d\udc8e', '\ud83d\udc99', '\ud83d\udc9a', '\ud83d\udc9b', '\ud83e\ude77', '\ud83d\udc9c'];
+const BLAST_LEVELS = [
+  { bombs: 3, timerSeconds: 22, boardSize: 12 },
+  { bombs: 3, timerSeconds: 20, boardSize: 12 },
+  { bombs: 4, timerSeconds: 18, boardSize: 12 },
+  { bombs: 5, timerSeconds: 17, boardSize: 12 },
+  { bombs: 6, timerSeconds: 15, boardSize: 12 }
+];
+
 class NewGamesHandler {
   static bombTimers = new Map();
+  static blastTimers = new Map();
 
   static pickRandom(items) {
     return items[Math.floor(Math.random() * items.length)];
@@ -218,6 +228,13 @@ class NewGamesHandler {
     this.bombTimers.delete(userId);
   }
 
+  static clearBlastTimer(userId) {
+    const timer = this.blastTimers.get(userId);
+    if (!timer) return;
+    clearInterval(timer.interval);
+    this.blastTimers.delete(userId);
+  }
+
   static async safeEditOrReply(ctx, text, replyMarkup) {
     const payload = {
       parse_mode: 'HTML',
@@ -227,6 +244,298 @@ class NewGamesHandler {
       return await ctx.editMessageText(text, payload);
     } catch (_error) {
       return ctx.reply(text, payload);
+    }
+  }
+
+  static getBlastLevelConfig(level = 1) {
+    return BLAST_LEVELS[Math.max(0, Math.min(BLAST_LEVELS.length - 1, Number(level || 1) - 1))];
+  }
+
+  static pickUniqueIndexes(total, count) {
+    const indexes = this.shuffleIndexes(total);
+    return new Set(indexes.slice(0, count));
+  }
+
+  static createBlastBoard(level = 1) {
+    const config = this.getBlastLevelConfig(level);
+    const bombIndexes = this.pickUniqueIndexes(config.boardSize, config.bombs);
+
+    return Array.from({ length: config.boardSize }, (_, index) => ({
+      type: bombIndexes.has(index) ? 'bomb' : 'gem',
+      revealed: false,
+      gemIcon: this.pickRandom(GEM_ICONS)
+    }));
+  }
+
+  static countBlastGems(board = []) {
+    return board.filter((cell) => cell.type === 'gem').length;
+  }
+
+  static countRevealedBlastGems(board = []) {
+    return board.filter((cell) => cell.type === 'gem' && cell.revealed).length;
+  }
+
+  static getBlastMultiplier(level = 1, gemsOpened = 0) {
+    return 1 + ((Math.max(1, level) - 1) * 0.35) + (gemsOpened * 0.04);
+  }
+
+  static formatBlastMoney(value = 0) {
+    return `${Math.max(0, Math.floor(value))}$`;
+  }
+
+  static getBlastCellLabel(cell, ended = false) {
+    if (!cell.revealed && !ended) return '🔘';
+    if (cell.type === 'bomb') return '💣';
+    return cell.gemIcon || '💎';
+  }
+
+  static buildBlastKeyboard(state, { ended = false } = {}) {
+    const rows = [];
+    for (let i = 0; i < state.board.length; i += 4) {
+      const row = state.board.slice(i, i + 4).map((cell, offset) => {
+        const index = i + offset;
+        const callbackData = (!ended && !cell.revealed) ? `game:blast:pick:${index}` : 'game:blast:noop';
+        return Markup.button.callback(this.getBlastCellLabel(cell, ended), callbackData);
+      });
+      rows.push(row);
+    }
+
+    if (!ended) {
+      rows.push([Markup.button.callback(`💰 سحب ${this.formatBlastMoney(state.pendingReward)}`, 'game:blast:cashout')]);
+    } else {
+      rows.push([Markup.button.callback('🔄 لعبة جديدة', 'game:blast')]);
+    }
+
+    rows.push([Markup.button.callback('⬅️ رجوع', 'menu:games')]);
+    return Markup.inlineKeyboard(rows);
+  }
+
+  static formatBlastText(state, secondsLeft = null) {
+    const totalGems = this.countBlastGems(state.board);
+    const revealedGems = this.countRevealedBlastGems(state.board);
+    const remainingGems = Math.max(0, totalGems - revealedGems);
+    const safeProgress = `${revealedGems}/${totalGems}`;
+    const seconds = secondsLeft ?? Math.max(0, Math.ceil((state.endAt - Date.now()) / 1000));
+
+    return (
+      '💎 <b>لعبة زر التفجير</b>\n\n' +
+      `🎯 المرحلة: <b>${state.level}/${BLAST_LEVELS.length}</b>\n` +
+      `💣 القنابل: <b>${state.bombs}</b>\n` +
+      `💎 الجواهر المتبقية: <b>${remainingGems}</b>\n` +
+      `📈 المضاعف: <b>x${state.multiplier.toFixed(2)}</b>\n` +
+      `💰 الربح المعلّق: <b>${this.formatBlastMoney(state.pendingReward)}</b>\n` +
+      `🌈 التقدم الآمن: <b>${safeProgress}</b>\n` +
+      `⏱️ الوقت المتبقي: <b>${seconds}</b> ثانية\n\n` +
+      `${state.lastEvent || 'اضغط زرًا واحدًا. الجوهرة تزيد ربحك، والقنبلة تنهي الجولة فورًا.'}`
+    );
+  }
+
+  static async startBlastTimer(ctx, chatId, messageId) {
+    this.clearBlastTimer(ctx.from.id);
+
+    const interval = setInterval(async () => {
+      const state = ctx.session?.blastGame;
+      if (!state || !state.active) {
+        this.clearBlastTimer(ctx.from.id);
+        return;
+      }
+
+      const secondsLeft = Math.max(0, Math.ceil((state.endAt - Date.now()) / 1000));
+      if (secondsLeft <= 0) {
+        await this.handleBlastTimeout(ctx, chatId, messageId);
+        return;
+      }
+
+      if (!chatId || !messageId) return;
+      try {
+        await ctx.telegram.editMessageText(chatId, messageId, undefined, this.formatBlastText(state, secondsLeft), {
+          parse_mode: 'HTML',
+          reply_markup: this.buildBlastKeyboard(state).reply_markup
+        });
+      } catch (_error) {
+        // ignore timer edit errors
+      }
+    }, 1000);
+
+    this.blastTimers.set(ctx.from.id, { interval });
+  }
+
+  static async handleBlastGame(ctx) {
+    try {
+      if (ctx.callbackQuery) await ctx.answerCbQuery();
+      ctx.session = ctx.session || {};
+
+      const board = this.createBlastBoard(1);
+      const state = {
+        active: true,
+        level: 1,
+        board,
+        bombs: this.getBlastLevelConfig(1).bombs,
+        pendingReward: 0,
+        multiplier: 1,
+        gemsOpened: 0,
+        lastEvent: 'ابدأ بحذر: هناك <b>3</b> متفجرات مخفية والباقي جواهر ملوّنة.',
+        endAt: Date.now() + (this.getBlastLevelConfig(1).timerSeconds * 1000)
+      };
+
+      ctx.session.blastGame = state;
+      const keyboard = this.buildBlastKeyboard(state);
+      await this.safeEditOrReply(ctx, this.formatBlastText(state), keyboard.reply_markup);
+
+      const chatId = ctx.callbackQuery?.message?.chat?.id;
+      const messageId = ctx.callbackQuery?.message?.message_id;
+      await this.startBlastTimer(ctx, chatId, messageId);
+    } catch (error) {
+      console.error('Error in handleBlastGame:', error);
+      await ctx.reply('❌ حدث خطأ في لعبة زر التفجير');
+    }
+  }
+
+  static async settleBlastWin(ctx, state, { completed = false } = {}) {
+    const payout = Math.max(0, Math.floor(state.pendingReward + (completed ? 75 : 0)));
+    state.active = false;
+    ctx.session.blastGame = null;
+    this.clearBlastTimer(ctx.from.id);
+
+    await GameManager.updateGameStats(ctx.from.id, '\u0632\u0631_\u0627\u0644\u062a\u0641\u062c\u064a\u0631', 'win', payout);
+    if (payout > 0) {
+      await EconomyManager.addCoins(ctx.from.id, payout, completed ? '\u0625\u0646\u0647\u0627\u0621 \u0644\u0639\u0628\u0629 \u0632\u0631 \u0627\u0644\u062a\u0641\u062c\u064a\u0631' : '\u0633\u062d\u0628 \u0623\u0631\u0628\u0627\u062d \u0632\u0631 \u0627\u0644\u062a\u0641\u062c\u064a\u0631');
+    }
+
+    const keyboard = this.buildBlastKeyboard(state, { ended: true });
+    const text = completed
+      ? `🏆 <b>ختمت اللعبة للنهاية!</b>\n\n💰 مجموع أرباحك: <b>${this.formatBlastMoney(payout)}</b>\n🎁 بونص الختم: <b>75$</b>\n🌈 لعبت كل المراحل بدون خسارة.`
+      : `💰 <b>تم السحب بنجاح</b>\n\n💎 سحبت: <b>${this.formatBlastMoney(payout)}</b>\n📈 وصلت حتى المرحلة: <b>${state.level}</b>`;
+
+    await this.safeEditOrReply(ctx, text, keyboard.reply_markup);
+  }
+
+  static async handleBlastTimeout(ctx, chatId, messageId) {
+    const state = ctx.session?.blastGame;
+    if (!state || !state.active) {
+      this.clearBlastTimer(ctx.from.id);
+      return;
+    }
+
+    state.active = false;
+    ctx.session.blastGame = null;
+    this.clearBlastTimer(ctx.from.id);
+    await GameManager.updateGameStats(ctx.from.id, '\u0632\u0631_\u0627\u0644\u062a\u0641\u062c\u064a\u0631', 'lost', 0);
+
+    const keyboard = this.buildBlastKeyboard(state, { ended: true });
+    const text =
+      '⏰ <b>انتهى الوقت!</b>\n\n' +
+      `💣 ضاع عليك الربح المعلّق: <b>${this.formatBlastMoney(state.pendingReward)}</b>\n` +
+      'جرّب مرة ثانية أو اسحب مبكرًا في الجولة القادمة.';
+
+    if (chatId && messageId) {
+      try {
+        await ctx.telegram.editMessageText(chatId, messageId, undefined, text, {
+          parse_mode: 'HTML',
+          reply_markup: keyboard.reply_markup
+        });
+      } catch (_error) {
+        await ctx.reply(text, { parse_mode: 'HTML', reply_markup: keyboard.reply_markup });
+      }
+    } else {
+      await ctx.reply(text, { parse_mode: 'HTML', reply_markup: keyboard.reply_markup });
+    }
+  }
+
+  static async handleBlastPick(ctx, cellIndex) {
+    try {
+      if (ctx.callbackQuery) await ctx.answerCbQuery();
+      ctx.session = ctx.session || {};
+      const state = ctx.session.blastGame;
+      if (!state || !state.active) return;
+
+      if (Date.now() > state.endAt) {
+        return this.handleBlastTimeout(ctx, ctx.callbackQuery?.message?.chat?.id, ctx.callbackQuery?.message?.message_id);
+      }
+
+      const cell = state.board[Number(cellIndex)];
+      if (!cell || cell.revealed) return;
+      cell.revealed = true;
+
+      if (cell.type === 'bomb') {
+        state.active = false;
+        state.board.forEach((item) => {
+          if (item.type === 'bomb') item.revealed = true;
+        });
+        ctx.session.blastGame = null;
+        this.clearBlastTimer(ctx.from.id);
+        await GameManager.updateGameStats(ctx.from.id, '\u0632\u0631_\u0627\u0644\u062a\u0641\u062c\u064a\u0631', 'lost', 0);
+
+        const keyboard = this.buildBlastKeyboard(state, { ended: true });
+        const text =
+          '💥 <b>انفجار!</b>\n\n' +
+          `💣 ضغطت على متفجرة وخسرت الربح المعلّق: <b>${this.formatBlastMoney(state.pendingReward)}</b>\n` +
+          'نصيحة: اسحب أرباحك قبل ما تزيد المجازفة.';
+        await this.safeEditOrReply(ctx, text, keyboard.reply_markup);
+        return;
+      }
+
+      state.gemsOpened += 1;
+      state.multiplier = this.getBlastMultiplier(state.level, state.gemsOpened);
+
+      const gemReward = Math.max(10, Math.floor(10 * state.multiplier));
+      let bonus = 0;
+      if (Math.random() < 0.18) {
+        bonus = this.pickRandom([10, 20, 30, 40]);
+      }
+      state.pendingReward += gemReward + bonus;
+
+      const rainbowLabel = this.pickRandom(['🌈 لمعة قوسية', '✨ بريق ملوّن', '🪩 ومضة جوهرة', '🎆 وميض احترافي']);
+      state.lastEvent =
+        `${rainbowLabel}\n` +
+        `💎 جوهرة مكتشفة: <b>+${this.formatBlastMoney(gemReward)}</b>` +
+        `${bonus > 0 ? `\n🎁 بونص عشوائي: <b>+${this.formatBlastMoney(bonus)}</b>` : ''}`;
+
+      const totalGems = this.countBlastGems(state.board);
+      const revealedGems = this.countRevealedBlastGems(state.board);
+
+      if (revealedGems >= totalGems) {
+        if (state.level >= BLAST_LEVELS.length) {
+          await this.settleBlastWin(ctx, state, { completed: true });
+          return;
+        }
+
+        state.level += 1;
+        const nextConfig = this.getBlastLevelConfig(state.level);
+        state.board = this.createBlastBoard(state.level);
+        state.bombs = nextConfig.bombs;
+        state.gemsOpened = 0;
+        state.multiplier = this.getBlastMultiplier(state.level, 0);
+        state.endAt = Date.now() + (nextConfig.timerSeconds * 1000);
+        state.lastEvent =
+          `🚀 انتقلت للمرحلة <b>${state.level}</b>\n` +
+          `💣 عدد المتفجرات الآن: <b>${state.bombs}</b>\n` +
+          `💰 ربحك المعلّق مستمر: <b>${this.formatBlastMoney(state.pendingReward)}</b>`;
+      }
+
+      await this.safeEditOrReply(ctx, this.formatBlastText(state), this.buildBlastKeyboard(state).reply_markup);
+    } catch (error) {
+      console.error('Error in handleBlastPick:', error);
+      await ctx.reply('❌ حدث خطأ أثناء اختيار الزر');
+    }
+  }
+
+  static async handleBlastCashout(ctx) {
+    try {
+      if (ctx.callbackQuery) await ctx.answerCbQuery();
+      ctx.session = ctx.session || {};
+      const state = ctx.session.blastGame;
+      if (!state || !state.active) return;
+
+      if (state.pendingReward <= 0) {
+        await ctx.answerCbQuery('افتح جوهرة واحدة على الأقل أولاً', { show_alert: false }).catch(() => {});
+        return;
+      }
+
+      await this.settleBlastWin(ctx, state, { completed: false });
+    } catch (error) {
+      console.error('Error in handleBlastCashout:', error);
+      await ctx.reply('❌ حدث خطأ أثناء سحب الأرباح');
     }
   }
 

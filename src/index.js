@@ -2849,6 +2849,15 @@ bot.action(/game:bomb:ans:(\d+)/, (ctx) => {
   const answerIndex = parseInt(ctx.match[1], 10);
   NewGamesHandler.handleBombAnswer(ctx, answerIndex);
 });
+bot.action('game:blast', (ctx) => NewGamesHandler.handleBlastGame(ctx));
+bot.action(/game:blast:pick:(\d+)/, (ctx) => {
+  const cellIndex = parseInt(ctx.match[1], 10);
+  NewGamesHandler.handleBlastPick(ctx, cellIndex);
+});
+bot.action('game:blast:cashout', (ctx) => NewGamesHandler.handleBlastCashout(ctx));
+bot.action('game:blast:noop', async (ctx) => {
+  if (ctx.callbackQuery) await ctx.answerCbQuery().catch(() => {});
+});
 bot.action('game:cardbattle', (ctx) => NewGamesHandler.handleCardBattle(ctx));
 bot.action(/game:card:pick:(\d+)/, (ctx) => {
   const cardIndex = parseInt(ctx.match[1], 10);
