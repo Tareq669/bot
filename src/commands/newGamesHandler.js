@@ -3,29 +3,6 @@ const GameManager = require('../games/gameManager');
 const EconomyManager = require('../economy/economyManager');
 const { User } = require('../database/models');
 
-const BOMB_QUESTIONS = [
-  {
-    question: '\u0645\u0627 \u0646\u0627\u062a\u062c 7 + 8\u061f',
-    options: ['13', '14', '15', '16'],
-    correctIndex: 2
-  },
-  {
-    question: '\u0643\u0645 \u0639\u062f\u062f \u062d\u0631\u0648\u0641 \u0643\u0644\u0645\u0629 "\u0630\u0643\u0627\u0621"\u061f',
-    options: ['3', '4', '5', '6'],
-    correctIndex: 1
-  },
-  {
-    question: '\u0623\u064a \u0643\u0648\u0643\u0628 \u064a\u064f\u0639\u0631\u0641 \u0628\u0627\u0644\u0643\u0648\u0643\u0628 \u0627\u0644\u0623\u062d\u0645\u0631\u061f',
-    options: ['\u0627\u0644\u0645\u0634\u062a\u0631\u064a', '\u0627\u0644\u0645\u0631\u064a\u062e', '\u0639\u0637\u0627\u0631\u062f', '\u0627\u0644\u0632\u0647\u0631\u0629'],
-    correctIndex: 1
-  },
-  {
-    question: '\u0643\u0645 \u062b\u0627\u0646\u064a\u0629 \u0641\u064a \u0627\u0644\u062f\u0642\u064a\u0642\u0629\u061f',
-    options: ['30', '45', '60', '90'],
-    correctIndex: 2
-  }
-];
-
 const MIND_PUZZLES = [
   {
     question: '\u0634\u064a\u0621 \u0643\u0644\u0645\u0627 \u0623\u062e\u0630\u062a \u0645\u0646\u0647 \u0643\u0628\u0631\u060c \u0645\u0627 \u0647\u0648\u061f',
@@ -255,10 +232,11 @@ class NewGamesHandler {
 
   static formatBombText(question, secondsLeft) {
     return (
-      '\ud83d\udca3 <b>\u0644\u0639\u0628\u0629 \u062a\u0641\u0643\u064a\u0643 \u0627\u0644\u0642\u0646\u0628\u0644\u0629</b>\n\n' +
+      '\ud83d\udca3 <b>\u0644\u0639\u0628\u0629 \u0627\u062e\u062a\u064a\u0627\u0631 \u0627\u0644\u0633\u0644\u0643 \u0627\u0644\u0635\u062d\u064a\u062d</b>\n\n' +
       `\u23f3 \u0627\u0644\u0648\u0642\u062a \u0627\u0644\u0645\u062a\u0628\u0642\u064a: <b>${secondsLeft}</b> \u062b\u0627\u0646\u064a\u0629\n` +
-      '\u26a0\ufe0f \u0623\u062c\u0628 \u0628\u0633\u0631\u0639\u0629 \u0642\u0628\u0644 \u0627\u0644\u0627\u0646\u0641\u062c\u0627\u0631\n\n' +
-      `<b>\u0627\u0644\u0633\u0624\u0627\u0644:</b>\n${question.question}`
+      '\u26a0\ufe0f \u0633\u0644\u0643 \u0648\u0627\u062d\u062f \u0641\u0642\u0637 \u0647\u0648 \u0627\u0644\u0622\u0645\u0646\u060c \u0648\u0628\u0627\u0642\u064a \u0627\u0644\u0623\u0633\u0644\u0627\u0643 \u062a\u0641\u062c\u0651\u0631 \u0627\u0644\u0642\u0646\u0628\u0644\u0629.\n\n' +
+      `\ud83e\uddf5 \u0639\u062f\u062f \u0627\u0644\u0623\u0633\u0644\u0627\u0643: <b>${question.wires.length}</b>\n` +
+      '\u0627\u062e\u062a\u0631 \u0633\u0644\u0643\u0627\u064b \u0648\u0627\u062d\u062f\u0627\u064b \u0642\u0628\u0644 \u0627\u0646\u062a\u0647\u0627\u0621 \u0627\u0644\u0648\u0642\u062a.'
     );
   }
 
@@ -267,27 +245,32 @@ class NewGamesHandler {
       if (ctx.callbackQuery) await ctx.answerCbQuery();
       ctx.session = ctx.session || {};
 
-      const question = this.pickRandom(BOMB_QUESTIONS);
-      const baseReward = Math.floor(Math.random() * 16) + 15;
+      const wireCount = Math.floor(Math.random() * 4) + 3;
+      const safeWireIndex = Math.floor(Math.random() * wireCount);
+      const wires = Array.from({ length: wireCount }, (_, index) => ({
+        index,
+        label: `🧵 السلك ${index + 1}`
+      }));
+      const baseReward = 20 + (wireCount * 10);
       const endAt = Date.now() + 10_000;
 
       ctx.session.bombGame = {
         active: true,
-        question,
-        correctIndex: question.correctIndex,
+        question: { wires },
+        correctIndex: safeWireIndex,
         baseReward,
         endAt
       };
 
       this.clearBombTimer(ctx.from.id);
 
-      const rows = question.options.map((option, index) => [
-        Markup.button.callback(option, `game:bomb:ans:${index}`)
+      const rows = wires.map((wire, index) => [
+        Markup.button.callback(wire.label, `game:bomb:ans:${index}`)
       ]);
       rows.push([Markup.button.callback('\u2b05\ufe0f \u0631\u062c\u0648\u0639', 'menu:games')]);
       const keyboard = Markup.inlineKeyboard(rows);
 
-      await this.safeEditOrReply(ctx, this.formatBombText(question, 10), keyboard.reply_markup);
+      await this.safeEditOrReply(ctx, this.formatBombText({ wires }, 10), keyboard.reply_markup);
 
       const chatId = ctx.callbackQuery?.message?.chat?.id;
       const messageId = ctx.callbackQuery?.message?.message_id;
@@ -332,7 +315,7 @@ class NewGamesHandler {
     ctx.session.bombGame = null;
     this.clearBombTimer(ctx.from.id);
 
-    await GameManager.updateGameStats(ctx.from.id, '\u062a\u0641\u0643\u064a\u0643_\u0627\u0644\u0642\u0646\u0628\u0644\u0629', 'lost', 0);
+    await GameManager.updateGameStats(ctx.from.id, '\u0627\u0644\u0633\u0644\u0643_\u0627\u0644\u0635\u062d\u064a\u062d', 'lost', 0);
 
     const keyboard = Markup.inlineKeyboard([
       [Markup.button.callback('\ud83d\udd04 \u0645\u062d\u0627\u0648\u0644\u0629 \u062c\u062f\u064a\u062f\u0629', 'game:bomb')],
@@ -341,7 +324,7 @@ class NewGamesHandler {
 
     const text =
       '\ud83d\udca5 <b>\u0627\u0646\u062a\u0647\u0649 \u0627\u0644\u0648\u0642\u062a!</b>\n\n' +
-      `\u2705 \u0627\u0644\u0625\u062c\u0627\u0628\u0629 \u0627\u0644\u0635\u062d\u064a\u062d\u0629: <b>${state.question.options[state.correctIndex]}</b>`;
+      `\u2705 \u0627\u0644\u0633\u0644\u0643 \u0627\u0644\u0622\u0645\u0646 \u0643\u0627\u0646: <b>\u0627\u0644\u0633\u0644\u0643 ${Number(state.correctIndex) + 1}</b>`;
 
     if (chatId && messageId) {
       try {
@@ -376,9 +359,9 @@ class NewGamesHandler {
       const reward = isCorrect ? state.baseReward * 2 : 0;
       const result = isCorrect ? 'win' : 'lost';
 
-      await GameManager.updateGameStats(ctx.from.id, '\u062a\u0641\u0643\u064a\u0643_\u0627\u0644\u0642\u0646\u0628\u0644\u0629', result, reward);
+      await GameManager.updateGameStats(ctx.from.id, '\u0627\u0644\u0633\u0644\u0643_\u0627\u0644\u0635\u062d\u064a\u062d', result, reward);
       if (isCorrect && reward > 0) {
-        await EconomyManager.addCoins(ctx.from.id, reward, '\u0641\u0648\u0632 \u0641\u064a \u0644\u0639\u0628\u0629 \u062a\u0641\u0643\u064a\u0643 \u0627\u0644\u0642\u0646\u0628\u0644\u0629');
+        await EconomyManager.addCoins(ctx.from.id, reward, '\u0641\u0648\u0632 \u0641\u064a \u0644\u0639\u0628\u0629 \u0627\u0644\u0633\u0644\u0643 \u0627\u0644\u0635\u062d\u064a\u062d');
       }
 
       const keyboard = Markup.inlineKeyboard([
@@ -387,8 +370,8 @@ class NewGamesHandler {
       ]);
 
       const text = isCorrect
-        ? `\u2705 <b>\u062a\u0645 \u062a\u0641\u0643\u064a\u0643 \u0627\u0644\u0642\u0646\u0628\u0644\u0629!</b>\n\n\ud83d\udcb0 \u0627\u0644\u0645\u0643\u0627\u0641\u0623\u0629: <b>${reward}</b> \u0639\u0645\u0644\u0629`
-        : `\u274c <b>\u0625\u062c\u0627\u0628\u0629 \u062e\u0627\u0637\u0626\u0629</b>\n\n\u2705 \u0627\u0644\u0625\u062c\u0627\u0628\u0629 \u0627\u0644\u0635\u062d\u064a\u062d\u0629: <b>${state.question.options[state.correctIndex]}</b>`;
+        ? `\u2705 <b>\u0646\u062c\u0648\u062a!</b>\n\n\ud83e\uddf5 \u0627\u062e\u062a\u0631\u062a \u0627\u0644\u0633\u0644\u0643 \u0627\u0644\u0622\u0645\u0646\n\ud83d\udcb0 \u0627\u0644\u0645\u0643\u0627\u0641\u0623\u0629: <b>${reward}</b> \u0639\u0645\u0644\u0629`
+        : `\ud83d\udca3 <b>\u0627\u0646\u0641\u062c\u0631\u062a \u0627\u0644\u0642\u0646\u0628\u0644\u0629!</b>\n\n\u274c \u0627\u062e\u062a\u0631\u062a \u0627\u0644\u0633\u0644\u0643 \u0627\u0644\u062e\u0637\u0623\n\u2705 \u0627\u0644\u0633\u0644\u0643 \u0627\u0644\u0622\u0645\u0646 \u0643\u0627\u0646: <b>\u0627\u0644\u0633\u0644\u0643 ${Number(state.correctIndex) + 1}</b>`;
 
       await this.safeEditOrReply(ctx, text, keyboard.reply_markup);
     } catch (error) {

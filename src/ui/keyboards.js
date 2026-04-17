@@ -160,7 +160,7 @@ class UIManager {
         Markup.button.callback('🎲 رول النرد', 'game:dice')
       ],
       [
-        Markup.button.callback('\ud83d\udca3 \u062a\u0641\u0643\u064a\u0643 \u0627\u0644\u0642\u0646\u0628\u0644\u0629', 'game:bomb'),
+        Markup.button.callback('🧵 اختيار السلك', 'game:bomb'),
         Markup.button.callback('\ud83c\udccf \u0645\u0639\u0631\u0643\u0629 \u0627\u0644\u0628\u0637\u0627\u0642\u0627\u062a', 'game:cardbattle')
       ],
       [
