@@ -232,7 +232,10 @@ bot.use(async (ctx, next) => {
     !ctx.callbackQuery.data.startsWith('tops:') &&
     !ctx.callbackQuery.data.startsWith('bank:create:') &&
     !ctx.callbackQuery.data.startsWith('stars:') &&
-    !ctx.callbackQuery.data.startsWith('xo:')
+    !ctx.callbackQuery.data.startsWith('xo:') &&
+    !ctx.callbackQuery.data.startsWith('game:blast') &&
+    !ctx.callbackQuery.data.startsWith('game:card') &&
+    !ctx.callbackQuery.data.startsWith('game:mind')
   ) {
     await ctx.answerCbQuery('هذا الزر مخصص للمحادثة الخاصة.', { show_alert: false }).catch(() => {});
     return;
@@ -679,6 +682,9 @@ bot.command('gluck', (ctx) => GroupGamesHandler.handleLuckCommand(ctx));
 bot.command('gluckstats', (ctx) => GroupGamesHandler.handleLuckStatsCommand(ctx));
 bot.command('ggame', (ctx) => GroupGamesHandler.handleGameToggleCommand(ctx));
 bot.command('ggames', (ctx) => GroupGamesHandler.handleGamesHelp(ctx));
+bot.command('gblast', (ctx) => NewGamesHandler.handleBlastGame(ctx));
+bot.command('gcardbattle', (ctx) => NewGamesHandler.handleCardBattle(ctx));
+bot.command('gmind', (ctx) => NewGamesHandler.handleMindPuzzle(ctx));
 bot.command('gteam', (ctx) => GroupGamesHandler.handleTeamCommand(ctx));
 bot.command('gteams', (ctx) => GroupGamesHandler.handleTeamsCommand(ctx));
 bot.command('gtour', (ctx) => GroupGamesHandler.handleTournamentCommand(ctx));
@@ -712,11 +718,6 @@ bot.command('quran', (ctx) => MenuHandler.handleQuranMenu(ctx));
 bot.command('quotes', (ctx) => MenuHandler.handleQuotesMenu(ctx));
 bot.command('poetry', (ctx) => MenuHandler.handlePoetryMenu(ctx));
 bot.command('games', (ctx) => MenuHandler.handleGamesMenu(ctx));
-bot.command('bomb', (ctx) => NewGamesHandler.handleBombDefuse(ctx));
-bot.command('wire', (ctx) => NewGamesHandler.handleBombDefuse(ctx));
-bot.command('blast', (ctx) => NewGamesHandler.handleBlastGame(ctx));
-bot.command('cardbattle', (ctx) => NewGamesHandler.handleCardBattle(ctx));
-bot.command('mind', (ctx) => NewGamesHandler.handleMindPuzzle(ctx));
 bot.command('economy', (ctx) => MenuHandler.handleEconomyMenu(ctx));
 bot.command('stats', (ctx) => CommandHandler.handleStats(ctx));
 bot.command('rewards', (ctx) => CommandHandler.handleRewards(ctx));
@@ -2849,11 +2850,6 @@ bot.action(/game:quiz:(.+)/, (ctx) => {
 bot.action('game:dice', (ctx) => GameHandler.handleDice(ctx));
 bot.action('game:luck', (ctx) => GameHandler.handleLuck(ctx));
 bot.action('game:challenges', (ctx) => GameHandler.handleChallenges(ctx));
-bot.action('game:bomb', (ctx) => NewGamesHandler.handleBombDefuse(ctx));
-bot.action(/game:bomb:ans:(\d+)/, (ctx) => {
-  const answerIndex = parseInt(ctx.match[1], 10);
-  NewGamesHandler.handleBombAnswer(ctx, answerIndex);
-});
 bot.action('game:blast', (ctx) => NewGamesHandler.handleBlastGame(ctx));
 bot.action(/game:blast:pick:(\d+)/, (ctx) => {
   const cellIndex = parseInt(ctx.match[1], 10);
@@ -2925,10 +2921,6 @@ bot.hears('🛡️ حماية من الإساءة', (ctx) => MenuHandler.handleP
 bot.hears('🎨 توليد صورة', (ctx) => imageHandler.handleImageButton(ctx));
 bot.hears('🌤️ الطقس', (ctx) => ChatGamesUtilityHandler.handleWeatherText(ctx, ''));
 bot.hears('🕌 الأذان', (ctx) => ChatGamesUtilityHandler.handleAdhanText(ctx, ''));
-bot.hears(/^(?:اختيار\s*السلك|السلك\s*الصح(?:يح|يح)|wire|bomb)$/i, (ctx) => NewGamesHandler.handleBombDefuse(ctx));
-bot.hears(/^(?:زر\s*التفجير|لعبة\s*التفجير|blast)$/i, (ctx) => NewGamesHandler.handleBlastGame(ctx));
-bot.hears(/^(?:معركة\s*البطاقات|card\s*battle|cardbattle)$/i, (ctx) => NewGamesHandler.handleCardBattle(ctx));
-bot.hears(/^(?:ألغاز\s*الذكاء|لغز\s*ذكاء|mind)$/i, (ctx) => NewGamesHandler.handleMindPuzzle(ctx));
 bot.hears(/^اكس\s*اوه$/i, (ctx) => ChatGamesUtilityHandler.handleXoStart(ctx));
 bot.hears(/^طقس(?:\s+(.+))?$/i, (ctx) => ChatGamesUtilityHandler.handleWeatherText(ctx, ctx.match[1]));
 bot.hears(/^(?:اذان|أذان)(?:\s+(.+))?$/i, (ctx) => ChatGamesUtilityHandler.handleAdhanText(ctx, ctx.match[1]));
@@ -3210,6 +3202,9 @@ bot.hears(/^ملفي$/i, (ctx) => GroupGamesHandler.handleGroupProfileCommand(ct
 bot.hears(/^(?:سؤال\s*سريع|كويز)$/i, (ctx) => GroupGamesHandler.handleQuizCommand(ctx));
 bot.hears(/^(?:حساب\s*ذهني|مسألة)$/i, (ctx) => GroupGamesHandler.handleMathCommand(ctx));
 bot.hears(/^(?:ترتيب\s*كلمة|رتب\s*كلمة)$/i, (ctx) => GroupGamesHandler.handleWordCommand(ctx));
+bot.hears(/^(?:زر\s*التفجير|لعبة\s*التفجير|gblast|blast)$/i, (ctx) => NewGamesHandler.handleBlastGame(ctx));
+bot.hears(/^(?:معركة\s*البطاقات|gcardbattle|cardbattle)$/i, (ctx) => NewGamesHandler.handleCardBattle(ctx));
+bot.hears(/^(?:ألغاز\s*الذكاء|لغز\s*ذكاء|gmind|mind)$/i, (ctx) => NewGamesHandler.handleMindPuzzle(ctx));
 bot.hears(/^(?:تحدي\s*يومي|اليومي)$/i, (ctx) => GroupGamesHandler.handleDailyCommand(ctx));
 bot.hears(/^(?:اختيارات|اختبار)$/i, (ctx) => GroupGamesHandler.handleMcqCommand(ctx));
 bot.hears(/^ديني(?:\s+.+)?$/i, (ctx) => GroupGamesHandler.handleReligiousMcqCommand(ctx));
